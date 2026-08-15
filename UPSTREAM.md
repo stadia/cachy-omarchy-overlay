@@ -12,7 +12,7 @@ License: MIT — Copyright (c) David Heinemeier Hansson
     rm -rf vendor/omarchy
     git clone --depth 1 --branch quattro --filter=blob:none --sparse \
       https://github.com/basecamp/omarchy.git vendor/omarchy
-    git -C vendor/omarchy sparse-checkout set shell bin LICENSE
+    git -C vendor/omarchy sparse-checkout set --skip-checks shell bin LICENSE
     git -C vendor/omarchy checkout <Commit above>
 
 `vendor/omarchy/` is git-ignored and read-only. Never edit it. Bumping the pin
