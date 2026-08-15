@@ -1,0 +1,4 @@
+vendor/omarchy/
+*.log
+.coo-dev/
+.superpowers/
