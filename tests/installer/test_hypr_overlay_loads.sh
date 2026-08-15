@@ -77,7 +77,68 @@ run_case() {
   fi
 }
 
+# A managed block pointing at an overlay that does not exist must degrade, not
+# detonate: the rest of the user's config has to keep loading. The proof is a
+# marker written by the root config on the line AFTER the managed block, so it
+# can only appear if execution got past our block. This is the same technique
+# that catches a marker written in the wrong comment syntax.
+run_missing_overlay_case() {
+  local format=$1
+  local work="$COO_TEST_SANDBOX/hypr-missing-$format"
+  mkdir -p "$work"
+  local after="$work/after.marker"
+  local root overlay
+  # Deliberately never created.
+  overlay="$work/definitely-absent-overlay.$format"
+
+  if [[ $format == conf ]]; then
+    root="$work/root.conf"
+    printf 'monitor = HEADLESS-1, 1920x1080@60, 0x0, 1\n' > "$root"
+  else
+    root="$work/root.lua"
+    printf 'hl.monitor({ output = "HEADLESS-1", mode = "1920x1080@60", position = "0x0", scale = 1 })\n' > "$root"
+  fi
+
+  {
+    coo_hypr_marker_begin "$format"
+    coo_hypr_overlay_snippet "$format" "$overlay"
+    coo_hypr_marker_end "$format"
+  } >> "$root"
+
+  # Everything below here is user config that must survive our broken block.
+  if [[ $format == conf ]]; then
+    printf 'exec-once = printf after > %s ; hyprctl dispatch exit\n' "$after" >> "$root"
+  else
+    {
+      printf 'local f = io.open("%s", "w")\n' "$after"
+      printf 'if f then f:write("after") f:close() end\n'
+      printf 'hl.on("hyprland.start", function() hl.dispatch(hl.dsp.exit()) end)\n'
+    } >> "$root"
+  fi
+
+  env -u HYPRLAND_INSTANCE_SIGNATURE \
+      WLR_BACKENDS=headless WLR_RENDERER=pixman \
+      timeout 25s Hyprland -c "$root" > "$work/hyprland.log" 2>&1
+
+  assert_file_exists "$after" "$format config keeps loading past a missing overlay"
+  if [[ ! -f $after ]]; then
+    printf '      --- hyprland.log tail ---\n'
+    tail -20 "$work/hyprland.log" | sed 's/^/      /'
+  fi
+}
+
 run_case conf
 run_case lua
+run_missing_overlay_case conf
+run_missing_overlay_case lua
+
+# The Lua guard must stay diagnosable: doctor.sh keys off this tag. Silence
+# would satisfy "config keeps loading" while hiding a broken install.
+missing_lua_log="$COO_TEST_SANDBOX/hypr-missing-lua/hyprland.log"
+if [[ -f $missing_lua_log ]]; then
+  assert_contains "$(cat "$missing_lua_log")" \
+    "[$COO_NAME] overlay failed to load" \
+    "lua guard logs a tagged diagnostic when the overlay is missing"
+fi
 
 exit "$ASSERT_FAILURES"

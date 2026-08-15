@@ -58,9 +58,16 @@ source = /home/u/.config/cachy-omarchy-overlay/hypr/overlay.conf
 
 ```lua
 -- >>> cachy-omarchy-overlay >>>
-dofile("/home/u/.config/cachy-omarchy-overlay/hypr/overlay.lua")
+do
+  local ok, err = pcall(dofile, "/home/u/.config/cachy-omarchy-overlay/hypr/overlay.lua")
+  if not ok then io.stderr:write("[cachy-omarchy-overlay] overlay failed to load: " .. tostring(err) .. "\n") end
+end
 -- <<< cachy-omarchy-overlay <<<
 ```
+
+`dofile`을 `pcall`로 감싸는 이유는 §2.5에, 실패 신호를 남기는 이유는 §2.6에 있다.
+`do ... end`로 감싼 것은 `ok`, `err` 두 지역 변수가 사용자 청크의 이름 공간과
+지역 변수 한도(청크당 200개)를 잠식하지 않게 하기 위해서다.
 
 위 두 블록은 `tests/installer/test_hypr_overlay_loads.sh`가 통과시킨 것과 **글자 그대로 동일한**
 형태다. 경로만 실제 설치 경로로 치환된다.
@@ -134,6 +141,73 @@ $ ls VC_MARKER
 VC_MARKER        # 오버레이 안의 순수 Lua io.open 이 실행된 증거
 ```
 
+### 2.5 왜 `pcall`로 감싸는가 — 실패 심각도 동등성
+
+기준은 **`.conf`가 없는 파일을 `source` 했을 때의 동작**이다. 이것을 먼저 실측했다.
+
+```text
+$ cat boot.conf
+monitor = HEADLESS-1, 1920x1080@60, 0x0, 1
+source = <없는 파일>
+exec-once = printf after > CONF_AFTER ; hyprctl dispatch exit
+
+$ Hyprland -c boot.conf
+ERR ]: source= globbing error: found no match
+boot exit=0    CONF_AFTER: present
+```
+
+즉 `.conf`는 **오류를 로그에 남기되, 나머지 설정은 정상적으로 계속 로드한다.** 컴포지터는
+정상 기동하고 `exec-once`도 실행된다. (`--verify-config`는 종료 코드 `1`과 함께
+`Config error in file <root> at line N: source= globbing error: found no match`를 출력한다.)
+
+무방비한 `dofile`은 이 기준에 한참 못 미친다. Lua 오류는 **그 줄 이후 청크 전체를 중단**시키므로,
+관리 블록 아래에 있는 사용자 설정이 통째로 사라진다.
+
+```text
+cannot open <path>: No such file or directory
+stack traceback: [C]: in global 'dofile' / <root>:N: in main chunk
+```
+
+`SPEC.md` §5.1에 따라 사용자 설정이 권위를 가진다. 오버레이는 그 파일에 얹혀 사는 손님이며,
+**우리 디렉터리를 지웠다고 해서 사용자의 모니터·키바인딩·자동 실행이 죽어서는 안 된다.**
+`pcall`로 감싼 결과를 실측하면 `.conf`와 동등해진다.
+
+```text
+$ Hyprland -c boot.lua        # 관리 블록이 없는 오버레이를 가리킴
+[cachy-omarchy-overlay] overlay failed to load: cannot open <path>: No such file or directory
+boot exit=0    AFTER: present     # 관리 블록 '아래'의 사용자 설정이 정상 로드됨
+```
+
+한 가지 차이는 남는다. `.conf`는 이 상황에서 `--verify-config`를 실패(종료 코드 `1`)시키지만,
+`pcall`로 감싼 `.lua`는 `config ok`를 반환한다. 기준이 "`.conf`보다 나쁘지 않을 것"이므로 이는
+허용되지만, **`.lua` 설치에 대해서는 `--verify-config`만으로 오버레이 유실을 감지할 수 없다**는
+뜻이다. 감지는 §2.6의 신호로 한다.
+
+### 2.6 실패 신호와 `doctor.sh` 진단 방법
+
+`pcall`이 오류를 완전히 삼켜버리면 "관리 블록은 있는데 오버레이가 안 뜨는" 상태가 조용히
+방치된다. 그래서 실패는 반드시 **관측 가능한 흔적**을 남긴다. 선택한 신호는
+`COO_NAME`으로 태그된 stderr 한 줄이며, Hyprland 세션 로그로 들어간다.
+
+```text
+[cachy-omarchy-overlay] overlay failed to load: <Lua 오류 메시지>
+```
+
+`doctor.sh`(`SPEC.md` §22)는 다음 순서로 검사한다. 앞의 두 단계는 컴포지터가 없어도 되고
+파일시스템 확인만으로 끝나므로 가장 신뢰할 수 있다.
+
+1. **관리 블록 존재 여부** — 루트 설정에서 마커 본문 `>>> cachy-omarchy-overlay >>>`를 찾는다.
+   없으면 미설치 상태다.
+2. **오버레이 파일 존재 및 가독성** — 블록이 가리키는 경로를 `test -r`로 확인한다.
+   블록은 있는데 파일이 없으면 이것이 곧 진단이다. 로그를 볼 필요조차 없다.
+3. **파일은 있는데 로드에 실패한 경우** — 세션 로그에서 `[cachy-omarchy-overlay] overlay
+   failed to load` 문자열을 찾는다. 잡히면 뒤에 붙은 Lua 오류 메시지가 원인이다.
+4. **최종 확인** — `hyprctl binds -j`에 우리 바인딩이 있는지 본다. 없으면 어떤 이유로든
+   오버레이가 적용되지 않은 것이다.
+
+이 태그 문자열은 `tests/installer/test_hypr_overlay_loads.sh`가 실제 중첩 Hyprland 부팅에서
+검증한다. 문자열을 바꾸면 테스트가 깨지므로 `doctor.sh`와 조용히 어긋날 수 없다.
+
 ---
 
 ## 3. 멱등성 규칙
@@ -150,6 +224,12 @@ VC_MARKER        # 오버레이 안의 순수 Lua io.open 이 실행된 증거
 문자열로 수행할 수 있다. 다만 **다시 쓸 때는 반드시 해당 포맷의 마커를 써야 한다.** `.conf`에서
 `.lua`로 마이그레이션한 사용자의 파일에 `#` 마커가 남아 있을 수 있으므로, 스캔은 두 도입부를 모두
 인식하고 출력은 항상 현재 포맷에 맞춰야 한다.
+
+**§2.5의 `pcall` 가드를 도입해도 이 성질은 그대로 유지된다.** 가드가 바꾼 것은 마커 *사이의
+본문*뿐이고 마커 자체는 건드리지 않았다. 블록 본문이 `.conf`는 한 줄, `.lua`는 네 줄로
+서로 달라졌지만, 멱등성 규칙은 애초에 본문을 읽지 않는다 — 시작 마커부터 종료 마커까지를
+통째로 치환할 뿐이다. 따라서 **단일 스캔 규칙은 그대로다.** 이것이 마커와 본문을 분리해 둔
+이유이기도 하다. 앞으로 블록 본문이 또 바뀌어도 멱등성 로직은 손댈 필요가 없다.
 
 관리 블록 밖의 사용자 설정은 절대 건드리지 않는다. 실질적인 내용은 전부 프로젝트가 소유한
 `overlay.conf` / `overlay.lua` 안에 들어가며, 루트 설정에 남는 것은 위의 세 줄뿐이다.
@@ -272,24 +352,27 @@ hyprctl binds -j   ->  키 조합 (권위 있음, 항상 정확)
 
 이번 스파이크에서 결론을 내지 못했거나, 설치기 설계 단계에서 반드시 결정해야 하는 항목들이다.
 
-1. **오버레이 파일이 사라졌을 때의 동작 — 두 포맷 모두 설정 오류가 된다.** 사용자가
-   `~/.config/cachy-omarchy-overlay`를 수동으로 지우고 루트 설정의 관리 블록은 남겨두는 상황이다.
-   실측 결과는 다음과 같다.
+1. ~~**오버레이 파일이 사라졌을 때 `dofile`을 방어할 것인가.**~~ — **결정 완료.**
+   방어한다. 상세는 §2.5 / §2.6에 있고, 요약은 다음과 같다.
 
-   ```text
-   .conf:  Config error in file <root> at line N: source= globbing error: found no match
-           (--verify-config 종료 코드 1. 오류가 해당 줄에 국한되고 파싱은 계속된다.)
+   결정 근거는 실패 심각도 동등성이다. `.conf`가 없는 파일을 `source` 하면 로그에
+   `source= globbing error: found no match`를 남기고 **나머지 설정은 정상 로드된다**(실측:
+   컴포지터 정상 기동, `exec-once` 실행됨). 무방비한 `dofile`은 Lua 오류로 **그 줄 이후 청크
+   전체를 중단**시키므로 이 기준에 못 미친다. `SPEC.md` §5.1이 사용자 설정에 권위를 주는 이상,
+   우리 디렉터리를 지운 것이 사용자의 모니터·키바인딩을 죽이는 결과로 이어져서는 안 된다.
 
-   .lua:   cannot open <path>: No such file or directory
-           stack traceback: [C]: in global 'dofile' / <root>:N: in main chunk
-           (--verify-config 종료 코드 1. Lua 오류이므로 그 줄 이후의 청크 전체가 중단된다.)
-   ```
+   채택한 형태는 `pcall(dofile, ...)`을 `do ... end`로 감싸고, 실패 시 `COO_NAME`으로 태그된
+   한 줄을 stderr에 남기는 것이다. 완전한 침묵은 "블록은 있는데 오버레이가 안 뜨는" 상태를
+   조용히 방치하므로 배제했다. `doctor.sh` 검사 절차는 §2.6에 있다.
 
-   관리 블록을 항상 파일 **끝**에 두는 현재 규칙 덕분에 실제로 유실되는 설정은 없다. 하지만
-   `.lua` 쪽 실패 양상이 더 나쁘고(청크 중단 + traceback), 사용자에게는 오류 오버레이만 보인다.
-   현재 스니펫은 무방비한 `dofile("...")`이다. 방어 코드
-   (`local ok = pcall(dofile, "...")` 또는 `loadfile`로 존재 여부 확인)를 넣을지 결정해야 한다.
-   넣는다면 §2.2의 블록 본문이 바뀌므로 문서와 테스트를 함께 고쳐야 한다.
+   이 결정은 **task-3-brief.md가 명시한 `dofile("%s")` 축자 값을 의도적으로 덮어쓴 것**이며,
+   조정자(coordinator)의 재정에 따른다. `coo_hypr_overlay_snippet lua`의 반환값이 바뀌었으므로
+   `tests/installer/test_hypr_detect.sh`의 단언도 부분 문자열 검사가 아니라 블록 전문에 대한
+   정확 비교로 교체했다.
+
+   남은 판단 여지: 경로에 `"`나 `\`가 들어 있으면 생성되는 Lua 문자열 리터럴이 깨진다.
+   `.conf`의 `source =`도 같은 종류의 취약점을 갖는다. 실무상 거의 없는 경우라 이번 범위에서는
+   이스케이프를 넣지 않았으나, 설치기가 임의 경로를 받게 되면 처리해야 한다.
 
 2. **`unbind`의 Lua 대응.** `hl.unbind(key)`는 API에 존재하지만, `dofile`로 로드된 오버레이가
    루트 설정보다 **먼저** 실행된다면 아직 만들어지지 않은 바인딩을 해제하려 드는 셈이 된다.
@@ -300,12 +383,30 @@ hyprctl binds -j   ->  키 조합 (권위 있음, 항상 정확)
    그대로 남는다. 제거 경로가 두 파일을 모두 정리해야 하는지, 아니면 감지된 현재 루트 설정만
    책임지는지 정해야 한다.
 
-4. **중첩 Hyprland 테스트의 백엔드.** `WLR_BACKENDS=headless WLR_RENDERER=pixman`은 wlroots
-   시절 환경 변수이며, **aquamarine 백엔드를 쓰는 0.56.2에서는 아무 효과가 없다.** 중첩
-   인스턴스는 실제로는 Wayland 백엔드로 뜨며(`Output WAYLAND-1`), 그 전에 DRM 백엔드를 먼저
-   시도했다가 `libseat: failed to open a seat`으로 실패한다. 테스트는 통과하지만, 사용자 데스크톱에
-   창이 잠깐 뜬다. aquamarine에는 `AQ_FORCE_BACKEND` 같은 변수가 없다(`AQ_DRM_DEVICES`,
-   `AQ_NO_ATOMIC` 등만 존재). CI에서 헤드리스로 돌릴 방법을 따로 찾아야 한다.
+4. **중첩 Hyprland 테스트는 현재 헤드리스가 아니다 — CI 자동화 시 반드시 걸린다.**
+   `tests/installer/test_hypr_overlay_loads.sh`는 `WLR_BACKENDS=headless WLR_RENDERER=pixman`을
+   설정하지만, 이 둘은 **wlroots 시절 환경 변수**이고 Hyprland 0.56.2는 **aquamarine** 백엔드를
+   쓴다. 따라서 **두 변수 모두 아무 효과가 없다.** 실제 동작은 이렇다.
+
+   ```text
+   ERR from aquamarine ]: libseat: failed to open a seat      # DRM 백엔드 시도 → 실패
+   ERR from aquamarine ]: DRM Backend failed
+   DEBUG from aquamarine ]: Output WAYLAND-1: ...             # Wayland 백엔드로 폴백
+   ```
+
+   즉 중첩 인스턴스는 **사용자 세션 안에 실제 Wayland 창을 띄운다.** 테스트는 통과하고 세션에
+   해를 끼치지도 않지만, 실행 중 데스크톱에 창이 잠깐 나타난다. 그리고 **`WAYLAND_DISPLAY`가
+   없는 헤드리스 CI 러너에서는 폴백할 대상이 없으므로 이 테스트는 그대로 실패한다.**
+
+   aquamarine에는 백엔드를 강제하는 변수가 없다. 라이브러리에 존재하는 `AQ_*` 변수 전체는
+   `AQ_DRM_DEVICES`, `AQ_FORCE_LINEAR_BLIT`, `AQ_LIBINPUT_NO_PLUGINS`, `AQ_MGPU_NO_EXPLICIT`,
+   `AQ_NO_ATOMIC`, `AQ_NO_MODIFIERS`, `AQ_TRACEH`뿐이다.
+
+   CI를 붙이는 사람에게 주는 지침: **`--verify-config`만으로도 `.lua` 경로는 완전히 검증된다.**
+   `--verify-config`는 컴포지터를 띄우지 않으면서 Lua 설정을 실제로 실행하기 때문이다(§2.4에서
+   `VC_MARKER`로 확인). 컴포지터 부팅이 꼭 필요한 것은 `.conf`의 `exec-once` 증명뿐이므로,
+   헤드리스 환경에서는 그 부분만 분리해 건너뛰거나 대체 수단을 찾으면 된다. 별도의 중첩
+   compositor(`cage`, `wlheadless-run` 등)를 쓰는 방법도 검토 대상이다.
 
 5. **`--verify-config`를 설치 후 검증에 쓸 것.** `Hyprland --verify-config -c <path>`는 컴포지터를
    띄우지 않고 설정을 파싱해 `config ok` 또는 구체적인 오류 메시지를 출력한다. §2.3의 마커 버그를
@@ -320,3 +421,16 @@ hyprctl binds -j   ->  키 조합 (권위 있음, 항상 정확)
 6. **`~` 확장과 `$XDG_CONFIG_HOME`.** `coo_detect_hypr_config()`는 `$XDG_CONFIG_HOME`(미설정 시
    `$HOME/.config`)만 본다. Hyprland 자체가 `-c`나 `HYPRLAND_CONFIG` 환경 변수로 다른 경로를
    가리킬 수 있는데, 이 경우를 감지할지 여부는 미정이다.
+
+7. **이 문서에서 한 번 틀렸다가 실측으로 바로잡은 항목 두 가지.** 뒤에 이 문서를 읽는 사람이
+   같은 추측을 반복하지 않도록 남긴다. 둘 다 "그럴 것 같다"로 적었다가 실제로 돌려보고
+   반대 결과를 얻은 경우다.
+
+   | 처음 적었던 추측 | 실측 결과 |
+   |---|---|
+   | `--verify-config`는 파싱 실패해도 종료 코드 `0`을 반환한다 | **틀림.** 정상 `0`, 파싱 실패 `1`로 신뢰할 수 있다. (앞서 파이프 뒤 `tail`의 종료 코드를 잘못 읽은 것이었다.) |
+   | `.conf`의 `source =`는 대상 파일이 없어도 경고만 내고 넘어가므로, 위험은 `.lua` 전용이다 | **틀림.** 두 포맷 모두 오류로 처리된다. 진짜 차이는 심각도가 아니라 **실패 범위**다 — `.conf` 오류는 해당 줄에 국한되고, Lua 오류는 그 줄 이후 청크 전체를 중단시킨다. 이 구분이 §2.5의 동등성 기준을 정했다. |
+
+   교훈: Hyprland의 동작은 **문서나 직관이 아니라 `--verify-config`와 중첩 인스턴스로 확인**해야
+   한다. 이 스파이크에서 나온 세 가지 실질적 발견(`#` 마커 문법, `hl.exec_once` 부재,
+   `dofile` 가드 필요성) 전부가 추측이 아니라 실행에서 나왔다.

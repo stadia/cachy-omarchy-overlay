@@ -51,17 +51,35 @@ coo_hypr_marker_begin() { _coo_hypr_marker "$COO_MARKER_BEGIN" "$1"; }
 coo_hypr_marker_end()   { _coo_hypr_marker "$COO_MARKER_END" "$1"; }
 
 # The body of the managed block. Callers wrap it in COO_MARKER_BEGIN/END.
-# dofile is used for Lua rather than require because it takes a filesystem
-# path directly and does not depend on package.path, which Hyprland controls.
+#
+# dofile is used for Lua rather than require because it takes a filesystem path
+# directly and does not depend on package.path, which Hyprland controls.
 # Verified against Hyprland 0.56.2: the Lua config VM is stock Lua 5.5 with
 # dofile/loadfile/require present, and package.path is rooted at the directory
 # of the root config only -- an out-of-tree overlay is not reachable via
 # require. See docs/HYPRLAND_INTEGRATION.md.
+#
+# The dofile is wrapped in pcall to match what Hyprland already does for a
+# `source =` pointing at a missing file: measured on 0.56.2, that logs
+# "source= globbing error: found no match" and the rest of the config loads
+# normally. A bare dofile would instead abort the remaining chunk with a Lua
+# traceback, so deleting our directory would take down the user's monitors and
+# keybindings. SPEC.md 5.1: the user's config is authoritative, we are a guest.
+#
+# The failure is deliberately NOT silent -- it writes a line tagged with
+# COO_NAME to stderr, which lands in Hyprland's session log. doctor.sh keys off
+# that tag. The `do ... end` block keeps our two locals out of the user's chunk.
 coo_hypr_overlay_snippet() {
   local format=$1 path=$2
   case $format in
     conf) printf 'source = %s\n' "$path" ;;
-    lua)  printf 'dofile("%s")\n' "$path" ;;
+    lua)
+      printf '%s\n' \
+        'do' \
+        "  local ok, err = pcall(dofile, \"$path\")" \
+        "  if not ok then io.stderr:write(\"[$COO_NAME] overlay failed to load: \" .. tostring(err) .. \"\\n\") end" \
+        'end'
+      ;;
     *)    die "unknown Hyprland config format: $format" ;;
   esac
 }

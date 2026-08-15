@@ -19,7 +19,13 @@ have_cmd definitely-not-a-real-command-xyz && ok=0 || ok=1
 assert_eq "$ok" "1" "have_cmd missing"
 
 # The upstream pin must be an exact SHA, never a branch name.
-pin=$(grep -oE '^Commit: [0-9a-f]{40}$' "$REPO_ROOT/UPSTREAM.md" || true)
+# The line is still anchored at both ends and still requires exactly 40 hex
+# characters, so a changed, truncated or malformed SHA fails loudly. It only
+# tolerates trailing whitespace: UPSTREAM.md is prose, and two trailing spaces
+# are a Markdown hard line break -- valid, invisible in an editor, and
+# reintroduced by any future edit or translation pass.
+pin=$(grep -oE '^Commit: [0-9a-f]{40}[[:space:]]*$' "$REPO_ROOT/UPSTREAM.md" || true)
+pin=${pin%"${pin##*[![:space:]]}"}
 assert_eq "$pin" "Commit: b724f7615630d7a7aca76dce070d469f43a3bfec" "upstream pin"
 
 exit "$ASSERT_FAILURES"

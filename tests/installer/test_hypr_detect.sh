@@ -29,9 +29,22 @@ assert_eq "$conf_snip" \
   'source = /home/u/.config/cachy-omarchy-overlay/hypr/overlay.conf' \
   "conf snippet"
 
+# The Lua snippet's contract is the whole block, not just "contains dofile":
+# a bare dofile of a missing file aborts the user's entire config, so the
+# guard, the scoping `do ... end`, and the diagnosable tagged stderr line are
+# all part of what this function promises. Assert the exact text.
 lua_snip=$(coo_hypr_overlay_snippet lua "/home/u/.config/cachy-omarchy-overlay/hypr/overlay.lua")
-assert_contains "$lua_snip" 'dofile(' "lua snippet uses dofile"
+expected_lua_snip=$(printf '%s\n' \
+  'do' \
+  '  local ok, err = pcall(dofile, "/home/u/.config/cachy-omarchy-overlay/hypr/overlay.lua")' \
+  '  if not ok then io.stderr:write("[cachy-omarchy-overlay] overlay failed to load: " .. tostring(err) .. "\n") end' \
+  'end')
+assert_eq "$lua_snip" "$expected_lua_snip" "lua snippet is a guarded, diagnosable dofile"
+
+# The pieces the above depends on, called out so a failure says which promise broke.
+assert_contains "$lua_snip" 'pcall(dofile, ' "lua snippet guards dofile with pcall"
 assert_contains "$lua_snip" '/home/u/.config/cachy-omarchy-overlay/hypr/overlay.lua' "lua snippet path"
+assert_contains "$lua_snip" "[$COO_NAME] overlay failed to load" "lua snippet failure is diagnosable"
 
 # Markers are comment syntax, and Lua's comment is '--', not '#'. A '#' marker
 # anywhere but line 1 of a .lua config is "unexpected symbol near '#'" and
