@@ -115,3 +115,27 @@ coo_is_arch_family() {
   id_like=$(. /etc/os-release && printf '%s' "${ID_LIKE:-}")
   [[ $id == arch || $id == cachyos || $id_like == *arch* ]]
 }
+
+# Quickshell ships both `qs` and `quickshell` on Arch (on this machine `qs` is
+# in fact a symlink to `quickshell`, verified with `readlink -f`), but `qs` is
+# the name used throughout upstream docs and is what Task 5/6/7 build their
+# invocations around, so it is tried first. See docs/QUICKSHELL_API.md for the
+# full verified CLI surface.
+coo_quickshell_bin() {
+  local candidate
+  for candidate in qs quickshell; do
+    if command -v "$candidate" >/dev/null 2>&1; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# `qs --version` prints e.g. "Quickshell 0.3.0 (revision , distributed by Arch
+# Linux)" -- extract just the dotted version so callers can compare it without
+# parsing the surrounding prose.
+coo_quickshell_version() {
+  local bin; bin=$(coo_quickshell_bin) || return 1
+  "$bin" --version 2>&1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n1
+}
