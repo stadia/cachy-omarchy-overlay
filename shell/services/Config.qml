@@ -18,7 +18,12 @@ Item {
     var parts = String(path || "").split(".")
     var node = root.data
     for (var i = 0; i < parts.length; i++) {
-      if (node === null || node === undefined || !(parts[i] in node))
+      // A string/number/boolean leaf reached before the path is exhausted
+      // must degrade to fallback here, before the `in` check below -- `in`
+      // throws TypeError when applied to a primitive. The `typeof` guard
+      // catches string/number/boolean, but NOT null (typeof null ===
+      // "object" in JS), so the explicit null check stays as its own arm.
+      if (node === null || node === undefined || typeof node !== "object" || !(parts[i] in node))
         return fallback
       node = node[parts[i]]
     }
