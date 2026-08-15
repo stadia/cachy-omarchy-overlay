@@ -173,7 +173,7 @@ stack traceback: [C]: in global 'dofile' / <root>:N: in main chunk
 `pcall`로 감싼 결과를 실측하면 `.conf`와 동등해진다.
 
 ```text
-$ Hyprland -c boot.lua        # 관리 블록이 없는 오버레이를 가리킴
+$ Hyprland -c boot.lua        # 관리 블록이 존재하지 않는 오버레이 파일을 가리킴
 [cachy-omarchy-overlay] overlay failed to load: cannot open <path>: No such file or directory
 boot exit=0    AFTER: present     # 관리 블록 '아래'의 사용자 설정이 정상 로드됨
 ```
@@ -250,10 +250,49 @@ modmask, key, keycode, locked, release, repeat, mouse,
 longPress, non_consuming, catch_all, submap, submap_universal
 ```
 
+**측정 방법.** `.lua` 쪽 수치는 이 머신의 실제 세션에서 얻었다. `.conf` 쪽은 세션이 없으므로,
+중첩 인스턴스를 `.conf`로 띄우고 그 안에서 `exec-once`로 `hyprctl binds -j`를 실행해 얻었다.
+`exec-once`는 중첩 인스턴스 내부에서 실행되므로 사용자 세션을 건드리지 않는다. 이 측정은
+`tests/installer/test_hypr_overlay_loads.sh`의 `run_conf_binds_introspection_case()`로
+상시 검증된다.
+
+두 포맷에서 동일함을 실측으로 확인한 항목: `modmask`(`SUPER` → `64`, `SUPER SHIFT` → `65`),
+`key`, `repeat`(`binde` → `true`), `release`(`bindr` → `true`), `locked`(`bindl` → `true`),
+`mouse`(`bindm` → `true`).
+
 ### 4.2 `.conf` 설정에서 추가로 알 수 있는 것
 
 `.conf` 설정에서는 `dispatcher`, `arg`, 그리고 (`bindd`를 쓴 경우) `description`까지 쓸 만한
 값이 나온다. 즉 `.conf`만 놓고 보면 `hyprctl binds -j` 하나로 뷰어를 만들 수 있다.
+
+아래는 중첩 `.conf` 인스턴스에서 실제로 받은 출력이다(관련 필드만 추림). 입력 설정은
+`$mainMod = SUPER` 와 `bind` / `binde` / `bindr` / `bindd` 각 한 줄이다.
+
+```json
+{"modmask": 64, "key": "Return",   "dispatcher": "exec",      "arg": "ghostty",         "description": "",                "repeat": false, "release": false}
+{"modmask": 64, "key": "minus",    "dispatcher": "layoutmsg", "arg": "splitratio -0.1", "description": "",                "repeat": true,  "release": false}
+{"modmask": 64, "key": "SUPER_L",  "dispatcher": "exec",      "arg": "echo released",   "description": "",                "repeat": false, "release": true}
+{"modmask": 64, "key": "K",        "dispatcher": "exec",      "arg": "coo-keybindings", "description": "Show keybindings", "repeat": false, "release": false}
+```
+
+확인된 사실:
+
+- `dispatcher`는 `exec`, `layoutmsg` 같은 **실제 디스패처 이름**이다. `.lua`가 반환하는
+  `"__lua"` 자리표시자가 아니다.
+- `arg`는 실행 가능한 인자 문자열 그대로이며, **`$mainMod` 같은 설정 변수는 이미 해석된
+  상태**다. 파서가 변수를 다시 풀 필요가 없다.
+- `bindd`의 설명은 `description`에 그대로 살아서 나오고 `has_description`이 `true`가 된다.
+  `bindd`를 쓰지 않은 항목은 빈 문자열이다.
+
+즉 §4.4의 조인이 `.conf`에서는 사실상 필요 없다. 조인이 반드시 필요한 쪽은 `.lua`다.
+
+> **부수적 발견 — `splitratio`는 더 이상 디스패처가 아니다.** 처음 이 측정을 할 때
+> `binde = $mainMod, minus, splitratio, -0.1`을 넣었더니 해당 바인딩이 결과에서 통째로
+> 사라졌다. 로그에는 `ERR ]: Invalid dispatcher: splitratio`가 남아 있었다. 0.56.2에서
+> 살아 있는 형태는 `layoutmsg, splitratio -0.1`이다. `tests/fixtures/hypr/simple.conf`도
+> 이에 맞춰 고쳤다. **잘못된 디스패처는 경고만 남기고 조용히 무시되므로**, 파서가
+> 설정 파일에서 읽어낸 바인딩이 `hyprctl binds`에는 없을 수 있다. §4.4의 "설명하지 못한
+> 바인딩도 버리지 않는다" 규칙의 역방향 사례다.
 
 ### 4.3 `.lua` 설정에서는 동작을 알 수 없다
 
@@ -370,9 +409,22 @@ hyprctl binds -j   ->  키 조합 (권위 있음, 항상 정확)
    `tests/installer/test_hypr_detect.sh`의 단언도 부분 문자열 검사가 아니라 블록 전문에 대한
    정확 비교로 교체했다.
 
-   남은 판단 여지: 경로에 `"`나 `\`가 들어 있으면 생성되는 Lua 문자열 리터럴이 깨진다.
-   `.conf`의 `source =`도 같은 종류의 취약점을 갖는다. 실무상 거의 없는 경우라 이번 범위에서는
-   이스케이프를 넣지 않았으나, 설치기가 임의 경로를 받게 되면 처리해야 한다.
+   **경로 이스케이프도 처리 완료.** 처음에는 "실무상 드문 경우"로 보고 미뤘으나, 검토에서
+   지적받고 재평가한 결과 **가드가 막으려던 바로 그 실패 양상**이라 범위에 넣었다. 근거는
+   이렇다. 경로에 `"`나 `\`가 들어가면 그것은 오버레이 로드 실패가 아니라 **관리 블록 자체의
+   문법 오류**이고, **`pcall`은 이것을 잡을 수 없다.** `pcall`은 로드를 감싸지, 자신이 들어
+   있는 청크의 파싱을 감쌀 수 없기 때문이다. 실측하면 차이가 분명하다.
+
+   ```text
+   이스케이프 없음:  luac: unesc.lua:2: ')' expected near 'ird'     (청크 전체 파싱 실패)
+   이스케이프 적용:  (exit 0)                                        정상
+   ```
+
+   즉 이스케이프를 빼면 §2.5에서 세운 "`.conf`보다 나쁘지 않을 것" 기준이 그대로 깨진다.
+   `.conf`의 `source =`는 같은 경로에서 훨씬 부드럽게 실패하기 때문이다. `_coo_lua_escape()`가
+   `\` → `\\`, `"` → `\"`, 개행 → `\n` 순서로 치환한다(역슬래시를 먼저 처리하지 않으면 뒤에
+   추가한 이스케이프를 다시 이스케이프하게 된다). `"`와 `\`를 모두 담은 경로에 대해
+   `luac -p`로 실제 문법 검사까지 하는 단언이 `test_hypr_detect.sh`에 있다.
 
 2. **`unbind`의 Lua 대응.** `hl.unbind(key)`는 API에 존재하지만, `dofile`로 로드된 오버레이가
    루트 설정보다 **먼저** 실행된다면 아직 만들어지지 않은 바인딩을 해제하려 드는 셈이 된다.

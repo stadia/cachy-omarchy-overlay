@@ -39,11 +39,18 @@ coo_hypr_config_format() {
 # "unexpected symbol near '#'" (verified with Hyprland 0.56.2 --verify-config).
 # Only the comment lead-in changes; the marker payload stays byte-identical in
 # both formats so the installer's idempotency scan remains a single rule.
+#
+# An unknown format is fatal rather than defaulting to conf. Callers emit the
+# begin marker BEFORE the body, so silently falling back to '#' would write a
+# Lua-invalid line into the user's config and only then die on the body -- a
+# half-written managed block that breaks the config, which is the exact failure
+# this whole module exists to prevent. Fail before the first byte is written.
 _coo_hypr_marker() {
   local marker=$1 format=$2
   case $format in
-    lua) printf -- '--%s\n' "${marker#\#}" ;;
-    *)   printf '%s\n' "$marker" ;;
+    lua)  printf -- '--%s\n' "${marker#\#}" ;;
+    conf) printf '%s\n' "$marker" ;;
+    *)    die "unknown Hyprland config format: $format" ;;
   esac
 }
 
@@ -69,14 +76,31 @@ coo_hypr_marker_end()   { _coo_hypr_marker "$COO_MARKER_END" "$1"; }
 # The failure is deliberately NOT silent -- it writes a line tagged with
 # COO_NAME to stderr, which lands in Hyprland's session log. doctor.sh keys off
 # that tag. The `do ... end` block keeps our two locals out of the user's chunk.
+#
+# The path is escaped for a Lua double-quoted string literal. This is not
+# cosmetic: a bare " or \ in the path is a SYNTAX error in the emitted block,
+# and pcall cannot catch that -- pcall guards the load, not the parse of the
+# chunk containing it. So an unescaped path fails as a whole-config abort,
+# strictly worse than `source =` degrades, which would break the failure-parity
+# rule established in docs/HYPRLAND_INTEGRATION.md 2.5. Backslash must be
+# replaced first or it would double-escape the quotes added after it.
+_coo_lua_escape() {
+  local s=$1
+  s=${s//\\/\\\\}     # \  -> \\
+  s=${s//\"/\\\"}     # "  -> \"
+  s=${s//$'\n'/\\n}   # LF -> \n  (a raw newline is also a syntax error)
+  printf '%s' "$s"
+}
+
 coo_hypr_overlay_snippet() {
   local format=$1 path=$2
   case $format in
     conf) printf 'source = %s\n' "$path" ;;
     lua)
+      local esc; esc=$(_coo_lua_escape "$path")
       printf '%s\n' \
         'do' \
-        "  local ok, err = pcall(dofile, \"$path\")" \
+        "  local ok, err = pcall(dofile, \"$esc\")" \
         "  if not ok then io.stderr:write(\"[$COO_NAME] overlay failed to load: \" .. tostring(err) .. \"\\n\") end" \
         'end'
       ;;

@@ -127,18 +127,63 @@ run_missing_overlay_case() {
   fi
 }
 
+# docs/HYPRLAND_INTEGRATION.md 4.2 claims a .conf config yields a usable
+# dispatcher, arg and bindd description from `hyprctl binds -j`, whereas a .lua
+# config reports dispatcher "__lua" with an opaque arg. The .lua half was
+# measured on the live session; this measures the .conf half rather than
+# inheriting it, because Milestone 6's whole viewer design rests on it.
+#
+# hyprctl runs inside the nested instance via exec-once, so it reads that
+# instance's own binds. It never addresses the user's session.
+run_conf_binds_introspection_case() {
+  local work="$COO_TEST_SANDBOX/hypr-binds-conf"
+  mkdir -p "$work"
+  local out="$work/binds.json"
+  local root="$work/root.conf"
+
+  {
+    printf 'monitor = HEADLESS-1, 1920x1080@60, 0x0, 1\n'
+    printf '$mainMod = SUPER\n'
+    printf 'bind = $mainMod, Return, exec, ghostty\n'
+    printf 'binde = $mainMod, minus, layoutmsg, splitratio -0.1\n'
+    printf 'bindr = $mainMod, SUPER_L, exec, echo released\n'
+    printf 'bindd = $mainMod, K, Show keybindings, exec, coo-keybindings\n'
+    printf 'exec-once = hyprctl binds -j > %s ; hyprctl dispatch exit\n' "$out"
+  } > "$root"
+
+  env -u HYPRLAND_INSTANCE_SIGNATURE \
+      timeout 25s Hyprland -c "$root" > "$work/hyprland.log" 2>&1
+
+  assert_file_exists "$out" "conf instance produced hyprctl binds output"
+  local j; j=$(cat "$out" 2>/dev/null)
+
+  # A real dispatcher name, not the "__lua" placeholder a Lua config reports.
+  assert_contains "$j" '"dispatcher": "exec"' "conf binds report a real dispatcher"
+  # The real argument, with $mainMod-style variables already resolved.
+  assert_contains "$j" '"arg": "ghostty"' "conf binds report a usable arg"
+  # bindd's description survives all the way to hyprctl.
+  assert_contains "$j" '"description": "Show keybindings"' "conf bindd description surfaces"
+  assert_contains "$j" '"has_description": true' "conf bindd sets has_description"
+  # Flags shared with the .lua path.
+  assert_contains "$j" '"repeat": true' "binde sets repeat"
+  assert_contains "$j" '"release": true' "bindr sets release"
+  assert_contains "$j" '"modmask": 64' "SUPER decodes to modmask 64 in conf too"
+}
+
 run_case conf
 run_case lua
 run_missing_overlay_case conf
 run_missing_overlay_case lua
+run_conf_binds_introspection_case
 
 # The Lua guard must stay diagnosable: doctor.sh keys off this tag. Silence
 # would satisfy "config keeps loading" while hiding a broken install.
+# No `if` around this: a conditional would let the assertion vanish silently if
+# the log ever stopped being produced, turning a real regression into a pass.
 missing_lua_log="$COO_TEST_SANDBOX/hypr-missing-lua/hyprland.log"
-if [[ -f $missing_lua_log ]]; then
-  assert_contains "$(cat "$missing_lua_log")" \
-    "[$COO_NAME] overlay failed to load" \
-    "lua guard logs a tagged diagnostic when the overlay is missing"
-fi
+assert_file_exists "$missing_lua_log" "missing-overlay lua run produced a log"
+assert_contains "$(cat "$missing_lua_log" 2>/dev/null)" \
+  "[$COO_NAME] overlay failed to load" \
+  "lua guard logs a tagged diagnostic when the overlay is missing"
 
 exit "$ASSERT_FAILURES"
