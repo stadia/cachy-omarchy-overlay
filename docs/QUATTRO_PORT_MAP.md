@@ -139,20 +139,30 @@ This is a hard load failure at line 5, before a single property is evaluated.
 **What "singleton" means for a consumer that tries a relative-path import
 instead.** The obvious workaround — replacing `import qs.Commons` with
 `import "../../Commons"` — does not work, and its failure mode is the
-dangerous kind:
+dangerous kind.
+
+> **Evidence boundary.** Everything above this point was executed on this
+> machine and its output pasted verbatim. Everything in the two bullets below is
+> **inferred**, not demonstrated: it follows from QML's documented
+> `pragma Singleton` / `qmldir` semantics and from upstream's own comment quoted
+> immediately after, but we did not build a fixture that exhibits the
+> silently-empty-copy behaviour. Treat the conclusion as sound and the
+> mechanism as unverified. §8 tracks this as an open question.
 
 - `Border.qml`, `Color.qml`, `Style.qml` and `Util.qml` each begin with
   `pragma Singleton`. A `pragma Singleton` type is only usable as a singleton
   when a `qmldir` declares it with the `singleton` keyword under a module URI.
-  A bare relative-directory import gives the consumer the *component*, not the
-  engine-managed instance, so `Style.space(4)` has no object to resolve against.
+  A bare relative-directory import should therefore give the consumer the
+  *component*, not the engine-managed instance, leaving `Style.space(4)` with no
+  object to resolve against.
 - Where a relative import does yield something usable, the QML engine treats
-  each import path as its own type registration. Two files importing the same
-  directory by relative path get **separate instances** with separate state.
-  For `Color` and `Style`, whose entire content is loaded asynchronously from
-  disk (`FileView` on `colors.toml` / `shell.toml`, `Process` on `hyprctl`),
-  a second instance means a second, never-populated copy: every colour reads
-  its hardcoded fallback and every metric its default. Nothing throws.
+  each import path as its own type registration, so two files importing the same
+  directory by relative path should get **separate instances** with separate
+  state. For `Color` and `Style`, whose entire content is loaded asynchronously
+  from disk (`FileView` on `colors.toml` / `shell.toml`, `Process` on `hyprctl`),
+  a second instance would mean a second, never-populated copy: every colour
+  reading its hardcoded fallback and every metric its default, with nothing
+  thrown.
 
 Upstream states this explicitly at `shell/shell.qml:14-17`, and it is the single
 most load-bearing sentence in the tree for our own design:
@@ -316,7 +326,7 @@ polls `opened`. Everything else is optional. The concrete API list is §5.
 | `manifest.json` | plugin metadata file | `id: omarchy.menu`, `kinds: ["menu","bar-widget"]`, `keepLoaded: true`, `entryPoints.menu: Menu.qml`. Consumed by the upstream plugin registry, which v0.1 does not have (SPEC.md §27.2 ships no plugin system) | DROP |
 | `BarWidget.qml` | plugin entry point | 24 lines; a bar button that shells out to `omarchy-shell shell toggle` and `xdg-terminal-exec`. We ship no bar | DROP |
 | `omarchy-shell` | IPC transport | `bin/omarchy-shell`; requires `$OMARCHY_PATH`, wraps `qs ipc -n -p "$OMARCHY_PATH/shell" call`. Our own launcher CLI replaces it | REWRITE |
-| `IpcHandler` | Quickshell type | `shell.qml:872`, `target: "shell"`, exposing `summon`/`hide`/`toggle`/`call`. The mechanism is fine; the target surface is ours to define | KEEP |
+| `IpcHandler` | Quickshell type | Used widely upstream; the one that matters here is `shell.qml:872`, `target: "shell"`, exposing `summon`/`hide`/`toggle`/`call`. (`shell.qml:821` declares a second, `target: "image-selector"`, and other plugins declare their own.) The mechanism is fine; the target surface is ours to define | KEEP |
 | `colors.toml` | theme input | `~/.local/state/omarchy/current/theme/colors.toml`; foundational palette read by `Color.qml` | DROP |
 | `shell.toml` | theme input | `~/.local/state/omarchy/current/theme/shell.toml` plus `~/.config/omarchy/shell.toml`; per-surface colour roles, spacing scale, font scale, border tokens | DROP |
 | `shell.json` | host config | `$OMARCHY_PATH/config/omarchy/shell.json` and `~/.config/omarchy/shell.json`; plugin enablement and bar layout, read by `shell.qml`, not by the menu | DROP |
@@ -332,8 +342,11 @@ Everything else in the starter table survived verification. Three "Used for"
 descriptions were wrong and are corrected above:
 
 - `Quickshell.Io` was described as supplying `IpcHandler`. `Menu.qml` contains
-  no `IpcHandler`; the only one in the tree is `shell.qml:872`. The menu uses
-  `Process`, `SplitParser` and `FileView` from that module.
+  no `IpcHandler` — `grep -rn IpcHandler shell/` returns none for the menu
+  plugin, two in `shell.qml` (`:821` `target: "image-selector"` and `:872`
+  `target: "shell"`), and a dozen more across other plugins. The menu uses
+  `Process`, `SplitParser` and `FileView` from that module. What matters for the
+  port is that IPC is purely a host concern for this plugin.
 - `Util` was described as providing `decodeBase64`. `Menu.qml` never calls it
   (it calls `shellQuote`, `alpha`, `execDetached`, `editsFilter`,
   `editedFilter`).
@@ -463,9 +476,9 @@ change; DROP = the ported menu does not need it.
 | §26 entry | Needed by the ported menu | Detail | Verdict |
 |---|---|---|---|
 | `Theme.color(name)` | yes | 11 names: the 7 `menu.*` roles `Menu.qml` reads (`background`, `text`, `border`, `scrim`, `selectedBackground`, `selectedText`, `selectedBorder`) plus `foreground`, `background`, `accent` and `urgent`, which `ConfirmDialog` reads for its destructive button | KEEP |
-| `Theme.metric(name)` | yes | 17 tokens, of which 16 are plain lookups: `gapsOut`, `cornerRadius`, `spacing.xs`, `spacing.md`, `spacing.hairline`, `spacing.panelPadding`, `spacing.rowPaddingX`, `spacing.controlPaddingY`, `font.menuFamily`, `font.caption`, `font.bodySmall`, `font.body`, `font.title`, `font.heading`, `font.displayLarge`, `font.iconLarge`, plus a border width for `ConfirmDialog` | KEEP |
+| `Theme.metric(name)` | yes | 17 names. `Menu.qml` uses 17 distinct `Style` tokens (§3), of which 16 are plain name lookups: `gapsOut`, `cornerRadius`, `spacing.xs`, `spacing.md`, `spacing.hairline`, `spacing.panelPadding`, `spacing.rowPaddingX`, `spacing.controlPaddingY`, `font.menuFamily`, `font.caption`, `font.bodySmall`, `font.body`, `font.title`, `font.heading`, `font.displayLarge`, `font.iconLarge`. The 17th, `space(px)`, is a function and is not a `metric(name)` at all — see gap 1 in §5.1. `ConfirmDialog` adds one further name, `normalBorderWidth`, bringing the metric surface to 16 + 1 = 17 names | KEEP |
 | `Shell.close(pluginId)` | partly | `Menu.qml` never calls it — it closes itself by setting `opened = false`, and the host notices by polling `opened` (`shell.qml:505`). The host still needs the inverse direction: a `close()` call into the menu. Keep the entry, and pair it with a readable `opened` | REWRITE |
-| `Shell.exec(command)` | yes | 4 sites: `Util.execDetached` for every action row (`Menu.qml:141`) and the two dmenu result writes (`130`, `132`). Fire-and-forget with no output is the correct shape for these | KEEP |
+| `Shell.exec(command)` | yes | 3 sites: `Util.execDetached` for every action row (`Menu.qml:141`) and the two dmenu result writes (`130`, `132`). Fire-and-forget with no output is the correct shape for these. The other two command sites (`346`, `972`) need output captured and belong to gap 2 in §5.1, not here | KEEP |
 | `AppIndex.query(text)` | yes, but insufficient alone | The Apps submenu needs `sortedEntries("")` plus, per entry, `id`, `icon`, `keywords`, `entryName`, `entrySubtext`; and beyond querying it needs `iconSource(icon)`, `launch(appId,label)`, `remove(appId,label)`, `refreshIcons()` and an `appsChanged` signal | REWRITE |
 | `CommandIndex.query(text)` | no | The menu is its own index. Items come from the merged JSONC tree and all matching, scoring and ordering happen inside `MenuModel.js` (`matchesQuery`, `searchScore`, `termInSearchWords`, `descriptionTextMatches`). A separate command index is a launcher concern, not a menu one | DROP |
 | `Config.get(path)` | yes | The menu's own configurable inputs are few: the menu definition path, the default font family, and (if we keep it) the user extension path | KEEP |
@@ -476,8 +489,11 @@ Six gaps. Each is a documented compatibility API to add per SPEC.md §26's
 "otherwise add a documented compatibility API; add a test":
 
 1. **`Theme.space(px)` — a scaling function, not a name.** 30 of the 60 `Style.`
-   references are `Style.space(n)` with 20 distinct literals, which upstream
-   multiplies by a spacing scale. A `metric(name)` lookup cannot express it.
+   references are `Style.space(n)`: 18 distinct call forms, being 16 numeric
+   literals plus two computed arguments (`Style.space(root.dmenuWidth)` and
+   `Style.space(root.dmenuMaxHeight)`, which alone rule out a lookup table),
+   all of which upstream multiplies by a spacing scale. A `metric(name)` lookup
+   cannot express it.
 2. **A capturing command runner.** Three `Process` blocks need something
    `Shell.exec` does not give: streamed stdout (`SplitParser`), an exit code,
    and the ability to be superseded. `providerProc` (`881`) collects provider
@@ -557,3 +573,23 @@ from §3 or when a row carries an invalid verdict. Bumping the pin in
 `UPSTREAM.md` will fail that test until this document is re-verified against the
 new tree. The test skips (exit 0, with an explicit message) when
 `vendor/omarchy/` is absent, since it is git-ignored by design.
+
+### Open questions
+
+1. **The relative-import failure mode in §2.1 is inferred, not demonstrated.**
+   The module-not-installed failure was executed and pasted verbatim; the two
+   bullets describing what a relative-path import does instead rest on QML's
+   documented singleton semantics plus upstream's comment at `shell.qml:14-17`.
+   Demonstrating it needs a small QML fixture: two consumer files importing one
+   `pragma Singleton` directory by relative path, asserting they observe separate
+   state. Milestone 1's service design depends on the conclusion, so if that
+   design is to be justified by test rather than by reading, this fixture is the
+   test to write.
+2. **`powerprofilesctl` resolves but does not run on this machine**
+   (`ModuleNotFoundError: No module named 'gi'`, see §4). Whether that is a
+   host-specific gap or a general CachyOS one is unresolved, and Milestone 4
+   should confirm before treating the power-profiles provider as available.
+3. **`Style.font.menuFamily` vs `Style.font.family`.** `Menu.qml` reads the
+   former, `ConfirmDialog` the latter, and upstream resolves both through the
+   same fontconfig path. Whether our theme layer keeps two font slots or collapses
+   them into one is a Milestone 2 decision, not settled here.
