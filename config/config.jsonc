@@ -1,0 +1,19 @@
+{
+  // Schema version of this file, bumped only by a migration.
+  "schemaVersion": 1,
+  "version": "0.1.0-dev",
+
+  "launcher": {
+    "maxResults": 50
+  },
+
+  "keybindings": {
+    // Maximum recursion depth for Hyprland `source =` following (SPEC 16.5).
+    "sourceMaxDepth": 20
+  },
+
+  "logging": {
+    // "off" | "error" | "info" | "debug". Never logs search text (SPEC 29).
+    "level": "error"
+  }
+}
