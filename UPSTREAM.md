@@ -13,7 +13,7 @@
 | Source license | MIT (Copyright David Heinemeier Hansson) |
 | Packaging recipes | https://github.com/omacom-io/omarchy-pkgs (`pkgbuilds/omarchy`, `pkgbuilds/omarchy-settings`) @ `7e448b90313fea4fb78da9a78607287691d3b241` |
 | Known compatibility patches | none |
-| Last tested CachyOS environment | CachyOS, kernel 7.1.8-1-cachyos, Hyprland 0.56.2, Quickshell 0.3.0. `omarchy`/`omarchy-settings` 미설치. **M2 라이브 기동 검증 완료** — 패키지 미설치 상태에서 빌드 산출물 추출 트리로 R01(기동)·R02(IPC ping) 실측 통과. |
+| Last tested CachyOS environment | CachyOS, kernel 7.1.8-1-cachyos, Hyprland 0.56.2, Quickshell 0.3.0. `omarchy`/`omarchy-settings` 미설치. **M2** R01·R02. **M3** R03–R06 (`omarchy.menu` 토글·Escape·더미 앱 실행). 패치 수 none. |
 
 체크아웃 `version` 파일은 `4.0.0.alpha`다. 공식 패키지 `pkgver`와 태그 `v4.0.0`을 권위로 쓴다.
 
@@ -43,7 +43,7 @@
 
 CachyOS에서 `omarchy.menu`를 쓰려면 공식 OS가 아니라 **핀된 런타임 트리 + Quickshell + `OMARCHY_PATH` + IPC 래퍼**면 된다. 공식 `omarchy` 패키지는 그 트리에 `omarchy-settings`·부트로더·SDDM을 묶으므로 설치하지 않는다.
 
-## Known limitations (M2 기준, 미해결)
+## Known limitations (M2·M3, 미해결)
 
 상세와 실측 근거는 `docs/RUNTIME_STARTUP.md` §6.
 
@@ -54,3 +54,4 @@ CachyOS에서 `omarchy.menu`를 쓰려면 공식 OS가 아니라 **핀된 런타
   미설치 시 1초마다 WARN 반복. `PKGBUILD depends` 누락(§28).
 - **`graphical-session.target` 비활성** — `uwsm` 부재로 유닛 자동 시작 안 함(§17 미검증).
 - **패키지 미설치 상태에서만 검증** — 실설치 경로(`/usr/share/cachy-omarchy/upstream`)는 M5.
+- **M3 런처** — 원본 `omarchy.menu` IPC. `uwsm-app` WRAPPER 있음. SUPER+K 는 M4.

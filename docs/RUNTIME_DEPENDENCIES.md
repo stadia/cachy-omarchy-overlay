@@ -24,7 +24,7 @@
 | `perl` | 공식 PKGBUILD 주석만 | CachyOS `perl` | DISABLE for M1 | installed | yes | 핀된 스크립트는 bash | NONE — **M2 실측: 기동 경로에서 미사용**(기동 로그에 perl 관련 WARN 없음). 헬퍼 전용이면 M3+에서 재측정 |
 | `jq` | 다수 헬퍼 | CachyOS `jq` | OPTIONAL | yes | yes for menu open | 메뉴는 QML이 JSONC 파싱 | NONE — **M2 실측: 기동 경로 미사용**(WARN 없음). 헬퍼/메뉴 동작은 M3+ |
 | `gum` | 다수 헬퍼 TUI | CachyOS `gum` | OPTIONAL | yes | yes for menu open | 없음 | NONE — **M2 실측: 기동 경로 미사용**(WARN 없음). TUI 헬퍼는 M4 키바인딩 UI |
-| `uwsm` / `uwsm-app` | `AppLibrary.launch`: `uwsm-app -- gtk-launch <id>.desktop` | 공식 depends | OPTIONAL | **미설치(실측)** | 가능 | `gtk-launch` 또는 `xdg-open` | WRAPPER — **이 호스트에 uwsm 없음**(`pacman -Q uwsm` → 없음). M3 앱 실행은 `gtk-launch` 위임 compat 필요 예상 |
+| `uwsm` / `uwsm-app` | `AppLibrary.launch`: `uwsm-app -- gtk-launch <id>.desktop` | 공식 depends | OPTIONAL | **미설치(실측)** | 가능 | `gtk-launch` | WRAPPER — **M3 실측**: `overlay/compat/bin/uwsm-app` 이 `--` 뒤 나머지를 `exec`. 셸 프로세스 PATH 에만 붙음(§45) |
 | `inotifywait` / `inotify-tools` | `services/PluginRegistry.qml:638` `localPluginWatcher` 가 `~/.config/omarchy/plugins` 감시 | CachyOS `inotify-tools` | **REQUIRED(정상 기동) / OPTIONAL(기능)** | **미설치(실측)** | no(로그 정상화 시) | 없음 — 없으면 1초마다 WARN 반복 | NONE — **M2 실측으로 신규 추가**. `PKGBUILD depends` 누락. 기능은 정상이나 로그 스팸 → `depends` 에 `inotify-tools` 추가 권장 |
 | `gtk-launch` | 앱 실행 | `glib2` | REQUIRED for app launch | yes | no | `gio launch` | NONE or WRAPPER |
 | `systemd --user` | 우리 유닛 계획 | systemd | REQUIRED for M2 | yes | no | 수동 기동 | WRAPPER |
@@ -81,5 +81,5 @@ qs ipc -n -p "$OMARCHY_PATH/shell" call -- shell toggle omarchy.menu '{"menu":"r
   1초마다 재시작하며 WARN 을 반복. 기능은 정상(37개 플러그인 등록)이나 정상 기동(로그 정숙)을
   위해 `REQUIRED`. **`PKGBUILD depends=('quickshell' 'hyprland')` 에 `inotify-tools` 추가 권장**
   (M7 신뢰성 마일스톤 전, 또는 M3 전). 추론 아닌 실측.
-- **`uwsm` 미설치 확정** — `pacman -Q uwsm` 없음. M3 앱 실행은 `gtk-launch` 위임 compat 예상.
+- **`uwsm` 미설치 확정** — `pacman -Q uwsm` 없음. M3 는 `overlay/compat/bin/uwsm-app` WRAPPER 로 `gtk-launch` 위임 (R06 마커 실측).
 - **`omarchy.osd` 기동 불필요 확정** — 비활성 상태로 기동 정상. 상세는 `PLUGIN_AUDIT.md`.

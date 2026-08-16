@@ -1,10 +1,10 @@
 # Quattro 셸 기동 계약
 
-> Milestone 2 산출물. 패키징된 업스트림 Omarchy Quattro 셸을 CachyOS에서
-> 기동시키기 위해 **실측으로 확정한** 계약. 구현 세션이 Task 5 라이브 기동으로
-> 얻은 관측값에 근거하며, 측정한 것과 추론한 것을 구분해 적는다.
+> Milestone 2 기동 계약 + Milestone 3 런처 실측. 패키징된 업스트림 Omarchy
+> Quattro 셸을 CachyOS에서 기동·토글하기 위해 **실측으로 확정한** 계약.
+> 측정한 것과 추론한 것을 구분해 적는다.
 >
-> 스펙: `SPEC.md` (Spec 1.0) §13·§14·§15·§16·§17·§44·§45·§48·§55.
+> 스펙: `SPEC.md` (Spec 1.0) §13–§17·§19·§20·§42.3·§43–§45·§48(R01–R06)·§55·§56.
 > 핀: `upstream.lock` — Omarchy 4.0.0 @ `f0020448ca87329199de7cb12f2015ebc4a3e5e7`.
 
 ---
@@ -15,7 +15,7 @@
 
 ```bash
 export OMARCHY_PATH=/usr/share/cachy-omarchy/upstream
-# compat shim 디렉터리가 존재할 때만 PATH 앞에 붙인다 (현재는 비어 있음, §4).
+# compat shim 디렉터리가 존재할 때만 PATH 앞에 붙인다 (M3: uwsm-app, §4).
 [[ -d /usr/lib/cachy-omarchy/compat/bin ]] && export PATH="/usr/lib/cachy-omarchy/compat/bin:$PATH"
 
 exec env QS_DISABLE_FILE_WATCHER=1 QS_NO_RELOAD_POPUP=1 \
@@ -149,11 +149,15 @@ Task 5 라이브 기동에서 **실제로 필요했던** `omarchy-*` compat shim
   직접 만들어 우회했으므로, 그 shim 이 기동에 필요했는지는 **미확인** (M3 메뉴
   토글에서 재측정).
 
-따라서 `overlay/compat/bin/` 은 비어 있는 채로 둔다(§44: 로그가 요구하지 않은 shim
-은 만들지 않는다). shim 이 필요해지면 그 명령만 추가한다.
+**기동 경로**의 `omarchy-*` shim 은 여전히 없다. `overlay/compat/bin/` 에 넣는 것은
+로그/소스가 요구한 명령만이다(§44).
 
-> **추론 표시**: "기동에 shim 불필요" 는 측정이다. "omarchy-toggle-bar 가 기동에
-> 필요한지" 는 우회했으므로 미확인이다 — M3 에서 다시 본다.
+**M3 앱 실행 경로**에서 `AppLibrary.launch` 가 `uwsm-app -- gtk-launch` 를 부른다.
+이 호스트에 `uwsm-app` 이 없어 `overlay/compat/bin/uwsm-app` WRAPPER 를 추가했다
+(`exec "$@"` 만, gtk-launch 재구현 아님). compat PATH 는 `cachy-omarchy-shell --run`
+이 셸 프로세스에만 붙인다(§45). 기동 자체는 이 shim 없이 통과한다.
+
+> **측정**: 기동에 `omarchy-*` shim 불필요. 메뉴 앱 실행에 `uwsm-app` WRAPPER 필요.
 
 ---
 
@@ -181,9 +185,10 @@ case $output in
 esac
 ```
 
-> **미확인**: 이 오류 문자열들은 실행 중인 셸이 있어야 재현되는 영역이다. 본 정적
-> 검수에서는 계획/래퍼의 주장으로 남겨둔다. **M3 에서 실측 문자열과 일치하는지 반드시
-> 확인할 것.** 매칭이 빗나가면 IPC 실패가 exit 0 으로 조용히 통과한다(silent success).
+> **측정 (M3 Task 1)**: 실행 중인 추출 트리에서 원본 `qs ipc` 는
+> `Target not found.` / `Function not found.` 를 **stdout + exit 0** 으로 낸다.
+> 마침표 포함, 래퍼 `case` 와 바이트 일치. `cachy-omarchy-shell` 은 둘 다 exit 1
+> 로 승격한다. 래퍼 수정 없음.
 
 ### 타임아웃 분류
 
@@ -221,31 +226,43 @@ esac
 4. **사용자 `~/.config/omarchy/shell.json` 오버라이드** — §2. 우리 기본값이 통째로
    무시될 수 있음. 감지·경고는 M7 doctor 후보.
 
-5. **`uwsm` 부재** — `pacman -Q uwsm` → 미설치(실측). `AppLibrary.launch` 가
-   `uwsm-app -- gtk-launch` 를 쓴다(M0 감사). 이 호스트엔 `gtk-launch` 만 있다.
-   M3 앱 실행에서 compat 래퍼가 필요할 가능성 높음(`WRAPPER`, `REIMPLEMENT` 아님).
+5. **`uwsm` 부재** — `pacman -Q uwsm` → 미설치(실측). M3 에서
+   `overlay/compat/bin/uwsm-app` WRAPPER 를 추가해 `gtk-launch` 로 위임.
+   `REIMPLEMENT` 아님. 셸 프로세스 PATH 에만 붙음.
 
 6. **패키지 미설치 상태에서만 검증** — 본 M2 검증은 빌드 산출물을 임시 디렉터리에
    추출해 그 트리를 띄운 것으로, `/usr/share/cachy-omarchy/upstream` 에 실제 설치된
    상태는 아니다. 실설치 경로 검증은 M5.
 
-7. **IPC 오류 문자열 미실측** — §5. M3 에서 확인.
+7. **IPC 오류 문자열** — §5. M3 에서 `Target not found.` / `Function not found.`
+   실측 완료. 미실측이 아님.
 
 ---
 
-## 7. M3 를 위한 다음 단계
+## 7. M3 결과
 
-`shell toggle omarchy.menu` 를 부르기 전에 확인할 것:
+브랜치 `feature/spec-1.0-m3`. 메뉴 UI 재구현 없음. 패치 수 0. Waybar 보존은
+성공으로 선언하지 않음(한계 1).
 
-1. **메뉴가 이미 로드됨은 확인됨** — §3에서 `omarchy.menu` 등록·firstParty·비활성 목록
-   부재를 실측. M3는 토글 IPC만 추가하면 된다.
-2. **`cachy-omarchy-launcher` 래퍼** — `cachy-omarchy-shell --ipc shell toggle omarchy.menu
-   '{"menu":"root"}'` 를 감싼 얇은 래퍼. IPC 재발명 금지(§15).
-3. **앱 실행 compat** — `uwsm-app` 부재(§6 한계 5). `overlay/compat/bin/uwsm-app`
-   shim 이 `gtk-launch` 로 위임하는지 M3에서 실측 후 결정. 로그가 요구할 때만.
-4. **IPC 오류 문자열 실측** — §5 함정의 `case` 패턴이 실제 quickshell 출력과 일치하는지
-   M3에서 확인. 빗나가면 silent success 위험.
-5. **메뉴 명령 감사** — 메뉴에서 보이는 `omarchy-*` 명령을
-   `SAFE`/`ADAPTED`/`DISABLED` 로 분류(§42.3, §43). 위험 명령은 비활성.
-6. **바 억제 결정 시점** — M5 `cachy-omarchy-init` 작업과 묶어 결정. M3 데모는
-   샌드박스/임시 `bar-off` 로 우회 가능하나, 실설치는 한계 1 해결이 선행.
+| 수용 | 실측 |
+| --- | --- |
+| R03 | `listPlugins` 에서 `omarchy.menu` kinds `menu,bar-widget` |
+| R04 | `cachy-omarchy-launcher` 후 `hyprctl layers` 의 `omarchy-menu` 기하 (예: 3072×1728 @ 0,0). IPC 불린만으로 렌더를 주장하지 않음 |
+| R05 | `wtype -k Escape` 후 `omarchy-menu` layer 소멸 |
+| R06 | 샌드박스 더미 `.desktop` → AppLibrary `uwsm-app -- gtk-launch` → 마커 파일 |
+
+구현:
+
+- `overlay/bin/cachy-omarchy-launcher` — `--ipc shell toggle omarchy.menu '{"menu":"root"}'`
+- `overlay/compat/bin/uwsm-app` — `--` 뒤 `exec "$@"`
+- `overlay/bin/cachy-omarchy-bindings` + `overlay/hypr/bindings.{conf,lua}` —
+  SUPER+SPACE. 충돌 시 기본은 미주입. `hyprctl reload` 없음. SUPER+K 는 주석 자리(M4)
+- `docs/COMMAND_AUDIT.md` 전수 표 160행. ADAPTED 3 (`omarchy-shell`,
+  `omarchy-menu-keybindings`, `omarchy-restart-shell`). 나머지 DISABLED/disable.
+  비활성 경로 = 공식 bin 미설치 + when 가드. JSONC 패치 없음
+
+### M4 다음 단계
+
+`omarchy-menu-keybindings` / SUPER+K (`SPEC.md` §57·§72). 바인딩 파일의 주석
+자리를 활성화하고, 업스트림 시각을 우선한다. `gum`/`jq` 의존은 키바인드 UI 에서
+재측정.
