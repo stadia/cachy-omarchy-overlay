@@ -15,11 +15,11 @@
 | Source license | MIT (Copyright David Heinemeier Hansson) |
 | Packaging recipes | https://github.com/omacom-io/omarchy-pkgs (`pkgbuilds/omarchy`, `pkgbuilds/omarchy-settings`) @ `7e448b90313fea4fb78da9a78607287691d3b241` |
 | Known compatibility patches | none |
-| Last tested CachyOS environment | CachyOS, kernel 7.1.8-1-cachyos, Hyprland 0.56.2, Quickshell 0.3.0. `omarchy`/`omarchy-settings` 미설치. **M2** R01·R02. **M3** R03–R06 (`omarchy.menu` 토글·Escape·더미 앱 실행). 패치 수 none. |
+| Last tested CachyOS environment | CachyOS, kernel 7.1.8-1-cachyos, Hyprland 0.56.2, Quickshell 0.3.0. `omarchy`/`omarchy-settings` 미설치. **M2** R01·R02. **M3** R03–R06 (`omarchy.menu` 토글·Escape·더미 앱 실행). **2026-08-17** 실 시스템 승인 검증: 실제 `pacman -U` 설치, `cachy-omarchy-init` 을 사용자 실제 Hyprland 설정에 실행(충돌 감지·주입 거부), 실제 rollback `4.0.0-2 → 4.0.0-1`, `devtools` chroot 에서 clean build 성공. 상세는 `docs/RUNTIME_STARTUP.md` §12. 패치 수 none. |
 
 체크아웃 `version` 파일은 `4.0.0.alpha`다. 공식 패키지 `pkgver`와 태그 `v4.0.0`을 권위로 쓴다.
 
-## Components packaged (M1–M5, `pacman -U` 실설치는 아직 검증 안 함)
+## Components packaged (M1–M5; `pacman -U` 실설치는 2026-08-17 검증됨 — `docs/RUNTIME_STARTUP.md` §12)
 
 두 패키지로 나뉜다. `cachy-omarchy-shell` 은 핀된 업스트림 트리를, `cachy-omarchy-overlay`
 는 CachyOS 통합(공개 명령·compat shim·유저 유닛·기본값)을 소유한다. 서로 다른 산출물이며

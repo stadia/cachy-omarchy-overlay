@@ -444,6 +444,11 @@ $ systemctl --user list-unit-files | grep -i cachy-omarchy
 
 ### 9.5 미검증 항목
 
+> **2026-08-17 갱신:** 아래 1·3·4 항목은 §12 에서 실 시스템으로 검증됐다. 이 목록은
+> Milestone 5 종료 시점의 기록으로 보존하며, 현재 상태는 §12 와
+> `docs/RC_GAP_INVENTORY.md` 를 권위로 삼는다. 2(키 주입)와 5(스킵 false-green)는
+> 여전히 유효하다.
+
 Milestone 5 종료 시점까지 실측하지 못한 것을 명시한다:
 
 1. **실제 `pacman -U` 설치.** 본 태스크의 검증은 `bsdtar` 로 임시 디렉터리에 두 패키지를
@@ -604,9 +609,13 @@ installed-manifest 심볼릭 링크는 부재가 아니라 손상 상태다.
 임시 소스는 실행 후 제거한다. `tests/package/test_clean_build.sh`가 fake
 `makechrootpkg`로 해당 운반과 아카이브 감사를 실측한다.
 
-이 호스트에는 `makechrootpkg`, `archbuild`, `devtools`가 없고 준비된 chroot도 없다.
-따라서 실제 clean chroot 패키지 빌드는 **미검증**이다 — fake 운반 테스트가 실제
-chroot나 `makepkg -i`가 실행됐다는 주장이 아니다.
+> **2026-08-17 갱신:** 이 문단은 M7 종료 시점의 기록이다. 이후 `devtools 1:1.5.1-1`
+> 을 설치하고 실제 chroot 에서 `build-packages --clean` 을 성공시켰다 — §12.5 참조.
+> 다만 `--nodeps` 때문에 의존 선언의 충분성은 여전히 이 경로로 검증되지 않는다.
+
+M7 종료 시점 기록: 이 호스트에는 `makechrootpkg`, `archbuild`, `devtools`가 없고 준비된
+chroot도 없었다. 따라서 당시 실제 clean chroot 패키지 빌드는 **미검증**이었다 — fake
+운반 테스트가 실제 chroot나 `makepkg -i`가 실행됐다는 주장이 아니다.
 
 ### 11.3 R01–R10 런타임 증거
 
@@ -646,3 +655,115 @@ fail-closed로 유지되고 doctor가 이를 FAIL로 보고하며 이후 install
 설치 대상이 아니다. `docs/RC_GAP_INVENTORY.md`가 SPEC §61의 권위 체크리스트다 —
 모든 기준을 `측정됨`, `추론됨`, `미검증`으로 표시하고 해당 테스트를 연결한다. 위의
 미검증 항목은 릴리스 갭이지 완료된 수용이 아니다.
+
+---
+
+## 12. 실 시스템 승인 검증 (2026-08-17)
+
+사용자 승인 아래 실제 CachyOS 호스트에서 SPEC §61의 미검증 3항목을 재현했다.
+sudo 가 필요한 명령은 전부 사용자가 직접 실행했고, 서브에이전트는 실행하지 않았다.
+
+### 12.1 실행 환경과 사전 스냅샷
+
+CachyOS, Hyprland 0.56.2 실행 중, Quickshell 0.3.0. 시작 시점에 `cachy-omarchy-*`
+두 패키지와 `omarchy`/`omarchy-settings` 모두 미설치, 오버레이가 소유할 11개 경로
+전부 부재, `~/.config/cachy-omarchy/`·`~/.local/state/omarchy/` 부재,
+`~/.config/hypr/hyprland.lua` md5 `60248c3256462f4f75475a1cc70c2eeb`.
+
+### 12.2 실제 `pacman -U` 설치 — 측정됨
+
+`./bin/install-packages --install` 로 두 패키지를 실제 설치했다. 확인 결과:
+
+- 11개 경로 전부 `cachy-omarchy-overlay` 소유(`pacman -Qo`).
+- 의존 해석이 `inotify-tools` 하나만 추가로 끌어왔다. 공식 `omarchy`/`omarchy-settings`
+  는 요구되지 않았다 — **정적 감사가 아니라 실제 pacman 트랜잭션이 이를 증명한다.**
+- 서비스는 `disabled`/`inactive`. `.INSTALL` 스크립트가 없고 `.wants/` 심볼릭도 없어
+  **설치만으로는 아무것도 실행되지 않는다.**
+- `hyprland.lua` md5 불변. `~/.config/cachy-omarchy/`·`~/.local/state/omarchy/` 부재 유지 —
+  **패키지는 사용자 상태를 만들지 않는다**(SPEC §6.6, §38)는 계약이 실측됐다.
+- 화면 layer 0개.
+
+CachyOS snapper 훅이 설치 전후 스냅샷(450/451)을 자동 생성했다.
+
+### 12.3 `cachy-omarchy-init` 과 충돌 정책 — 측정됨
+
+설치된 `/usr/bin/cachy-omarchy-init` 를 **사용자의 실제 홈**에 대해 실행했다.
+
+`--dry-run` 은 아무것도 쓰지 않았다(hyprland.lua md5 불변, 두 디렉터리 부재 유지).
+실제 실행은 `~/.local/state/omarchy/toggles/bar-off` 와
+`~/.config/cachy-omarchy/hypr/bindings.{conf,lua}` 를 만들고, `shell.json` 은 만들지
+않았다(M7 의 dead-file 수정이 설치본에 반영됨).
+
+바인딩 주입은 다음을 출력하고 중단했다:
+
+```
+warning: 기존 설정이 SUPER+SPACE 를 이미 바인딩한다. 덮어쓰지 않는다. 교체하려면 --force.
+```
+
+`hyprland.lua` md5 는 `60248c32…` 그대로였고 관리 블록은 주입되지 않았다.
+**SPEC §20 의 "감지·경고하되 조용히 덮어쓰지 않는다"가 사용자의 실제 walker 바인딩
+(`hyprland.lua:295`)에 대해 실측됐다.** §9.5 의 "실제 사용자 설정에는 실행하지 않았다"
+는 이 절로 대체된다.
+
+### 12.4 rollback — 측정됨
+
+`bump-pkgrel` → `build-packages` → `test-packages` → `install-packages` 로
+`cachy-omarchy-shell 4.0.0-2` 를 설치한 뒤 `./bin/rollback` 을 실행했다.
+
+- 이전 쌍이 `~/.local/state/cachy-omarchy/packages/previous-<stamp>/artifacts/` 에
+  체크섬과 함께 보존됐다.
+- pacman 이 `4.0.0-2 → 4.0.0-1` 다운그레이드를 수행했다.
+- `installed-build.manifest` 가 `-1` 쌍으로 되돌아갔고 pending 마커는 남지 않았다.
+- `pacman -Qkk` 결과 셸 232파일·오버레이 24파일, **대체 0개**.
+- `hyprland.lua` 와 사용자 상태(`bar-off`, 바인딩 사본)는 무손상.
+  **rollback 이 무관한 시스템 파일을 복원하지 않는다**(SPEC §36)가 실측됐다.
+
+### 12.5 clean chroot build — 측정됨, 단 의존 해석은 제외
+
+`devtools 1:1.5.1-1` 을 설치하고 `mkarchroot /var/lib/archbuild/coo/root base-devel`
+로 chroot(1.3G)를 만든 뒤
+`COO_CLEAN_CHROOT_DIR=/var/lib/archbuild/coo ./bin/build-packages --clean` 을 실행했다.
+두 패키지 모두 빌드에 성공했다.
+
+- chroot 는 **Arch 저장소**로 만들었다. CachyOS 특화 패키지에 의존하지 않는다는 성질을
+  보존하기 위해서다.
+- clean 빌드본과 호스트 빌드본의 **파일 목록이 완전히 동일**하고 권한·소유권 집합
+  (`-rw-r--r--`/`-rwxr-xr-x`/`drwxr-xr-x`, uid 0)도 같다.
+- 셸 패키징 중 `libfakeroot internal error: payload not recognized!` 가 출력됐다.
+  호스트와 chroot 의 fakeroot/glibc 버전 차이에서 오는 잡음이며, 위 비교로 **산출물에
+  영향이 없음을 확인**했다.
+- §11.2 의 "실제 clean chroot build 는 미검증" 은 이 절로 대체된다.
+
+**이 실행이 검증하지 않은 것 — `--nodeps`.** `bin/build-packages` 는
+`makechrootpkg -r … -- --nodeps` 를 호출하므로 출력에 `Skipping dependency checks.` 가
+두 번 찍힌다. 따라서 **선언된 `depends`/`makedepends` 의 충분성은 이 경로로 확인되지
+않는다.** `cachy-omarchy-overlay` 가 저장소에 없는 로컬 패키지 `cachy-omarchy-shell` 에
+의존하기 때문에 불가피한 선택이며, 제대로 풀려면 로컬 저장소 구성이 필요하다
+(SPEC §64 — v0.1 범위 밖). 의존 선언의 실제 근거는 clean build 가 아니라 §12.2 의
+실제 `pacman -U` 트랜잭션이다.
+
+### 12.6 이 검증이 드러낸 결함 2건
+
+둘 다 M7 v0.1 수용 심사를 통과한 상태였다. 심사가 부실했다기보다 **실제로 실행하지
+않으면 드러나지 않는 종류**였고, 그것이 §61 이 이 항목들을 미검증으로 남긴 이유다.
+
+| 커밋 | 결함 | 회귀 가드 |
+| --- | --- | --- |
+| `2b3da38` | `bin/install-packages`·`bin/rollback` 을 문서대로 실행할 수 없었다. `sudo` 로 전체를 감싸면 `state_dir` 이 `/root/.local/state/…` 로 해석돼 실패하고, `COO_PACMAN_BIN="sudo pacman"` 은 단일 단어 인용 때문에 동작하지 않았다. SPEC §37 이 규정한 설치 경로가 막혀 있었다. | 가짜 `sudo` 를 샌드박스 PATH 에 놓고 구성된 argv 가 `sudo pacman -U …` 인지 단언. 픽스 이전 코드는 4개 실패 |
+| `4311a42` | 테스트 스위트가 SPEC §49 U04(`pkgrel` 범프)를 견디지 못했다. 지원되는 조작이 `test_update_pipeline.sh` 의 11개 단언을 깨뜨려 `test-packages` 가 fail-closed 되고 rollback 검증 경로 전체가 막혔다 | 픽스처 `pkgrel` 을 센티넬 5 로 고정. 하드코딩된 `-1-` 이 재발하면 어느 값에서든 실패 |
+
+수정 후 두 결함 모두 실제 시스템에서 해소를 확인했다 — 래퍼 없이
+`./bin/install-packages --install` 이 동작하고, 전체 스위트는 `pkgrel` 1·2 양쪽에서
+31/31 통과한다.
+
+### 12.7 여전히 미검증
+
+이 세션은 **셸을 서비스로 기동하지 않았다.** 따라서 다음은 그대로 미검증이다:
+
+- `SUPER+SPACE` / `SUPER+K` 라이브 동작. 관리 블록이 충돌로 주입되지 않았으므로
+  바인딩 자체가 존재하지 않는다. 검증하려면 `--force` 와 사용자 승인이 필요하다.
+- 라이브 Quickshell 프로세스와 세션 IPC.
+- 기존 Waybar·notification daemon·lock 화면과의 **공존**. 패키지가 해당 경로를 소유하지
+  않는다는 것은 측정됐지만(§11.3 R08–R10), 동시 실행은 관측하지 않았다.
+- `graphical-session.target` 자동 기동(§9.4 — 타깃이 여전히 inactive).
+- `COO_RUN_LIVE=1` 키 주입.

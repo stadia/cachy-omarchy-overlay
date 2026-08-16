@@ -9,27 +9,27 @@
 
 | §61 기준 | 상태 | 현재 증거 / 다음 갭 |
 | --- | --- | --- |
-| CachyOS에서 실행 | 미검증 | 호스트는 CachyOS 계열로 관측했지만 실제 패키지 설치·세션 실행은 하지 않았다. `docs/RUNTIME_STARTUP.md` §9.4 참조. |
+| CachyOS에서 실행 | 측정됨 (설치); 미검증 (세션 실행) | 2026-08-17 실제 CachyOS 호스트에서 `pacman -U`로 두 패키지를 설치하고 11개 경로 소유·무해성을 확인했다. `docs/RUNTIME_STARTUP.md` §12.2. 셸을 서비스로 기동하지는 않았다(§12.7). |
 | Omarchy OS 미설치 | 측정됨 | M6 종료 관측에서 `pacman -Q omarchy omarchy-settings`가 둘 다 없었다. M7 doctor는 두 package를 각각 read-only query하며, `tests/runtime/test_doctor.sh`의 controlled pacman fixture가 두 query와 present=FAIL을 검증한다. |
-| 공식 `omarchy` 불필요 | 추론됨 | 두 PKGBUILD dependency와 M5/M6 audit에 공식 패키지가 없다. 실제 의존성 해석은 clean build에서 재확인한다. |
-| 공식 `omarchy-settings` 불필요 | 추론됨 | 위와 동일. `packages/*/PKGBUILD`, `docs/PACKAGE_AUDIT.md` 참조. |
+| 공식 `omarchy` 불필요 | 측정됨 | 실제 `pacman -U` 트랜잭션이 `inotify-tools` 하나만 추가로 끌어왔고 공식 패키지를 요구하지 않았다(§12.2). 근거는 clean build가 아니다 — 그 경로는 `--nodeps`라 의존을 해석하지 않는다(§12.5). |
+| 공식 `omarchy-settings` 불필요 | 측정됨 | 위와 동일. 실제 설치 후에도 `pacman -Q omarchy-settings`는 부재다(§12.2). |
 | Quickshell 사용 | 추론됨 | `cachy-omarchy-shell --run`이 `quickshell -n -p`를 실행한다. live process/IPC는 미검증이다. |
 | upstream Quattro source 재사용 | 측정됨 | shell PKGBUILD/staging이 pin된 upstream `shell/`만 패키징한다. `docs/COMMAND_AUDIT.md` 참조. |
 | upstream commit pin | 측정됨 | `upstream.lock`과 shell PKGBUILD `_commit` 정적 검사 및 `tests/package/test_clean_build.sh`가 clean source HEAD 일치를 검사한다. |
-| shell package build 성공 | 측정됨 (fake transport); 미검증 (real chroot) | `tests/package/test_clean_build.sh`가 단일 정본 clean-build transport와 archive audit을 fake `makechrootpkg`로 검증한다. devtools/prepared chroot 부재로 실제 clean chroot build는 미검증이다. |
+| shell package build 성공 | 측정됨 (real chroot) | 2026-08-17 `devtools 1:1.5.1-1` + `mkarchroot`로 만든 Arch chroot에서 `build-packages --clean`이 두 패키지를 빌드했고, 산출물 파일 목록·권한이 호스트 빌드본과 동일했다(§12.5). 단 `--nodeps`이므로 의존 선언의 충분성은 이 경로로 검증되지 않는다. |
 | forbidden system path 미소유 | 측정됨 | M6 archive audit 및 `tests/package/test_forbidden.sh`, `tests/runtime/test_runtime_reliability.sh`가 금지 경로를 검사한다. |
 | long-running shell user start | 측정됨 (extracted wrapper); 미검증 (user service) | `tests/runtime/test_runtime_reliability.sh`는 test-owned extracted wrapper의 생존을 확인한다. `graphical-session.target`이 inactive였고 enable/start하지 않아 실제 user service start는 미검증이다. |
 | IPC 동작 | 측정됨 (extracted); 미검증 (live session) | `tests/runtime/test_runtime_reliability.sh`와 `tests/runtime/test_doctor.sh` fixture가 extracted/fake IPC ping을 검사한다. 실제 Quickshell session ping은 미검증이다. |
 | SUPER+SPACE launcher | 추론됨 | `tests/runtime/test_launcher_toggle.sh`와 binding static tests가 wrapper/binding reachability를 검사한다. live key injection 및 surface 관측은 미검증이다. |
 | 일반 앱 launch | 추론됨 | `tests/runtime/test_app_launch.sh`의 extracted desktop/`uwsm-app` fixture가 launch path를 검사한다. 실제 session application coexistence는 미검증이다. |
 | SUPER+K keybinding UI | 추론됨 | `tests/runtime/test_keybindings_toggle.sh`와 wrapper/static tests가 경로를 검사한다. live UI 호출은 미검증이다. |
-| 기존 Hyprland config 보존 | 추론됨 | `tests/runtime/test_bindings.sh`는 `cachy-omarchy-bindings`가 관리 source block만 추가하도록 검사한다. 실제 사용자 설정에는 실행하지 않았다. |
+| 기존 Hyprland config 보존 | 측정됨 | 2026-08-17 설치된 `cachy-omarchy-init`을 사용자의 실제 `~/.config/hypr/hyprland.lua`에 대해 실행했다. `SUPER+SPACE` 충돌(walker, `:295`)을 감지해 주입을 거부했고 md5는 불변이었다(§12.3). |
 | 기존 Waybar 보존 | 미검증 | init는 Omarchy bar-off 토글만 만들며 기존 Waybar와 공존을 실측하지 않았다. `RUNTIME_STARTUP.md` §9.3. |
 | 기존 notification daemon 보존 | 미검증 | `disabledPlugins`가 `omarchy.notifications`를 끄지만 dunst/mako 등과 중복·충돌을 실측하지 않았다. |
 | 기존 lock setup 보존 | 미검증 | `disabledPlugins`가 `omarchy.lock`을 끄지만 hyprlock 등과 상호작용을 실측하지 않았다. |
 | newer upstream rebuild 자동화 | 측정됨 | M6 U01–U08 fake git/makepkg/bsdtar 경로가 candidate 검증 후 metadata 발행을 검사한다. `tests/package/test_update_pipeline.sh`. |
 | failed update 미설치 | 측정됨 (fake) | `tests/package/test_update_pipeline.sh` U05–U08은 fake pacman 호출 없이 원래 lock/PKGBUILD를 보존한다. |
-| prior working package rollback | 측정됨 (fake); 미검증 (real pacman) | `tests/package/test_update_pipeline.sh` U09–U10은 prior pair 보존, rollback finalization failure, corrupt pair와 dangling state의 fail-closed 동작을 fake pacman으로 검사한다. |
+| prior working package rollback | 측정됨 (real pacman) | 2026-08-17 실제 `4.0.0-2 → 4.0.0-1` 다운그레이드를 `bin/rollback`으로 수행했다. 이전 쌍 아카이브·매니페스트 복귀·pending 부재·`pacman -Qkk` 대체 0개를 확인했다(§12.4). fake pacman 테스트는 U09–U10 그대로 유지된다. |
 
 ## M7 runtime reliability (R01–R10)
 
