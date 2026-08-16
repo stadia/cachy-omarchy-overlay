@@ -363,11 +363,16 @@ post-install 훅이 아니라 **사용자가 직접 실행**하는 유저 레벨
 만드는지, 언제 만드는지, 멱등 규칙은 다음과 같다.
 
 - **만드는 것 (최초 실행 시에만)**
-  - `~/.config/cachy-omarchy/shell.json` — `$COO_PREFIX_ROOT/defaults/shell.json` 복사본.
   - `~/.config/cachy-omarchy/hypr/bindings.{conf,lua}` — `cachy-omarchy-bindings` 에
     위임해 설치하고, 사용자 Hyprland 설정에 관리 source 블록만 주입한다(본문은 건드리지
     않음).
   - `~/.local/state/omarchy/toggles/bar-off` — 내장 바를 숨기는 빈 파일.
+- **만들지 않는 것** — `~/.config/cachy-omarchy/shell.json`. 셸이 읽는 사용자 경로는
+  `~/.config/omarchy/shell.json` 이지 이 경로가 아니므로, 여기에 파일을 만들면 사용자
+  편집이 조용히 무시된다(dead file). 패키지 기본값은
+  `/usr/share/cachy-omarchy/upstream/config/omarchy/shell.json` 으로 스테이징되며
+  init 없이도 셸이 적용한다. 기존 사용자가 이 dead file 을 갖고 있다면
+  `cachy-omarchy-doctor` 가 WARN 으로 알린다.
 - **멱등 규칙 — 파일 단위, 존재 여부만 본다.** 대상 파일이 이미 있으면 건드리지 않고
   "유지" 메시지만 낸다. 두 번째 실행은 사용자가 고친 `shell.json` 을 덮어쓰지 않는다
   (`tests/runtime/test_init.sh` 의 `USER_EDIT` 보존 검증).
@@ -567,73 +572,76 @@ retention, U10 valid/corrupt rollback을 검증한다. 실패 경로는 모두 i
 `WantedBy=graphical-session.target`은 의도이지 관측된 자동 시작이 아니다.
 
 
-## 11. M7 RC evidence — measured boundary and remaining approval work
+## 11. M7 RC 증거 — 실측 경계와 남은 승인 작업
 
-M7 is an evidence update, not authorization to modify a live session. The clean build and all
-other M7 tests use a sandbox HOME, extracted package trees, or fake package-manager tools. `cachy-omarchy-doctor`
-is diagnostic-only: it does not install packages, repair state, reload Hyprland, start services,
-or change user configuration.
+M7은 증거 갱신이지 라이브 세션 수정 허가가 아니다. clean build 및 다른 모든 M7
+테스트는 샌드박스 HOME, 추출 패키지 트리, 또는 fake 패키지 매니저 도구만 쓴다.
+`cachy-omarchy-doctor`는 진단 전용이다 — 패키지 설치, 상태 복구, Hyprland reload,
+서비스 시작, 사용자 설정 변경을 하지 않는다.
 
-### 11.1 Doctor and release state
+### 11.1 Doctor와 릴리스 상태
 
-`cachy-omarchy-doctor` reads package/query, wrapper, service, manifest, process and IPC state.
-It distinguishes PASS, WARN, and FAIL rather than treating an unavailable observation as healthy.
-In particular, it reports both official `omarchy` and `omarchy-settings` package queries, the
-user override and inert `~/.config/cachy-omarchy/shell.json`, and the unobserved automatic-start
-boundary. The command is covered by `tests/runtime/test_doctor.sh` with controlled `pacman`,
-`qs`, process, and manifest fixtures.
+`cachy-omarchy-doctor`는 패키지 질의, 래퍼, 서비스, manifest, 프로세스, IPC 상태를
+읽는다. 관측 불가를 정상으로 간주하지 않고 PASS, WARN, FAIL을 구분한다. 특히 공식
+`omarchy` 및 `omarchy-settings` 패키지 질의, 사용자 오버라이드 및 inert
+`~/.config/cachy-omarchy/shell.json`, 미관측 자동 시작 경계를 보고한다. 이 명령은
+`tests/runtime/test_doctor.sh`가 통제된 `pacman`, `qs`, 프로세스, manifest fixture로
+검증한다.
 
-The validated manifest is the release authority; a flat `build/` archive is only a convenience
-copy. `install-pending.manifest` is fail-closed: doctor reports it as FAIL, and both install and
-rollback reject it before a pacman call. The operator must inspect and resolve the actual package
-state; doctor deliberately has no recovery action. A dangling pending or installed-manifest
-symlink is corrupt state, not absence.
+검증된 manifest가 릴리스 권위이며 평면 `build/` 아카이브는 편의 복사본일 뿐이다.
+`install-pending.manifest`는 fail-closed다 — doctor가 FAIL로 보고하고 install과
+rollback 모두 pacman 호출 전에 거부한다. 운영자가 실제 패키지 상태를 확인·해결해야
+하며 doctor는 복구 동작을 의도적으로 두지 않는다. dangling pending 또는
+installed-manifest 심볼릭 링크는 부재가 아니라 손상 상태다.
 
-### 11.2 Clean build boundary
+### 11.2 clean build 경계
 
-`bin/build-packages --clean` transports a temporary, commit-verified `clean-omarchy.tar` and
-`clean-overlay*.tar` into a temporary package context and invokes
-`makechrootpkg -r "$COO_CLEAN_CHROOT_DIR" -- --nodeps`. This keeps `overlay/` as the one tracked
-source of truth: no overlay copy is committed under `packages/`, and temporary sources are
-removed after the run. `tests/package/test_clean_build.sh` measures that transport and archive
-audit with a fake `makechrootpkg`.
+`bin/build-packages --clean`은 임시의 commit 검증된 `clean-omarchy.tar`와
+`clean-overlay*.tar`를 임시 패키지 컨텍스트로 운반하고
+`makechrootpkg -r "$COO_CLEAN_CHROOT_DIR" -- --nodeps`를 호출한다. 이렇게 `overlay/`를
+유일한 추적 정본으로 유지한다 — `packages/` 아래에 overlay 복사본을 커밋하지 않고
+임시 소스는 실행 후 제거한다. `tests/package/test_clean_build.sh`가 fake
+`makechrootpkg`로 해당 운반과 아카이브 감사를 실측한다.
 
-This host has no `makechrootpkg`, `archbuild`, or `devtools`, and no prepared chroot was created.
-Therefore a real clean chroot package build is **미검증**; the fake transport test is not a claim
-that a real chroot or `makepkg -i` ran.
+이 호스트에는 `makechrootpkg`, `archbuild`, `devtools`가 없고 준비된 chroot도 없다.
+따라서 실제 clean chroot 패키지 빌드는 **미검증**이다 — fake 운반 테스트가 실제
+chroot나 `makepkg -i`가 실행됐다는 주장이 아니다.
 
-### 11.3 R01–R10 runtime evidence
+### 11.3 R01–R10 런타임 증거
 
-`tests/runtime/test_runtime_reliability.sh` overlays the two archive payloads in one extracted
-tree with a sandbox HOME. It measured R01 wrapper process survival and R02 IPC `shell ping`.
-R03 and R06 have extracted/static evidence only; R04 and R05 require an approved live Wayland
-session and remain **미검증**. R08 measured package ownership only, not a live user Waybar.
+`tests/runtime/test_runtime_reliability.sh`는 두 아카이브 페이로드를 하나의 추출 트리에
+겹치고 샌드박스 HOME에서 실행한다. R01 래퍼 프로세스 생존과 R02 IPC `shell ping`을
+실측했다. R03과 R06은 추출/정적 증거만 있고 R04와 R05는 승인된 라이브 Wayland 세션이
+필요하므로 **미검증**이다. R08은 패키지 소유 경로만 실측했고 라이브 사용자 Waybar는
+아니다.
 
-R07 has **manual wrapper-restart evidence**: a test-owned wrapper child is stopped and a wrapper
-is manually started again, then IPC succeeds. `Restart=on-failure` service recovery remains
-**미검증** without an approved user-systemd test. Automatic start is likewise **미검증**:
-`graphical-session.target` was read as inactive, and M7 did not enable, start, or reload a unit.
+R07은 **manual wrapper-restart evidence**다 — 테스트 소유 래퍼 자식을 멈추고 래퍼를
+수동으로 다시 시작한 뒤 IPC가 성공한다. `Restart=on-failure` 서비스 복구는 승인된
+user-systemd 테스트 없이 **미검증**이다. 자동 시작 역시 **미검증**이다 —
+`graphical-session.target`이 inactive로 관측됐고 M7은 유닛을 enable/start/reload하지
+않았다.
 
-R09 and R10 measured that the package does not own notification/lock system paths and that
-`omarchy.notifications`/`omarchy.lock` are disabled by default. Live coexistence with dunst/mako
-or a user lock setup such as hyprlock is **미검증**. Existing Waybar live coexistence is also
-**미검증**. No notification or lock daemon was stopped, started, or configured.
+R09와 R10은 패키지가 notification/lock 시스템 경로를 소유하지 않고
+`omarchy.notifications`/`omarchy.lock`이 기본 비활성임을 실측했다. dunst/mako 또는
+hyprlock 등 사용자 lock 설정과의 라이브 공존은 **미검증**이다. 기존 Waybar 라이브
+공존도 **미검증**이다. 어떤 notification/lock 데몬도 중지·시작·설정하지 않았다.
 
-### 11.4 U01–U10 upgrade and rollback RC evidence
+### 11.4 U01–U10 업그레이드·롤백 RC 증거
 
-`tests/package/test_update_pipeline.sh` covers U01–U10 in a **fake lane**: git, makepkg, bsdtar,
-checksum, and pacman are sandbox fakes. It measures no-update behavior, lock/pkgrel publication,
-patch/build/audit/runtime failures before install, prior-pair retention, and rollback selection.
-The fake lane also verifies a pending finalization failure after install or rollback: pending stays
-fail-closed, doctor fails it, and later install/rollback make no pacman call.
+`tests/package/test_update_pipeline.sh`는 U01–U10을 **fake lane**으로 검증한다 — git,
+makepkg, bsdtar, checksum, pacman이 샌드박스 fake다. no-update 동작, lock/pkgrel 발행,
+설치 전 patch/build/audit/runtime 실패, prior-pair 보존, rollback 선택을 실측한다.
+fake lane은 install 또는 rollback 후 pending 확정 실패도 검증한다 — pending이
+fail-closed로 유지되고 doctor가 이를 FAIL로 보고하며 이후 install/rollback은 pacman을
+호출하지 않는다.
 
-This is workflow safety evidence, not a real `pacman -U` install, upgrade, or downgrade. A real
-package-manager smoke remains **미검증** until explicit user approval in an isolated environment.
+이것은 워크플로 안전 증거이지 실제 `pacman -U` 설치·업그레이드·다운그레이드가 아니다.
+실제 패키지 매니저 smoke는 격리 환경에서 명시적 사용자 승인 전까지 **미검증**이다.
 
-### 11.5 RC checklist disposition
+### 11.5 RC 체크리스트 판정
 
-Patch count is **패치 수 0** (`packages/cachy-omarchy-shell/patches/README.md` contains `none`).
-The official `omarchy` and `omarchy-settings` packages are absent in the recorded host check and
-are neither dependencies nor install targets. `docs/RC_GAP_INVENTORY.md` is the authoritative
-SPEC §61 checklist: it labels every criterion as `측정됨`, `추론됨`, or `미검증` and links it to
-the applicable test. The unverified items above are release gaps, not completed acceptance.
+패치 수는 **패치 수 0**이다 (`packages/cachy-omarchy-shell/patches/README.md`가 `none`).
+공식 `omarchy`와 `omarchy-settings` 패키지는 기록된 호스트 검사에서 부재이며 의존이나
+설치 대상이 아니다. `docs/RC_GAP_INVENTORY.md`가 SPEC §61의 권위 체크리스트다 —
+모든 기준을 `측정됨`, `추론됨`, `미검증`으로 표시하고 해당 테스트를 연결한다. 위의
+미검증 항목은 릴리스 갭이지 완료된 수용이 아니다.

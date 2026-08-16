@@ -28,7 +28,8 @@ user-invocable: false
 - 공개 명령 5개, 모두 `overlay/bin/`에 있고 설치되면 `/usr/bin/`으로 간다:
   `cachy-omarchy-shell`, `cachy-omarchy-launcher`, `cachy-omarchy-keybindings`,
   `cachy-omarchy-bindings`, `cachy-omarchy-init`.
-- 사용자 라이브 설정: `~/.config/cachy-omarchy/`(shell.json, hypr/bindings.{conf,lua}).
+- 사용자 라이브 설정: `~/.config/cachy-omarchy/`(hypr/bindings.{conf,lua}). `shell.json` 은
+  셸이 읽지 않는 dead file 이므로 init 가 만들지 않는다.
 - 패키지 정본/기본값: `/usr/share/cachy-omarchy/`(defaults/shell.json, hypr/bindings.{conf,lua}).
 - compat shim: `/usr/lib/cachy-omarchy/compat/bin/`(예: `omarchy-shell`, `uwsm-app`) — `/usr/bin`으로
   새면 안 되고, 이는 `tests/runtime/test_installed_tree.sh`가 양방향으로 검사한다.
