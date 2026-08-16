@@ -1,6 +1,8 @@
 # Upstream
 
-기계 핀은 `upstream.lock`을 본다.
+기계 핀은 `upstream.lock`을 본다. 아래 Version/Tag/Commit 표는 사람이 유지하는
+스냅샷이며 `update-upstream` 뒤에는 release date·실측 환경 확인 전까지 stale일 수 있다.
+자동화와 패키징의 권위는 항상 `upstream.lock`이다.
 
 | 항목 | 값 |
 | --- | --- |

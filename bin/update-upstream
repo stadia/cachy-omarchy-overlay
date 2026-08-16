@@ -39,8 +39,22 @@ fi
 
 candidate=$(mktemp -d "${TMPDIR:-/tmp}/coo-update-XXXXXX")
 trap 'rm -rf "$candidate"' EXIT
-for item in bin packages overlay tests lib upstream.lock UPSTREAM.md; do
-  [[ -e $repo_root/$item ]] && cp -a "$repo_root/$item" "$candidate/"
+# Copy every tracked runtime/test input needed by the default test runner while
+# deliberately pruning ignored makepkg leftovers (packages/*/{pkg,src}).
+copy_tree() {
+  local item=$1 path relative
+  [[ -e $repo_root/$item ]] || return 0
+  while IFS= read -r -d '' path; do
+    relative=${path#"$repo_root/"}
+    mkdir -p "$candidate/$(dirname "$relative")"
+    cp -a "$path" "$candidate/$relative"
+  done < <(find "$repo_root/$item" \( -path '*/pkg' -o -path '*/src' \) -prune -o -type f -print0)
+}
+for item in bin packages overlay tests lib docs; do
+  copy_tree "$item"
+done
+for item in upstream.lock UPSTREAM.md; do
+  [[ -f $repo_root/$item ]] && cp -a "$repo_root/$item" "$candidate/$item"
 done
 mkdir -p "$candidate/build"
 

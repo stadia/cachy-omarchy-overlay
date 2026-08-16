@@ -6,8 +6,10 @@ source "$(dirname "${BASH_SOURCE[0]}")/../lib/assert.sh"
 root=$COO_TEST_SANDBOX/repo
 mkdir -p "$root/packages" "$root/bin"
 cp -a "$REPO_ROOT/upstream.lock" "$root/"
-cp -a "$REPO_ROOT/packages/cachy-omarchy-shell" "$root/packages/"
-cp -a "$REPO_ROOT/packages/cachy-omarchy-overlay" "$root/packages/"
+while IFS= read -r -d '' path; do
+  mkdir -p "$root/$(dirname "$path")"
+  cp -a "$REPO_ROOT/$path" "$root/$path"
+done < <(git -C "$REPO_ROOT" ls-files -z packages/cachy-omarchy-shell packages/cachy-omarchy-overlay)
 cp -a "$REPO_ROOT/bin/check-upstream" "$REPO_ROOT/bin/build-packages" \
   "$REPO_ROOT/bin/validated-build.sh" "$REPO_ROOT/bin/test-packages" \
   "$REPO_ROOT/bin/install-packages" "$REPO_ROOT/bin/rollback" \
@@ -91,6 +93,13 @@ EOF
 cat >"$fake/smoke" <<'EOF'
 #!/usr/bin/env bash
 printf 'smoke\n' >>"$COO_PACMAN_LOG"
+EOF
+cat >"$fake/candidate-doc-runner" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+[[ -f ${COO_REPO_ROOT:?}/docs/RUNTIME_STARTUP.md ]] || { echo 'missing candidate docs' >&2; exit 41; }
+[[ -f $COO_REPO_ROOT/docs/COMMAND_AUDIT.md ]] || { echo 'missing candidate audit docs' >&2; exit 42; }
+exec "$COO_REPO_ROOT/tests/test.sh" test_m3_docs
 EOF
 chmod +x "$fake"/*
 
@@ -283,13 +292,22 @@ assert_eq "$(sha256sum "$root/upstream.lock")" "$update_lock_before" "U01 update
 assert_eq "$(sha256sum "$root/packages/cachy-omarchy-shell/PKGBUILD")" "$update_pkg_before" "U01 update leaves PKGBUILD unchanged"
 assert_eq "$(wc -l <"$log")" "0" "U01 update invokes no build"
 
+# Candidate validation must carry docs required by the repository's default test runner.
+cp -a "$REPO_ROOT/docs" "$root/docs"
+mkdir -p "$root/tests/lib" "$root/tests/runtime"
+cp -a "$REPO_ROOT/tests/test.sh" "$root/tests/test.sh"
+cp -a "$REPO_ROOT/tests/lib/assert.sh" "$root/tests/lib/assert.sh"
+cp -a "$REPO_ROOT/tests/runtime/test_m3_docs.sh" "$root/tests/runtime/test_m3_docs.sh"
+
 # U02/U03: successful update uses peeled commit, resets only shell pkgrel, and never installs.
 update_state=$COO_TEST_SANDBOX/update-state
 update_build=$COO_TEST_SANDBOX/update-build
 pac_update=$COO_TEST_SANDBOX/update-pacman.log
 : >"$pac_update"
-out=$(COO_REPO_ROOT="$root" COO_GIT_BIN="$fake/git" COO_STATE_DIR="$update_state" COO_BUILD_DIR="$update_build" COO_TOOL_LOG="$log" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_TEST_RUNNER="$fake/test-runner" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$pac_update" "$root/bin/update-upstream" 2>&1); code=$?
+code=0
+out=$(COO_REPO_ROOT="$root" COO_GIT_BIN="$fake/git" COO_STATE_DIR="$update_state" COO_BUILD_DIR="$update_build" COO_TOOL_LOG="$log" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_TEST_RUNNER="$fake/candidate-doc-runner" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$pac_update" "$root/bin/update-upstream" 2>&1) || code=$?
 assert_eq "$code" "0" "U02 update validates and publishes candidate"
+assert_contains "$out" "PASS tests/runtime/test_m3_docs.sh" "candidate runs M3 docs test"
 updated_lock=$(cat "$root/upstream.lock")
 updated_pkg=$(cat "$root/packages/cachy-omarchy-shell/PKGBUILD")
 assert_contains "$updated_lock" "OMARCHY_VERSION=4.0.1" "U02 lock version updates"
