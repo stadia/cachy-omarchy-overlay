@@ -19,12 +19,12 @@ assert_contains "$audit" "xkbcli compile-keymap" "code: 키 해석은 xkbcli com
 assert_contains "$audit" "omarchy-menu-select" "검색 메뉴는 omarchy-menu-select"
 assert_contains "$audit" "omarchy-cmd-present lua" "lua 캐시 가드는 omarchy-cmd-present lua"
 assert_contains "$audit" "JSON::PP" "select payload 는 perl JSON::PP"
-assert_contains "$audit" 'exec 경로는 `jq -Rnr @json`' "jq 는 dispatch(exec) 경로 전용"
+assert_contains "$audit" 'exec/sendshortcut 경로는 `jq -Rnr @json`' "jq 는 dispatch 경로 전용(목록/--print 미사용)"
 assert_contains "$audit" "gum 미사용" "이 경로는 gum 미사용(실측)"
 
 # --- 호스트 실측: 업스트림 그대로는 정적 2행만 나온다 -------------------------
 assert_contains "$audit" "48개" "호스트 bind 48개 실측이 기록됨"
-assert_contains "$audit" "정적" "정적 2행만 나온다는 실측이 기록됨"
+assert_contains "$audit" "정적 2행만" "정적 2행만 나온다는 실측이 기록됨"
 assert_contains "$audit" "__lua" "description-less __lua drop 이 기록됨"
 
 assert_file_exists "$DEPS" "RUNTIME_DEPENDENCIES.md 존재"

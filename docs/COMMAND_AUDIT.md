@@ -47,7 +47,7 @@ omarchy-launch-about (브랜딩/os-release)
 
 | command | called from | purpose | class | action |
 | --- | --- | --- | --- | --- |
-| `omarchy-menu-keybindings` | 메뉴 `learn.keybindings` | `hyprctl binds` + Lua 캐시 + 검색 메뉴 | ADAPTED | copy+adapt — SUPER+K가 이 명령을 부르게. **M4 실측 완료**(아래). 데이터 수집만 CachyOS Hyprland 설정에 맞춘다 |
+| `omarchy-menu-keybindings` | 메뉴 `learn.keybindings` | `hyprctl binds` + Lua 캐시 + 검색 메뉴 | ADAPTED | wrapper — `cachy-omarchy-keybindings`(적응 카피) + compat `omarchy-shell` + 스테이징 `omarchy-menu-select`/`omarchy-cmd-present`. **M4 실측 완료**(아래). 데이터 수집만 CachyOS Hyprland 설정에 맞춘다 |
 | `omarchy-menu-tmux-keybindings` | 메뉴 | Tmux 전용 | DISABLED | disable |
 | `omarchy-menu-herdr-keybindings` | 메뉴 | Herdr 전용 | DISABLED | disable |
 
@@ -67,8 +67,8 @@ omarchy-launch-about (브랜딩/os-release)
   - 정적 행: SHIFT ALT L/D (web app copy/download) 2개 하드코딩.
   - 캐시: `${XDG_CACHE_HOME:-~/.cache}/omarchy/keybindings-<sha256>.records`.
     dynamic 이 비면 refresh 실패 → 캐시 파일을 남기지 않는다.
-  - 선택 후 dispatch: `hyprctl dispatch` (exec 경로는 `jq -Rnr @json` 으로 Lua
-    문자열 인용 — `lua_string()`).
+  - 선택 후 dispatch: `hyprctl dispatch` (exec/sendshortcut 경로는 `jq -Rnr @json`
+    으로 Lua 문자열 인용 — `lua_string()`).
   - `--print`/`-p`: 메뉴 없이 목록만 출력.
 - `omarchy-menu-select` — payload 는 `perl -MJSON::PP` (2회 호출),
   `omarchy-shell shell summon omarchy.menu "$payload"`, doneFile 0.05s 폴링,
@@ -216,7 +216,7 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-menu` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-menu-emoji` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-menu-herdr-keybindings` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-menu-keybindings` | ADAPTED | wrapper | M4 SUPER+K. 지금은 바이너리 부재로 행 실행 실패 |
+| `omarchy-menu-keybindings` | ADAPTED | wrapper | M4 SUPER+K → `cachy-omarchy-keybindings`. compat 에 같은 이름의 shim 을 두지 않으므로 메뉴 행 실행은 여전히 실패(범위는 SUPER+K 만) |
 | `omarchy-menu-plugin` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-menu-share` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-menu-timezone` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
