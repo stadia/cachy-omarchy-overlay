@@ -1,0 +1,22 @@
+# Maintainer: Cachy Omarchy Overlay
+pkgname=cachy-omarchy-overlay
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='CachyOS integration for the pinned Omarchy Quattro shell runtime'
+arch=('any')
+url='https://github.com/basecamp/omarchy'
+license=('MIT')
+# 업스트림 버전과 독립적으로 진화한다 (SPEC 6.4, 8). 공식 omarchy /
+# omarchy-settings 에는 절대 의존하지 않는다 (SPEC 21).
+depends=('cachy-omarchy-shell' 'bash')
+source=()
+sha256sums=()
+
+package() {
+  # NOTE (chroot limitation, tracked for Milestone 7): overlay/ lives two
+  # levels above this PKGBUILD. A clean chroot build only bind-mounts the
+  # PKGBUILD's own directory, so this path will not resolve there. SPEC §26
+  # permits plain `makepkg` for v0.1 and defers chroot to release quality.
+  # Same trade-off already accepted in packages/cachy-omarchy-shell/PKGBUILD.
+  bash "$startdir/stage-overlay.sh" "$startdir/../../overlay" "$pkgdir"
+}
