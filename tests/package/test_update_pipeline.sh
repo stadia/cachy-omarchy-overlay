@@ -10,7 +10,8 @@ cp -a "$REPO_ROOT/packages/cachy-omarchy-shell" "$root/packages/"
 cp -a "$REPO_ROOT/packages/cachy-omarchy-overlay" "$root/packages/"
 cp -a "$REPO_ROOT/bin/check-upstream" "$REPO_ROOT/bin/build-packages" \
   "$REPO_ROOT/bin/validated-build.sh" "$REPO_ROOT/bin/test-packages" \
-  "$REPO_ROOT/bin/install-packages" "$REPO_ROOT/bin/rollback" "$root/bin/"
+  "$REPO_ROOT/bin/install-packages" "$REPO_ROOT/bin/rollback" \
+  "$REPO_ROOT/bin/update-upstream" "$REPO_ROOT/bin/bump-pkgrel" "$root/bin/"
 chmod +x "$root/bin"/*
 fake=$COO_TEST_SANDBOX/fake
 mkdir -p "$fake"
@@ -19,6 +20,11 @@ log=$COO_TEST_SANDBOX/tools.log
 cat >"$fake/git" <<'EOF'
 #!/usr/bin/env bash
 # v4.0.1 is annotated: direct ref is tag object, peeled ref is commit.
+if [[ ${COO_FAKE_NO_UPDATE:-0} == 1 ]]; then
+  printf '%s\n' 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa refs/tags/v4.0.0'
+  printf '%s\n' 'f0020448ca87329199de7cb12f2015ebc4a3e5e7 refs/tags/v4.0.0^{}'
+  exit 0
+fi
 if [[ ${COO_FAKE_LIGHTWEIGHT:-0} == 1 ]]; then
   printf '%s\n' 'f0020448ca87329199de7cb12f2015ebc4a3e5e7 refs/tags/v4.0.0'
   printf '%s\n' '4444444444444444444444444444444444444444 refs/tags/v4.0.1'
@@ -265,5 +271,72 @@ code=0
 out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$COO_TEST_SANDBOX/corrupt-state" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$root/bin/rollback" 2>&1) || code=$?
 assert_eq "$code" "1" "U10 corrupt prior state fails safely"
 assert_eq "$(wc -l <"$paclog")" "0" "corrupt prior invokes no pacman"
+
+# U01 update no-op: discovery must not mutate metadata or invoke packaging tools.
+update_lock_before=$(sha256sum "$root/upstream.lock")
+update_pkg_before=$(sha256sum "$root/packages/cachy-omarchy-shell/PKGBUILD")
+: >"$log"
+out=$(COO_FAKE_NO_UPDATE=1 COO_REPO_ROOT="$root" COO_GIT_BIN="$fake/git" COO_TOOL_LOG="$log" "$root/bin/update-upstream" 2>&1); code=$?
+assert_eq "$code" "0" "U01 update no-op exits cleanly"
+assert_contains "$out" "up to date" "U01 update reports up to date"
+assert_eq "$(sha256sum "$root/upstream.lock")" "$update_lock_before" "U01 update leaves lock unchanged"
+assert_eq "$(sha256sum "$root/packages/cachy-omarchy-shell/PKGBUILD")" "$update_pkg_before" "U01 update leaves PKGBUILD unchanged"
+assert_eq "$(wc -l <"$log")" "0" "U01 update invokes no build"
+
+# U02/U03: successful update uses peeled commit, resets only shell pkgrel, and never installs.
+update_state=$COO_TEST_SANDBOX/update-state
+update_build=$COO_TEST_SANDBOX/update-build
+pac_update=$COO_TEST_SANDBOX/update-pacman.log
+: >"$pac_update"
+out=$(COO_REPO_ROOT="$root" COO_GIT_BIN="$fake/git" COO_STATE_DIR="$update_state" COO_BUILD_DIR="$update_build" COO_TOOL_LOG="$log" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_TEST_RUNNER="$fake/test-runner" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$pac_update" "$root/bin/update-upstream" 2>&1); code=$?
+assert_eq "$code" "0" "U02 update validates and publishes candidate"
+updated_lock=$(cat "$root/upstream.lock")
+updated_pkg=$(cat "$root/packages/cachy-omarchy-shell/PKGBUILD")
+assert_contains "$updated_lock" "OMARCHY_VERSION=4.0.1" "U02 lock version updates"
+assert_contains "$updated_lock" "OMARCHY_COMMIT=2222222222222222222222222222222222222222" "U02 lock uses peeled commit"
+assert_contains "$updated_lock" "OMARCHY_TAG=v4.0.1" "U02 lock tag updates"
+assert_contains "$updated_pkg" "pkgver=4.0.1" "U03 shell pkgver updates"
+assert_contains "$updated_pkg" "pkgrel=1" "U03 pkgrel resets to one"
+assert_contains "$updated_pkg" "_commit='2222222222222222222222222222222222222222'" "U02 shell commit updates"
+assert_eq "$(grep -m1 '^pkgver=' "$root/packages/cachy-omarchy-overlay/PKGBUILD")" "pkgver=0.1.0" "U02 overlay version is independent"
+assert_eq "$(wc -l <"$pac_update")" "0" "U02 update never invokes pacman"
+assert_contains "$out" "UPSTREAM.md requires human" "UPSTREAM.md deferred with explicit reason"
+
+# U04 is explicit local packaging revision only: no lock or version mutation.
+lock_before_bump=$(sha256sum "$root/upstream.lock")
+version_before_bump=$(grep -m1 '^pkgver=' "$root/packages/cachy-omarchy-shell/PKGBUILD")
+out=$(COO_REPO_ROOT="$root" "$root/bin/bump-pkgrel" 2>&1); code=$?
+assert_eq "$code" "0" "U04 local pkgrel bump exits cleanly"
+assert_contains "$out" "1 -> 2" "U04 reports increment"
+assert_eq "$(grep -m1 '^pkgrel=' "$root/packages/cachy-omarchy-shell/PKGBUILD")" "pkgrel=2" "U04 increments only pkgrel"
+assert_eq "$(grep -m1 '^pkgver=' "$root/packages/cachy-omarchy-shell/PKGBUILD")" "$version_before_bump" "U04 preserves pkgver"
+assert_eq "$(sha256sum "$root/upstream.lock")" "$lock_before_bump" "U04 preserves lock"
+
+# U05-U08 failures keep original tracked metadata and never invoke pacman.
+for mode in patch build audit test; do
+  failroot=$COO_TEST_SANDBOX/update-fail-$mode
+  cp -a "$root" "$failroot"
+  # U02 changed root to 4.0.1; each failure fixture must start at the prior pin
+  # so update-upstream actually enters its patch/build/audit/test stage.
+  sed -i 's/OMARCHY_VERSION=4\.0\.1/OMARCHY_VERSION=4.0.0/; s/OMARCHY_COMMIT=2222222222222222222222222222222222222222/OMARCHY_COMMIT=f0020448ca87329199de7cb12f2015ebc4a3e5e7/; s/OMARCHY_TAG=v4\.0\.1/OMARCHY_TAG=v4.0.0/' "$failroot/upstream.lock"
+  sed -i "s/pkgver=4.0.1/pkgver=4.0.0/; s/pkgrel=2/pkgrel=1/; s/_commit='2222222222222222222222222222222222222222'/_commit='f0020448ca87329199de7cb12f2015ebc4a3e5e7'/" "$failroot/packages/cachy-omarchy-shell/PKGBUILD"
+  before_lock=$(sha256sum "$failroot/upstream.lock")
+  before_pkg=$(sha256sum "$failroot/packages/cachy-omarchy-shell/PKGBUILD")
+  fail_pac=$COO_TEST_SANDBOX/fail-$mode-pacman.log
+  : >"$fail_pac"
+  envs=(COO_REPO_ROOT="$failroot" COO_GIT_BIN="$fake/git" COO_STATE_DIR="$COO_TEST_SANDBOX/fail-$mode-state" COO_BUILD_DIR="$COO_TEST_SANDBOX/fail-$mode-build" COO_TOOL_LOG="$log" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_TEST_RUNNER="$fake/test-runner" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$fail_pac")
+  case $mode in
+    patch) envs+=(COO_PATCH_FAIL=1); update_id=U05; expected_code=1 ;;
+    build) envs+=(COO_FAKE_BUILD_FAIL=1); update_id=U06; expected_code=7 ;;
+    audit) envs+=(COO_FAKE_AUDIT_FAIL=1); update_id=U07; expected_code=1 ;;
+    test) envs+=(COO_FAKE_TEST_MODE=skip); update_id=U08; expected_code=1 ;;
+  esac
+  code=0
+  out=$(env "${envs[@]}" "$failroot/bin/update-upstream" 2>&1) || code=$?
+  assert_eq "$code" "$expected_code" "$update_id $mode failure blocks publish"
+  assert_eq "$(sha256sum "$failroot/upstream.lock")" "$before_lock" "U$mode failure preserves lock"
+  assert_eq "$(sha256sum "$failroot/packages/cachy-omarchy-shell/PKGBUILD")" "$before_pkg" "U$mode failure preserves PKGBUILD"
+  assert_eq "$(wc -l <"$fail_pac")" "0" "U$mode failure invokes no pacman"
+done
 
 exit "$ASSERT_FAILURES"
