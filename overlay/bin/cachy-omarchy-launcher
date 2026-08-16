@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# 실행 중인 패키징 Quattro 셸에 원본 omarchy.menu 를 토글한다.
+# IPC 를 재발명하지 않는다 — cachy-omarchy-shell --ipc 에 위임 (SPEC 15, 56, 71).
+set -uo pipefail
+
+here=$(cd "$(dirname -- "$0")" && pwd)
+if [[ -x $here/cachy-omarchy-shell ]]; then
+  SHELL_BIN=$here/cachy-omarchy-shell
+else
+  SHELL_BIN=${COO_SHELL_BIN:-cachy-omarchy-shell}
+fi
+
+usage() {
+  cat <<'USAGE'
+사용법: cachy-omarchy-launcher
+
+실행 중인 cachy-omarchy-shell 에 --ipc 로 원본 omarchy.menu 를 토글한다.
+IPC 를 다시 구현하지 않는다. 셸이 떠 있지 않으면 실패한다.
+
+  --help    이 도움말
+USAGE
+}
+
+case ${1:-} in
+  --help) usage; exit 0 ;;
+  "") ;;
+  *) printf 'error: 알 수 없는 인자: %s\n' "$1" >&2; usage >&2; exit 1 ;;
+esac
+
+out=$("$SHELL_BIN" --ipc shell toggle omarchy.menu '{"menu":"root"}' 2>&1)
+code=$?
+if (( code != 0 )); then
+  printf '%s\n' "$out" >&2
+  if [[ $out == *"셸이 실행 중이 아니다"* || $out == *"셸이 응답하지 않는다"* ]]; then
+    printf 'error: 셸이 기동되어 있지 않다. cachy-omarchy-shell --run 을 먼저 실행하라.\n' >&2
+  fi
+  exit 1
+fi
+[[ -n $out ]] && printf '%s\n' "$out"
+exit 0
