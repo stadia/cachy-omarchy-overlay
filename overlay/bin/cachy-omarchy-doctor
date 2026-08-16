@@ -171,7 +171,7 @@ check_build_manifest() {
   # Preserve the original validated diagnostic wording; installed state is the
   # new, separately named pointer so operators can distinguish the two.
   [[ $label == validated ]] && prefix="" || prefix="$label "
-  [[ -e $manifest ]] || { warn "${prefix}artifact/manifest not present"; return; }
+  [[ -e $manifest || -L $manifest ]] || { warn "${prefix}artifact/manifest not present"; return; }
   read_manifest "$manifest" || { fail "${prefix}artifact/manifest mismatch: $MANIFEST_ERROR"; return; }
   if ! command -v "$SHA256_BIN" >/dev/null 2>&1; then
     fail "${prefix}artifact/manifest mismatch: checksum tool unavailable ($SHA256_BIN)"
@@ -259,7 +259,7 @@ else
   warn "IPC ping not measurable (shell not observed)"
 fi
 
-[[ ! -e $STATE_DIR/install-pending.manifest ]] \
+[[ ! -e $STATE_DIR/install-pending.manifest && ! -L $STATE_DIR/install-pending.manifest ]] \
   && pass "incomplete install state absent" \
   || fail "incomplete install state: install-pending.manifest requires operator recovery"
 check_manifest

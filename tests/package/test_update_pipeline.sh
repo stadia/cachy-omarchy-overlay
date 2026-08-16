@@ -330,6 +330,64 @@ out=$(run_rc_doctor "$COO_TEST_SANDBOX/state") || code=$?
 assert_eq "$code" "0" "U10 rolled-back pair is doctor-healthy"
 assert_contains "$out" "PASS: installed artifact/manifest (3.9.9" "U10 doctor reflects rolled-back pair"
 
+# M7 follow-up: rollback finalization failure is ambiguous after pacman, so its
+# pending marker must block all later package-manager actions and doctor must
+# fail closed rather than trusting the previous installed pointer.
+rollback_pending_state=$COO_TEST_SANDBOX/rollback-pending-state
+cp -a "$COO_TEST_SANDBOX/state" "$rollback_pending_state"
+rm -f "$rollback_pending_state/install-pending.manifest"
+: >"$paclog"
+code=0
+out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$rollback_pending_state" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" COO_MV_BIN="$fake/mv" COO_FAKE_INSTALLED_MV_FAIL=1 "$root/bin/rollback" 2>&1) || code=$?
+assert_eq "$code" "14" "rollback finalization failure is reported"
+assert_eq "$(wc -l <"$paclog")" "1" "rollback finalization failure ran pacman once"
+assert_file_exists "$rollback_pending_state/install-pending.manifest" "rollback finalization failure retains pending marker"
+code=0
+out=$(run_rc_doctor "$rollback_pending_state") || code=$?
+assert_eq "$code" "1" "rollback pending state fails doctor"
+assert_contains "$out" "FAIL: incomplete install state" "rollback pending state is explicit"
+: >"$paclog"
+code=0
+out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$rollback_pending_state" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$root/bin/install-packages" --install 2>&1) || code=$?
+assert_eq "$code" "1" "rollback pending state blocks install"
+assert_eq "$(wc -l <"$paclog")" "0" "rollback pending install invokes no pacman"
+code=0
+out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$rollback_pending_state" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$root/bin/rollback" 2>&1) || code=$?
+assert_eq "$code" "1" "rollback pending state blocks another rollback"
+assert_eq "$(wc -l <"$paclog")" "0" "rollback pending rollback invokes no pacman"
+
+# Dangling state pointers count as state that cannot be trusted, not absence.
+# The fixture validates both the pending guard and installed pointer before any
+# fake pacman invocation.
+dangling_state=$COO_TEST_SANDBOX/dangling-state
+cp -a "$COO_TEST_SANDBOX/state" "$dangling_state"
+rm -f "$dangling_state/install-pending.manifest"
+ln -s missing-pending.manifest "$dangling_state/install-pending.manifest"
+code=0
+out=$(run_rc_doctor "$dangling_state") || code=$?
+assert_eq "$code" "1" "dangling pending marker fails doctor"
+assert_contains "$out" "FAIL: incomplete install state" "dangling pending marker is explicit"
+: >"$paclog"
+code=0
+out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$dangling_state" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$root/bin/install-packages" --install 2>&1) || code=$?
+assert_eq "$code" "1" "dangling pending marker blocks install"
+assert_eq "$(wc -l <"$paclog")" "0" "dangling pending install invokes no pacman"
+code=0
+out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$dangling_state" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$root/bin/rollback" 2>&1) || code=$?
+assert_eq "$code" "1" "dangling pending marker blocks rollback"
+assert_eq "$(wc -l <"$paclog")" "0" "dangling pending rollback invokes no pacman"
+rm -f "$dangling_state/install-pending.manifest" "$dangling_state/installed-build.manifest"
+ln -s missing-installed.manifest "$dangling_state/installed-build.manifest"
+code=0
+out=$(run_rc_doctor "$dangling_state") || code=$?
+assert_eq "$code" "1" "dangling installed pointer fails doctor"
+assert_contains "$out" "FAIL: installed artifact/manifest mismatch" "dangling installed pointer is explicit"
+: >"$paclog"
+code=0
+out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$dangling_state" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$root/bin/install-packages" --install 2>&1) || code=$?
+assert_eq "$code" "1" "dangling installed pointer blocks install"
+assert_eq "$(wc -l <"$paclog")" "0" "dangling installed pointer invokes no pacman"
+
 # Missing/corrupt prior state must not invoke pacman.
 : >"$paclog"
 code=0

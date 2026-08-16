@@ -15,7 +15,7 @@ usage() { printf 'Usage: install-packages --install\n'; }
 [[ ${1:-} == --install && $# -eq 1 ]] || { usage >&2; exit 1; }
 
 pending=$state_dir/install-pending.manifest
-[[ ! -e $pending ]] || { coo_fail 'incomplete install state requires operator recovery'; exit 1; }
+[[ ! -e $pending && ! -L $pending ]] || { coo_fail 'incomplete install state requires operator recovery'; exit 1; }
 manifest=$state_dir/validated-build.manifest
 coo_validate_current_manifest "$repo_root" "$state_dir" "$manifest" "$sha256_bin" || exit 1
 current_release_dir=$COO_RELEASE_DIR
@@ -24,7 +24,7 @@ current_artifacts=("${COO_ARTIFACT_NAMES[@]}")
 # Preserve the previously installed validated pair before any package manager
 # invocation. A missing installed pointer simply means this is the first install.
 installed=$state_dir/installed-build.manifest
-if [[ -e $installed ]]; then
+if [[ -e $installed || -L $installed ]]; then
   coo_validate_manifest "$state_dir" "$installed" "$sha256_bin" || exit 1
   coo_archive_validated_release "$state_dir" "$installed" "$install_bin" "$sha256_bin" "$mv_bin" >/dev/null \
     || { coo_fail 'could not archive previous validated pair'; exit 1; }

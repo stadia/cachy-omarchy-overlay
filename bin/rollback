@@ -20,7 +20,7 @@ esac
 
 # A successful pacman transaction with failed installed-state finalization is
 # intentionally ambiguous. Never roll back from a stale pointer in that state.
-[[ ! -e $state_dir/install-pending.manifest ]] || {
+[[ ! -e $state_dir/install-pending.manifest && ! -L $state_dir/install-pending.manifest ]] || {
   coo_fail 'incomplete install state requires operator recovery'
   exit 1
 }
