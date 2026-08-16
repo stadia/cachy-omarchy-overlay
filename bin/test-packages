@@ -23,7 +23,7 @@ coo_validate_current_manifest "$repo_root" "$state_dir" "$manifest" "$sha256_bin
 out=$(mktemp "${TMPDIR:-/tmp}/coo-test-packages-XXXXXX")
 trap 'rm -f "$out"' EXIT
 set +e
-"$test_runner" >"$out" 2>&1
+env -u COO_STATE_DIR "$test_runner" >"$out" 2>&1
 status=$?
 set -e
 cat "$out"
@@ -31,7 +31,11 @@ if (( status != 0 )); then
   printf 'error: test runner failed: %s\n' "$status" >&2
   exit "$status"
 fi
-if grep -Fq 'skip:' "$out"; then
+# Artifact/source skips are false-green failures. The only allowed skips are
+# explicit opt-in key injection and absent Wayland for live-only smoke checks.
+unexpected_skips=$(grep -F 'skip:' "$out" | grep -Fv 'skip: 라이브 키 주입 (COO_RUN_LIVE=1 필요)' | grep -Fv 'skip: WAYLAND_DISPLAY 없음' || true)
+if [[ -n $unexpected_skips ]]; then
+  printf '%s\n' "$unexpected_skips" >&2
   coo_fail 'test runner skipped required coverage'
   exit 1
 fi

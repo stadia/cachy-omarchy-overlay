@@ -57,6 +57,10 @@ for item in upstream.lock UPSTREAM.md; do
   [[ -f $repo_root/$item ]] && cp -a "$repo_root/$item" "$candidate/$item"
 done
 mkdir -p "$candidate/build"
+# Some source tests use git ls-files. This is a disposable candidate index,
+# never a worktree or mutation of the caller's repository.
+git init -q "$candidate"
+git -C "$candidate" add -A
 
 candidate_lock=$candidate/upstream.lock
 candidate_pkg=$candidate/packages/cachy-omarchy-shell/PKGBUILD
@@ -89,10 +93,14 @@ done < <(find "$candidate/packages" -path '*/patches/*.patch' -type f -print0 | 
 # deliberately so U06–U08 can use fake makepkg/audit/test tools without network.
 candidate_state=$candidate/state
 candidate_build=$candidate/build
+candidate_source=${COO_OMARCHY_GIT:-$repo_root/build/omarchy}
 COO_REPO_ROOT="$candidate" COO_BUILD_DIR="$candidate_build" COO_STATE_DIR="$candidate_state" \
-  COO_OMARCHY_GIT="${COO_OMARCHY_GIT:-$repo_root/build/omarchy}" \
+  COO_OMARCHY_GIT="$candidate_source" \
   "$candidate/bin/build-packages"
+# Source-tree package tests default to $REPO_ROOT/build/omarchy; preserve the
+# selected original source path for the candidate's real test runner.
 COO_REPO_ROOT="$candidate" COO_STATE_DIR="$candidate_state" \
+  COO_OMARCHY_GIT="$candidate_source" \
   "$candidate/bin/test-packages"
 
 candidate_manifest=$candidate_state/validated-build.manifest

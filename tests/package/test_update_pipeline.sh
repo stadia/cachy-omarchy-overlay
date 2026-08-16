@@ -3,6 +3,13 @@
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/assert.sh"
 
+# A default candidate suite invokes this test again. The outer fake-tool test
+# controls that recursion while retaining the candidate's actual test runner.
+if [[ ${COO_UPDATE_PIPELINE_NESTED:-0} == 1 ]]; then
+  echo "nested update pipeline fixture complete"
+  exit 0
+fi
+
 root=$COO_TEST_SANDBOX/repo
 mkdir -p "$root/packages" "$root/bin"
 cp -a "$REPO_ROOT/upstream.lock" "$root/"
@@ -47,11 +54,23 @@ mkdir -p "$PKGDEST"
 if [[ $PWD == *cachy-omarchy-shell ]]; then
   ver=$(grep -m1 '^pkgver=' PKGBUILD | cut -d= -f2 | tr -d "'\"")
   rel=$(grep -m1 '^pkgrel=' PKGBUILD | cut -d= -f2 | tr -d "'\"")
-  : >"$PKGDEST/cachy-omarchy-shell-${ver}-${rel}-any.pkg.tar.zst"
+  target="$PKGDEST/cachy-omarchy-shell-${ver}-${rel}-any.pkg.tar.zst"
+  if [[ -n ${COO_FAKE_ARTIFACT_SOURCE:-} ]]; then
+    source_archive=$(find "$COO_FAKE_ARTIFACT_SOURCE" -maxdepth 1 -type f -name 'cachy-omarchy-shell-*.pkg.tar.zst' -print -quit)
+    cp "$source_archive" "$target"
+  else
+    : >"$target"
+  fi
 else
   ver=$(grep -m1 '^pkgver=' PKGBUILD | cut -d= -f2 | tr -d "'\"")
   rel=$(grep -m1 '^pkgrel=' PKGBUILD | cut -d= -f2 | tr -d "'\"")
-  : >"$PKGDEST/cachy-omarchy-overlay-${ver}-${rel}-any.pkg.tar.zst"
+  target="$PKGDEST/cachy-omarchy-overlay-${ver}-${rel}-any.pkg.tar.zst"
+  if [[ -n ${COO_FAKE_ARTIFACT_SOURCE:-} ]]; then
+    source_archive=$(find "$COO_FAKE_ARTIFACT_SOURCE" -maxdepth 1 -type f -name 'cachy-omarchy-overlay-*.pkg.tar.zst' -print -quit)
+    cp "$source_archive" "$target"
+  else
+    : >"$target"
+  fi
 fi
 [[ ${COO_FAKE_EXTRA:-0} != 1 ]] || : >"$PKGDEST/extra.pkg.tar.zst"
 EOF
@@ -93,13 +112,6 @@ EOF
 cat >"$fake/smoke" <<'EOF'
 #!/usr/bin/env bash
 printf 'smoke\n' >>"$COO_PACMAN_LOG"
-EOF
-cat >"$fake/candidate-doc-runner" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-[[ -f ${COO_REPO_ROOT:?}/docs/RUNTIME_STARTUP.md ]] || { echo 'missing candidate docs' >&2; exit 41; }
-[[ -f $COO_REPO_ROOT/docs/COMMAND_AUDIT.md ]] || { echo 'missing candidate audit docs' >&2; exit 42; }
-exec "$COO_REPO_ROOT/tests/test.sh" test_m3_docs
 EOF
 chmod +x "$fake"/*
 
@@ -294,10 +306,9 @@ assert_eq "$(wc -l <"$log")" "0" "U01 update invokes no build"
 
 # Candidate validation must carry docs required by the repository's default test runner.
 cp -a "$REPO_ROOT/docs" "$root/docs"
-mkdir -p "$root/tests/lib" "$root/tests/runtime"
-cp -a "$REPO_ROOT/tests/test.sh" "$root/tests/test.sh"
-cp -a "$REPO_ROOT/tests/lib/assert.sh" "$root/tests/lib/assert.sh"
-cp -a "$REPO_ROOT/tests/runtime/test_m3_docs.sh" "$root/tests/runtime/test_m3_docs.sh"
+cp -a "$REPO_ROOT/tests" "$root/tests"
+cp -a "$REPO_ROOT/lib" "$root/lib"
+cp -a "$REPO_ROOT/overlay" "$root/overlay"
 
 # U02/U03: successful update uses peeled commit, resets only shell pkgrel, and never installs.
 update_state=$COO_TEST_SANDBOX/update-state
@@ -305,9 +316,10 @@ update_build=$COO_TEST_SANDBOX/update-build
 pac_update=$COO_TEST_SANDBOX/update-pacman.log
 : >"$pac_update"
 code=0
-out=$(COO_REPO_ROOT="$root" COO_GIT_BIN="$fake/git" COO_STATE_DIR="$update_state" COO_BUILD_DIR="$update_build" COO_TOOL_LOG="$log" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_TEST_RUNNER="$fake/candidate-doc-runner" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$pac_update" "$root/bin/update-upstream" 2>&1) || code=$?
+out=$(WAYLAND_DISPLAY= COO_UPDATE_PIPELINE_NESTED=1 COO_REPO_ROOT="$root" COO_GIT_BIN="$fake/git" COO_STATE_DIR="$update_state" COO_BUILD_DIR="$update_build" COO_OMARCHY_GIT="$REPO_ROOT/build/omarchy" COO_TOOL_LOG="$log" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_FAKE_ARTIFACT_SOURCE="$REPO_ROOT/build" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$pac_update" "$root/bin/update-upstream" 2>&1) || code=$?
 assert_eq "$code" "0" "U02 update validates and publishes candidate"
-assert_contains "$out" "PASS tests/runtime/test_m3_docs.sh" "candidate runs M3 docs test"
+assert_contains "$out" "PASS tests/runtime/test_m3_docs.sh" "candidate default suite runs M3 docs test"
+assert_contains "$out" "PASS tests/package/test_package_files.sh" "candidate default suite reaches package files test"
 updated_lock=$(cat "$root/upstream.lock")
 updated_pkg=$(cat "$root/packages/cachy-omarchy-shell/PKGBUILD")
 assert_contains "$updated_lock" "OMARCHY_VERSION=4.0.1" "U02 lock version updates"
