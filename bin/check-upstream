@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Read-only Omarchy release discovery (SPEC §30).
+set -euo pipefail
+
+repo_root=${COO_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}
+git_bin=${COO_GIT_BIN:-git}
+lock=$repo_root/upstream.lock
+[[ -f $lock ]] || { echo "error: upstream.lock not found" >&2; exit 1; }
+# shellcheck disable=SC1090
+source "$lock"
+
+refs=$($git_bin ls-remote --tags --refs "$OMARCHY_REPOSITORY") || {
+  echo "error: unable to query upstream tags" >&2; exit 1;
+}
+latest=$(awk '$2 ~ /^refs\/tags\/v[0-9]+\.[0-9]+\.[0-9]+$/ { sub("refs/tags/v", "", $2); print $2 }' <<<"$refs" | sort -V | tail -n1)
+[[ -n $latest ]] || { echo "error: no stable semver tags found" >&2; exit 1; }
+commit=$(awk -v tag="refs/tags/v$latest" '$2 == tag { print $1; exit }' <<<"$refs")
+[[ $commit =~ ^[0-9a-fA-F]{40}$ ]] || { echo "error: invalid commit for v$latest" >&2; exit 1; }
+
+printf 'Current:\n  Omarchy %s\n  %s\n\n' "$OMARCHY_VERSION" "$OMARCHY_COMMIT"
+printf 'Available:\n  Omarchy %s\n  %s\n\n' "$latest" "$commit"
+if [[ $latest == "$OMARCHY_VERSION" && $commit == "$OMARCHY_COMMIT" ]]; then
+  echo 'Status:'; echo '  up to date'
+else
+  echo 'Status:'; echo '  update available'
+fi
