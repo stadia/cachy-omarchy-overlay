@@ -18,5 +18,5 @@ fi
 sha256sums=('SKIP')
 
 package() {
-  :
+  bash "$startdir/stage-upstream.sh" "$srcdir/omarchy" "$pkgdir"
 }
