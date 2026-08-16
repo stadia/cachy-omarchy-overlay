@@ -321,3 +321,121 @@ SUPER/mainMod 형식만 충돌로 인식한다. 테스트는 사용자 설정을
 패치 수 0을 유지한다(`packages/cachy-omarchy-shell/patches/README.md`: `none`).
 overlay 패키지, `cachy-omarchy-init`, Waybar 처리와 실제 설치 통합은 **M5 범위 밖**이며,
 사용자 지시 전에는 구현하거나 merge/handoff 하지 않는다.
+
+---
+
+## 9. M5 결과 — 오버레이 패키지와 설치 트리 통합 검증
+
+브랜치 `feature/spec-1.0-m5`. `tests/runtime/test_installed_tree.sh` 가 두 패키지
+아티팩트(`cachy-omarchy-overlay-0.1.0-1-any.pkg.tar.zst`,
+`cachy-omarchy-shell-4.0.0-1-any.pkg.tar.zst`)를 임시 디렉터리에 겹쳐 추출해
+"설치된 것처럼" 배치하고, 공개 명령이 그 트리만으로 동작하는지 검증한다.
+`sudo`/`pacman -U` 는 쓰지 않는다. 패치 수는 여전히 **0**이다.
+
+### 9.1 패키지 소유 경로 — `cachy-omarchy-overlay` 실측
+
+`bsdtar -tvf build/cachy-omarchy-overlay-0.1.0-1-any.pkg.tar.zst` 로 실측한 결과,
+메타 항목(`.BUILDINFO`/`.MTREE`/`.PKGINFO`)과 디렉터리 항목을 뺀 **파일 11개**가
+정확히 아래 경로다:
+
+| # | 경로 |
+| --- | --- |
+| 1 | `usr/bin/cachy-omarchy-bindings` |
+| 2 | `usr/bin/cachy-omarchy-init` |
+| 3 | `usr/bin/cachy-omarchy-keybindings` |
+| 4 | `usr/bin/cachy-omarchy-launcher` |
+| 5 | `usr/bin/cachy-omarchy-shell` |
+| 6 | `usr/lib/cachy-omarchy/compat/bin/omarchy-shell` |
+| 7 | `usr/lib/cachy-omarchy/compat/bin/uwsm-app` |
+| 8 | `usr/lib/systemd/user/cachy-omarchy-shell.service` |
+| 9 | `usr/share/cachy-omarchy/defaults/shell.json` |
+| 10 | `usr/share/cachy-omarchy/hypr/bindings.conf` |
+| 11 | `usr/share/cachy-omarchy/hypr/bindings.lua` |
+
+`/etc`, `/boot`, `/efi`, system 유닛(`usr/lib/systemd/system/`)은 소유하지 않는다.
+compat shim(6, 7번)은 `/usr/lib/cachy-omarchy/compat/bin/` 에만 있고 `/usr/bin` 으로
+새지 않는다 — `test_installed_tree.sh` 가 두 방향 모두 확인한다.
+
+### 9.2 `cachy-omarchy-init` 계약
+
+`overlay/bin/cachy-omarchy-init` (설치 후 `usr/bin/cachy-omarchy-init`)은 패키지의
+post-install 훅이 아니라 **사용자가 직접 실행**하는 유저 레벨 헬퍼다(SPEC §38). 무엇을
+만드는지, 언제 만드는지, 멱등 규칙은 다음과 같다.
+
+- **만드는 것 (최초 실행 시에만)**
+  - `~/.config/cachy-omarchy/shell.json` — `$COO_PREFIX_ROOT/defaults/shell.json` 복사본.
+  - `~/.config/cachy-omarchy/hypr/bindings.{conf,lua}` — `cachy-omarchy-bindings` 에
+    위임해 설치하고, 사용자 Hyprland 설정에 관리 source 블록만 주입한다(본문은 건드리지
+    않음).
+  - `~/.local/state/omarchy/toggles/bar-off` — 내장 바를 숨기는 빈 파일.
+- **멱등 규칙 — 파일 단위, 존재 여부만 본다.** 대상 파일이 이미 있으면 건드리지 않고
+  "유지" 메시지만 낸다. 두 번째 실행은 사용자가 고친 `shell.json` 을 덮어쓰지 않는다
+  (`tests/runtime/test_init.sh` 의 `USER_EDIT` 보존 검증).
+  - `--dry-run` 은 무엇을 할지 출력만 하고 **아무 파일도 만들지 않는다.**
+- **`bar-off` 는 사용자가 지우면 되살리지 않는다.** 판단 기준은 **파일이 아니라
+    toggles 디렉터리의 존재**다: `~/.local/state/omarchy/toggles/` 디렉터리가 이미
+    있으면(즉, 최초 실행을 이미 거쳤으면) 그 안의 `bar-off` 를 다시 만들지 않는다 —
+    사용자가 지운 것을 "바를 보겠다"는 의사로 해석한다. 디렉터리 자체가 없을 때만
+    최초 생성 대상이다.
+- 바인딩 설치는 **재구현하지 않고** 형제 명령 `cachy-omarchy-bindings` 에 위임한다
+  (SPEC §20). `--force` 는 그대로 전달되며, 충돌 시에도 기존 사용자 바인딩 줄을
+  지우지 않는다. `hyprctl reload` 는 어디에서도 호출하지 않는다.
+
+### 9.3 바 / Waybar 상태 — 정확히 이렇게 말한다
+
+**패키지 기본값은 내장 바를 끄지 못한다.** `shell.qml:975` 의 `canDisable: !isBarOption`
+때문에 바 종류(`kinds` 에 `"bar"` 포함) 플러그인은 `disabledPlugins` 검사 이전에
+early-return 하도록 업스트림이 설계돼 있다(§3 상세). 이 제약은 M5 에서도 그대로다 —
+`shell.json` 만으로는 바를 끌 수 없다.
+
+`cachy-omarchy-init` 를 **실행한** 사용자만 `~/.local/state/omarchy/toggles/bar-off`
+를 갖게 되고, 그 토글이 바를 화면 밖(`y=-26`)으로 숨긴다. `cachy-omarchy-init` 를
+실행하지 않은 사용자는 매 모니터 상단에 26px 를 예약하는 바를 그대로 보게 된다.
+
+**"Waybar 가 보존된다"고 선언하지 않는다.** 이 오버레이는 사용자의 기존 Waybar 를
+찾거나 조율하지 않는다. 위 문장은 "패키지 설치만으로 내장 바가 꺼진다"는 오해를 막기
+위한 것이며, `init` 를 실행한 뒤에도 검증한 것은 Omarchy 내장 바가 숨는다는 사실뿐이고
+Waybar 와의 상호작용은 측정한 적이 없다.
+
+### 9.4 systemd 타깃 실측 (재확인, 2026-08-16)
+
+Task 4 가 측정한 값을 본 태스크에서 동일한 읽기 전용 명령으로 재확인했다. 값은
+변화가 없다:
+
+```
+$ systemctl --user is-active graphical-session.target; echo "exit=$?"
+inactive
+exit=3
+
+$ systemctl --user show -p WantedBy -p After graphical-session.target
+WantedBy=
+After=graphical-session-pre.target basic.target gnome-session.target
+
+$ systemctl --user list-unit-files | grep -i cachy-omarchy
+(출력 없음 — 일치 항목 없음)
+```
+
+`graphical-session.target` 은 이 호스트에서 **inactive** 이고, `cachy-omarchy-shell.service`
+는 어떤 systemd 유닛 탐색 경로에도 설치돼 있지 않다(추출 트리 안에서만 존재 확인).
+**자동 기동 경로는 실측하지 못했다.** 유닛 파일의 `WantedBy=graphical-session.target`
+은 유닛이 **의도**하는 바이지, 타깃이 활성화됐을 때 실제로 pull-in 되어 기동한다는
+**실측된 동작이 아니다.** `enable`/`start`/`daemon-reload` 를 실행하지 않았으므로 이
+차이를 관측할 방법 자체가 없었다. 이후 문서·핸드오프에서 "자동으로 기동한다"라고
+쓰지 않는다.
+
+### 9.5 미검증 항목
+
+Milestone 5 종료 시점까지 실측하지 못한 것을 명시한다:
+
+1. **실제 `pacman -U` 설치.** 본 태스크의 검증은 `bsdtar` 로 임시 디렉터리에 두 패키지를
+   겹쳐 추출한 것이며, 파일 권한·소유자·`.INSTALL` 스크립트 유무 등 실제 설치와 다른
+   부분이 있을 수 있다.
+2. **`COO_RUN_LIVE=1` 키 주입 전수 테스트.** 포커스 창이 없는 상태에서 사용자가 수동으로
+   실행해야 하는 항목이며, 본 태스크에서는 실행하지 않았다.
+3. **클린 chroot 빌드.** 두 PKGBUILD 모두 `package()` 에서 `$startdir/../../` 로 레포
+   상위 경로를 참조한다(`packages/cachy-omarchy-shell/PKGBUILD`,
+   `packages/cachy-omarchy-overlay/PKGBUILD`). 클린 chroot 는 PKGBUILD 자신의 디렉터리만
+   바인드 마운트하므로 이 경로가 해석되지 않는다. SPEC §26 이 v0.1 에는 일반 `makepkg`
+   를 허용하지만, 릴리스 품질에는 해결이 필요하다(M6/M7 로 이월).
+4. **`graphical-session.target` 자동 기동.** §9.4 참조 — 이 호스트에서 타깃이 inactive
+   라 pull-in 동작을 관측할 수 없었다.

@@ -17,19 +17,44 @@
 
 체크아웃 `version` 파일은 `4.0.0.alpha`다. 공식 패키지 `pkgver`와 태그 `v4.0.0`을 권위로 쓴다.
 
-## Components packaged (M1 빌드·M2 기동 검증, 설치하지 않음)
+## Components packaged (M1–M5, `pacman -U` 실설치는 아직 검증 안 함)
 
-`packages/cachy-omarchy-shell/stage-upstream.sh` 가 실제로 설치하는 것:
+두 패키지로 나뉜다. `cachy-omarchy-shell` 은 핀된 업스트림 트리를, `cachy-omarchy-overlay`
+는 CachyOS 통합(공개 명령·compat shim·유저 유닛·기본값)을 소유한다. 서로 다른 산출물이며
+`cachy-omarchy-overlay` 가 `depends=('cachy-omarchy-shell' 'bash')` 로 전자에 의존한다.
+실측: `tests/runtime/test_installed_tree.sh` (M5) — 두 아티팩트를 겹쳐 추출해 설치된
+것처럼 동작함을 검증. `docs/RUNTIME_STARTUP.md` §9 참조.
 
-- `shell/` 전체 (Quickshell 셸 트리)
+### `cachy-omarchy-shell` (`packages/cachy-omarchy-shell/stage-upstream.sh`)
+
+- `shell/` 전체 (Quickshell 셸 트리) → `/usr/share/cachy-omarchy/upstream/shell/`
 - `version` (핀 표시·doctor)
 - `default/omarchy/omarchy-menu.jsonc` (메뉴 정의)
 - `config/omarchy/shell.json` — **업스트림 것이 아니라 우리 기본값**(`overlay/defaults/shell.json`).
   업스트림 기본값은 바 레이아웃 전체 + `disabledPlugins` 없음이어서, 그대로 쓰면
   사용자 Waybar 위에 Omarchy 바가 뜬다(§4.3). `applyShellConfig()` 가 딥머지하지 않으므로
   이 파일을 우리 것으로 교체하는 것이 무패치 바 억제 수단. 단, `disabledPlugins` 는
-  내장 바를 끄지 못한다 — `RUNTIME_STARTUP.md` §3 한계 참조.
+  내장 바를 끄지 못한다 — `RUNTIME_STARTUP.md` §3·§9.3 한계 참조.
 - `LICENSE` (MIT)
+
+### `cachy-omarchy-overlay` (`packages/cachy-omarchy-overlay/stage-overlay.sh`)
+
+업스트림 소스가 아니라 이 레포에서 새로 작성한 CachyOS 통합 레이어. 실측 소유 경로
+11개(`docs/RUNTIME_STARTUP.md` §9.1)는 다음 다섯 범주다:
+
+- `usr/bin/cachy-omarchy-{shell,launcher,keybindings,bindings,init}` — 공개 명령 5개.
+- `usr/lib/cachy-omarchy/compat/bin/{omarchy-shell,uwsm-app}` — compat shim. `/usr/bin`
+  에는 절대 설치하지 않는다(§44).
+- `usr/lib/systemd/user/cachy-omarchy-shell.service` — 유저 유닛. system 유닛은 소유하지
+  않는다.
+- `usr/share/cachy-omarchy/defaults/shell.json` — `cachy-omarchy-init` 가 최초 실행 시
+  사용자 설정으로 복사하는 정본. `cachy-omarchy-shell` 패키지의 스테이징된 기본값과
+  내용이 동일하다(`test_installed_tree.sh` 가 `jq -S` 로 비교).
+- `usr/share/cachy-omarchy/hypr/{bindings.conf,bindings.lua}` — `cachy-omarchy-bindings`
+  가 사용자 `~/.config/cachy-omarchy/hypr/` 로 복사하는 소스.
+
+`cachy-omarchy-init` 는 post-install 훅이 아니라 사용자가 직접 실행하는 유저 레벨
+헬퍼다(SPEC §38) — 상세 계약은 `docs/RUNTIME_STARTUP.md` §9.2.
 
 ## Components intentionally excluded
 
