@@ -863,3 +863,65 @@ applications/icons/*.png` 가 반복된다. 업스트림 셸 트리에 `omakub` 
 - **lock 화면 공존.** `omarchy.lock` 은 `disabledPlugins` 로 꺼져 있으나 hyprlock 등과
   동시 동작은 관측하지 않았다.
 - `COO_RUN_LIVE=1` 키 주입 자동화 테스트.
+
+---
+
+## 14. systemd user service 검증 (2026-08-17)
+
+§13 의 포그라운드 세션을 종료한 뒤, 설치된 유닛으로 서비스를 기동해 R07 을 검증했다.
+**`enable` 은 하지 않았다** — `start` 만으로 R07 이 성립하고, 이 호스트에서
+`graphical-session.target` 이 inactive 라 enable 해도 자동 기동은 관측할 수 없기
+때문이다. 지속적 변경을 만들지 않는 쪽을 택했다.
+
+### 14.1 기동 — 측정됨
+
+`systemctl --user start cachy-omarchy-shell.service` 가 exit 0 으로 성공했다.
+유닛의 `ConditionEnvironment=WAYLAND_DISPLAY` 는 systemd 사용자 환경에
+`WAYLAND_DISPLAY=wayland-1` 이 있어 충족됐다.
+
+**`MainPID` 가 곧 `quickshell` 이다.** `MainPID=3104997` 이고
+`ps -o comm= -p 3104997` 이 `quickshell` 을 반환했다 — 래퍼의
+`exec env … systemd-cat -- quickshell` 체인이 PID 를 보존하므로 systemd 가 셸
+프로세스를 직접 감독한다. **이것이 R07 의 전제다**: systemd 가 감독하는 대상이
+래퍼 껍데기였다면 셸이 죽어도 재시작이 걸리지 않는다.
+
+IPC ping `ok`, `omarchy-bar` 레이어 생성, 사용자 mako 는 `y=26` 으로 공존.
+
+### 14.2 R07 `Restart=on-failure` — 측정됨
+
+`MainPID` 를 `kill -KILL` 한 뒤 저널이 전 과정을 기록했다:
+
+```
+08:45:41  Started Cachy Omarchy Quattro Shell.
+08:45:58  Main process exited, code=killed, status=9/KILL
+08:45:58  Failed with result 'signal'.
+08:45:59  Scheduled restart job, restart counter is at 1.
+08:45:59  Started Cachy Omarchy Quattro Shell.
+```
+
+| 항목 | 값 |
+| --- | --- |
+| 복구 시간 | 2초 (`RestartSec=1` + 기동) |
+| MainPID | `3104997` → `3105903` |
+| `NRestarts` | 1 |
+| 복구 후 IPC ping | `ok` |
+| 복구 후 바 레이어 | 재생성 1개 |
+
+### 14.3 정상 종료는 재시작하지 않는다 — 측정됨
+
+`systemctl --user stop` 후 `active=inactive`, `NRestarts` 는 1 → 0 으로 리셋,
+`quickshell` 프로세스 부재. **`Restart=on-failure` 가 의도대로 실패에만 반응하고
+정상 종료에는 반응하지 않는다.** 재시작이 도는 것만 확인하면 "정상 종료 후에도
+계속 되살아나는" 반대 결함을 놓친다.
+
+종료 시 바 레이어가 사라지고 사용자 mako 가 `y=26` → **`y=0` 으로 복귀**했다 —
+바가 예약했던 26px 가 반환된 것이며, exclusive zone 을 정상적으로 해제한다는 증거다.
+
+### 14.4 이 절이 검증하지 않은 것
+
+- **자동 기동.** `enable` 하지 않았고 `graphical-session.target` 은 여전히 inactive 다.
+  `WantedBy=graphical-session.target` 이 실제 로그인에서 pull-in 되는지는 미검증이다(§9.4).
+- **`StartLimitBurst` 도달 시 동작.** 재시작을 1회만 유발했다. systemd 기본
+  (10초 내 5회)을 초과하면 유닛이 failed 로 고정되는데, 그 경계는 관측하지 않았다.
+- 서비스는 검증 후 `stop` 했고 `disabled` 상태로 남겼다. `~/.config/systemd/user/`
+  에 `.wants` 심볼릭이 생기지 않았음을 확인했다.

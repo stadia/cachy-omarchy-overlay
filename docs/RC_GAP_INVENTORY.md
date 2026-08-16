@@ -18,7 +18,7 @@
 | upstream commit pin | 측정됨 | `upstream.lock`과 shell PKGBUILD `_commit` 정적 검사 및 `tests/package/test_clean_build.sh`가 clean source HEAD 일치를 검사한다. |
 | shell package build 성공 | 측정됨 (real chroot) | 2026-08-17 `devtools 1:1.5.1-1` + `mkarchroot`로 만든 Arch chroot에서 `build-packages --clean`이 두 패키지를 빌드했고, 산출물 파일 목록·권한이 호스트 빌드본과 동일했다(§12.5). 단 `--nodeps`이므로 의존 선언의 충분성은 이 경로로 검증되지 않는다. |
 | forbidden system path 미소유 | 측정됨 | M6 archive audit 및 `tests/package/test_forbidden.sh`, `tests/runtime/test_runtime_reliability.sh`가 금지 경로를 검사한다. |
-| long-running shell user start | 측정됨 (extracted wrapper); 미검증 (user service) | `tests/runtime/test_runtime_reliability.sh`는 test-owned extracted wrapper의 생존을 확인한다. `graphical-session.target`이 inactive였고 enable/start하지 않아 실제 user service start는 미검증이다. |
+| long-running shell user start | 측정됨 (user service) | 2026-08-17 `systemctl --user start` 로 설치된 유닛을 기동해 `MainPID` 가 곧 `quickshell` 임을 확인하고 IPC `ok` 를 받았다(§14.1). 자동 기동(`enable` + target pull-in)은 여전히 미검증이다(§14.4). |
 | IPC 동작 | 측정됨 (live session) | 라이브 셸에 `cachy-omarchy-shell --ipc shell ping` → `ok`, `listPlugins` 응답 확인(§13.1, §13.5). |
 | SUPER+SPACE launcher | 측정됨 | 사용자가 실제로 눌러 원본 Quattro 런처가 열렸고 `Escape` 로 닫혔다(§13.1). 관리 블록은 `--force` 로 주입됐으며 Hyprland 가 재로드해 바인딩 48→49, `SUPER+space` 중복 0(§13.4). |
 | 일반 앱 launch | 측정됨 | 라이브 런처에서 앱 실행에 성공했다. 이 호스트에 `uwsm` 이 없으므로 compat shim 이 실제로 사용된 증거다(§13.3). |
@@ -45,7 +45,7 @@
 | R04 launcher toggles | 측정됨 (수동) | 사용자가 `SUPER+SPACE` 로 런처를 열었다(§13.1). `COO_RUN_LIVE=1` 자동화 테스트는 여전히 미실행이다. |
 | R05 Escape closes launcher | 측정됨 (수동) | 사용자가 `Escape` 로 런처를 닫았다(§13.1). `wtype` 자동 주입은 여전히 미실행이다. |
 | R06 application launch | 측정됨 | 라이브 런처에서 앱이 실행됐다(§13.1). compat PATH 격리도 `/proc/<pid>/environ` 으로 실측했다(§13.3). |
-| R07 restarting service recovers | 미검증 (systemd service) | 추출 wrapper를 수동 기동→그 자식 PID만 TERM/KILL→수동 재기동하여 두 번째 IPC `ok`를 확인한 것은 **manual wrapper-restart evidence**일 뿐이다. 승인된 user-systemd test 없이 `Restart=on-failure` service recovery는 **미검증**이다. |
+| R07 restarting service recovers | 측정됨 (systemd service) | 2026-08-17 `MainPID` 를 SIGKILL 하자 systemd 가 `Failed with result 'signal'` → `Scheduled restart job` → 2초 내 새 PID 로 복구했고 `NRestarts=1`, 복구 후 IPC `ok`. 정상 `stop` 은 재시작을 유발하지 않았다(§14.2, §14.3). |
 | R08 absence of Waybar modification | 측정됨 (package ownership) | archive/extracted tree에 `/etc`, system unit, home/Waybar path, `.INSTALL`이 없음을 확인했다. 실제 사용자 Waybar 공존은 여전히 미검증이다. |
 | R09 absence of notification replacement | 측정됨 (package ownership) | `omarchy.notifications`는 disabledPlugins에 있고 notification `/etc`·system-unit path가 없다. **dunst/mako 등 live user daemon 보존은 미검증**이다. |
 | R10 absence of lock replacement | 측정됨 (package ownership) | `omarchy.lock`은 disabledPlugins에 있고 lock `/etc`·system-unit path가 없다. **hyprlock 등 live lock setup 보존은 미검증**이다. |
