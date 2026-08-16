@@ -527,7 +527,10 @@ M6 공개 명령은 `bin/check-upstream`, `bin/update-upstream`, `bin/build-pack
 `install-packages`는 인자 없이 설치하지 않고 반드시 `--install`을 요구한다.
 그 직전에 현재 manifest/checksum을 다시 검증하고, 이미 설치된 검증 pair가 있으면
 먼저 state archive로 보존한다. 설치는 정확히 shell+overlay 두 파일만 대상으로
-한다. 실제 `pacman -U` 실행은 사용자 승인 환경에서만 수행한다.
+한다. 실제 `pacman -U` 실행은 사용자 승인 환경에서만 수행한다. pacman 성공 뒤
+`installed-build.manifest` 확정에 실패하면 `install-pending.manifest`를 남기고
+fail-closed로 끝낸다. 이 상태에서는 install/rollback 모두 거부되며, 운영자는
+**operator recovery**로 실제 설치 상태를 확인·정리한 뒤에만 다음 작업을 진행한다.
 
 `rollback`은 `packages/previous-*` 아래의 완전하고 checksum이 맞는 prior pair만
 선택해 두 패키지를 함께 되돌린다. 임의 pacman cache나 CachyOS 시스템 파일,
@@ -540,7 +543,9 @@ pacman을 호출하지 않고 실패한다.
 annotated tag는 peeled commit을, lightweight tag는 direct commit을 사용한다.
 `update-upstream`은 disposable candidate에서 patch→build→audit→test를 모두
 성공시킨 뒤에만 `upstream.lock`, shell PKGBUILD의 `pkgver`/`_commit`, `pkgrel=1`을
-발행한다. overlay 버전은 독립적이므로 upstream update로 바꾸지 않는다.
+발행한다. metadata 두 파일이 성공한 뒤에만 validated manifest를 **마지막**으로
+발행하며, metadata 발행 실패 시 이전 metadata와 manifest를 보상 복구한다. overlay
+버전은 독립적이므로 upstream update로 바꾸지 않는다.
 `bump-pkgrel`은 로컬 packaging revision만 증가시키고 lock/pkgver를 바꾸지 않는다.
 
 `UPSTREAM.md`의 Version/Tag/Commit 표는 사람이 유지하는 snapshot이다. release date와
