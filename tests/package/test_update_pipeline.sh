@@ -12,7 +12,7 @@ fi
 
 root=$COO_TEST_SANDBOX/repo
 mkdir -p "$root/packages" "$root/bin"
-cp -a "$REPO_ROOT/upstream.lock" "$root/"
+cp -a "$REPO_ROOT/upstream.lock" "$REPO_ROOT/UPSTREAM.md" "$root/"
 while IFS= read -r -d '' path; do
   mkdir -p "$root/$(dirname "$path")"
   cp -a "$REPO_ROOT/$path" "$root/$path"
