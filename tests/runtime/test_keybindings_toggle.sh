@@ -161,6 +161,7 @@ for _ in $(seq 1 40); do
 done
 [[ $helper_code != 999 ]] && helper_exited=0 || helper_exited=1
 assert_eq "$helper_exited" "0" "Escape 취소 뒤 helper PID 가 종료한다"
+assert_eq "$helper_code" "0" "Escape 취소 뒤 helper exit 0"
 printf '      FINDING: helper cancellation exit = %s\n' "$helper_code"
 
 cleanup
