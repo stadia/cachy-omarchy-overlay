@@ -14,6 +14,8 @@ INSTALL_ROOT=$(dirname "$(dirname "$PREFIX_ROOT")")
 BIN_DIR=$INSTALL_ROOT/bin
 SERVICE_FILE=$INSTALL_ROOT/lib/systemd/user/cachy-omarchy-shell.service
 OMARCHY_PATH=${COO_OMARCHY_PATH:-$PREFIX_ROOT/upstream}
+SHA256_BIN=${COO_SHA256_BIN:-sha256sum}
+IPC_TIMEOUT=${COO_IPC_TIMEOUT:-2s}
 
 failures=0
 pass() { printf 'PASS: %s\n' "$1"; }
@@ -84,46 +86,71 @@ check_packages() {
   done
 }
 
-check_manifest() {
-  local manifest=$STATE_DIR/validated-build.manifest line release version commit artifact count=0 sum name path actual
-  [[ -e $manifest ]] || { warn "validated artifact/manifest not present"; return; }
-  [[ -f $manifest ]] || { fail "artifact/manifest mismatch: manifest is not a regular file"; return; }
-
-  release=$(awk -F= '$1 == "RELEASE" { n++; value=$2 } END { if (n == 1) print value }' "$manifest")
-  version=$(awk -F= '$1 == "OMARCHY_VERSION" { n++; value=$2 } END { if (n == 1) print value }' "$manifest")
-  commit=$(awk -F= '$1 == "OMARCHY_COMMIT" { n++; value=$2 } END { if (n == 1) print value }' "$manifest")
-  if [[ ! $release =~ ^validated-builds/[A-Za-z0-9._+-]+$ || ! $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ || ! $commit =~ ^[0-9A-Fa-f]{40}$ ]]; then
-    fail "artifact/manifest mismatch: invalid manifest identity"
-    return
-  fi
+# Keep this parser schema-equivalent to bin/validated-build.sh. Doctor is
+# shipped separately from the repository helper, so it cannot source that file
+# from an installed tree.
+read_manifest() {
+  local manifest=$1 line value name sum
+  local seen_release=0 seen_version=0 seen_commit=0 seen_shell=0 seen_overlay=0
+  MANIFEST_ERROR="" MANIFEST_RELEASE="" MANIFEST_VERSION="" MANIFEST_COMMIT=""
+  MANIFEST_NAMES=() MANIFEST_SUMS=()
+  [[ -f $manifest ]] || { MANIFEST_ERROR="manifest is not a regular file"; return 1; }
 
   while IFS= read -r line || [[ -n $line ]]; do
-    [[ $line == ARTIFACT=* ]] || continue
-    artifact=${line#ARTIFACT=}
-    name=${artifact%% *}; sum=${artifact#* }
-    count=$((count + 1))
-    if [[ $name == "$artifact" || ! $name =~ ^[A-Za-z0-9._+-]+\.pkg\.tar\.zst$ || ! $sum =~ ^[0-9A-Fa-f]{64}$ ]]; then
-      fail "artifact/manifest mismatch: invalid artifact record"
-      return
-    fi
-    path=$STATE_DIR/$release/artifacts/$name
-    if [[ ! -f $path ]]; then
-      fail "artifact/manifest mismatch: missing $name"
-      return
-    fi
-    if command -v sha256sum >/dev/null 2>&1; then
-      actual=$(sha256sum "$path" 2>/dev/null | awk '{print $1}')
-      if [[ $actual != "$sum" ]]; then
-        fail "artifact/manifest mismatch: checksum $name"
-        return
-      fi
-    fi
+    case $line in
+      RELEASE=*)
+        [[ $seen_release -eq 0 ]] || { MANIFEST_ERROR="duplicate RELEASE"; return 1; }
+        seen_release=1; MANIFEST_RELEASE=${line#RELEASE=} ;;
+      OMARCHY_VERSION=*)
+        [[ $seen_version -eq 0 ]] || { MANIFEST_ERROR="duplicate OMARCHY_VERSION"; return 1; }
+        seen_version=1; MANIFEST_VERSION=${line#OMARCHY_VERSION=} ;;
+      OMARCHY_COMMIT=*)
+        [[ $seen_commit -eq 0 ]] || { MANIFEST_ERROR="duplicate OMARCHY_COMMIT"; return 1; }
+        seen_commit=1; MANIFEST_COMMIT=${line#OMARCHY_COMMIT=} ;;
+      ARTIFACT=*)
+        value=${line#ARTIFACT=}; name=${value%% *}; sum=${value#* }
+        [[ $name != "$value" && $name =~ ^[A-Za-z0-9._+-]+\.pkg\.tar\.zst$ && $sum =~ ^[0-9a-fA-F]{64}$ ]] \
+          || { MANIFEST_ERROR="invalid ARTIFACT"; return 1; }
+        case $name in
+          cachy-omarchy-shell-*)
+            [[ $seen_shell -eq 0 ]] || { MANIFEST_ERROR="duplicate shell artifact"; return 1; }
+            seen_shell=1 ;;
+          cachy-omarchy-overlay-*)
+            [[ $seen_overlay -eq 0 ]] || { MANIFEST_ERROR="duplicate overlay artifact"; return 1; }
+            seen_overlay=1 ;;
+          *) MANIFEST_ERROR="unknown artifact type"; return 1 ;;
+        esac
+        MANIFEST_NAMES+=("$name"); MANIFEST_SUMS+=("$sum") ;;
+      "") ;;
+      *) MANIFEST_ERROR="unknown manifest field"; return 1 ;;
+    esac
   done <"$manifest"
-  if [[ $count -ne 2 ]]; then
-    fail "artifact/manifest mismatch: expected shell and overlay artifacts"
+
+  [[ $seen_release -eq 1 && $seen_version -eq 1 && $seen_commit -eq 1 && $seen_shell -eq 1 && $seen_overlay -eq 1 ]] \
+    || { MANIFEST_ERROR="missing required singleton fields"; return 1; }
+  [[ $MANIFEST_RELEASE =~ ^(validated-builds|packages)/[A-Za-z0-9._+-]+$ ]] \
+    || { MANIFEST_ERROR="unsafe RELEASE"; return 1; }
+  [[ $MANIFEST_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && $MANIFEST_COMMIT =~ ^[0-9a-fA-F]{40}$ ]] \
+    || { MANIFEST_ERROR="invalid upstream pin"; return 1; }
+  [[ ${#MANIFEST_NAMES[@]} -eq 2 && ${MANIFEST_NAMES[0]} == cachy-omarchy-shell-* && ${MANIFEST_NAMES[1]} == cachy-omarchy-overlay-* ]] \
+    || { MANIFEST_ERROR="artifact order/type is invalid"; return 1; }
+}
+
+check_manifest() {
+  local manifest=$STATE_DIR/validated-build.manifest i path actual
+  [[ -e $manifest ]] || { warn "validated artifact/manifest not present"; return; }
+  read_manifest "$manifest" || { fail "artifact/manifest mismatch: $MANIFEST_ERROR"; return; }
+  if ! command -v "$SHA256_BIN" >/dev/null 2>&1; then
+    fail "artifact/manifest mismatch: checksum tool unavailable ($SHA256_BIN)"
     return
   fi
-  pass "validated artifact/manifest ($version, $commit)"
+  for i in "${!MANIFEST_NAMES[@]}"; do
+    path=$STATE_DIR/$MANIFEST_RELEASE/artifacts/${MANIFEST_NAMES[$i]}
+    [[ -f $path ]] || { fail "artifact/manifest mismatch: missing ${MANIFEST_NAMES[$i]}"; return; }
+    actual=$("$SHA256_BIN" "$path" 2>/dev/null | awk '{print $1}')
+    [[ $actual == "${MANIFEST_SUMS[$i]}" ]] || { fail "artifact/manifest mismatch: checksum ${MANIFEST_NAMES[$i]}"; return; }
+  done
+  pass "validated artifact/manifest ($MANIFEST_VERSION, $MANIFEST_COMMIT)"
 }
 
 has_binding_conflict() {
@@ -164,10 +191,21 @@ fi
 
 if command -v pgrep >/dev/null 2>&1 && pgrep -x quickshell >/dev/null 2>&1; then
   pass "Quickshell process running"
-  if command -v qs >/dev/null 2>&1; then
-    warn "IPC ping requires a live target; not invoked by read-only doctor"
-  else
+  if ! command -v qs >/dev/null 2>&1; then
     warn "IPC ping not measurable (qs missing)"
+  elif [[ -z ${WAYLAND_DISPLAY:-} ]]; then
+    warn "IPC ping not measurable (WAYLAND_DISPLAY missing)"
+  elif ! command -v timeout >/dev/null 2>&1; then
+    warn "IPC ping not measurable (timeout missing)"
+  else
+    ipc_output=$(COO_OMARCHY_PATH="$OMARCHY_PATH" COO_COMPAT_BIN="$COMPAT_BIN" \
+      timeout --kill-after=1s "$IPC_TIMEOUT" "$BIN_DIR/cachy-omarchy-shell" --ipc shell ping 2>&1)
+    ipc_status=$?
+    if [[ $ipc_status -eq 0 ]]; then
+      pass "IPC ping${ipc_output:+ ($ipc_output)}"
+    else
+      fail "IPC ping failed${ipc_output:+: $ipc_output}"
+    fi
   fi
 else
   warn "Quickshell process not observed"
