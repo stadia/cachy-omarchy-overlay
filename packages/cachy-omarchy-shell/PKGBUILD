@@ -1,0 +1,22 @@
+# Maintainer: Cachy Omarchy Overlay
+pkgname=cachy-omarchy-shell
+pkgver=4.0.0
+pkgrel=1
+pkgdesc='Pinned Omarchy Quattro shell runtime for CachyOS (no omarchy-settings)'
+arch=('any')
+url='https://github.com/basecamp/omarchy'
+license=('MIT')
+depends=('quickshell' 'hyprland')
+makedepends=('git')
+_commit='f0020448ca87329199de7cb12f2015ebc4a3e5e7'
+
+if [[ -n ${COO_OMARCHY_GIT:-} ]]; then
+  source=("omarchy::git+file://${COO_OMARCHY_GIT}#commit=${_commit}")
+else
+  source=("omarchy::git+https://github.com/basecamp/omarchy.git#commit=${_commit}")
+fi
+sha256sums=('SKIP')
+
+package() {
+  :
+}
