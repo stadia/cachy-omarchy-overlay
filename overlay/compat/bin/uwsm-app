@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# AppLibrary.launch 는 `uwsm-app -- gtk-launch <id>.desktop` 을 부른다.
+# 이 호스트엔 uwsm 이 없다. 스코프 래퍼만 버리고 나머지를 exec 한다 (SPEC 44 WRAPPER).
+# 셸 프로세스 PATH 에만 붙는다 (SPEC 45). 사용자 셸 PATH 를 오염시키지 않는다.
+set -uo pipefail
+if [[ ${1:-} == -- ]]; then
+  shift
+fi
+(( $# >= 1 )) || { printf 'error: uwsm-app: missing command\n' >&2; exit 1; }
+exec "$@"
