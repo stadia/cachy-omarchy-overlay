@@ -371,4 +371,42 @@ Task 6 계획서는 `LazyLoader`가 이 Quickshell 버전에 없을 수 있다�
 만든다"는 것까지 검증된 결과다.
 
 이후 마일스톤(런처, 키바인딩 서피스)이 같은 조합을 재사용할 때는 이 표를 그대로 신뢰해도 된다.
+
+---
+
+## 11. Task 7: 살아있는 인스턴스에 대한 IPC 레벨 실패는 정말 stdout + exit 0인가
+
+Task 7 지시서는 pinned upstream `bin/omarchy-shell`이 가정하는 또 다른 동작 -- 인스턴스는
+떠 있지만 호출 자체가 잘못된 경우(`Target not found.`, `Function not found.`,
+`Too few/Too many arguments provided`)는 stdout에 메시지를 내고 exit 0로 끝난다는 것 --
+을 이 버전에서 독립적으로 검증하라고 명시했다. §5/§9는 "인스턴스가 없거나 아직 준비되지
+않은" 경우만 다루므로 별개의 측정이다.
+
+**측정 방법**: `dev/run-shell.sh`로 `shell/shell.qml`(target `shell`: `ping`/`version`/
+`reload`, target `test`: `open`/`close`/`toggle`/`state`)을 띄운 뒤, `shell ping`으로
+준비 완료를 확인하고 나서 다음을 직접 호출했다.
+
+| 호출 | stdout | exit code |
+|---|---|---|
+| `qs ipc -n -p <shell> call -- nosuchtarget nosuchmethod` | `Target not found.` | **0** |
+| `qs ipc -n -p <shell> call -- shell nosuchmethod` | `Function not found.` | **0** |
+| `qs ipc -n -p <shell> call -- shell ping extraarg` | `Too many arguments provided (0 required but 1 were provided.)`<br>`Function definition: function ping(): string` | **0** |
+| `qs ipc -n -p <shell> call -- shell` (함수명 자체가 없음) | `Function required to send message.` | **0** |
+
+**결론**: 계획서의 가정은 이 버전에서 **그대로 유지된다** -- `Target not found.`,
+`Function not found.`, `Too many arguments provided...`는 모두 exit 0로 stdout에 찍힌다.
+`bin/coo-shell`은 이 세 문자열 패턴(과, 대칭적으로 있을 `Too few arguments provided...`)을
+`call_once()`에서 감지해 exit 3(→ CLI의 exit 1)로 승격시킨다.
+
+`Too few arguments provided`는 이 저장소의 현재 IPC 타겟(`shell`, `test`) 중 인자를 받는
+함수가 하나도 없어 직접 재현하지 못했다 -- 대신 함수명 자체를 생략했을 때 나오는
+`Function required to send message.`를 관측했는데, 이는 계획서가 나열한 네 패턴 어디에도
+안 걸린다. 다만 `bin/coo-shell`은 `target`과 `method` 두 인자를 모두 받았는지 자체 검사
+(`(( $# >= 2 ))`) 후에만 `qs`를 호출하므로, "함수명이 아예 없는" 이 경로는 CLI를 통해서는
+도달할 수 없다 -- 실사용에서 문제되지 않는다. `Too few arguments provided`는 인자를 받는
+타겟이 생기는 이후 마일스톤(런처 등)에서 재검증할 것.
+
+측정에 사용한 인스턴스는 테스트 종료 시 PID로 직접 종료했으며 (`pkill` 미사용),
+`test open`을 호출한 트라이얼은 모두 같은 트라이얼 안에서 `test close`로 되돌린 뒤
+`hyprctl layers`로 `coo-test` 네임스페이스가 남지 않았음을 확인했다.
 </content>

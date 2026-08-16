@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Thin wrapper: toggle the launcher surface. Bound to SUPER + SPACE.
+exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/coo-shell" launcher toggle "$@"

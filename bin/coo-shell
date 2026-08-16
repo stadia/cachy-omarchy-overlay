@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# Forwards an IPC call to the running coo-shell, starting it if needed.
+#
+# Adapted from the IPC-transport behavior of Omarchy's bin/omarchy-shell,
+# https://github.com/basecamp/omarchy @ b724f7615630d7a7aca76dce070d469f43a3bfec
+# MIT, Copyright (c) David Heinemeier Hansson.
+set -uo pipefail
+
+SELF_DIR=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)
+REPO_ROOT=$(cd "$SELF_DIR/.." && pwd)
+source "$REPO_ROOT/lib/common.sh"
+source "$REPO_ROOT/lib/env.sh"
+
+QUIET=0
+if [[ ${1:-} == "-q" ]]; then QUIET=1; shift; fi
+
+fail() {
+  (( QUIET )) && exit 0
+  printf 'error: %s\n' "$1" >&2
+  exit 1
+}
+
+usage() {
+  cat <<'USAGE'
+Usage: coo-shell [-q] <target> <method> [args...]
+
+Forwards an IPC call to the running coo-shell process. Starts the user
+service and retries when the shell is not up, unless COO_NO_AUTOSTART=1.
+
+Options:
+  -q          Quiet best-effort mode: no output, always exit 0.
+  -h,--help   Show this help.
+
+Shorthands:
+  coo-shell ping              -> shell ping
+  coo-shell reload            -> shell reload
+
+Examples:
+  coo-shell ping
+  coo-shell launcher open
+  coo-shell launcher close
+  coo-shell launcher toggle
+  coo-shell keybindings toggle
+  coo-shell reload
+
+Environment:
+  COO_SHELL_PATH        QML root directory (default: installed shell/)
+  COO_NO_AUTOSTART=1    Never start the service; fail instead.
+  COO_IPC_TIMEOUT       Per-call timeout (default: 2s)
+USAGE
+}
+
+if (( $# == 0 )) || [[ ${1:-} == "-h" || ${1:-} == "--help" ]]; then
+  usage; exit 0
+fi
+
+# `ping` and `reload` are shorthands for the `shell` target.
+case $1 in
+  ping|reload|version) set -- shell "$1" ;;
+esac
+(( $# >= 2 )) || fail "usage: coo-shell [-q] <target> <method> [args...]"
+
+SHELL_PATH=${COO_SHELL_PATH:-$(coo_data_root)/shell}
+[[ -f $SHELL_PATH/shell.qml ]] || fail "coo-shell QML not found: $SHELL_PATH/shell.qml"
+
+QS=$(coo_quickshell_bin) || fail "quickshell is not installed"
+
+# qs matches instances by display. A caller from outside the session (ssh,
+# TTY) has none, so recover it from the compositor socket.
+if [[ -z ${WAYLAND_DISPLAY:-} ]]; then
+  socket=$(ls -t "${XDG_RUNTIME_DIR:-/run/user/$UID}"/wayland-[0-9]* 2>/dev/null \
+           | grep -v '\.lock$' | head -n1)
+  [[ -n $socket ]] && export WAYLAND_DISPLAY=${socket##*/}
+fi
+
+IPC_TIMEOUT=${COO_IPC_TIMEOUT:-2s}
+
+# Emits the reply on stdout. Return: 0 ok, 1 not running, 3 IPC-level error
+# (message on stdout), 4 not responding.
+#
+# NOTE on the missing "not ready yet" state: the pinned upstream
+# bin/omarchy-shell also branches on a `Not ready to accept queries yet`
+# reply (stdout, exit 0) for a shell that has started but hasn't registered
+# its IPC socket yet. docs/QUICKSHELL_API.md §9 measured this directly
+# against Quickshell 0.3.0 (15 sequential trials + a 20-way parallel burst
+# aimed at the boot window) and found that reply never occurs: every
+# pre-ready call is byte-identical to the no-instance-at-all case --
+# `No running instances for "..."` on stdout, exit 255. There is no way for
+# this CLI to distinguish "booting" from "never started" via `qs ipc call`
+# on this version, so that branch is not implemented here (it would be dead
+# code, silently unreachable, and its error string would be a guess rather
+# than an observed fact). rc 1 below covers both cases honestly; the bounded
+# retry loop still recovers a shell that is merely slow to start, since it
+# doesn't need to tell the two states apart to do that.
+call_once() {
+  local output status
+  output=$(timeout --kill-after=1s "$IPC_TIMEOUT" \
+           "$QS" ipc -n -p "$SHELL_PATH" call -- "$@" 2>/dev/null)
+  status=$?
+
+  if (( status == 124 || status == 137 )); then return 4; fi
+  if (( status != 0 )); then return 1; fi
+
+  case $output in
+    "Target not found."|"Function not found."|"Too few arguments provided"*|"Too many arguments provided"*)
+      printf '%s' "$output"; return 3 ;;
+  esac
+
+  printf '%s' "$output"
+  return 0
+}
+
+reply=$(call_once "$@"); rc=$?
+
+if (( rc == 1 )) && [[ ${COO_NO_AUTOSTART:-0} != 1 ]]; then
+  systemctl --user start coo-shell.service >/dev/null 2>&1
+  # Bounded retry: 25 x 200ms = 5s ceiling (SPEC 19.3, no unbounded wait).
+  for _ in $(seq 1 25); do
+    sleep 0.2
+    reply=$(call_once "$@"); rc=$?
+    (( rc == 1 )) || break
+  done
+fi
+
+case $rc in
+  0) (( QUIET )) || { [[ -n $reply ]] && printf '%s\n' "$reply"; }; exit 0 ;;
+  1) fail "coo-shell is not running (try: systemctl --user start coo-shell.service, or coo doctor)" ;;
+  3) fail "$reply" ;;
+  4) fail "coo-shell is not responding" ;;
+esac
