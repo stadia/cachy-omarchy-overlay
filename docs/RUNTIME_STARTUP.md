@@ -439,3 +439,41 @@ Milestone 5 종료 시점까지 실측하지 못한 것을 명시한다:
    를 허용하지만, 릴리스 품질에는 해결이 필요하다(M6/M7 로 이월).
 4. **`graphical-session.target` 자동 기동.** §9.4 참조 — 이 호스트에서 타깃이 inactive
    라 pull-in 동작을 관측할 수 없었다.
+5. **🔴 `build/*.pkg.tar.zst` 가 없으면 이 캡스톤 테스트는 아무것도 검증하지 않고
+   "통과"로 집계된다 — Milestone 6 파이프라인은 반드시 이 문단을 읽을 것.**
+   `tests/runtime/test_installed_tree.sh` 는 시작부에 다음 두 줄이 있다:
+
+   ```bash
+   coo_pkg_artifact >/dev/null 2>&1 || { echo "skip: 셸 아티팩트 없음"; exit 0; }
+   coo_overlay_artifact >/dev/null 2>&1 || { echo "skip: 오버레이 아티팩트 없음"; exit 0; }
+   ```
+
+   `build/cachy-omarchy-shell-*.pkg.tar.zst` 또는
+   `build/cachy-omarchy-overlay-*.pkg.tar.zst` 가 (아직 `makepkg` 를 돌리지 않아서)
+   하나라도 없으면, 아홉 개 assertion 중 **단 하나도 실행되지 않고** `exit 0` 으로
+   끝난다. `tests/test.sh` 는 이것을 여느 성공한 테스트와 구분 없이 `PASS` 로 세고
+   총계에 더한다 — 이 태스크 보고서의 "25/25 test files passed" 도 그 스킵 분기를
+   타지 않고 실제로 아홉 assertion 이 전부 돈 결과였지만, 그 사실은 로그를 직접
+   읽어야만 알 수 있고 총계 숫자만으로는 구분되지 않는다. **깨끗한 체크아웃에서
+   `makepkg` 없이 `./tests/test.sh` 만 돌리는 CI 는, 이 캡스톤 테스트가 증명하려는
+   바로 그것(추출 트리 통합)을 한 번도 실행하지 않고도 녹색을 낼 수 있다.**
+
+   같은 패턴이 이 테스트에만 있는 것이 아니다 — `tests/runtime/test_harness.sh`,
+   `tests/runtime/test_shell_smoke.sh`, `tests/runtime/test_app_launch.sh`,
+   `tests/runtime/test_launcher_toggle.sh`, `tests/runtime/test_keybindings_toggle.sh`,
+   `tests/package/test_overlay_files.sh`, `tests/package/test_overlay_forbidden.sh`
+   모두 아티팩트나 라이브 환경(quickshell/jq/hyprctl/wtype/`WAYLAND_DISPLAY`/
+   `COO_RUN_LIVE=1`)이 없으면 동일하게 `skip:` 후 `exit 0` 한다. 즉, **파이프라인
+   요구사항은 이 파일 하나에 국한되지 않는다.**
+
+   이 문서는 스킵 동작 자체를 바꾸지 않는다 — 환경 의존 테스트가 스킵하는 것은
+   정당한 설계이고, 하나만 예외로 만들면 형제 테스트들은 조용히 스킵하는데 이
+   테스트만 깨끗한 체크아웃에서 알 수 없는 빨간불을 내게 된다. 대신 **Milestone 6
+   이 빌드/업데이트 파이프라인을 만들 때 지켜야 할 요구사항으로 못박는다**:
+
+   - 파이프라인은 `./tests/test.sh` 를 돌리기 **전에** 두 패키지 모두 `makepkg` 로
+     빌드해 `build/*.pkg.tar.zst` 를 준비해야 한다.
+   - 파이프라인은 `tests/runtime/test_installed_tree.sh` (및 위에 나열한 형제
+     테스트들)의 출력에서 `skip:` 문자열을 감지하면, 그 테스트를 **PASS 가 아니라
+     실패로 취급**해야 한다 — `tests/test.sh` 자체의 exit code 만으로는 스킵과 실제
+     통과를 구분할 수 없으므로, 파이프라인이 로그를 파싱해 별도로 강제해야 한다.
