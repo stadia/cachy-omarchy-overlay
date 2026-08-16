@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+# Prepare and validate a new upstream pin without installing it (SPEC §31–33).
+set -euo pipefail
+
+repo_root=${COO_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}
+git_bin=${COO_GIT_BIN:-git}
+mv_bin=${COO_MV_BIN:-mv}
+install_bin=${COO_INSTALL_BIN:-install}
+state_dir=${COO_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/cachy-omarchy}
+build_dir=${COO_BUILD_DIR:-$repo_root/build}
+lock=$repo_root/upstream.lock
+shell_pkg=$repo_root/packages/cachy-omarchy-shell/PKGBUILD
+
+fail() { printf 'error: %s\n' "$1" >&2; exit 1; }
+usage() { printf 'Usage: update-upstream\n'; }
+case ${1:-} in
+  --help) usage; exit 0 ;;
+  '') ;;
+  *) usage >&2; exit 1 ;;
+esac
+[[ -f $lock && -f $shell_pkg ]] || fail 'repository update metadata is incomplete'
+# shellcheck disable=SC1090
+source "$lock"
+
+# Match check-upstream: annotated tags use peeled commits; lightweight tags use
+# the direct ref. Only stable vMAJOR.MINOR.PATCH tags are candidates.
+refs=$($git_bin ls-remote --tags "$OMARCHY_REPOSITORY") || fail 'unable to query upstream tags'
+latest=$(awk '$2 ~ /^refs\/tags\/v[0-9]+\.[0-9]+\.[0-9]+$/ { sub("refs/tags/v", "", $2); print $2 }' <<<"$refs" | sort -V | tail -n1)
+[[ -n $latest ]] || fail 'no stable semver tags found'
+tag_ref="refs/tags/v$latest"
+peeled=$(awk -v tag="${tag_ref}^{}" '$2 == tag { print $1; exit }' <<<"$refs")
+direct=$(awk -v tag="$tag_ref" '$2 == tag { print $1; exit }' <<<"$refs")
+commit=${peeled:-$direct}
+[[ $commit =~ ^[0-9a-fA-F]{40}$ ]] || fail "invalid commit for v$latest"
+if [[ $latest == "$OMARCHY_VERSION" && $commit == "$OMARCHY_COMMIT" ]]; then
+  printf 'up to date: Omarchy %s %s\n' "$OMARCHY_VERSION" "$OMARCHY_COMMIT"
+  exit 0
+fi
+
+candidate=$(mktemp -d "${TMPDIR:-/tmp}/coo-update-XXXXXX")
+trap 'rm -rf "$candidate"' EXIT
+# Copy every tracked runtime/test input needed by the default test runner while
+# deliberately pruning ignored makepkg leftovers (packages/*/{pkg,src}).
+copy_tree() {
+  local item=$1 path relative
+  [[ -e $repo_root/$item ]] || return 0
+  while IFS= read -r -d '' path; do
+    relative=${path#"$repo_root/"}
+    mkdir -p "$candidate/$(dirname "$relative")"
+    cp -a "$path" "$candidate/$relative"
+  done < <(find "$repo_root/$item" \( -path '*/pkg' -o -path '*/src' \) -prune -o -type f -print0)
+}
+for item in bin packages overlay tests lib docs; do
+  copy_tree "$item"
+done
+for item in upstream.lock UPSTREAM.md; do
+  [[ -f $repo_root/$item ]] && cp -a "$repo_root/$item" "$candidate/$item"
+done
+mkdir -p "$candidate/build"
+# Some source tests use git ls-files. This is a disposable candidate index,
+# never a worktree or mutation of the caller's repository.
+git init -q "$candidate"
+git -C "$candidate" add -A
+
+candidate_lock=$candidate/upstream.lock
+candidate_pkg=$candidate/packages/cachy-omarchy-shell/PKGBUILD
+cat >"$candidate_lock" <<EOF
+OMARCHY_VERSION=$latest
+OMARCHY_COMMIT=$commit
+OMARCHY_CHANNEL=$OMARCHY_CHANNEL
+OMARCHY_REPOSITORY=$OMARCHY_REPOSITORY
+OMARCHY_TAG=v$latest
+EOF
+pkg_tmp=$(mktemp "${candidate_pkg%/*}/.PKGBUILD-update-XXXXXX")
+awk -v version="$latest" -v pin="$commit" '
+  /^pkgver=/ { print "pkgver=" version; next }
+  /^pkgrel=/ { print "pkgrel=1"; next }
+  /^_commit=/ { print "_commit=\047" pin "\047"; next }
+  { print }
+' "$candidate_pkg" >"$pkg_tmp"
+"$mv_bin" "$pkg_tmp" "$candidate_pkg"
+
+# Current patch set is empty, but the stage is explicit and injectable for U05.
+if [[ ${COO_PATCH_FAIL:-0} == 1 ]]; then
+  fail 'patch application failed'
+fi
+patch_bin=${COO_PATCH_APPLY_BIN:-git}
+while IFS= read -r -d '' patch; do
+  ( cd "$candidate" && "$patch_bin" apply "$patch" ) || fail "patch application failed: ${patch##*/}"
+done < <(find "$candidate/packages" -path '*/patches/*.patch' -type f -print0 | sort -z)
+
+# Candidate commands see only candidate metadata. Tool overrides are inherited
+# deliberately so U06–U08 can use fake makepkg/audit/test tools without network.
+candidate_state=$candidate/state
+candidate_build=$candidate/build
+candidate_source=${COO_OMARCHY_GIT:-$repo_root/build/omarchy}
+COO_REPO_ROOT="$candidate" COO_BUILD_DIR="$candidate_build" COO_STATE_DIR="$candidate_state" \
+  COO_OMARCHY_GIT="$candidate_source" \
+  "$candidate/bin/build-packages"
+# Source-tree package tests default to $REPO_ROOT/build/omarchy; preserve the
+# selected original source path for the candidate's real test runner.
+COO_REPO_ROOT="$candidate" COO_STATE_DIR="$candidate_state" \
+  COO_OMARCHY_GIT="$candidate_source" \
+  "$candidate/bin/test-packages"
+
+candidate_manifest=$candidate_state/validated-build.manifest
+[[ -f $candidate_manifest ]] || fail 'candidate validation manifest missing'
+release_rel=$(awk -F= '$1 == "RELEASE" { print $2; exit }' "$candidate_manifest")
+[[ $release_rel == validated-builds/* && -d $candidate_state/$release_rel ]] || fail 'candidate release missing'
+
+# Publish candidate artifacts/state first. The existing manifest remains the
+# authority until the final pointer rename below; stray flat archives are never
+# treated as validated by M6 commands.
+mkdir -p "$state_dir/validated-builds" "$build_dir"
+release_target=$state_dir/$release_rel
+[[ ! -e $release_target ]] || fail 'candidate release already exists'
+"$mv_bin" "$candidate_state/$release_rel" "$release_target"
+while IFS= read -r artifact; do
+  name=${artifact##*/}
+  "$install_bin" -m 644 "$artifact" "$build_dir/$name"
+done < <(find "$release_target/artifacts" -maxdepth 1 -type f -name '*.pkg.tar.zst' -print | sort)
+# POSIX cannot atomically rename two different tracked files. Prepare both in
+# their own directories, then compensate the first rename if the second or the
+# final manifest commit fails. The old manifest remains authoritative until
+# both tracked metadata files have published.
+pointer_tmp=$(mktemp "$state_dir/.validated-build.manifest-update-XXXXXX")
+cp "$candidate_manifest" "$pointer_tmp"
+lock_backup=$(mktemp "${lock%/*}/.upstream.lock-backup-XXXXXX")
+pkg_backup=$(mktemp "${shell_pkg%/*}/.PKGBUILD-backup-XXXXXX")
+lock_new=$(mktemp "${lock%/*}/.upstream.lock-new-XXXXXX")
+pkg_new=$(mktemp "${shell_pkg%/*}/.PKGBUILD-new-XXXXXX")
+cp "$lock" "$lock_backup"; cp "$shell_pkg" "$pkg_backup"
+cp "$candidate_lock" "$lock_new"; cp "$candidate_pkg" "$pkg_new"
+if ! COO_UPDATE_METADATA_PUBLISH=lock "$mv_bin" "$lock_new" "$lock"; then
+  fail 'could not publish upstream.lock'
+fi
+if ! COO_UPDATE_METADATA_PUBLISH=pkg "$mv_bin" "$pkg_new" "$shell_pkg"; then
+  "$mv_bin" "$lock_backup" "$lock" || fail 'could not restore upstream.lock after PKGBUILD failure'
+  fail 'could not publish shell PKGBUILD; upstream.lock restored'
+fi
+if ! "$mv_bin" "$pointer_tmp" "$state_dir/validated-build.manifest"; then
+  "$mv_bin" "$pkg_backup" "$shell_pkg" || fail 'could not restore shell PKGBUILD after manifest failure'
+  "$mv_bin" "$lock_backup" "$lock" || fail 'could not restore upstream.lock after manifest failure'
+  fail 'could not publish validated manifest; metadata restored'
+fi
+rm -f "$lock_backup" "$pkg_backup"
+
+# UPSTREAM.md includes a human-tested environment and release date. Those facts
+# cannot be inferred from a git tag, so this command deliberately leaves it
+# unchanged and states that the machine authority is upstream.lock.
+printf 'ready: Omarchy %s %s (UPSTREAM.md requires human release/test attestation)\n' "$latest" "$commit"

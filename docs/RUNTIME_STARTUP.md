@@ -491,3 +491,77 @@ Milestone 5 종료 시점까지 실측하지 못한 것을 명시한다:
      테스트들)의 출력에서 `skip:` 문자열을 감지하면, 그 테스트를 **PASS 가 아니라
      실패로 취급**해야 한다 — `tests/test.sh` 자체의 exit code 만으로는 스킵과 실제
      통과를 구분할 수 없으므로, 파이프라인이 로그를 파싱해 별도로 강제해야 한다.
+
+---
+
+## 10. M6 결과 — 검증된 업데이트/재빌드 파이프라인
+
+M6 공개 명령은 `bin/check-upstream`, `bin/update-upstream`, `bin/build-packages`,
+`bin/test-packages`, `bin/install-packages`, `bin/rollback`, `bin/bump-pkgrel`이다.
+이 명령들은 공식 `omarchy`/`omarchy-settings`를 설치하지 않으며, 기본 경로는
+`pacman -U`를 호출하지 않는다.
+
+### 10.1 build-before-test와 false-green 스킵 정책
+
+`build-packages`는 shell 뒤 overlay 순서로 평범한 `makepkg --nodeps`를 실행하고,
+두 아카이브의 금지 경로를 감사한 뒤 checksum을 기록한다. 테스트는 항상
+`build-packages` 뒤에 `test-packages`로 실행한다. `makepkg -i`, clean chroot,
+실제 설치는 이 명령 경로에 없다.
+
+`test-packages`는 현재 lock/패키지 버전과 checksum이 일치하는
+`validated-build.manifest`가 먼저 있어야 한다. 전체 테스트 출력에서 `skip:`을
+실패로 승격한다. 특히 `tests/runtime/test_installed_tree.sh`의 아티팩트 부재
+스킵은 절대 PASS가 아니다. 기본적으로 허용되는 것은 명시적
+`COO_RUN_LIVE=1` 없이 생기는 라이브 키 주입 스킵과 `WAYLAND_DISPLAY` 없는
+라이브 전용 스모크 스킵뿐이며, 이 예외도 설치 트리/패키지 검증 성공을 뜻하지
+않는다.
+
+### 10.2 validated release와 명시적 설치
+
+검증 정본은 `${XDG_STATE_HOME:-$HOME/.local/state}/cachy-omarchy/`
+아래의 `validated-build.manifest`다. manifest는 upstream lock commit, 두 패키지
+이름, SHA-256, immutable release 디렉터리를 함께 묶는다. `build/`의 평면
+아카이브는 편의 복사본일 뿐 검증 권위가 아니며, stale 아티팩트를 설치 후보로
+추정하지 않는다.
+
+`install-packages`는 인자 없이 설치하지 않고 반드시 `--install`을 요구한다.
+그 직전에 현재 manifest/checksum을 다시 검증하고, 이미 설치된 검증 pair가 있으면
+먼저 state archive로 보존한다. 설치는 정확히 shell+overlay 두 파일만 대상으로
+한다. 실제 `pacman -U` 실행은 사용자 승인 환경에서만 수행한다. pacman 성공 뒤
+`installed-build.manifest` 확정에 실패하면 `install-pending.manifest`를 남기고
+fail-closed로 끝낸다. 이 상태에서는 install/rollback 모두 거부되며, 운영자는
+**operator recovery**로 실제 설치 상태를 확인·정리한 뒤에만 다음 작업을 진행한다.
+
+`rollback`은 `packages/previous-*` 아래의 완전하고 checksum이 맞는 prior pair만
+선택해 두 패키지를 함께 되돌린다. 임의 pacman cache나 CachyOS 시스템 파일,
+Hyprland/Waybar/사용자 설정은 복원하지 않는다. prior manifest가 없거나 손상되면
+pacman을 호출하지 않고 실패한다.
+
+### 10.3 update transaction과 버전/문서 경계
+
+`check-upstream`은 stable `vMAJOR.MINOR.PATCH` tag만 조회하는 read-only 명령이다.
+annotated tag는 peeled commit을, lightweight tag는 direct commit을 사용한다.
+`update-upstream`은 disposable candidate에서 patch→build→audit→test를 모두
+성공시킨 뒤에만 `upstream.lock`, shell PKGBUILD의 `pkgver`/`_commit`, `pkgrel=1`을
+발행한다. metadata 두 파일이 성공한 뒤에만 validated manifest를 **마지막**으로
+발행하며, metadata 발행 실패 시 이전 metadata와 manifest를 보상 복구한다. overlay
+버전은 독립적이므로 upstream update로 바꾸지 않는다.
+`bump-pkgrel`은 로컬 packaging revision만 증가시키고 lock/pkgver를 바꾸지 않는다.
+
+`UPSTREAM.md`의 Version/Tag/Commit 표는 사람이 유지하는 snapshot이다. release date와
+CachyOS 실측 환경은 tag 조회만으로 알 수 없으므로 update 뒤 stale일 수 있다.
+자동화/패키징 권위는 항상 `upstream.lock`이며, 사람이 release/test attestation을
+확인한 뒤 `UPSTREAM.md`를 갱신한다.
+
+### 10.4 U01–U10 검증과 남은 한계
+
+`tests/package/test_update_pipeline.sh`는 fake git/makepkg/bsdtar/pacman만 사용해
+U01 no-update/read-only, U02 lock update, U03 pkgrel reset, U04 local bump, U05 patch
+failure, U06 build failure, U07 audit failure, U08 test/skip failure, U09 prior pair
+retention, U10 valid/corrupt rollback을 검증한다. 실패 경로는 모두 install/pacman을
+호출하지 않고 원래 lock/PKGBUILD를 보존해야 한다.
+
+패치 수 0은 계속 유지한다. `packages/*/PKGBUILD`가 `$startdir/../../overlay`을
+참조하므로 clean chroot는 여전히 깨져 있으며 M7에서 해결한다. 또한 이 호스트의
+`graphical-session.target`은 inactive여서 service의 자동 기동은 미검증이다.
+`WantedBy=graphical-session.target`은 의도이지 관측된 자동 시작이 아니다.

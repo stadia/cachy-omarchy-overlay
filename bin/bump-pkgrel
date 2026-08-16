@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Increment only the shell packaging revision (SPEC §34 U04).
+set -euo pipefail
+
+repo_root=${COO_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}
+mv_bin=${COO_MV_BIN:-mv}
+pkgbuild=$repo_root/packages/cachy-omarchy-shell/PKGBUILD
+[[ ${1:-} == "" ]] || { echo "Usage: bump-pkgrel" >&2; exit 1; }
+[[ -f $pkgbuild ]] || { echo "error: shell PKGBUILD not found" >&2; exit 1; }
+old=$(grep -m1 '^pkgrel=' "$pkgbuild" | cut -d= -f2 | tr -d "'\"")
+[[ $old =~ ^[0-9]+$ ]] || { echo "error: invalid pkgrel" >&2; exit 1; }
+new=$((old + 1))
+tmp=$(mktemp "${pkgbuild%/*}/.PKGBUILD.pkgrel-XXXXXX")
+trap 'rm -f "$tmp"' EXIT
+awk -v value="$new" 'BEGIN { done=0 } /^pkgrel=/ && !done { print "pkgrel=" value; done=1; next } { print } END { exit done ? 0 : 1 }' "$pkgbuild" >"$tmp" || { echo "error: pkgrel not found" >&2; exit 1; }
+"$mv_bin" "$tmp" "$pkgbuild"
+trap - EXIT
+printf 'shell pkgrel: %s -> %s\n' "$old" "$new"

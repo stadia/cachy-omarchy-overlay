@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Roll back only a complete, checksummed archive of a prior validated pair.
+set -euo pipefail
+
+repo_root=${COO_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}
+state_dir=${COO_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/cachy-omarchy}
+sha256_bin=${COO_SHA256_BIN:-sha256sum}
+pacman_bin=${COO_PACMAN_BIN:-pacman}
+smoke_bin=${COO_ROLLBACK_SMOKE_BIN:-}
+# shellcheck disable=SC1091
+source "$repo_root/bin/validated-build.sh"
+
+usage() { printf 'Usage: rollback\n'; }
+case ${1:-} in
+  --help) usage; exit 0 ;;
+  '') ;;
+  *) coo_fail "unknown argument: $1"; exit 1 ;;
+esac
+
+# A successful pacman transaction with failed installed-state finalization is
+# intentionally ambiguous. Never roll back from a stale pointer in that state.
+[[ ! -e $state_dir/install-pending.manifest ]] || {
+  coo_fail 'incomplete install state requires operator recovery'
+  exit 1
+}
+
+# Newest complete archive wins. Do not guess from arbitrary package files.
+mapfile -t candidates < <(find "$state_dir/packages" -mindepth 2 -maxdepth 2 -type f -name validated-build.manifest -print 2>/dev/null | sort -r)
+(( ${#candidates[@]} > 0 )) || { coo_fail 'no prior validated build is available'; exit 1; }
+selected=${candidates[0]}
+coo_validate_manifest "$state_dir" "$selected" "$sha256_bin" || {
+  coo_fail 'newest prior validated build is incomplete or corrupt'
+  exit 1
+}
+
+"$pacman_bin" -U "$COO_RELEASE_DIR/artifacts/${COO_ARTIFACT_NAMES[0]}" \
+  "$COO_RELEASE_DIR/artifacts/${COO_ARTIFACT_NAMES[1]}"
+if [[ -n $smoke_bin ]]; then
+  "$smoke_bin"
+fi
+printf 'rolled back from: %s\n' "$selected"

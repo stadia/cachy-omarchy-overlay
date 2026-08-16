@@ -12,8 +12,10 @@ set -a
 source "$lock"
 set +a
 
-assert_eq "$OMARCHY_VERSION" "4.0.0" "lock version"
-assert_eq "$OMARCHY_COMMIT" "f0020448ca87329199de7cb12f2015ebc4a3e5e7" "lock commit"
+[[ $OMARCHY_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && version_ok=0 || version_ok=1
+assert_eq "$version_ok" "0" "lock version is stable semver"
+[[ $OMARCHY_COMMIT =~ ^[0-9a-f]{40}$ ]] && commit_ok=0 || commit_ok=1
+assert_eq "$commit_ok" "0" "lock commit is a full SHA"
 
 pkgver=$(grep -E '^pkgver=' "$pkgbuild" | head -1 | cut -d= -f2 | tr -d "'" | tr -d '"')
 commit=$(grep -E '^_commit=' "$pkgbuild" | head -1 | cut -d= -f2 | tr -d "'" | tr -d '"')
