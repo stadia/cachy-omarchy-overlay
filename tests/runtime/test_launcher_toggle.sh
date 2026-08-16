@@ -10,6 +10,7 @@ command -v quickshell >/dev/null || { echo "skip: quickshell 없음"; exit 0; }
 command -v jq >/dev/null || { echo "skip: jq 없음"; exit 0; }
 command -v hyprctl >/dev/null || { echo "skip: hyprctl 없음"; exit 0; }
 command -v wtype >/dev/null || { echo "skip: wtype 없음 (R05 Escape)"; exit 0; }
+[[ ${COO_RUN_LIVE:-0} == 1 ]] || { echo "skip: 라이브 키 주입 (COO_RUN_LIVE=1 필요)"; exit 0; }
 [[ -n ${WAYLAND_DISPLAY:-} ]] || { echo "skip: WAYLAND_DISPLAY 없음"; exit 0; }
 coo_pkg_artifact >/dev/null || { echo "skip: build/*.pkg.tar.zst 없음"; exit 0; }
 
@@ -115,7 +116,10 @@ onscreen=$(menu_onscreen)
 assert_eq "$onscreen" "omarchy-menu" "R04 메뉴 표면이 화면에 있다 (layer 기하)"
 printf '      FINDING: 열린 메뉴 layer = %s\n' "$(menu_layers)"
 
-# Exclusive keyboard focus 가 붙은 뒤에 Escape 를 보낸다.
+# 완전한 layer 키보드 포커스 필드는 hyprctl layers 에 없지만, 최소한
+# 메뉴 layer 매핑을 다시 단정한 뒤에만 Escape 를 보낸다.
+assert_eq "$(jq -r 'length' <<<"$(menu_layers)")" "1" "R05 wtype 전 omarchy-menu layer 가 매핑됐다"
+[[ $(jq -r 'length' <<<"$(menu_layers)") -eq 1 ]] || exit "$ASSERT_FAILURES"
 sleep 0.3
 wtype -k Escape
 wait_menu closed && closed=0 || closed=1

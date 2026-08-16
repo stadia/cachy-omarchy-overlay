@@ -40,6 +40,7 @@ command -v quickshell >/dev/null || { exit "$ASSERT_FAILURES"; }
 command -v jq >/dev/null || { exit "$ASSERT_FAILURES"; }
 command -v hyprctl >/dev/null || { exit "$ASSERT_FAILURES"; }
 command -v wtype >/dev/null || { echo "skip: wtype 없음 (R06 라이브)"; exit "$ASSERT_FAILURES"; }
+[[ ${COO_RUN_LIVE:-0} == 1 ]] || { echo "skip: 라이브 키 주입 (COO_RUN_LIVE=1 필요)"; exit 0; }
 command -v gtk-launch >/dev/null || { echo "skip: gtk-launch 없음"; exit "$ASSERT_FAILURES"; }
 [[ -n ${WAYLAND_DISPLAY:-} ]] || { exit "$ASSERT_FAILURES"; }
 coo_pkg_artifact >/dev/null || { exit "$ASSERT_FAILURES"; }
@@ -109,8 +110,21 @@ parent_path=$PATH
 [[ $parent_path == *"$COO_COMPAT_BIN"* ]] && p=1 || p=0
 assert_eq "$p" "0" "테스트 프로세스 PATH 는 compat 으로 오염되지 않는다"
 
+menu_layers() {
+  hyprctl -j layers 2>/dev/null | jq -c \
+    '[ to_entries[].value.levels | to_entries[].value[] | select(.namespace == "omarchy-menu") ]' \
+    || echo '[]'
+}
+
 "$W" --ipc shell summon omarchy.menu '{"menu":"apps"}' >/dev/null
-sleep 0.6
+menu_mapped=1
+for _ in $(seq 1 40); do
+  [[ $(jq -r 'length' <<<"$(menu_layers)") -gt 0 ]] && { menu_mapped=0; break; }
+  sleep 0.25
+done
+assert_eq "$menu_mapped" "0" "R06 wtype 전 omarchy-menu layer 가 매핑됐다"
+(( menu_mapped == 0 )) || exit "$ASSERT_FAILURES"
+
 wtype CooR06Probe
 sleep 0.4
 wtype -k Return
