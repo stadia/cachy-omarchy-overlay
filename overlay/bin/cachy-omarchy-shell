@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# 패키징된 Omarchy Quattro 셸을 CachyOS 에서 기동하고 IPC 를 전달한다.
+#
+# 기동/IPC 명령은 핀된 업스트림 bin/omarchy-launch-shell 및 bin/omarchy-shell
+# (basecamp/omarchy @ f0020448ca87329199de7cb12f2015ebc4a3e5e7, MIT) 의 동작을
+# 그대로 따른다. 새 Quickshell 호스트를 만들지 않는다 (SPEC 55, 70).
+set -uo pipefail
+
+PREFIX_ROOT=${COO_PREFIX_ROOT:-/usr/share/cachy-omarchy}
+OMARCHY_PATH=${COO_OMARCHY_PATH:-$PREFIX_ROOT/upstream}
+COMPAT_BIN=${COO_COMPAT_BIN:-/usr/lib/cachy-omarchy/compat/bin}
+export OMARCHY_PATH
+
+fail() { printf 'error: %s\n' "$1" >&2; exit 1; }
+
+usage() {
+  cat <<'USAGE'
+사용법: cachy-omarchy-shell <명령>
+
+명령:
+  --run                       Quickshell 을 포그라운드로 기동한다 (systemd ExecStart 용).
+  --ipc <target> <method> ..  실행 중인 셸에 IPC 호출을 전달한다.
+  --path                      해석된 OMARCHY_PATH 를 출력한다.
+  --help                      이 도움말.
+
+환경:
+  COO_OMARCHY_PATH   업스트림 루트 override (기본: /usr/share/cachy-omarchy/upstream)
+  COO_COMPAT_BIN     compat shim 디렉터리 (셸 프로세스에만 PATH 앞에 붙는다)
+  COO_IPC_TIMEOUT    IPC 호출당 타임아웃 (기본 2s)
+USAGE
+}
+
+require_tree() {
+  [[ -f $OMARCHY_PATH/shell/shell.qml ]] \
+    || fail "셸 트리를 찾을 수 없다: $OMARCHY_PATH/shell/shell.qml"
+}
+
+cmd_run() {
+  require_tree
+  # compat shim 은 셸 프로세스에만 보이게 한다. 사용자의 일반 PATH 를
+  # 오염시키지 않는다 (SPEC 44, 45).
+  [[ -d $COMPAT_BIN ]] && export PATH="$COMPAT_BIN:$PATH"
+
+  # 파일 워처를 끄는 것은 필수다. pacman 이 $OMARCHY_PATH/shell 을 다시 쓰는
+  # 도중 리로드가 걸리면 반쯤 쓰인 트리를 읽고, 실패한 리로드가 두 번째 엔진
+  # 세대를 남겨 다음 재시작의 IPC kill 을 크래시로 만든다.
+  exec env QS_DISABLE_FILE_WATCHER=1 QS_NO_RELOAD_POPUP=1 \
+    systemd-cat -t cachy-omarchy-shell -- \
+    quickshell -n -p "$OMARCHY_PATH/shell"
+}
+
+cmd_ipc() {
+  require_tree
+  (( $# >= 2 )) || fail "사용법: cachy-omarchy-shell --ipc <target> <method> [args...]"
+
+  local timeout_v=${COO_IPC_TIMEOUT:-2s} output status
+  output=$(timeout --kill-after=1s "$timeout_v" \
+    qs ipc -n -p "$OMARCHY_PATH/shell" call -- "$@" 2>/dev/null)
+  status=$?
+
+  (( status == 124 || status == 137 )) && fail "셸이 응답하지 않는다"
+  (( status != 0 )) && fail "셸이 실행 중이 아니다"
+
+  # IPC 레벨 오류는 stdout 에 실려 exit 0 으로 온다. 그대로 통과시키면
+  # 실패가 성공처럼 보인다.
+  case $output in
+    "Target not found."|"Function not found."|"Too few arguments provided"*|"Too many arguments provided"*)
+      fail "$output" ;;
+  esac
+
+  [[ -n $output ]] && printf '%s\n' "$output"
+  return 0
+}
+
+case ${1:-} in
+  --run)  shift; cmd_run "$@" ;;
+  --ipc)  shift; cmd_ipc "$@" ;;
+  --path) printf '%s\n' "$OMARCHY_PATH" ;;
+  --help|"") usage ;;
+  *) printf 'error: 알 수 없는 인자: %s\n' "$1" >&2; usage >&2; exit 1 ;;
+esac
