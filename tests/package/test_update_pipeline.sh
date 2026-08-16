@@ -114,6 +114,13 @@ cat >"$fake/pacman" <<'EOF'
 printf '%s\n' "$*" >>"$COO_PACMAN_LOG"
 [[ ${COO_FAKE_PACMAN_FAIL:-0} != 1 ]] || exit 11
 EOF
+# Records exactly the argv it was invoked with, then exits 0 without exec'ing
+# anything -- proves the shape of the constructed command (privilege fix)
+# without ever touching a real sudo or a real pacman.
+cat >"$fake/sudo" <<'EOF'
+#!/usr/bin/env bash
+printf 'sudo %s\n' "$*" >>"$COO_SUDO_LOG"
+EOF
 cat >"$fake/test-runner" <<'EOF'
 #!/usr/bin/env bash
 [[ -n ${COO_TEST_LOG:-} ]] && printf 'runner\n' >>"$COO_TEST_LOG"
@@ -349,6 +356,51 @@ code=0
 out=$(run_rc_doctor "$COO_TEST_SANDBOX/state") || code=$?
 assert_eq "$code" "0" "U10 rolled-back pair is doctor-healthy"
 assert_contains "$out" "PASS: installed artifact/manifest (3.9.9" "U10 doctor reflects rolled-back pair"
+
+# Privilege handling (release-blocking defect): install-packages/rollback must
+# elevate only the pacman transaction (SPEC §37's documented `sudo pacman -U
+# ...`), never require the whole script to run as root. Before the fix,
+# "$pacman_bin" -U ... was a single literal word "pacman" with no sudo
+# involved at all, so this asserts the *shape* of the constructed command --
+# not merely that the script exits 0 -- which is exactly what the old code
+# fails to produce. $fake is prepended to PATH for these calls; every other
+# fake tool in it is a transparent pass-through by default (see fake/mv,
+# fake/install, fake/sha256sum above), so only "sudo" resolution is actually
+# exercised here. Must run before update-upstream/bump-pkgrel below mutate
+# $root's checkout out from under this pinned validated-build.manifest.
+priv_state=$COO_TEST_SANDBOX/priv-state
+cp -a "$COO_TEST_SANDBOX/state" "$priv_state"
+mapfile -t priv_artifacts < <(sed -n 's/^ARTIFACT=\([^ ]*\) .*/\1/p' "$priv_state/validated-build.manifest")
+assert_eq "${#priv_artifacts[@]}" "2" "privilege fixture manifest names exactly two artifacts"
+
+sudo_log=$COO_TEST_SANDBOX/sudo.log
+: >"$sudo_log"
+code=0
+out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$priv_state" COO_SUDO_LOG="$sudo_log" PATH="$fake:$PATH" "$root/bin/install-packages" --install 2>&1) || code=$?
+assert_eq "$code" "0" "install-packages succeeds as a normal user with no COO_PACMAN_BIN override"
+sudo_line=$(cat "$sudo_log")
+assert_contains "$sudo_line" "sudo pacman -U" "install-packages elevates only the pacman transaction via sudo"
+assert_contains "$sudo_line" "${priv_artifacts[0]}" "sudo pacman invocation names the current shell artifact"
+assert_contains "$sudo_line" "${priv_artifacts[1]}" "sudo pacman invocation names the current overlay artifact"
+
+# COO_PACMAN_BIN must still bypass sudo entirely and unchanged (five other
+# call sites in this file rely on exactly this override behavior).
+priv_state_override=$COO_TEST_SANDBOX/priv-state-override
+cp -a "$COO_TEST_SANDBOX/state" "$priv_state_override"
+: >"$sudo_log"
+: >"$paclog"
+COO_REPO_ROOT="$root" COO_STATE_DIR="$priv_state_override" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" COO_SUDO_LOG="$sudo_log" PATH="$fake:$PATH" "$root/bin/install-packages" --install >/dev/null
+assert_eq "$(wc -l <"$sudo_log")" "0" "COO_PACMAN_BIN override never touches sudo"
+assert_contains "$(cat "$paclog")" "-U" "COO_PACMAN_BIN override still invokes pacman directly"
+
+# rollback must exhibit the same elevation shape as install-packages.
+priv_rollback_state=$COO_TEST_SANDBOX/priv-rollback-state
+cp -a "$COO_TEST_SANDBOX/state" "$priv_rollback_state"
+: >"$sudo_log"
+code=0
+out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$priv_rollback_state" COO_SUDO_LOG="$sudo_log" PATH="$fake:$PATH" "$root/bin/rollback" 2>&1) || code=$?
+assert_eq "$code" "0" "rollback succeeds as a normal user with no COO_PACMAN_BIN override"
+assert_contains "$(cat "$sudo_log")" "sudo pacman -U" "rollback elevates only the pacman transaction via sudo"
 
 # M7 follow-up: rollback finalization failure is ambiguous after pacman, so its
 # pending marker must block all later package-manager actions and doctor must

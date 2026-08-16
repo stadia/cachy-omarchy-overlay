@@ -5,11 +5,25 @@ set -euo pipefail
 repo_root=${COO_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}
 state_dir=${COO_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/cachy-omarchy}
 sha256_bin=${COO_SHA256_BIN:-sha256sum}
-pacman_bin=${COO_PACMAN_BIN:-pacman}
+pacman_bin=${COO_PACMAN_BIN:-}
+sudo_bin=${COO_SUDO_BIN:-sudo}
 mv_bin=${COO_MV_BIN:-mv}
 smoke_bin=${COO_ROLLBACK_SMOKE_BIN:-}
 # shellcheck disable=SC1091
 source "$repo_root/bin/validated-build.sh"
+
+# Elevate only the pacman transaction, never the whole script: running as root
+# would resolve state_dir under /root and leave root-owned files behind under
+# the invoking user's XDG state dir. COO_PACMAN_BIN still overrides verbatim
+# (used by tests to substitute a fake pacman) and is never wrapped in sudo.
+if [[ -n $pacman_bin ]]; then
+  pacman_cmd=("$pacman_bin")
+elif (( EUID == 0 )); then
+  coo_fail 'do not run rollback with sudo; run it as your normal user — it elevates only the pacman transaction itself. Usage: ./bin/rollback'
+  exit 1
+else
+  pacman_cmd=("$sudo_bin" pacman)
+fi
 
 usage() { printf 'Usage: rollback\n'; }
 case ${1:-} in
@@ -43,7 +57,7 @@ cp "$selected" "$pending_tmp"
 "$mv_bin" "$pending_tmp" "$pending"
 
 set +e
-"$pacman_bin" -U "$COO_RELEASE_DIR/artifacts/${COO_ARTIFACT_NAMES[0]}" \
+"${pacman_cmd[@]}" -U "$COO_RELEASE_DIR/artifacts/${COO_ARTIFACT_NAMES[0]}" \
   "$COO_RELEASE_DIR/artifacts/${COO_ARTIFACT_NAMES[1]}"
 status=$?
 set -e
