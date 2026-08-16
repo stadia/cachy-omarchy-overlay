@@ -49,8 +49,8 @@ has_space_conflict() {
 has_k_conflict() {
   awk '
     /^[[:space:]]*(#|--)/ { next }
-    /^[[:space:]]*hl\.bind[[:space:]]*\([[:space:]]*"SUPER[[:space:]]*\+[[:space:]]*K"/ { found=1; exit }
-    /^[[:space:]]*hl\.bind[[:space:]]*\([[:space:]]*mainMod[[:space:]]*\.\.[[:space:]]*"[[:space:]]*\+[[:space:]]*K"/ { found=1; exit }
+    /^[[:space:]]*hl\.bind[[:space:]]*\([[:space:]]*["\047]SUPER[[:space:]]*\+[[:space:]]*K["\047]/ { found=1; exit }
+    /^[[:space:]]*hl\.bind[[:space:]]*\([[:space:]]*mainMod[[:space:]]*\.\.[[:space:]]*["\047][[:space:]]*\+[[:space:]]*K["\047]/ { found=1; exit }
     /^[[:space:]]*bind[[:space:]]*=[[:space:]]*(SUPER|\$mainMod)[[:space:]]*,[[:space:]]*K([[:space:]]*,|$)/ { found=1; exit }
     END { exit !found }
   ' <<<"$1"

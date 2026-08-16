@@ -131,6 +131,19 @@ assert_contains "$out" "SUPER+K" "literal Lua 충돌 경고가 SUPER+K 를 말�
 after=$(cat "$hypr/hyprland.lua")
 assert_eq "$after" "$before" "literal Lua SUPER+K 는 기본 주입을 막는다"
 
+# --- single-quoted Lua SUPER+K forms remain conflicts ----------------------
+cat >"$hypr/hyprland.lua" <<'EOF'
+local mainMod = "SUPER"
+hl.bind('SUPER + K', hl.dsp.exec_cmd("single-literal-k"))
+hl.bind(mainMod .. ' + K', hl.dsp.exec_cmd("single-mainmod-k"))
+EOF
+before=$(cat "$hypr/hyprland.lua")
+out=$(COO_HYPR_DIR="$hypr" COO_CONFIG_DIR="$HOME/.config/cachy-omarchy" "$H" 2>&1); code=$?
+assert_eq "$code" "0" "단일 인용 Lua SUPER+K 형태도 충돌이다"
+assert_contains "$out" "SUPER+K" "단일 인용 Lua 충돌 경고가 SUPER+K 를 말한다"
+after=$(cat "$hypr/hyprland.lua")
+assert_eq "$after" "$before" "단일 인용 literal/mainMod Lua 는 기본 주입을 막는다"
+
 # --- lua K false positives do not block ------------------------------------
 cat >"$hypr/hyprland.lua" <<'EOF'
 hl.bind("ALT + K", hl.dsp.exec_cmd("alt-k"))
