@@ -243,7 +243,7 @@ out=$(COO_SRC_HYPR="$COO_TEST_SANDBOX/nonexistent" \
       COO_CONFIG_DIR="$COO_TEST_SANDBOX/cfg2" \
       "$B" 2>&1); code=$?
 assert_eq "$code" "1" "소스 부재 → exit 1"
-assert_contains "$out" "hypr" "오류 메시지가 어떤 경로가 없는지 말한다"
+assert_contains "$out" "$COO_TEST_SANDBOX/nonexistent" "오류 메시지가 실제로 없는 경로를 보여준다"
 [[ -e "$COO_TEST_SANDBOX/cfg2/hypr/bindings.conf" ]] && half=1 || half=0
 assert_eq "$half" "0" "실패 시 반쯤 쓰인 상태를 남기지 않는다"
 
