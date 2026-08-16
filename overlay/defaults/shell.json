@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "bar": {
+    "layout": { "left": [], "center": [], "right": [] }
+  },
+  "plugins": [],
+  "disabledPlugins": [
+    "omarchy.bar",
+    "omarchy.notifications",
+    "omarchy.lock",
+    "omarchy.osd",
+    "omarchy.idle",
+    "omarchy.battery",
+    "omarchy.nightlight",
+    "omarchy.media",
+    "omarchy.polkit",
+    "omarchy.reminders",
+    "omarchy.background"
+  ]
+}
