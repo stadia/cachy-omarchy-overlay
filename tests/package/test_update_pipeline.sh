@@ -17,6 +17,18 @@ while IFS= read -r -d '' path; do
   mkdir -p "$root/$(dirname "$path")"
   cp -a "$REPO_ROOT/$path" "$root/$path"
 done < <(git -C "$REPO_ROOT" ls-files -z packages/cachy-omarchy-shell packages/cachy-omarchy-overlay)
+
+# Hermetic fixture: the live working tree's pkgrel (SPEC §49 U04 lets a local
+# revision bump it at any time) must not leak into this sandbox, or every
+# assertion below naming a shell artifact would only pass by accident of
+# whatever pkgrel happens to be checked out. Pin it to a sentinel distinct
+# from every pkgrel this test itself produces (U02 resets to 1, U04 bumps to
+# 2), so a future assertion that hardcodes "-1-" or "-2-" for the *current*
+# shell artifact fails on every run -- not only when the live tree disagrees.
+shell_pkgrel_pin=5
+sed -i "s/^pkgrel=.*/pkgrel=${shell_pkgrel_pin}/" "$root/packages/cachy-omarchy-shell/PKGBUILD"
+shell_pkgrel_pin=$(grep -m1 '^pkgrel=' "$root/packages/cachy-omarchy-shell/PKGBUILD" | cut -d= -f2 | tr -d "'\"")
+
 cp -a "$REPO_ROOT/bin/check-upstream" "$REPO_ROOT/bin/build-packages" \
   "$REPO_ROOT/bin/validated-build.sh" "$REPO_ROOT/bin/test-packages" \
   "$REPO_ROOT/bin/install-packages" "$REPO_ROOT/bin/rollback" \
@@ -179,7 +191,10 @@ manifest_src=$(cat "$manifest")
 assert_contains "$manifest_src" "OMARCHY_COMMIT=f0020448ca87329199de7cb12f2015ebc4a3e5e7" "manifest binds commit"
 assert_contains "$manifest_src" "cachy-omarchy-overlay-0.1.0-1-any.pkg.tar.zst" "manifest binds overlay artifact"
 release=$(awk -F= '$1 == "RELEASE" { print $2 }' "$manifest")
-assert_file_exists "$COO_TEST_SANDBOX/state/$release/artifacts/cachy-omarchy-shell-4.0.0-1-any.pkg.tar.zst" "manifest points to immutable shell release"
+# Derived from the fixture's own (hermetically pinned) PKGBUILD, not a
+# hardcoded pkgrel -- see shell_pkgrel_pin above.
+shell_artifact_v400="cachy-omarchy-shell-4.0.0-${shell_pkgrel_pin}-any.pkg.tar.zst"
+assert_file_exists "$COO_TEST_SANDBOX/state/$release/artifacts/$shell_artifact_v400" "manifest points to immutable shell release"
 
 # U06: failed build publishes neither artifacts nor a manifest.
 rm -f "$log"
@@ -237,7 +252,12 @@ sed -i "s/pkgver=4.0.0/pkgver=4.0.1/; s/_commit='[0-9a-f]*'/_commit='55555555555
 COO_TOOL_LOG="$log" COO_REPO_ROOT="$dyn" COO_BUILD_DIR="$COO_TEST_SANDBOX/dynamic-build" COO_STATE_DIR="$COO_TEST_SANDBOX/dynamic-state" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" "$dyn/bin/build-packages" >/dev/null
 dynamic_manifest=$(cat "$COO_TEST_SANDBOX/dynamic-state/validated-build.manifest")
 assert_contains "$dynamic_manifest" "OMARCHY_VERSION=4.0.1" "dynamic lock version reaches manifest"
-assert_contains "$dynamic_manifest" "cachy-omarchy-shell-4.0.1-1-any.pkg.tar.zst" "dynamic shell artifact name is used"
+# Read the expected name back out of the dynamic fixture's own PKGBUILD
+# (the sed above only touches pkgver, so pkgrel is inherited) instead of
+# hardcoding it, so this label is actually true.
+dyn_shell_ver=$(grep -m1 '^pkgver=' "$dyn/packages/cachy-omarchy-shell/PKGBUILD" | cut -d= -f2 | tr -d "'\"")
+dyn_shell_rel=$(grep -m1 '^pkgrel=' "$dyn/packages/cachy-omarchy-shell/PKGBUILD" | cut -d= -f2 | tr -d "'\"")
+assert_contains "$dynamic_manifest" "cachy-omarchy-shell-${dyn_shell_ver}-${dyn_shell_rel}-any.pkg.tar.zst" "dynamic shell artifact name is used"
 assert_contains "$dynamic_manifest" "cachy-omarchy-overlay-0.1.0-1-any.pkg.tar.zst" "overlay version remains independent"
 
 # U08: testing requires a current manifest first, and any skip is a failure.
@@ -304,7 +324,7 @@ assert_eq "$(wc -l <"$paclog")" "0" "archive rename failure invokes no pacman"
 
 COO_REPO_ROOT="$root" COO_STATE_DIR="$COO_TEST_SANDBOX/state" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$root/bin/install-packages" --install >/dev/null
 assert_contains "$(cat "$paclog")" "-U" "U09 install calls fake pacman explicitly"
-assert_contains "$(cat "$paclog")" "cachy-omarchy-shell-4.0.0-1-any.pkg.tar.zst" "U09 installs exact current shell"
+assert_contains "$(cat "$paclog")" "$shell_artifact_v400" "U09 installs exact current shell"
 assert_eq "$(cat "$prior/artifacts/$old_shell")" "old-shell" "U09 previous shell remains archived"
 assert_eq "$(cat "$prior/artifacts/$old_overlay")" "old-overlay" "U09 previous overlay remains archived"
 assert_file_exists "$COO_TEST_SANDBOX/state/installed-build.manifest" "U09 finalizes installed build pointer"
@@ -503,14 +523,19 @@ assert_eq "$code" "1" "metadata second rename failure aborts update"
 assert_eq "$(sha256sum "$pubroot/upstream.lock")" "$pub_lock_before" "metadata failure restores lock"
 assert_eq "$(sha256sum "$pubroot/packages/cachy-omarchy-shell/PKGBUILD")" "$pub_pkg_before" "metadata failure preserves PKGBUILD"
 assert_eq "$(cat "$pub_state/validated-build.manifest")" "$pub_pointer_before" "metadata failure preserves old manifest pointer"
-assert_file_exists "$pub_state/$pub_old_release/artifacts/cachy-omarchy-shell-4.0.0-1-any.pkg.tar.zst" "metadata failure preserves old referenced release"
+assert_file_exists "$pub_state/$pub_old_release/artifacts/$shell_artifact_v400" "metadata failure preserves old referenced release"
 
 # A pacman-success/final-pointer-failure state is explicitly pending. Neither
 # a new install nor rollback may trust the stale installed pointer afterwards.
 postroot=$COO_TEST_SANDBOX/post-pacman-repo
 cp -a "$root" "$postroot"
 sed -i 's/OMARCHY_VERSION=4\.0\.1/OMARCHY_VERSION=4.0.0/; s/OMARCHY_COMMIT=2222222222222222222222222222222222222222/OMARCHY_COMMIT=f0020448ca87329199de7cb12f2015ebc4a3e5e7/; s/OMARCHY_TAG=v4\.0\.1/OMARCHY_TAG=v4.0.0/' "$postroot/upstream.lock"
-sed -i "s/pkgver=4.0.1/pkgver=4.0.0/; s/pkgrel=2/pkgrel=1/; s/_commit='2222222222222222222222222222222222222222'/_commit='f0020448ca87329199de7cb12f2015ebc4a3e5e7'/" "$postroot/packages/cachy-omarchy-shell/PKGBUILD"
+# poststate below still carries the never-touched original validated
+# manifest from the very first build (pinned to shell_pkgrel_pin), so
+# postroot's checkout must reconstruct that exact pin -- a hardcoded "1"
+# here would silently diverge from it and break install-packages'
+# cross-check between the manifest and this checkout.
+sed -i "s/pkgver=4.0.1/pkgver=4.0.0/; s/pkgrel=2/pkgrel=${shell_pkgrel_pin}/; s/_commit='2222222222222222222222222222222222222222'/_commit='f0020448ca87329199de7cb12f2015ebc4a3e5e7'/" "$postroot/packages/cachy-omarchy-shell/PKGBUILD"
 poststate=$COO_TEST_SANDBOX/post-pacman-state
 cp -a "$COO_TEST_SANDBOX/state" "$poststate"
 : >"$paclog"
