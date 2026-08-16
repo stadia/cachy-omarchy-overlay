@@ -39,10 +39,16 @@ usage() {
 관리 source 블록만 주입한다. 전체 hyprland.lua/conf 를 덮어쓰지 않는다.
 
 SUPER+SPACE 또는 SUPER+K 가 이미 있으면 감지·경고하고 주입하지 않는다.
---force 만 충돌이 있어도 블록을 넣는다. hyprctl reload 는 하지 않는다.
+bindings.conf/bindings.lua 는 $CONFIG_DIR/hypr/ 에 이미 있으면 건드리지
+않는다(사용자가 고쳤을 수 있으므로). hyprctl reload 는 하지 않는다.
+
+--force 는 두 가지를 동시에 한다(하나로 묶인 이유: 둘 다 "더 적극적으로
+하라"는 같은 요청이다):
+  1) 바인딩 충돌이 있어도 관리 블록을 주입한다(기존 사용자 줄은 지우지 않음).
+  2) 이미 있는 bindings.conf/bindings.lua 를 정본으로 덮어써 새로고침한다.
 
   --help    이 도움말
-  --force   충돌이 있어도 관리 블록을 주입한다
+  --force   충돌 시에도 관리 블록을 주입하고, 기존 bindings.conf/lua 를 새로고침한다
 
 환경 변수:
   COO_SRC_HYPR     바인딩 소스 디렉터리를 직접 지정한다(bindings.conf/lua 위치).
@@ -81,8 +87,17 @@ install_overlay() {
   [[ -n $SRC_HYPR && -f $SRC_HYPR/bindings.conf && -f $SRC_HYPR/bindings.lua ]] \
     || fail "바인딩 소스를 찾을 수 없다: ${SRC_HYPR:-<미해석>} (COO_SRC_HYPR 로 지정 가능)"
   mkdir -p "$DEST_HYPR"
-  cp -a "$SRC_HYPR/bindings.conf" "$DEST_HYPR/bindings.conf"
-  cp -a "$SRC_HYPR/bindings.lua" "$DEST_HYPR/bindings.lua"
+  # 이 파일들은 SPEC §6.6 상 "사용자 라이브 설정"이다(정본은
+  # /usr/share/cachy-omarchy/hypr/ 에 있다) — 기본은 존재하는 파일을 덮어쓰지
+  # 않는다. --force 는 예외적으로 "정본으로 새로고침"을 의미한다.
+  local f
+  for f in bindings.conf bindings.lua; do
+    if [[ -e $DEST_HYPR/$f && $FORCE -eq 0 ]]; then
+      printf '유지: %s (이미 존재 — 덮어쓰지 않음. 정본으로 새로고침하려면 --force)\n' "$DEST_HYPR/$f"
+      continue
+    fi
+    cp -a "$SRC_HYPR/$f" "$DEST_HYPR/$f"
+  done
 }
 
 lua_snippet() {

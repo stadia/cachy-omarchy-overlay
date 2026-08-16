@@ -372,6 +372,17 @@ post-install 훅이 아니라 **사용자가 직접 실행**하는 유저 레벨
   "유지" 메시지만 낸다. 두 번째 실행은 사용자가 고친 `shell.json` 을 덮어쓰지 않는다
   (`tests/runtime/test_init.sh` 의 `USER_EDIT` 보존 검증).
   - `--dry-run` 은 무엇을 할지 출력만 하고 **아무 파일도 만들지 않는다.**
+- **`bindings.conf`/`bindings.lua` 도 같은 규칙을 따른다 — 존재하면 절대 덮어쓰지
+  않는다.** SPEC §6.6 상 이 두 파일은 "사용자 라이브 설정"이고 정본은
+  `/usr/share/cachy-omarchy/hypr/` 에 있으므로, 패키지가 업그레이드돼도 사용자가
+  고친 바인딩을 재실행이 지우면 안 된다. `cachy-omarchy-bindings` 는 파일이 이미
+  있으면 건드리지 않고 어떤 파일을 그대로 뒀는지 한 줄로 알린다.
+  **예외 — `--force` 는 이 두 파일도 정본으로 새로고침한다.** `--force` 는 원래
+  "바인딩 충돌이 있어도 관리 블록을 주입한다"는 뜻이었는데, 같은 플래그가 이제
+  "이미 있는 bindings.conf/lua 도 갱신하라"는 의미를 겸한다 — 사용자가 명시적으로
+  더 적극적인 동작을 요청했다고 보기 때문이다. `--force` 를 전달하지 않으면 두
+  동작 모두 일어나지 않는다(`tests/runtime/test_init.sh` 의 바인딩 보존 / `--force`
+  갱신 케이스로 검증).
 - **`bar-off` 는 사용자가 지우면 되살리지 않는다.** 판단 기준은 **파일이 아니라
     toggles 디렉터리의 존재**다: `~/.local/state/omarchy/toggles/` 디렉터리가 이미
     있으면(즉, 최초 실행을 이미 거쳤으면) 그 안의 `bar-off` 를 다시 만들지 않는다 —
@@ -379,7 +390,10 @@ post-install 훅이 아니라 **사용자가 직접 실행**하는 유저 레벨
     최초 생성 대상이다.
 - 바인딩 설치는 **재구현하지 않고** 형제 명령 `cachy-omarchy-bindings` 에 위임한다
   (SPEC §20). `--force` 는 그대로 전달되며, 충돌 시에도 기존 사용자 바인딩 줄을
-  지우지 않는다. `hyprctl reload` 는 어디에서도 호출하지 않는다.
+  지우지 않는다(관리 블록 주입 대상은 여전히 `hyprland.lua`/`hyprland.conf` 본문이며,
+  거기서는 --force 도 사용자 줄을 삭제하지 않는다 — 새로고침 대상은 어디까지나
+  `~/.config/cachy-omarchy/hypr/bindings.{conf,lua}` 파일 자체다).
+  `hyprctl reload` 는 어디에서도 호출하지 않는다.
 
 ### 9.3 바 / Waybar 상태 — 정확히 이렇게 말한다
 

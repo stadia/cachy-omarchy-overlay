@@ -40,6 +40,24 @@ assert_eq "$code" "0" "두 번째 실행 exit 0"
 assert_contains "$(cat "$HOME/.config/cachy-omarchy/shell.json")" "USER_EDIT" \
   "사용자 수정 보존 (멱등)"
 
+# FINDING 1 회귀: 사용자가 고친 bindings.conf 를 재실행이 덮어쓰지 않는다.
+BIND_CONF="$HOME/.config/cachy-omarchy/hypr/bindings.conf"
+assert_file_exists "$BIND_CONF" "바인딩 conf 배치 확인 (사전 조건)"
+printf '\n# USER_MARKER\n' >> "$BIND_CONF"
+before_marker=$(cat "$BIND_CONF")
+out=$("$I" 2>&1); code=$?
+assert_eq "$code" "0" "바인딩 파일이 이미 있는 채 재실행 exit 0"
+after_marker=$(cat "$BIND_CONF")
+assert_eq "$after_marker" "$before_marker" "사용자가 고친 bindings.conf 를 재실행이 보존한다"
+assert_contains "$out" "bindings.conf" "기본 재실행이 건드리지 않은 바인딩 파일을 알린다"
+
+# --force 는 그 반대: 사용자가 명시적으로 새로고침을 요청한 것이므로 갱신한다.
+out=$("$I" --force 2>&1); code=$?
+assert_eq "$code" "0" "--force 재실행 exit 0"
+after_force=$(cat "$BIND_CONF")
+[[ $after_force == *"USER_MARKER"* ]] && kept=1 || kept=0
+assert_eq "$kept" "0" "--force 는 bindings.conf 를 갱신해 사용자 마커가 사라진다"
+
 # 사용자가 지운 bar-off 를 되살리지 않는다 — 사용자 의사를 존중한다.
 rm -f "$HOME/.local/state/omarchy/toggles/bar-off"
 "$I" >/dev/null 2>&1
