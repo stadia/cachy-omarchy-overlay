@@ -22,10 +22,15 @@ usage() {
 최초 사용 시 사용자 설정을 만든다. 이미 있는 파일은 건드리지 않는다.
 
 만드는 것:
-  ~/.config/cachy-omarchy/shell.json            셸 설정 (패키지 기본값 복사)
   ~/.config/cachy-omarchy/hypr/bindings.{conf,lua}
   ~/.local/state/omarchy/toggles/bar-off        Omarchy 내장 바 숨김
   사용자 Hyprland 설정에 관리 source 블록       (충돌 시 주입하지 않음)
+
+주의: 셸 설정(~/.config/cachy-omarchy/shell.json)은 만들지 않는다.
+셸은 ~/.config/omarchy/shell.json 을 읽지 이 경로를 읽지 않으므로,
+여기에 파일을 만들어도 사용자 편집이 조용히 무시된다. 패키지 기본값은
+/usr/share/cachy-omarchy/upstream/config/omarchy/shell.json 으로
+스테이징되며 init 없이도 적용된다.
 
 중요: 이 명령을 실행하지 않으면 Omarchy 내장 바가 화면 상단에 나타나
 26px 를 예약한다. 패키지 기본값만으로는 그 바를 끌 수 없다.
@@ -48,20 +53,12 @@ while (( $# )); do
   shift
 done
 
-DEFAULTS=$PREFIX_ROOT/defaults/shell.json
-[[ -f $DEFAULTS ]] || fail "기본 설정을 찾을 수 없다: $DEFAULTS (COO_PREFIX_ROOT 로 지정 가능)"
-
-# 1) 셸 설정. 파일 단위로 판단한다 — 디렉터리만 보고 건너뛰면 사용자가 일부만
-#    지웠을 때 나머지를 복구하지 못한다.
-if [[ -e $CONFIG_DIR/shell.json ]]; then
-  note "유지: $CONFIG_DIR/shell.json (이미 존재)"
-else
-  act "생성: $CONFIG_DIR/shell.json"
-  if ! (( DRY )); then
-    mkdir -p "$CONFIG_DIR" || fail "설정 디렉터리를 만들 수 없다: $CONFIG_DIR"
-    cp -a "$DEFAULTS" "$CONFIG_DIR/shell.json"
-  fi
-fi
+# 1) 셸 설정(~/.config/cachy-omarchy/shell.json)은 만들지 않는다.
+#    shell.qml:31 이 읽는 사용자 경로는 ~/.config/omarchy/shell.json 이지 이
+#    경로가 아니므로, 여기에 파일을 만들면 사용자 편집이 조용히 무시된다.
+#    패키지 기본값은 /usr/share/cachy-omarchy/upstream/config/omarchy/shell.json
+#    으로 스테이징되며 init 없이도 셸이 적용한다. 기존 사용자가 이 dead file
+#    을 갖고 있다면 cachy-omarchy-doctor 가 WARN 으로 알린다.
 
 # 2) bar-off 토글. toggles 디렉터리가 아직 없을 때만 만든다. 디렉터리는 있는데
 #    파일이 없다면 사용자가 일부러 지운 것이고, 그것은 "바를 보겠다"는 의사다.

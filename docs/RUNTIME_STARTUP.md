@@ -363,11 +363,16 @@ post-install 훅이 아니라 **사용자가 직접 실행**하는 유저 레벨
 만드는지, 언제 만드는지, 멱등 규칙은 다음과 같다.
 
 - **만드는 것 (최초 실행 시에만)**
-  - `~/.config/cachy-omarchy/shell.json` — `$COO_PREFIX_ROOT/defaults/shell.json` 복사본.
   - `~/.config/cachy-omarchy/hypr/bindings.{conf,lua}` — `cachy-omarchy-bindings` 에
     위임해 설치하고, 사용자 Hyprland 설정에 관리 source 블록만 주입한다(본문은 건드리지
     않음).
   - `~/.local/state/omarchy/toggles/bar-off` — 내장 바를 숨기는 빈 파일.
+- **만들지 않는 것** — `~/.config/cachy-omarchy/shell.json`. 셸이 읽는 사용자 경로는
+  `~/.config/omarchy/shell.json` 이지 이 경로가 아니므로, 여기에 파일을 만들면 사용자
+  편집이 조용히 무시된다(dead file). 패키지 기본값은
+  `/usr/share/cachy-omarchy/upstream/config/omarchy/shell.json` 으로 스테이징되며
+  init 없이도 셸이 적용한다. 기존 사용자가 이 dead file 을 갖고 있다면
+  `cachy-omarchy-doctor` 가 WARN 으로 알린다.
 - **멱등 규칙 — 파일 단위, 존재 여부만 본다.** 대상 파일이 이미 있으면 건드리지 않고
   "유지" 메시지만 낸다. 두 번째 실행은 사용자가 고친 `shell.json` 을 덮어쓰지 않는다
   (`tests/runtime/test_init.sh` 의 `USER_EDIT` 보존 검증).

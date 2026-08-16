@@ -29,16 +29,11 @@ assert_eq "$wrote" "0" "--dry-run 은 아무것도 만들지 않는다"
 # 최초 실행.
 out=$("$I" 2>&1); code=$?
 assert_eq "$code" "0" "최초 실행 exit 0"
-assert_file_exists "$HOME/.config/cachy-omarchy/shell.json" "사용자 설정 배치"
+# shell.json 은 만들지 않는다 — 셸이 읽는 경로가 아니므로 dead file 이다.
+[[ -e "$HOME/.config/cachy-omarchy/shell.json" ]] && made=1 || made=0
+assert_eq "$made" "0" "init 는 dead shell.json 을 만들지 않는다"
 assert_file_exists "$HOME/.local/state/omarchy/toggles/bar-off" "bar-off 토글 생성"
 assert_file_exists "$HOME/.config/cachy-omarchy/hypr/bindings.conf" "바인딩 배치"
-
-# 사용자가 고친 파일을 두 번째 실행이 덮어쓰지 않는다.
-printf '{"version":1,"USER_EDIT":true}\n' > "$HOME/.config/cachy-omarchy/shell.json"
-out=$("$I" 2>&1); code=$?
-assert_eq "$code" "0" "두 번째 실행 exit 0"
-assert_contains "$(cat "$HOME/.config/cachy-omarchy/shell.json")" "USER_EDIT" \
-  "사용자 수정 보존 (멱등)"
 
 # FINDING 1 회귀: 사용자가 고친 bindings.conf 를 재실행이 덮어쓰지 않는다.
 BIND_CONF="$HOME/.config/cachy-omarchy/hypr/bindings.conf"
