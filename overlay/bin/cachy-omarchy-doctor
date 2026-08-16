@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+# Read-only release diagnostics for the Cachy Omarchy overlay (SPEC §40).
+# It deliberately never installs, edits configuration, reloads Hyprland, or
+# attempts to recover incomplete package-manager state.
+set -uo pipefail
+
+PREFIX_ROOT=${COO_PREFIX_ROOT:-/usr/share/cachy-omarchy}
+COMPAT_BIN=${COO_COMPAT_BIN:-/usr/lib/cachy-omarchy/compat/bin}
+HYPR_DIR=${COO_HYPR_DIR:-$HOME/.config/hypr}
+CONFIG_DIR=${COO_CONFIG_DIR:-$HOME/.config/cachy-omarchy}
+STATE_DIR=${COO_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/cachy-omarchy}
+USER_OMARCHY_CONFIG_DIR=${COO_OMARCHY_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/omarchy}
+INSTALL_ROOT=$(dirname "$(dirname "$PREFIX_ROOT")")
+BIN_DIR=$INSTALL_ROOT/bin
+SERVICE_FILE=$INSTALL_ROOT/lib/systemd/user/cachy-omarchy-shell.service
+OMARCHY_PATH=${COO_OMARCHY_PATH:-$PREFIX_ROOT/upstream}
+
+failures=0
+pass() { printf 'PASS: %s\n' "$1"; }
+warn() { printf 'WARN: %s\n' "$1"; }
+fail() { printf 'FAIL: %s\n' "$1"; failures=$((failures + 1)); }
+
+usage() {
+  cat <<'USAGE'
+Usage: cachy-omarchy-doctor
+
+Read-only diagnostics for the installed or extracted Cachy Omarchy tree.
+Environment overrides: COO_PREFIX_ROOT, COO_COMPAT_BIN, COO_HYPR_DIR,
+COO_CONFIG_DIR, COO_STATE_DIR, COO_OMARCHY_PATH, COO_OMARCHY_CONFIG_DIR.
+USAGE
+}
+
+case ${1:-} in
+  "") ;;
+  --help|-h) usage; exit 0 ;;
+  *) printf 'error: unknown argument: %s\n' "$1" >&2; usage >&2; exit 2 ;;
+esac
+
+check_os() {
+  local release=${COO_OS_RELEASE:-/etc/os-release} id=""
+  if [[ -r $release ]]; then
+    id=$(awk -F= '$1 == "ID" { gsub(/"/, "", $2); print tolower($2); exit }' "$release")
+    case $id in
+      cachyos|arch) pass "Arch-family OS ($id)" ;;
+      *) warn "Arch-family OS not confirmed (${id:-unknown})" ;;
+    esac
+  else
+    warn "Arch-family OS not measurable"
+  fi
+}
+
+check_command_version() {
+  local label=$1 command=$2
+  if command -v "$command" >/dev/null 2>&1; then
+    pass "$label available ($(command -v "$command"))"
+  else
+    warn "$label not measurable (command missing)"
+  fi
+}
+
+check_file() {
+  local label=$1 path=$2
+  [[ -f $path ]] && pass "$label ($path)" || fail "$label missing: $path"
+}
+
+check_executable() {
+  local label=$1 path=$2
+  [[ -x $path ]] && pass "$label reachable ($path)" || fail "$label missing or not executable: $path"
+}
+
+check_packages() {
+  local pkg out
+  if ! command -v pacman >/dev/null 2>&1; then
+    warn "installed package versions not measurable (pacman missing)"
+    return
+  fi
+  for pkg in cachy-omarchy-shell cachy-omarchy-overlay; do
+    out=$(pacman -Q "$pkg" 2>/dev/null)
+    if [[ $? -eq 0 ]]; then
+      pass "package version: $out"
+    else
+      warn "package not installed: $pkg"
+    fi
+  done
+}
+
+check_manifest() {
+  local manifest=$STATE_DIR/validated-build.manifest line release version commit artifact count=0 sum name path actual
+  [[ -e $manifest ]] || { warn "validated artifact/manifest not present"; return; }
+  [[ -f $manifest ]] || { fail "artifact/manifest mismatch: manifest is not a regular file"; return; }
+
+  release=$(awk -F= '$1 == "RELEASE" { n++; value=$2 } END { if (n == 1) print value }' "$manifest")
+  version=$(awk -F= '$1 == "OMARCHY_VERSION" { n++; value=$2 } END { if (n == 1) print value }' "$manifest")
+  commit=$(awk -F= '$1 == "OMARCHY_COMMIT" { n++; value=$2 } END { if (n == 1) print value }' "$manifest")
+  if [[ ! $release =~ ^validated-builds/[A-Za-z0-9._+-]+$ || ! $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ || ! $commit =~ ^[0-9A-Fa-f]{40}$ ]]; then
+    fail "artifact/manifest mismatch: invalid manifest identity"
+    return
+  fi
+
+  while IFS= read -r line || [[ -n $line ]]; do
+    [[ $line == ARTIFACT=* ]] || continue
+    artifact=${line#ARTIFACT=}
+    name=${artifact%% *}; sum=${artifact#* }
+    count=$((count + 1))
+    if [[ $name == "$artifact" || ! $name =~ ^[A-Za-z0-9._+-]+\.pkg\.tar\.zst$ || ! $sum =~ ^[0-9A-Fa-f]{64}$ ]]; then
+      fail "artifact/manifest mismatch: invalid artifact record"
+      return
+    fi
+    path=$STATE_DIR/$release/artifacts/$name
+    if [[ ! -f $path ]]; then
+      fail "artifact/manifest mismatch: missing $name"
+      return
+    fi
+    if command -v sha256sum >/dev/null 2>&1; then
+      actual=$(sha256sum "$path" 2>/dev/null | awk '{print $1}')
+      if [[ $actual != "$sum" ]]; then
+        fail "artifact/manifest mismatch: checksum $name"
+        return
+      fi
+    fi
+  done <"$manifest"
+  if [[ $count -ne 2 ]]; then
+    fail "artifact/manifest mismatch: expected shell and overlay artifacts"
+    return
+  fi
+  pass "validated artifact/manifest ($version, $commit)"
+}
+
+has_binding_conflict() {
+  local f body
+  for f in "$HYPR_DIR/hyprland.conf" "$HYPR_DIR/hyprland.lua"; do
+    [[ -f $f ]] || continue
+    body=$(grep -vE '^[[:space:]]*(#|--)' "$f" || true)
+    if grep -qiE 'SUPER[[:space:]]*\+[[:space:]]*(SPACE|K)|bind[[:space:]]*=[[:space:]]*(SUPER|\$mainMod)[[:space:]]*,[[:space:]]*(SPACE|K)([[:space:]]*,|$)' <<<"$body"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+check_os
+check_command_version "Hyprland" hyprctl
+check_command_version "Quickshell" quickshell
+check_packages
+
+[[ -d $OMARCHY_PATH ]] && pass "OMARCHY_PATH compatibility root ($OMARCHY_PATH)" \
+  || fail "OMARCHY_PATH compatibility root missing: $OMARCHY_PATH"
+check_file "shell.qml" "$OMARCHY_PATH/shell/shell.qml"
+check_file "shell service" "$SERVICE_FILE"
+check_file "omarchy.menu availability" "$OMARCHY_PATH/default/omarchy/omarchy-menu.jsonc"
+check_executable "shell wrapper" "$BIN_DIR/cachy-omarchy-shell"
+check_executable "launcher invocation" "$BIN_DIR/cachy-omarchy-launcher"
+check_executable "binding helper" "$BIN_DIR/cachy-omarchy-bindings"
+check_executable "keybinding invocation" "$BIN_DIR/cachy-omarchy-keybindings"
+check_executable "compat omarchy-shell" "$COMPAT_BIN/omarchy-shell"
+
+if has_binding_conflict; then
+  fail "Hyprland binding conflict: SUPER+SPACE or SUPER+K already bound"
+elif [[ -f $HYPR_DIR/hyprland.conf || -f $HYPR_DIR/hyprland.lua ]]; then
+  pass "Hyprland binding conflict absent"
+else
+  warn "Hyprland binding conflict not measurable (no config)"
+fi
+
+if command -v pgrep >/dev/null 2>&1 && pgrep -x quickshell >/dev/null 2>&1; then
+  pass "Quickshell process running"
+  if command -v qs >/dev/null 2>&1; then
+    warn "IPC ping requires a live target; not invoked by read-only doctor"
+  else
+    warn "IPC ping not measurable (qs missing)"
+  fi
+else
+  warn "Quickshell process not observed"
+  warn "IPC ping not measurable (shell not observed)"
+fi
+
+[[ ! -e $STATE_DIR/install-pending.manifest ]] \
+  && pass "incomplete install state absent" \
+  || fail "incomplete install state: install-pending.manifest requires operator recovery"
+check_manifest
+
+if [[ -e $CONFIG_DIR/shell.json ]]; then
+  warn "inert shell.json: $CONFIG_DIR/shell.json is a reference copy; shell reads $USER_OMARCHY_CONFIG_DIR/shell.json"
+else
+  pass "inert shell.json reference copy absent"
+fi
+if [[ -e $USER_OMARCHY_CONFIG_DIR/shell.json ]]; then
+  warn "user shell override present: $USER_OMARCHY_CONFIG_DIR/shell.json"
+else
+  pass "user shell override absent"
+fi
+warn "graphical-session auto-start unverified; unit intent is not observed startup"
+
+exit "$failures"
