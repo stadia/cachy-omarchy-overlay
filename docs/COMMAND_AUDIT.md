@@ -76,3 +76,191 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 2. 메뉴 JSONC의 Omarchy-OS 액션은 끄거나 실패해도 셸이 죽지 않게 둔다(업스트림이 이미 명령 실패를 어떻게 다루는지는 M3에서 실측).
 3. `omarchy-settings`가 제공하는 `omarchy-debug*`는 패키징하지 않는다.
 4. 공식 `bin/` 전체를 `/usr/bin`에 설치하지 않는다.
+
+---
+
+## 메뉴 노출 전수 (M3)
+
+출처: 핀된 `default/omarchy/omarchy-menu.jsonc` 의 `action`/`when`/`checked` 와
+`shell/plugins/menu/Menu.qml` 하드코딩 `omarchy-*` (fonts/powerprofiles provider).
+앱 목록(`provider: apps`)은 데스크톱 엔트리이지 `omarchy-*`가 아니다 — R06.
+
+### 비활성 경로
+
+REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않는다.
+
+1. **바이너리 부재** — 공식 `omarchy`/`omarchy-settings` `bin/`을 `/usr/bin`에
+   설치하지 않는다. 메뉴 `runAction`은 `Util.execDetached`라 없는 명령은
+   실패하고 셸은 유지된다.
+2. **`when`/`checked` 가드** — `omarchy-cmd-present` / `omarchy-hw-*` /
+   `omarchy-pkg-present` 가 없으면 조건이 실패해 해당 행이 숨겨진다.
+3. **M5** — 사용자 메뉴 오버레이 또는 `cachy-omarchy-init`가 위험 항목을
+   더 숨길 수 있다. M3는 패치 수 0을 유지한다.
+
+표준 명령(`systemctl suspend|hibernate`, `hyprpicker`, `passwd`)은 SAFE이며
+`omarchy-*`가 아니라 이 표에 없다. `uwsm-app`은 Task 3 WRAPPER.
+
+<!-- MENU_AUDIT_BEGIN -->
+| command | class | action | note |
+| --- | --- | --- | --- |
+| `omarchy-bar` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
+| `omarchy-branding-about` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
+| `omarchy-branding-screensaver` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
+| `omarchy-capture-qr` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-capture-screenrecording` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-capture-screenrecording-with-webcam` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-capture-screenshot` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-capture-text` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-channel-current` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-channel-set` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-cmd-present` | DISABLED | disable | when/checked 가드. 바이너리 없으면 행이 숨겨짐 |
+| `omarchy-default-agent` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-default-browser` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-default-editor` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-default-terminal` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-dns` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-drive-password` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-emacs` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-font-current` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-font-list` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-font-set` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-games-retro-install` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-hibernation-available` | DISABLED | disable | when/checked 가드. 바이너리 없으면 행이 숨겨짐 |
+| `omarchy-hw-dell-xps-haptic-touchpad` | DISABLED | disable | when/checked 가드. 바이너리 없으면 행이 숨겨짐 |
+| `omarchy-hw-fingerprint` | DISABLED | disable | when/checked 가드. 바이너리 없으면 행이 숨겨짐 |
+| `omarchy-hw-hybrid-gpu` | DISABLED | disable | when/checked 가드. 바이너리 없으면 행이 숨겨짐 |
+| `omarchy-hw-laptop` | DISABLED | disable | when/checked 가드. 바이너리 없으면 행이 숨겨짐 |
+| `omarchy-hw-touchpad` | DISABLED | disable | when/checked 가드. 바이너리 없으면 행이 숨겨짐 |
+| `omarchy-hw-touchscreen` | DISABLED | disable | when/checked 가드. 바이너리 없으면 행이 숨겨짐 |
+| `omarchy-hw-webcam` | DISABLED | disable | when/checked 가드. 바이너리 없으면 행이 숨겨짐 |
+| `omarchy-hyprland-monitor-internal` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-hyprland-monitor-internal-mirror` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-hyprland-window-gaps-toggle` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-hyprland-window-single-square-aspect-toggle` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-hyprland-workspace-layout-toggle` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-install-ai-chatgpt` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-and-launch` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-app` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-browser` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-chromium-google-account` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-dev-env` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-docker-dbs` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-editor-emacs` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-editor-helix` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-editor-vscode` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-editor-zed` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-font` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-gaming-battlenet` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-gaming-geforce-now` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-gaming-heroic` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-gaming-lutris` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-gaming-retroarch` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-gaming-steam` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-gaming-xbox-cloud` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-gaming-xbox-controllers` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-preinstalls` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-service-1password` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-service-dropbox` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-service-nordvpn` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-service-once` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-service-signal` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-service-spotify` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-service-tailscale` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-terminal` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-launch-about` | DISABLED | disable | 공식 런처/웹앱/플로팅 터미널 |
+| `omarchy-launch-config-editor` | DISABLED | disable | 공식 런처/웹앱/플로팅 터미널 |
+| `omarchy-launch-discord-community` | DISABLED | disable | 공식 런처/웹앱/플로팅 터미널 |
+| `omarchy-launch-floating-terminal-with-presentation` | DISABLED | disable | 공식 런처/웹앱/플로팅 터미널 |
+| `omarchy-launch-screensaver` | DISABLED | disable | 공식 런처/웹앱/플로팅 터미널 |
+| `omarchy-launch-webapp` | DISABLED | disable | 공식 런처/웹앱/플로팅 터미널 |
+| `omarchy-menu` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-menu-emoji` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-menu-herdr-keybindings` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-menu-keybindings` | ADAPTED | wrapper | M4 SUPER+K. 지금은 바이너리 부재로 행 실행 실패 |
+| `omarchy-menu-plugin` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-menu-share` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-menu-timezone` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-menu-tmux-keybindings` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-network-status` | DISABLED | disable | when/checked 가드. 바이너리 없으면 행이 숨겨짐 |
+| `omarchy-pkg-aur-install` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-pkg-install` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-pkg-present` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-pkg-remove` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-plugin-add` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-plymouth-reset` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
+| `omarchy-plymouth-set-by-theme` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
+| `omarchy-plymouth-switcher` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
+| `omarchy-powerprofiles-list` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-powerprofiles-set` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-refresh-hyprland` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-refresh-hyprsunset` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-refresh-plymouth` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-refresh-shell` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-refresh-tmux` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-reminder` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-remove-browser` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-remove-dev-env` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-remove-gaming-battlenet` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-remove-gaming-geforce-now` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-remove-gaming-heroic` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-remove-gaming-lutris` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-remove-gaming-minecraft` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-remove-gaming-retroarch` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-remove-gaming-steam` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-remove-gaming-xbox-cloud` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-remove-gaming-xbox-controllers` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-remove-preinstalls` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-remove-security-fido2` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-remove-security-fingerprint` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-remove-security-sshd` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-remove-service-dropbox` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-remove-service-tailscale` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-restart-audio` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-restart-bluetooth` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-restart-hyprsunset` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-restart-shell` | ADAPTED | wrapper | later `cachy-omarchy-reload`. M3 미구현 |
+| `omarchy-restart-trackpad` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-restart-wifi` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-restart-xcompose` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-setup-direct-boot` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-setup-security-fido2` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-setup-security-fingerprint` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-setup-security-sshd` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-shell` | ADAPTED | wrapper | M2 `cachy-omarchy-shell --ipc`. 메뉴의 summon/toggle 경로 |
+| `omarchy-sudo-passwordless` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-system-factory-reset` | DISABLED | disable | 세션/전원/팩토리리셋. 전체 OS 헬퍼 |
+| `omarchy-system-lock` | DISABLED | disable | 세션/전원/팩토리리셋. 전체 OS 헬퍼 |
+| `omarchy-system-logout` | DISABLED | disable | 세션/전원/팩토리리셋. 전체 OS 헬퍼 |
+| `omarchy-system-reboot` | DISABLED | disable | 세션/전원/팩토리리셋. 전체 OS 헬퍼 |
+| `omarchy-system-shutdown` | DISABLED | disable | 세션/전원/팩토리리셋. 전체 OS 헬퍼 |
+| `omarchy-theme-bg-install` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
+| `omarchy-theme-bg-set` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
+| `omarchy-theme-bg-switcher` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
+| `omarchy-theme-install` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
+| `omarchy-theme-remove` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
+| `omarchy-theme-set` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
+| `omarchy-theme-switcher` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
+| `omarchy-theme-update` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
+| `omarchy-toggle-bar` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
+| `omarchy-toggle-crash-capture` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
+| `omarchy-toggle-enabled` | DISABLED | disable | when/checked 가드. 바이너리 없으면 행이 숨겨짐 |
+| `omarchy-toggle-hybrid-gpu` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
+| `omarchy-toggle-idle` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
+| `omarchy-toggle-nightlight` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
+| `omarchy-toggle-notification-silencing` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
+| `omarchy-toggle-screensaver` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
+| `omarchy-toggle-touchpad` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
+| `omarchy-toggle-touchscreen` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
+| `omarchy-transcode` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-tui-install` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-tui-remove` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-update` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-update-firmware` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-update-time` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-voxtype-install` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-voxtype-remove` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-webapp-handler` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-webapp-install` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-webapp-remove` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-windows-vm` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+<!-- MENU_AUDIT_END -->
