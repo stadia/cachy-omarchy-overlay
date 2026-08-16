@@ -44,14 +44,20 @@ Examples:
   coo-shell reload
 
 Environment:
-  COO_SHELL_PATH        QML root directory (default: installed shell/)
-  COO_NO_AUTOSTART=1    Never start the service; fail instead.
-  COO_IPC_TIMEOUT       Per-call timeout (default: 2s)
+  COO_SHELL_PATH          QML root directory (default: installed shell/)
+  COO_NO_AUTOSTART=1      Never start the service; fail instead.
+  COO_IPC_TIMEOUT         Timeout for the first (real) call (default: 2s).
+  COO_IPC_RETRY_TIMEOUT   Timeout for each up-polling retry after autostart
+                          (default: 0.5s). Deliberately shorter than
+                          COO_IPC_TIMEOUT: a retry is a "has it come up yet"
+                          probe, not a real request, so a hung probe is
+                          itself evidence of not-ready and gets abandoned
+                          quickly rather than eating the full budget.
 USAGE
 }
 
 if (( $# == 0 )) || [[ ${1:-} == "-h" || ${1:-} == "--help" ]]; then
-  usage; exit 0
+  (( QUIET )) || usage; exit 0
 fi
 
 # `ping` and `reload` are shorthands for the `shell` target.
@@ -74,6 +80,19 @@ if [[ -z ${WAYLAND_DISPLAY:-} ]]; then
 fi
 
 IPC_TIMEOUT=${COO_IPC_TIMEOUT:-2s}
+IPC_KILL_AFTER=1s
+
+# The retry loop below is polling "has the service come up yet", not making
+# a real request: a hung probe is itself evidence of not-ready, so it gets a
+# much shorter budget than the first call. See the arithmetic below the loop
+# for why this is safe -- a genuinely-up-but-slow-to-answer instance is not
+# at risk of being misclassified as down, because once a target's IPC socket
+# is registered, answering a trivial IpcHandler function like ping() is a
+# local round trip with no rendering/font/image work on the path -- the
+# 0.5s/0.2s budget below is not competing with QML boot time (that's what
+# the outer 25-iteration loop is for), only with a single already-live call.
+RETRY_TIMEOUT=${COO_IPC_RETRY_TIMEOUT:-0.5s}
+RETRY_KILL_AFTER=0.2s
 
 # Emits the reply on stdout. Return: 0 ok, 1 not running, 3 IPC-level error
 # (message on stdout), 4 not responding.
@@ -93,8 +112,9 @@ IPC_TIMEOUT=${COO_IPC_TIMEOUT:-2s}
 # retry loop still recovers a shell that is merely slow to start, since it
 # doesn't need to tell the two states apart to do that.
 call_once() {
+  local to=$1 kill_after=$2; shift 2
   local output status
-  output=$(timeout --kill-after=1s "$IPC_TIMEOUT" \
+  output=$(timeout --kill-after="$kill_after" "$to" \
            "$QS" ipc -n -p "$SHELL_PATH" call -- "$@" 2>/dev/null)
   status=$?
 
@@ -110,15 +130,38 @@ call_once() {
   return 0
 }
 
-reply=$(call_once "$@"); rc=$?
+reply=$(call_once "$IPC_TIMEOUT" "$IPC_KILL_AFTER" "$@"); rc=$?
 
 if (( rc == 1 )) && [[ ${COO_NO_AUTOSTART:-0} != 1 ]]; then
   systemctl --user start coo-shell.service >/dev/null 2>&1
-  # Bounded retry: 25 x 200ms = 5s ceiling (SPEC 19.3, no unbounded wait).
+  # Bounded retry: 25 attempts, 200ms apart, each attempt capped by
+  # RETRY_TIMEOUT + RETRY_KILL_AFTER instead of the (longer) first-call
+  # budget -- see the comment above RETRY_TIMEOUT for why a short cap here
+  # cannot misclassify a legitimate slow reply as down.
+  #
+  # Typical case (the common one -- no instance yet, `qs` fails fast rather
+  # than hanging; see docs/QUICKSHELL_API.md §9): ceiling is
+  #   25 x 200ms = 5s.
+  # Worst case (every retry attempt itself hangs, e.g. a wedged socket):
+  # each attempt can cost up to RETRY_TIMEOUT + RETRY_KILL_AFTER before
+  # `timeout` forces it down, so with the defaults (0.5s + 0.2s = 0.7s):
+  #   25 x (200ms sleep + 0.7s) = 25 x 0.9s = 22.5s
+  # plus the first call's own worst case (IPC_TIMEOUT + IPC_KILL_AFTER =
+  # 2s + 1s = 3s):
+  #   22.5s + 3s = 25.5s total worst-case ceiling.
+  # Still bounded (SPEC 19.3, no unbounded wait) -- just not the ~83s the
+  # unshortened per-retry timeout would have cost had it kept using
+  # IPC_TIMEOUT/IPC_KILL_AFTER for every one of the 25 attempts.
+  #
+  # A timeout on a retry attempt (rc 4) is treated the same as "not running
+  # yet" (rc 1) here, not as a final verdict: a single slow probe during the
+  # boot window does not mean the shell is actually unresponsive, only that
+  # this particular short-budget attempt didn't land in time. The loop still
+  # exits immediately on success (rc 0) or a real IPC-level error (rc 3).
   for _ in $(seq 1 25); do
     sleep 0.2
-    reply=$(call_once "$@"); rc=$?
-    (( rc == 1 )) || break
+    reply=$(call_once "$RETRY_TIMEOUT" "$RETRY_KILL_AFTER" "$@"); rc=$?
+    (( rc == 1 || rc == 4 )) || break
   done
 fi
 
