@@ -92,6 +92,8 @@ cat >"$fake/mv" <<'EOF'
 #!/usr/bin/env bash
 last=${!#}
 if [[ ${COO_FAKE_POINTER_FAIL:-0} == 1 && $last == */validated-build.manifest ]]; then exit 10; fi
+if [[ ${COO_FAKE_METADATA_PKG_MV_FAIL:-0} == 1 && ${COO_UPDATE_METADATA_PUBLISH:-} == pkg ]]; then exit 13; fi
+if [[ ${COO_FAKE_INSTALLED_MV_FAIL:-0} == 1 && ${COO_INSTALL_FINALIZE:-0} == 1 && $last == */installed-build.manifest ]]; then exit 14; fi
 if [[ ${COO_FAKE_ARCHIVE_MV_FAIL:-0} == 1 && $last == */packages/previous-* ]]; then exit 12; fi
 /usr/bin/mv "$@"
 EOF
@@ -368,5 +370,49 @@ for mode in patch build audit test; do
   assert_eq "$(sha256sum "$failroot/packages/cachy-omarchy-shell/PKGBUILD")" "$before_pkg" "U$mode failure preserves PKGBUILD"
   assert_eq "$(wc -l <"$fail_pac")" "0" "U$mode failure invokes no pacman"
 done
+
+# Metadata publication is a transaction boundary: a failed second rename must
+# leave both tracked inputs and the old authoritative pointer/release intact.
+pubroot=$COO_TEST_SANDBOX/metadata-publish-repo
+cp -a "$root" "$pubroot"
+sed -i 's/OMARCHY_VERSION=4\.0\.1/OMARCHY_VERSION=4.0.0/; s/OMARCHY_COMMIT=2222222222222222222222222222222222222222/OMARCHY_COMMIT=f0020448ca87329199de7cb12f2015ebc4a3e5e7/; s/OMARCHY_TAG=v4\.0\.1/OMARCHY_TAG=v4.0.0/' "$pubroot/upstream.lock"
+sed -i "s/pkgver=4.0.1/pkgver=4.0.0/; s/pkgrel=2/pkgrel=1/; s/_commit='2222222222222222222222222222222222222222'/_commit='f0020448ca87329199de7cb12f2015ebc4a3e5e7'/" "$pubroot/packages/cachy-omarchy-shell/PKGBUILD"
+pub_state=$COO_TEST_SANDBOX/metadata-publish-state
+cp -a "$COO_TEST_SANDBOX/state" "$pub_state"
+pub_lock_before=$(sha256sum "$pubroot/upstream.lock")
+pub_pkg_before=$(sha256sum "$pubroot/packages/cachy-omarchy-shell/PKGBUILD")
+pub_pointer_before=$(cat "$pub_state/validated-build.manifest")
+pub_old_release=$(awk -F= '$1 == "RELEASE" { print $2; exit }' "$pub_state/validated-build.manifest")
+code=0
+out=$(COO_REPO_ROOT="$pubroot" COO_GIT_BIN="$fake/git" COO_STATE_DIR="$pub_state" COO_BUILD_DIR="$COO_TEST_SANDBOX/metadata-publish-build" COO_TOOL_LOG="$log" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_TEST_RUNNER="$fake/test-runner" COO_MV_BIN="$fake/mv" COO_FAKE_METADATA_PKG_MV_FAIL=1 "$pubroot/bin/update-upstream" 2>&1) || code=$?
+assert_eq "$code" "1" "metadata second rename failure aborts update"
+assert_eq "$(sha256sum "$pubroot/upstream.lock")" "$pub_lock_before" "metadata failure restores lock"
+assert_eq "$(sha256sum "$pubroot/packages/cachy-omarchy-shell/PKGBUILD")" "$pub_pkg_before" "metadata failure preserves PKGBUILD"
+assert_eq "$(cat "$pub_state/validated-build.manifest")" "$pub_pointer_before" "metadata failure preserves old manifest pointer"
+assert_file_exists "$pub_state/$pub_old_release/artifacts/cachy-omarchy-shell-4.0.0-1-any.pkg.tar.zst" "metadata failure preserves old referenced release"
+
+# A pacman-success/final-pointer-failure state is explicitly pending. Neither
+# a new install nor rollback may trust the stale installed pointer afterwards.
+postroot=$COO_TEST_SANDBOX/post-pacman-repo
+cp -a "$root" "$postroot"
+sed -i 's/OMARCHY_VERSION=4\.0\.1/OMARCHY_VERSION=4.0.0/; s/OMARCHY_COMMIT=2222222222222222222222222222222222222222/OMARCHY_COMMIT=f0020448ca87329199de7cb12f2015ebc4a3e5e7/; s/OMARCHY_TAG=v4\.0\.1/OMARCHY_TAG=v4.0.0/' "$postroot/upstream.lock"
+sed -i "s/pkgver=4.0.1/pkgver=4.0.0/; s/pkgrel=2/pkgrel=1/; s/_commit='2222222222222222222222222222222222222222'/_commit='f0020448ca87329199de7cb12f2015ebc4a3e5e7'/" "$postroot/packages/cachy-omarchy-shell/PKGBUILD"
+poststate=$COO_TEST_SANDBOX/post-pacman-state
+cp -a "$COO_TEST_SANDBOX/state" "$poststate"
+: >"$paclog"
+code=0
+out=$(COO_REPO_ROOT="$postroot" COO_STATE_DIR="$poststate" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" COO_MV_BIN="$fake/mv" COO_FAKE_INSTALLED_MV_FAIL=1 "$postroot/bin/install-packages" --install 2>&1) || code=$?
+assert_eq "$code" "14" "post-pacman installed pointer failure is reported"
+assert_file_exists "$poststate/install-pending.manifest" "post-pacman failure leaves explicit pending state"
+assert_eq "$(wc -l <"$paclog")" "1" "post-pacman failure ran pacman exactly once"
+: >"$paclog"
+code=0
+out=$(COO_REPO_ROOT="$postroot" COO_STATE_DIR="$poststate" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$postroot/bin/install-packages" --install 2>&1) || code=$?
+assert_eq "$code" "1" "pending install blocks another install"
+assert_eq "$(wc -l <"$paclog")" "0" "pending install blocks further pacman"
+code=0
+out=$(COO_REPO_ROOT="$postroot" COO_STATE_DIR="$poststate" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$postroot/bin/rollback" 2>&1) || code=$?
+assert_eq "$code" "1" "pending install blocks rollback"
+assert_eq "$(wc -l <"$paclog")" "0" "pending rollback invokes no pacman"
 
 exit "$ASSERT_FAILURES"

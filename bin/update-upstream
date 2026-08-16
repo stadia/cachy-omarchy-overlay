@@ -119,24 +119,29 @@ while IFS= read -r artifact; do
   name=${artifact##*/}
   "$install_bin" -m 644 "$artifact" "$build_dir/$name"
 done < <(find "$release_target/artifacts" -maxdepth 1 -type f -name '*.pkg.tar.zst' -print | sort)
+# POSIX cannot atomically rename two different tracked files. Prepare both in
+# their own directories, then compensate the first rename if the second or the
+# final manifest commit fails. The old manifest remains authoritative until
+# both tracked metadata files have published.
 pointer_tmp=$(mktemp "$state_dir/.validated-build.manifest-update-XXXXXX")
 cp "$candidate_manifest" "$pointer_tmp"
-"$mv_bin" "$pointer_tmp" "$state_dir/validated-build.manifest"
-
-# POSIX cannot atomically rename two different tracked files. Prepare both in
-# their own directories, then compensate the first rename if the second fails.
 lock_backup=$(mktemp "${lock%/*}/.upstream.lock-backup-XXXXXX")
 pkg_backup=$(mktemp "${shell_pkg%/*}/.PKGBUILD-backup-XXXXXX")
 lock_new=$(mktemp "${lock%/*}/.upstream.lock-new-XXXXXX")
 pkg_new=$(mktemp "${shell_pkg%/*}/.PKGBUILD-new-XXXXXX")
 cp "$lock" "$lock_backup"; cp "$shell_pkg" "$pkg_backup"
 cp "$candidate_lock" "$lock_new"; cp "$candidate_pkg" "$pkg_new"
-if ! "$mv_bin" "$lock_new" "$lock"; then
+if ! COO_UPDATE_METADATA_PUBLISH=lock "$mv_bin" "$lock_new" "$lock"; then
   fail 'could not publish upstream.lock'
 fi
-if ! "$mv_bin" "$pkg_new" "$shell_pkg"; then
-  "$mv_bin" "$lock_backup" "$lock" || true
+if ! COO_UPDATE_METADATA_PUBLISH=pkg "$mv_bin" "$pkg_new" "$shell_pkg"; then
+  "$mv_bin" "$lock_backup" "$lock" || fail 'could not restore upstream.lock after PKGBUILD failure'
   fail 'could not publish shell PKGBUILD; upstream.lock restored'
+fi
+if ! "$mv_bin" "$pointer_tmp" "$state_dir/validated-build.manifest"; then
+  "$mv_bin" "$pkg_backup" "$shell_pkg" || fail 'could not restore shell PKGBUILD after manifest failure'
+  "$mv_bin" "$lock_backup" "$lock" || fail 'could not restore upstream.lock after manifest failure'
+  fail 'could not publish validated manifest; metadata restored'
 fi
 rm -f "$lock_backup" "$pkg_backup"
 

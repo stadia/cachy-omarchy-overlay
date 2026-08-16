@@ -17,6 +17,13 @@ case ${1:-} in
   *) coo_fail "unknown argument: $1"; exit 1 ;;
 esac
 
+# A successful pacman transaction with failed installed-state finalization is
+# intentionally ambiguous. Never roll back from a stale pointer in that state.
+[[ ! -e $state_dir/install-pending.manifest ]] || {
+  coo_fail 'incomplete install state requires operator recovery'
+  exit 1
+}
+
 # Newest complete archive wins. Do not guess from arbitrary package files.
 mapfile -t candidates < <(find "$state_dir/packages" -mindepth 2 -maxdepth 2 -type f -name validated-build.manifest -print 2>/dev/null | sort -r)
 (( ${#candidates[@]} > 0 )) || { coo_fail 'no prior validated build is available'; exit 1; }
