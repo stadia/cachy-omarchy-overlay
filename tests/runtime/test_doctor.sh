@@ -34,14 +34,34 @@ fi
 exit 0
 EOF
 chmod +x "$root/usr/bin/cachy-omarchy-shell"
-printf '#!/usr/bin/env bash\nexit 0\n' >"$fake_bin/pgrep"
-printf '#!/usr/bin/env bash\nexit 0\n' >"$fake_bin/qs"
-chmod +x "$fake_bin/pgrep" "$fake_bin/qs"
+cat >"$fake_bin/pgrep" <<'EOF'
+#!/usr/bin/env bash
+[[ ${COO_FAKE_PROCESS:-0} == 1 ]]
+EOF
+cat >"$fake_bin/qs" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+cat >"$fake_bin/pacman" <<'EOF'
+#!/usr/bin/env bash
+[[ ${1:-} == -Q ]] || exit 2
+printf '%s\n' "${2:-}" >>"${COO_PACMAN_LOG:?}"
+case ${2:-} in
+  omarchy|omarchy-settings)
+    [[ ${COO_FAKE_OFFICIAL_PRESENT:-} == "$2" ]] && { printf '%s 1.0-1\n' "$2"; exit 0; }
+    ;;
+esac
+exit 1
+EOF
+for cmd in hyprctl quickshell; do printf '#!/usr/bin/env bash\nexit 0\n' >"$fake_bin/$cmd"; done
+chmod +x "$fake_bin/pgrep" "$fake_bin/qs" "$fake_bin/pacman" "$fake_bin/hyprctl" "$fake_bin/quickshell"
 printf '#!/usr/bin/env bash\nexit 0\n' >"$compat/omarchy-shell"
 chmod +x "$compat/omarchy-shell"
 
+pacman_log=$COO_TEST_SANDBOX/pacman.log
 run_doctor() {
-  COO_PREFIX_ROOT="$prefix" COO_COMPAT_BIN="$compat" COO_HYPR_DIR="$hypr" \
+  PATH="$fake_bin:/usr/bin:/bin" WAYLAND_DISPLAY="${COO_TEST_WAYLAND_DISPLAY:-}" \
+    COO_PACMAN_LOG="$pacman_log" COO_PREFIX_ROOT="$prefix" COO_COMPAT_BIN="$compat" COO_HYPR_DIR="$hypr" \
     COO_CONFIG_DIR="$config" COO_OMARCHY_CONFIG_DIR="$user_config" COO_STATE_DIR="$state" "$DOCTOR" 2>&1
 }
 
@@ -53,14 +73,31 @@ assert_eq "$(sha256sum "$config/sentinel" | awk '{print $1}')" "$before" "doctor
 assert_contains "$out" "PASS: shell.qml" "healthy tree reports shell.qml"
 assert_contains "$out" "PASS: launcher invocation" "healthy tree reports launcher reachability"
 assert_contains "$out" "WARN: graphical-session auto-start" "auto-start remains explicitly unverified"
+assert_contains "$out" "WARN: Quickshell process not observed" "baseline does not inherit a real Quickshell process"
 assert_contains "$out" "WARN: IPC ping not measurable" "absent process leaves IPC explicitly unmeasured"
+assert_contains "$(cat "$pacman_log")" "omarchy" "doctor queries official omarchy package"
+assert_contains "$(cat "$pacman_log")" "omarchy-settings" "doctor queries official omarchy-settings package"
 
-out=$(PATH="$fake_bin:$PATH" WAYLAND_DISPLAY=fixture-wayland run_doctor); code=$?
+out=$(COO_FAKE_PROCESS=1 COO_TEST_WAYLAND_DISPLAY=fixture-wayland run_doctor); code=$?
 assert_eq "$code" 0 "live IPC ping success passes"
 assert_contains "$out" "PASS: IPC ping" "doctor performs bounded read-only IPC ping"
-out=$(PATH="$fake_bin:$PATH" WAYLAND_DISPLAY=fixture-wayland COO_FAKE_PING_FAIL=1 run_doctor); code=$?
+out=$(COO_FAKE_PROCESS=1 COO_TEST_WAYLAND_DISPLAY=fixture-wayland COO_FAKE_PING_FAIL=1 run_doctor); code=$?
 assert_eq "$code" 1 "live IPC ping failure fails"
 assert_contains "$out" "FAIL: IPC ping" "failed IPC ping is explicit"
+out=$(COO_FAKE_PROCESS=1 COO_TEST_WAYLAND_DISPLAY=fixture-wayland COO_IPC_TIMEOUT=0 run_doctor); code=$?
+assert_eq "$code" 1 "zero IPC timeout is rejected before ping"
+assert_contains "$out" "FAIL: IPC timeout" "zero IPC timeout is explicit"
+for invalid_timeout in '' -1 not-a-number 11; do
+  out=$(COO_IPC_TIMEOUT="$invalid_timeout" run_doctor); code=$?
+  assert_eq "$code" 1 "invalid IPC timeout is rejected: ${invalid_timeout:-empty}"
+  assert_contains "$out" "FAIL: IPC timeout" "invalid timeout is explicit: ${invalid_timeout:-empty}"
+done
+out=$(COO_FAKE_OFFICIAL_PRESENT=omarchy run_doctor); code=$?
+assert_eq "$code" 1 "official omarchy presence fails"
+assert_contains "$out" "FAIL: official package present: omarchy" "official omarchy presence is explicit"
+out=$(COO_FAKE_OFFICIAL_PRESENT=omarchy-settings run_doctor); code=$?
+assert_eq "$code" 1 "official omarchy-settings presence fails"
+assert_contains "$out" "FAIL: official package present: omarchy-settings" "official omarchy-settings presence is explicit"
 
 printf 'pending\n' >"$state/install-pending.manifest"
 out=$(run_doctor); code=$?

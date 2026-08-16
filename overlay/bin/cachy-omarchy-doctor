@@ -15,7 +15,9 @@ BIN_DIR=$INSTALL_ROOT/bin
 SERVICE_FILE=$INSTALL_ROOT/lib/systemd/user/cachy-omarchy-shell.service
 OMARCHY_PATH=${COO_OMARCHY_PATH:-$PREFIX_ROOT/upstream}
 SHA256_BIN=${COO_SHA256_BIN:-sha256sum}
-IPC_TIMEOUT=${COO_IPC_TIMEOUT:-2s}
+IPC_TIMEOUT_RAW=${COO_IPC_TIMEOUT-2s}
+IPC_TIMEOUT=""
+IPC_TIMEOUT_VALID=0
 
 failures=0
 pass() { printf 'PASS: %s\n' "$1"; }
@@ -28,7 +30,8 @@ Usage: cachy-omarchy-doctor
 
 Read-only diagnostics for the installed or extracted Cachy Omarchy tree.
 Environment overrides: COO_PREFIX_ROOT, COO_COMPAT_BIN, COO_HYPR_DIR,
-COO_CONFIG_DIR, COO_STATE_DIR, COO_OMARCHY_PATH, COO_OMARCHY_CONFIG_DIR.
+COO_CONFIG_DIR, COO_STATE_DIR, COO_OMARCHY_PATH, COO_OMARCHY_CONFIG_DIR,
+COO_IPC_TIMEOUT (1–10 seconds, optional `s` suffix).
 USAGE
 }
 
@@ -71,19 +74,43 @@ check_executable() {
 }
 
 check_packages() {
-  local pkg out
+  local pkg out status
   if ! command -v pacman >/dev/null 2>&1; then
     warn "installed package versions not measurable (pacman missing)"
+    warn "official package absence not measurable (pacman missing)"
     return
   fi
   for pkg in cachy-omarchy-shell cachy-omarchy-overlay; do
-    out=$(pacman -Q "$pkg" 2>/dev/null)
-    if [[ $? -eq 0 ]]; then
+    status=0; out=$(pacman -Q "$pkg" 2>/dev/null) || status=$?
+    if [[ $status -eq 0 ]]; then
       pass "package version: $out"
-    else
+    elif [[ $status -eq 1 ]]; then
       warn "package not installed: $pkg"
+    else
+      warn "package query failed: $pkg"
     fi
   done
+  for pkg in omarchy omarchy-settings; do
+    status=0; out=$(pacman -Q "$pkg" 2>/dev/null) || status=$?
+    if [[ $status -eq 0 ]]; then
+      fail "official package present: $out"
+    elif [[ $status -eq 1 ]]; then
+      pass "official package absent: $pkg"
+    else
+      warn "official package query failed: $pkg"
+    fi
+  done
+}
+
+validate_ipc_timeout() {
+  local seconds
+  if [[ $IPC_TIMEOUT_RAW =~ ^([1-9]|10)s?$ ]]; then
+    seconds=${BASH_REMATCH[1]}
+    IPC_TIMEOUT="${seconds}s"
+    IPC_TIMEOUT_VALID=1
+    return 0
+  fi
+  return 1
 }
 
 # Keep this parser schema-equivalent to bin/validated-build.sh. Doctor is
@@ -165,6 +192,10 @@ has_binding_conflict() {
   return 1
 }
 
+if ! validate_ipc_timeout; then
+  fail "IPC timeout invalid: ${IPC_TIMEOUT_RAW@Q} (use an integer from 1s through 10s)"
+fi
+
 check_os
 check_command_version "Hyprland" hyprctl
 check_command_version "Quickshell" quickshell
@@ -191,7 +222,9 @@ fi
 
 if command -v pgrep >/dev/null 2>&1 && pgrep -x quickshell >/dev/null 2>&1; then
   pass "Quickshell process running"
-  if ! command -v qs >/dev/null 2>&1; then
+  if [[ $IPC_TIMEOUT_VALID -ne 1 ]]; then
+    warn "IPC ping not attempted (invalid timeout)"
+  elif ! command -v qs >/dev/null 2>&1; then
     warn "IPC ping not measurable (qs missing)"
   elif [[ -z ${WAYLAND_DISPLAY:-} ]]; then
     warn "IPC ping not measurable (WAYLAND_DISPLAY missing)"

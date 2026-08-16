@@ -8,7 +8,7 @@
 | §61 기준 | 상태 | 현재 증거 / 다음 갭 |
 | --- | --- | --- |
 | CachyOS에서 실행 | 미검증 | 호스트는 CachyOS 계열로 관측했지만 실제 패키지 설치·세션 실행은 하지 않았다. `docs/RUNTIME_STARTUP.md` §9.4 참조. |
-| Omarchy OS 미설치 | 측정됨 | M6 종료 관측에서 `pacman -Q omarchy omarchy-settings`가 둘 다 없었다. 재현 시 doctor/package query로 다시 확인한다. |
+| Omarchy OS 미설치 | 측정됨 | M6 종료 관측에서 `pacman -Q omarchy omarchy-settings`가 둘 다 없었다. M7 doctor는 두 package를 각각 read-only query하며, `tests/runtime/test_doctor.sh`의 controlled pacman fixture가 두 query와 present=FAIL을 검증한다. |
 | 공식 `omarchy` 불필요 | 추론됨 | 두 PKGBUILD dependency와 M5/M6 audit에 공식 패키지가 없다. 실제 의존성 해석은 clean build에서 재확인한다. |
 | 공식 `omarchy-settings` 불필요 | 추론됨 | 위와 동일. `packages/*/PKGBUILD`, `docs/PACKAGE_AUDIT.md` 참조. |
 | Quickshell 사용 | 추론됨 | `cachy-omarchy-shell --run`이 `quickshell -n -p`를 실행한다. live process/IPC는 미검증이다. |
@@ -36,6 +36,9 @@
 `shell.qml`, service, wrapper/menu/binding/keybinding reachability, process/IPC 관측
 가능성이다. 다음은 특히 숨기지 않는다.
 
+- `omarchy`와 `omarchy-settings`는 각각 read-only `pacman -Q`로 확인한다. 하나라도
+  존재하면 **FAIL**, pacman query 자체를 할 수 없으면 **WARN**이며 doctor는 설치/제거하지
+  않는다.
 - `install-pending.manifest`는 **FAIL**이다. doctor는 recovery·install·reload를 시도하지
   않으며 operator recovery가 필요하다고만 보고한다.
 - validated manifest와 immutable artifact checksum이 맞지 않으면 **FAIL**이다.
