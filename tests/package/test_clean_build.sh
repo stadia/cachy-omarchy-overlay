@@ -130,6 +130,34 @@ else
   echo 'ok:   dirty upstream publishes no validated manifest'
 fi
 [[ ! -e $COO_TEST_SANDBOX/dirty.log ]] || { echo 'FAIL: dirty upstream reached makechrootpkg'; ASSERT_FAILURES=$((ASSERT_FAILURES + 1)); }
+
+# A different Git HEAD is equally unsafe even if the worktree is clean: the
+# manifest must never label that source as upstream.lock's commit.
+set +e
+COO_REPO_ROOT="$REPO_ROOT" \
+COO_BUILD_DIR="$COO_TEST_SANDBOX/build-wrong-head" \
+COO_STATE_DIR="$COO_TEST_SANDBOX/state-wrong-head" \
+COO_CLEAN_CHROOT_DIR="$COO_TEST_SANDBOX/chroot" \
+COO_CLEAN_OMARCHY_SOURCE="$upstream" \
+COO_GIT_BIN="$fake/git" \
+COO_EXPECTED_COMMIT="$OMARCHY_COMMIT" \
+COO_FAKE_GIT_HEAD=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+COO_MAKECHROOTPKG_BIN="$fake/makechrootpkg" \
+COO_BSDTAR_BIN="$fake/bsdtar" \
+COO_CLEAN_LOG="$COO_TEST_SANDBOX/wrong-head.log" \
+"$REPO_ROOT/bin/build-packages" --clean >"$COO_TEST_SANDBOX/wrong-head.out" 2>&1
+wrong_head_status=$?
+set -e
+assert_eq 1 "$wrong_head_status" "wrong upstream HEAD is rejected"
+assert_contains "$(cat "$COO_TEST_SANDBOX/wrong-head.out")" 'HEAD does not match upstream.lock' \
+  "wrong upstream HEAD rejection is explicit"
+if [[ -e $COO_TEST_SANDBOX/state-wrong-head/validated-build.manifest ]]; then
+  echo 'FAIL: wrong upstream HEAD published a validated manifest'
+  ASSERT_FAILURES=$((ASSERT_FAILURES + 1))
+else
+  echo 'ok:   wrong upstream HEAD publishes no validated manifest'
+fi
+[[ ! -e $COO_TEST_SANDBOX/wrong-head.log ]] || { echo 'FAIL: wrong upstream HEAD reached makechrootpkg'; ASSERT_FAILURES=$((ASSERT_FAILURES + 1)); }
 # Temporary source archives were made below mktemp work and must not become
 # tracked copies in either package directory.
 if find "$REPO_ROOT/packages" -type f \( -name 'clean-*.tar' -o -name 'overlay.tar' \) | grep -q .; then
