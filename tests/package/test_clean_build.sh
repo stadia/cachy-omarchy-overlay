@@ -51,17 +51,43 @@ else
   : >"cachy-omarchy-overlay-${ver}-${rel}-any.pkg.tar.zst"
 fi
 EOF
+cat >"$fake/git" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+[[ $1 == -C ]] || exit 96
+source_dir=$2
+shift 2
+case $1 in
+  rev-parse)
+    [[ ${COO_FAKE_GIT_HEAD:-$COO_EXPECTED_COMMIT} == "$COO_EXPECTED_COMMIT" ]] || {
+      printf '%s\n' "${COO_FAKE_GIT_HEAD}"; exit 0;
+    }
+    printf '%s\n' "$COO_EXPECTED_COMMIT"
+    ;;
+  status)
+    [[ ${COO_FAKE_GIT_DIRTY:-0} != 1 ]] || printf ' M shell/shell.qml\n'
+    ;;
+  archive)
+    # The controlled fixture archive models git archive's locked tree output,
+    # not the caller's uncommitted worktree.
+    tar -C "$source_dir" --transform='s,^,omarchy/,' -cf - shell
+    ;;
+  *) exit 97 ;;
+esac
+EOF
 cat >"$fake/bsdtar" <<'EOF'
 #!/usr/bin/env bash
 echo usr/share/cachy-omarchy/ok
 EOF
-chmod +x "$fake/makechrootpkg" "$fake/bsdtar"
+chmod +x "$fake/makechrootpkg" "$fake/git" "$fake/bsdtar"
 
 COO_REPO_ROOT="$REPO_ROOT" \
 COO_BUILD_DIR="$COO_TEST_SANDBOX/build" \
 COO_STATE_DIR="$COO_TEST_SANDBOX/state" \
 COO_CLEAN_CHROOT_DIR="$COO_TEST_SANDBOX/chroot" \
 COO_CLEAN_OMARCHY_SOURCE="$upstream" \
+COO_GIT_BIN="$fake/git" \
+COO_EXPECTED_COMMIT="$OMARCHY_COMMIT" \
 COO_MAKECHROOTPKG_BIN="$fake/makechrootpkg" \
 COO_BSDTAR_BIN="$fake/bsdtar" \
 COO_CLEAN_LOG="$log" \
@@ -76,6 +102,34 @@ assert_file_exists "$COO_TEST_SANDBOX/state/validated-build.manifest" \
 assert_contains "$(cat "$log")" '-r ' "clean tool receives chroot root"
 assert_contains "$(cat "$log")" '--nodeps' "clean tool receives non-install makepkg argument"
 [[ $(wc -l <"$log") -eq 2 ]] || { echo 'FAIL: clean tool was not called exactly twice'; ASSERT_FAILURES=$((ASSERT_FAILURES + 1)); }
+
+# A dirty tree must be rejected before it can archive or call makechrootpkg;
+# otherwise the release manifest would falsely attest upstream.lock's commit.
+set +e
+COO_REPO_ROOT="$REPO_ROOT" \
+COO_BUILD_DIR="$COO_TEST_SANDBOX/build-dirty" \
+COO_STATE_DIR="$COO_TEST_SANDBOX/state-dirty" \
+COO_CLEAN_CHROOT_DIR="$COO_TEST_SANDBOX/chroot" \
+COO_CLEAN_OMARCHY_SOURCE="$upstream" \
+COO_GIT_BIN="$fake/git" \
+COO_EXPECTED_COMMIT="$OMARCHY_COMMIT" \
+COO_FAKE_GIT_DIRTY=1 \
+COO_MAKECHROOTPKG_BIN="$fake/makechrootpkg" \
+COO_BSDTAR_BIN="$fake/bsdtar" \
+COO_CLEAN_LOG="$COO_TEST_SANDBOX/dirty.log" \
+"$REPO_ROOT/bin/build-packages" --clean >"$COO_TEST_SANDBOX/dirty.out" 2>&1
+dirty_status=$?
+set -e
+assert_eq 1 "$dirty_status" "dirty upstream tree is rejected"
+assert_contains "$(cat "$COO_TEST_SANDBOX/dirty.out")" 'worktree is not clean' \
+  "dirty upstream rejection is explicit"
+if [[ -e $COO_TEST_SANDBOX/state-dirty/validated-build.manifest ]]; then
+  echo 'FAIL: dirty upstream published a validated manifest'
+  ASSERT_FAILURES=$((ASSERT_FAILURES + 1))
+else
+  echo 'ok:   dirty upstream publishes no validated manifest'
+fi
+[[ ! -e $COO_TEST_SANDBOX/dirty.log ]] || { echo 'FAIL: dirty upstream reached makechrootpkg'; ASSERT_FAILURES=$((ASSERT_FAILURES + 1)); }
 # Temporary source archives were made below mktemp work and must not become
 # tracked copies in either package directory.
 if find "$REPO_ROOT/packages" -type f \( -name 'clean-*.tar' -o -name 'overlay.tar' \) | grep -q .; then

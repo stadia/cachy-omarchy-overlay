@@ -12,6 +12,7 @@ sha256_bin=${COO_SHA256_BIN:-sha256sum}
 install_bin=${COO_INSTALL_BIN:-install}
 mv_bin=${COO_MV_BIN:-mv}
 tar_bin=${COO_TAR_BIN:-tar}
+git_bin=${COO_GIT_BIN:-git}
 clean=0
 clean_chroot_dir=${COO_CLEAN_CHROOT_DIR:-}
 clean_omarchy_source=${COO_CLEAN_OMARCHY_SOURCE:-$repo_root/build/omarchy}
@@ -55,7 +56,15 @@ if (( clean )); then
   [[ -n $clean_chroot_dir ]] || fail '--clean requires COO_CLEAN_CHROOT_DIR (a prepared makechrootpkg root)'
   [[ -d $clean_chroot_dir ]] || fail "clean chroot root is not a directory: $clean_chroot_dir"
   command -v "$makechrootpkg_bin" >/dev/null 2>&1 || fail "makechrootpkg unavailable: $makechrootpkg_bin"
+  command -v "$git_bin" >/dev/null 2>&1 || fail "git unavailable: $git_bin"
   [[ -d $clean_omarchy_source && ${clean_omarchy_source##*/} == omarchy ]] || fail "--clean requires the pinned local upstream tree named omarchy: $clean_omarchy_source"
+  clean_head=$("$git_bin" -C "$clean_omarchy_source" rev-parse --verify 'HEAD^{commit}') \
+    || fail "--clean upstream tree has no readable HEAD commit: $clean_omarchy_source"
+  [[ $clean_head == "$OMARCHY_COMMIT" ]] \
+    || fail "--clean upstream HEAD does not match upstream.lock: $clean_head"
+  clean_status=$("$git_bin" -C "$clean_omarchy_source" status --porcelain --untracked-files=no) \
+    || fail "--clean cannot inspect upstream worktree: $clean_omarchy_source"
+  [[ -z $clean_status ]] || fail '--clean upstream worktree is not clean'
 fi
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/coo-build-XXXXXX")
@@ -81,7 +90,7 @@ stage_clean_package() {
   cp -a "$source_dir/." "$clean_dir/"
   case $name in
     cachy-omarchy-shell)
-      "$tar_bin" -C "$(dirname "$clean_omarchy_source")" -cf "$clean_dir/clean-omarchy.tar" "${clean_omarchy_source##*/}"
+      "$git_bin" -C "$clean_omarchy_source" archive --format=tar --prefix=omarchy/ "$OMARCHY_COMMIT" >"$clean_dir/clean-omarchy.tar"
       "$tar_bin" -C "$repo_root" -cf "$clean_dir/clean-overlay-defaults.tar" overlay/defaults
       ;;
     cachy-omarchy-overlay)
