@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Foreground entry point for the systemd user service. Owns the exact
+# Quickshell invocation so the unit file never has to know it (SPEC 20).
+set -euo pipefail
+SELF_DIR=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)
+ROOT=$(cd "$SELF_DIR/.." && pwd)
+source "$ROOT/lib/common.sh"
+source "$ROOT/lib/env.sh"
+
+QS=$(coo_quickshell_bin) || die "quickshell is not installed"
+SHELL_PATH=${COO_SHELL_PATH:-$ROOT/shell}
+[[ -f $SHELL_PATH/shell.qml ]] || die "coo-shell QML not found: $SHELL_PATH/shell.qml"
+
+exec "$QS" -p "$SHELL_PATH"

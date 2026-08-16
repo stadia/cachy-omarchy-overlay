@@ -1,0 +1,13 @@
+[Unit]
+Description=Cachy Omarchy Overlay Shell
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/share/cachy-omarchy-overlay/bin/coo-shell-daemon
+Restart=on-failure
+RestartSec=1
+
+[Install]
+WantedBy=default.target
