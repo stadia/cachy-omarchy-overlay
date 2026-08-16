@@ -344,4 +344,31 @@ stdout에 `No running instances...`류 메시지, exit 255로 나타난다. 부�
 길어져 이 구간이 더 넓게 관측될 수 있으나, 관측된 실패 응답의 **형태**(exit 255 +
 "No running instances")가 부팅 시간에 따라 달라질 이유는 없다 -- 소켓이 아직 등록되지
 않았다는 사실 자체가 그 메시지의 원인이기 때문이다.
+
+---
+
+## 10. Task 6: `TestSurface.qml`이 쓰는 QML 타입/첨부 속성 검증
+
+Task 6 계획서는 `LazyLoader`가 이 Quickshell 버전에 없을 수 있다고 경고하며, 없다면 `Loader` +
+`active:`로 대체하라고 했다. `/usr/lib/qt6/qml/Quickshell*`의 `*.qmltypes`를 직접 grep해
+아래 타입/첨부 속성을 전부 확인했다 -- **어느 것도 대체하지 않았다. 계획서의 QML은 이 버전에서
+그대로 쓸 수 있다.**
+
+| 타입/속성 | 선언 위치 (qmltypes) | 비고 |
+|---|---|---|
+| `LazyLoader` | `Quickshell/quickshell-core.qmltypes` | export `Quickshell/LazyLoader 0.0`. `active`(bool), `component`(기본 프로퍼티) 존재. 계획서 그대로 사용. |
+| `PanelWindow` | `Quickshell/_Window/quickshell-window.qmltypes` (`PanelWindowInterface`) | export `Quickshell._Window/PanelWindow 0.0`. `anchors`, `exclusionMode` 확인. `color`는 상위 프로토타입(`WindowInterface`)에 있음. |
+| `WlrLayershell.layer` / `.keyboardFocus` / `.namespace` | `Quickshell/Wayland/_WlrLayerShell/quickshell-wayland-layershell.qmltypes` | `WlrLayershell`은 `attachedType: "...WlrLayershell"` -- 첨부 속성으로 확인됨. 세 프로퍼티 이름 모두 정확히 일치. |
+| `WlrLayer.Overlay` | 위와 동일 | enum 값: `Background, Bottom, Top, Overlay`. |
+| `WlrKeyboardFocus.Exclusive` | 위와 동일 | enum 값: `None, Exclusive, OnDemand`. |
+| `ExclusionMode.Ignore` | `Quickshell/_Window/quickshell-window.qmltypes` | enum 값: `Normal, Ignore, Auto`. `PanelWindow`와 `WlrLayershell` 양쪽에 동일한 `exclusionMode` 프로퍼티가 있음(레이어셸이 `PanelWindow`를 상속하지 않고 별도 프로토타입 체인이라 중복 선언됨). |
+
+검증 방법은 정적 분석(qmltypes grep)에 그치지 않았다: `dev/run-shell.sh`로 실제 호스트를
+띄우고 `qs ipc call -- test open`/`close`를 호출한 뒤 `hyprctl layers`로 namespace
+`coo-test`인 레이어가 실제로 나타났다 사라지는지 확인했고(§Task 6 보고서 참조), `grim`으로
+화면을 캡처해 420x140 크기의 둥근 모서리 패널이 화면 중앙에 실제로 렌더링되는 것을 육안으로도
+확인했다. 즉 이 표는 "타입이 존재한다"뿐 아니라 "이 타입 조합이 실제로 레이어셸 서피스를
+만든다"는 것까지 검증된 결과다.
+
+이후 마일스톤(런처, 키바인딩 서피스)이 같은 조합을 재사용할 때는 이 표를 그대로 신뢰해도 된다.
 </content>

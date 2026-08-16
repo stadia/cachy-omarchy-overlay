@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Io
 
 import "services"
+import "surfaces"
 
 // The coo-shell root. Long-running host for launcher surfaces only.
 // It MUST NOT create a bar, notifications, OSD, lock screen, or polkit
@@ -37,6 +38,48 @@ ShellRoot {
     function reload(): string {
       shell.config.reload()
       return "ok"
+    }
+  }
+
+  // ---------------------------------------------------------- test surface
+  //
+  // Milestone 1 throwaway proving open/close/toggle/state over IPC. Task 7's
+  // CLI and Milestone 2's launcher/keybindings targets reuse this exact
+  // shape verbatim under different target names.
+
+  property bool testOpen: false
+
+  LazyLoader {
+    id: testLoader
+    active: shell.testOpen
+    component: Component {
+      TestSurface {
+        config: shell.config
+        onRequestClose: shell.testOpen = false
+      }
+    }
+  }
+
+  IpcHandler {
+    target: "test"
+
+    function open(): string {
+      shell.testOpen = true
+      return "ok"
+    }
+
+    function close(): string {
+      shell.testOpen = false
+      return "ok"
+    }
+
+    function toggle(): string {
+      shell.testOpen = !shell.testOpen
+      return "ok"
+    }
+
+    function state(): string {
+      return shell.testOpen ? "open" : "closed"
     }
   }
 
