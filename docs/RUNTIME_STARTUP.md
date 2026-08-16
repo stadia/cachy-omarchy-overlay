@@ -565,3 +565,75 @@ retention, U10 valid/corrupt rollback을 검증한다. 실패 경로는 모두 i
 참조하므로 clean chroot는 여전히 깨져 있으며 M7에서 해결한다. 또한 이 호스트의
 `graphical-session.target`은 inactive여서 service의 자동 기동은 미검증이다.
 `WantedBy=graphical-session.target`은 의도이지 관측된 자동 시작이 아니다.
+
+
+## 11. M7 RC evidence — measured boundary and remaining approval work
+
+M7 is an evidence update, not authorization to modify a live session. The clean build and all
+other M7 tests use a sandbox HOME, extracted package trees, or fake package-manager tools. `cachy-omarchy-doctor`
+is diagnostic-only: it does not install packages, repair state, reload Hyprland, start services,
+or change user configuration.
+
+### 11.1 Doctor and release state
+
+`cachy-omarchy-doctor` reads package/query, wrapper, service, manifest, process and IPC state.
+It distinguishes PASS, WARN, and FAIL rather than treating an unavailable observation as healthy.
+In particular, it reports both official `omarchy` and `omarchy-settings` package queries, the
+user override and inert `~/.config/cachy-omarchy/shell.json`, and the unobserved automatic-start
+boundary. The command is covered by `tests/runtime/test_doctor.sh` with controlled `pacman`,
+`qs`, process, and manifest fixtures.
+
+The validated manifest is the release authority; a flat `build/` archive is only a convenience
+copy. `install-pending.manifest` is fail-closed: doctor reports it as FAIL, and both install and
+rollback reject it before a pacman call. The operator must inspect and resolve the actual package
+state; doctor deliberately has no recovery action. A dangling pending or installed-manifest
+symlink is corrupt state, not absence.
+
+### 11.2 Clean build boundary
+
+`bin/build-packages --clean` transports a temporary, commit-verified `clean-omarchy.tar` and
+`clean-overlay*.tar` into a temporary package context and invokes
+`makechrootpkg -r "$COO_CLEAN_CHROOT_DIR" -- --nodeps`. This keeps `overlay/` as the one tracked
+source of truth: no overlay copy is committed under `packages/`, and temporary sources are
+removed after the run. `tests/package/test_clean_build.sh` measures that transport and archive
+audit with a fake `makechrootpkg`.
+
+This host has no `makechrootpkg`, `archbuild`, or `devtools`, and no prepared chroot was created.
+Therefore a real clean chroot package build is **미검증**; the fake transport test is not a claim
+that a real chroot or `makepkg -i` ran.
+
+### 11.3 R01–R10 runtime evidence
+
+`tests/runtime/test_runtime_reliability.sh` overlays the two archive payloads in one extracted
+tree with a sandbox HOME. It measured R01 wrapper process survival and R02 IPC `shell ping`.
+R03 and R06 have extracted/static evidence only; R04 and R05 require an approved live Wayland
+session and remain **미검증**. R08 measured package ownership only, not a live user Waybar.
+
+R07 has **manual wrapper-restart evidence**: a test-owned wrapper child is stopped and a wrapper
+is manually started again, then IPC succeeds. `Restart=on-failure` service recovery remains
+**미검증** without an approved user-systemd test. Automatic start is likewise **미검증**:
+`graphical-session.target` was read as inactive, and M7 did not enable, start, or reload a unit.
+
+R09 and R10 measured that the package does not own notification/lock system paths and that
+`omarchy.notifications`/`omarchy.lock` are disabled by default. Live coexistence with dunst/mako
+or a user lock setup such as hyprlock is **미검증**. Existing Waybar live coexistence is also
+**미검증**. No notification or lock daemon was stopped, started, or configured.
+
+### 11.4 U01–U10 upgrade and rollback RC evidence
+
+`tests/package/test_update_pipeline.sh` covers U01–U10 in a **fake lane**: git, makepkg, bsdtar,
+checksum, and pacman are sandbox fakes. It measures no-update behavior, lock/pkgrel publication,
+patch/build/audit/runtime failures before install, prior-pair retention, and rollback selection.
+The fake lane also verifies a pending finalization failure after install or rollback: pending stays
+fail-closed, doctor fails it, and later install/rollback make no pacman call.
+
+This is workflow safety evidence, not a real `pacman -U` install, upgrade, or downgrade. A real
+package-manager smoke remains **미검증** until explicit user approval in an isolated environment.
+
+### 11.5 RC checklist disposition
+
+Patch count is **패치 수 0** (`packages/cachy-omarchy-shell/patches/README.md` contains `none`).
+The official `omarchy` and `omarchy-settings` packages are absent in the recorded host check and
+are neither dependencies nor install targets. `docs/RC_GAP_INVENTORY.md` is the authoritative
+SPEC §61 checklist: it labels every criterion as `측정됨`, `추론됨`, or `미검증` and links it to
+the applicable test. The unverified items above are release gaps, not completed acceptance.
