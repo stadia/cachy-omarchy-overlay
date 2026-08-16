@@ -47,7 +47,13 @@ has_space_conflict() {
 }
 
 has_k_conflict() {
-  grep -qiE 'SUPER[[:space:]]*\+[[:space:]]*K|[[:space:]]\+[[:space:]]*K["'\'']|,\s*K[[:space:],]' <<<"$1"
+  awk '
+    /^[[:space:]]*(#|--)/ { next }
+    /^[[:space:]]*hl\.bind[[:space:]]*\([[:space:]]*"SUPER[[:space:]]*\+[[:space:]]*K"/ { found=1; exit }
+    /^[[:space:]]*hl\.bind[[:space:]]*\([[:space:]]*mainMod[[:space:]]*\.\.[[:space:]]*"[[:space:]]*\+[[:space:]]*K"/ { found=1; exit }
+    /^[[:space:]]*bind[[:space:]]*=[[:space:]]*(SUPER|\$mainMod)[[:space:]]*,[[:space:]]*K([[:space:]]*,|$)/ { found=1; exit }
+    END { exit !found }
+  ' <<<"$1"
 }
 
 install_overlay() {

@@ -120,6 +120,30 @@ body=$(cat "$hypr/hyprland.lua")
 assert_contains "$body" "-- >>> cachy-omarchy >>>" "K 충돌 --force 후 관리 블록"
 assert_contains "$body" "existing-k" "K 충돌 --force 도 기존 bind 줄을 지우지 않는다"
 
+# --- literal Lua SUPER+K remains a conflict --------------------------------
+cat >"$hypr/hyprland.lua" <<'EOF'
+hl.bind("SUPER + K", hl.dsp.exec_cmd("literal-k"))
+EOF
+before=$(cat "$hypr/hyprland.lua")
+out=$(COO_HYPR_DIR="$hypr" COO_CONFIG_DIR="$HOME/.config/cachy-omarchy" "$H" 2>&1); code=$?
+assert_eq "$code" "0" "literal Lua SUPER+K 는 충돌이다"
+assert_contains "$out" "SUPER+K" "literal Lua 충돌 경고가 SUPER+K 를 말한다"
+after=$(cat "$hypr/hyprland.lua")
+assert_eq "$after" "$before" "literal Lua SUPER+K 는 기본 주입을 막는다"
+
+# --- lua K false positives do not block ------------------------------------
+cat >"$hypr/hyprland.lua" <<'EOF'
+hl.bind("ALT + K", hl.dsp.exec_cmd("alt-k"))
+-- hl.bind("SUPER + K", hl.dsp.exec_cmd("comment-only"))
+hl.bind("SUPER + Return", hl.dsp.exec_cmd("ghostty"))
+EOF
+out=$(COO_HYPR_DIR="$hypr" COO_CONFIG_DIR="$HOME/.config/cachy-omarchy" "$H" 2>&1); code=$?
+assert_eq "$code" "0" "Lua ALT+K/주석은 SUPER+K 충돌이 아니다"
+body=$(cat "$hypr/hyprland.lua")
+assert_contains "$body" "-- >>> cachy-omarchy >>>" "Lua ALT+K/주석만 있으면 관리 블록을 주입한다"
+assert_contains "$body" "alt-k" "Lua ALT+K 원본 줄을 보존한다"
+assert_contains "$body" "comment-only" "Lua 주석 원본 줄을 보존한다"
+
 # --- conf, no conflict ------------------------------------------------------
 rm -f "$hypr/hyprland.lua"
 cat >"$hypr/hyprland.conf" <<'EOF'
@@ -133,6 +157,38 @@ body=$(cat "$hypr/hyprland.conf")
 assert_contains "$body" "# >>> cachy-omarchy >>>" "conf 관리 블록"
 assert_contains "$body" "source =" "conf 블록은 source 한다"
 assert_contains "$body" "ghostty" "conf 본문 보존"
+
+# --- conf SUPER+K positive forms remain conflicts --------------------------
+cat >"$hypr/hyprland.conf" <<'EOF'
+bind = SUPER, K, exec, literal-k
+EOF
+before=$(cat "$hypr/hyprland.conf")
+out=$(COO_HYPR_DIR="$hypr" COO_CONFIG_DIR="$HOME/.config/cachy-omarchy" "$H" 2>&1); code=$?
+assert_eq "$code" "0" "literal conf SUPER,K 는 충돌이다"
+after=$(cat "$hypr/hyprland.conf")
+assert_eq "$after" "$before" "literal conf SUPER,K 는 기본 주입을 막는다"
+
+cat >"$hypr/hyprland.conf" <<'EOF'
+bind = $mainMod, K, exec, variable-k
+EOF
+before=$(cat "$hypr/hyprland.conf")
+out=$(COO_HYPR_DIR="$hypr" COO_CONFIG_DIR="$HOME/.config/cachy-omarchy" "$H" 2>&1); code=$?
+assert_eq "$code" "0" '$mainMod conf K 는 지원되는 충돌이다'
+after=$(cat "$hypr/hyprland.conf")
+assert_eq "$after" "$before" '$mainMod conf K 는 기본 주입을 막는다'
+
+# --- conf K false positives do not block -----------------------------------
+cat >"$hypr/hyprland.conf" <<'EOF'
+bind = ALT, K, exec, alt-k
+# bind = SUPER, K, exec, comment-only
+bind = SUPER, Return, exec, ghostty
+EOF
+out=$(COO_HYPR_DIR="$hypr" COO_CONFIG_DIR="$HOME/.config/cachy-omarchy" "$H" 2>&1); code=$?
+assert_eq "$code" "0" "conf ALT,K/주석은 SUPER+K 충돌이 아니다"
+body=$(cat "$hypr/hyprland.conf")
+assert_contains "$body" "# >>> cachy-omarchy >>>" "conf ALT,K/주석만 있으면 관리 블록을 주입한다"
+assert_contains "$body" "alt-k" "conf ALT,K 원본 줄을 보존한다"
+assert_contains "$body" "comment-only" "conf 주석 원본 줄을 보존한다"
 
 cat >"$hypr/hyprland.conf" <<'EOF'
 bind = SUPER, SPACE, exec, walker
