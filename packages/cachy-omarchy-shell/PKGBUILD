@@ -18,5 +18,14 @@ fi
 sha256sums=('SKIP')
 
 package() {
-  bash "$startdir/stage-upstream.sh" "$srcdir/omarchy" "$pkgdir"
+  # NOTE (chroot limitation, tracked for Milestone 7): overlay/defaults lives
+  # two levels above this PKGBUILD, outside packages/cachy-omarchy-shell/. A
+  # clean chroot build (makechrootpkg/archbuild) only bind-mounts the
+  # PKGBUILD's own directory into the build root, so this path will not
+  # resolve there. SPEC §26 permits plain `makepkg` for v0.1 and defers
+  # chroot support to release quality, so this is accepted for now rather
+  # than duplicating overlay/defaults/shell.json into this package directory
+  # (which would create two sources of truth for the same file).
+  bash "$startdir/stage-upstream.sh" "$srcdir/omarchy" "$pkgdir" \
+    "$startdir/../../overlay/defaults"
 }

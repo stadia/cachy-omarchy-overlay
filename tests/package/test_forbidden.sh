@@ -4,7 +4,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/../lib/assert.sh"
 
 src=${COO_OMARCHY_GIT:-$REPO_ROOT/build/omarchy}
 stage=$COO_TEST_SANDBOX/pkg
-bash "$REPO_ROOT/packages/cachy-omarchy-shell/stage-upstream.sh" "$src" "$stage"
+bash "$REPO_ROOT/packages/cachy-omarchy-shell/stage-upstream.sh" "$src" "$stage" \
+  "$REPO_ROOT/overlay/defaults"
 
 mapfile -t files < <(find "$stage" -type f -o -type l | sed "s|^$stage||" | sort)
 

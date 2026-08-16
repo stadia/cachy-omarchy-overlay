@@ -24,7 +24,7 @@ First-party non-bar는 **명시적으로 disable하기 전엔 기동 시 로드*
 | `omarchy.bar` | bar | DISABLE | no — 기본 bar 옵션. 다른 bar가 없으면 레이아웃이 살아남음. `shell.json` bar.layout을 비우거나 우리 기본 json으로 막음 |
 | `omarchy.notifications` | service | DISABLE | no |
 | `omarchy.lock` | service | DISABLE | no |
-| `omarchy.osd` | panel | DISABLE unless 앱 런치 OSD에 필요 | no. AppLibrary가 `omarchy-shell osd show`를 부름 — 없으면 실행은 되고 OSD만 실패할 수 있음. M2에서 실측 |
+| `omarchy.osd` | panel | DISABLE unless 앱 런치 OSD에 필요 | no. AppLibrary가 `omarchy-shell osd show`를 부름 — 없으면 실행은 되고 OSD만 실패할 수 있음. **M2 실측: `disabledPlugins` 로 끈 채 기동 → 셸 기동·IPC 정상, 37개 플러그인 등록. OSD 호출은 앱 런치(M3) 시에만 발생하므로 기동에 불필요 확정.** |
 | `omarchy.idle` | service | DISABLE | no — screensaver/lock 헬퍼 호출 |
 | `omarchy.battery` | service | DISABLE | no |
 | `omarchy.nightlight` | service | DISABLE | no |
