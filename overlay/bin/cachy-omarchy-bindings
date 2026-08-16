@@ -5,7 +5,20 @@
 set -uo pipefail
 
 here=$(cd "$(dirname -- "$0")" && pwd)
-SRC_HYPR=$(cd "$here/../hypr" && pwd)
+
+# 설치 레이아웃에서 bin 과 share 는 형제가 아니다(/usr/bin vs
+# /usr/share/cachy-omarchy). 다른 오버레이 스크립트가 쓰는 PREFIX_ROOT 규약을
+# 그대로 따르고, 저장소에서 직접 실행할 때를 위해 ../hypr 를 폴백으로 둔다.
+PREFIX_ROOT=${COO_PREFIX_ROOT:-/usr/share/cachy-omarchy}
+if [[ -n ${COO_SRC_HYPR:-} ]]; then
+  SRC_HYPR=$COO_SRC_HYPR
+elif [[ -d $PREFIX_ROOT/hypr ]]; then
+  SRC_HYPR=$PREFIX_ROOT/hypr
+elif [[ -d $here/../hypr ]]; then
+  SRC_HYPR=$(cd "$here/../hypr" && pwd)
+else
+  SRC_HYPR=""
+fi
 HYPR_DIR=${COO_HYPR_DIR:-$HOME/.config/hypr}
 CONFIG_DIR=${COO_CONFIG_DIR:-$HOME/.config/cachy-omarchy}
 DEST_HYPR=$CONFIG_DIR/hypr
@@ -30,6 +43,14 @@ SUPER+SPACE 또는 SUPER+K 가 이미 있으면 감지·경고하고 주입하�
 
   --help    이 도움말
   --force   충돌이 있어도 관리 블록을 주입한다
+
+환경 변수:
+  COO_SRC_HYPR     바인딩 소스 디렉터리를 직접 지정한다(bindings.conf/lua 위치).
+  COO_PREFIX_ROOT  설치 프리픽스 루트. 기본값 /usr/share/cachy-omarchy.
+                   COO_SRC_HYPR 미설정 시 $COO_PREFIX_ROOT/hypr 를 먼저 찾고,
+                   없으면 저장소 상대 경로(../hypr)로 폴백한다.
+  COO_HYPR_DIR     사용자 Hyprland 설정 디렉터리. 기본값 ~/.config/hypr.
+  COO_CONFIG_DIR   프로젝트 설정 디렉터리. 기본값 ~/.config/cachy-omarchy.
 USAGE
 }
 
@@ -57,6 +78,8 @@ has_k_conflict() {
 }
 
 install_overlay() {
+  [[ -n $SRC_HYPR && -f $SRC_HYPR/bindings.conf && -f $SRC_HYPR/bindings.lua ]] \
+    || fail "hypr 바인딩 소스를 찾을 수 없다: ${SRC_HYPR:-<미해석>} (COO_SRC_HYPR 로 지정 가능)"
   mkdir -p "$DEST_HYPR"
   cp -a "$SRC_HYPR/bindings.conf" "$DEST_HYPR/bindings.conf"
   cp -a "$SRC_HYPR/bindings.lua" "$DEST_HYPR/bindings.lua"

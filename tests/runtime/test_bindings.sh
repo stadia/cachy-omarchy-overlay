@@ -213,4 +213,57 @@ assert_eq "$code" "0" "conf 충돌도 덮어쓰지 않는다"
 after=$(cat "$hypr/hyprland.conf")
 assert_eq "$after" "$before" "충돌 시 conf 본문이 그대로다"
 
+# --- 설치 경로 해석 (M5 Task 1) ---
+B="$REPO_ROOT/overlay/bin/cachy-omarchy-bindings"
+
+# 1) COO_SRC_HYPR 를 존중한다.
+fake_src="$COO_TEST_SANDBOX/prefix/hypr"
+mkdir -p "$fake_src"
+cp "$REPO_ROOT/overlay/hypr/bindings.conf" "$fake_src/"
+cp "$REPO_ROOT/overlay/hypr/bindings.lua" "$fake_src/"
+# 소스 경로 해석만 검증하는 케이스이므로, Hyprland 대상 탐지 단계까지
+# 통과하도록 충돌 없는 최소 hyprland.conf 픽스처를 둔다(브리프 원문에는
+# 없었지만, install_overlay 가 Hyprland 대상 탐지보다 먼저 실행되어
+# 이 픽스처 없이는 무관한 사유로 항상 exit 1 이 된다 — 실측으로 확인).
+mkdir -p "$COO_TEST_SANDBOX/hypr"
+cat >"$COO_TEST_SANDBOX/hypr/hyprland.conf" <<'EOF'
+$mainMod = SUPER
+bind = $mainMod, Return, exec, ghostty
+EOF
+out=$(COO_SRC_HYPR="$fake_src" \
+      COO_HYPR_DIR="$COO_TEST_SANDBOX/hypr" \
+      COO_CONFIG_DIR="$COO_TEST_SANDBOX/cfg" \
+      "$B" 2>&1); code=$?
+assert_eq "$code" "0" "COO_SRC_HYPR 로 실행 성공"
+assert_file_exists "$COO_TEST_SANDBOX/cfg/hypr/bindings.conf" "override 소스에서 복사됨"
+
+# 2) 소스 디렉터리가 없으면 조용히 진행하지 않고 즉시 실패한다.
+out=$(COO_SRC_HYPR="$COO_TEST_SANDBOX/nonexistent" \
+      COO_HYPR_DIR="$COO_TEST_SANDBOX/hypr2" \
+      COO_CONFIG_DIR="$COO_TEST_SANDBOX/cfg2" \
+      "$B" 2>&1); code=$?
+assert_eq "$code" "1" "소스 부재 → exit 1"
+assert_contains "$out" "hypr" "오류 메시지가 어떤 경로가 없는지 말한다"
+[[ -e "$COO_TEST_SANDBOX/cfg2/hypr/bindings.conf" ]] && half=1 || half=0
+assert_eq "$half" "0" "실패 시 반쯤 쓰인 상태를 남기지 않는다"
+
+# 3) 설치 레이아웃을 흉내내도 동작한다: bin 과 share 가 형제가 아니다.
+inst="$COO_TEST_SANDBOX/inst"
+mkdir -p "$inst/usr/bin" "$inst/usr/share/cachy-omarchy/hypr"
+cp "$B" "$inst/usr/bin/cachy-omarchy-bindings"
+cp "$REPO_ROOT/overlay/hypr/"*.conf "$REPO_ROOT/overlay/hypr/"*.lua \
+   "$inst/usr/share/cachy-omarchy/hypr/"
+# 위 1번과 같은 이유로 충돌 없는 hyprland.conf 픽스처가 필요하다.
+mkdir -p "$COO_TEST_SANDBOX/hypr3"
+cat >"$COO_TEST_SANDBOX/hypr3/hyprland.conf" <<'EOF'
+$mainMod = SUPER
+bind = $mainMod, Return, exec, ghostty
+EOF
+out=$(COO_PREFIX_ROOT="$inst/usr/share/cachy-omarchy" \
+      COO_HYPR_DIR="$COO_TEST_SANDBOX/hypr3" \
+      COO_CONFIG_DIR="$COO_TEST_SANDBOX/cfg3" \
+      "$inst/usr/bin/cachy-omarchy-bindings" 2>&1); code=$?
+assert_eq "$code" "0" "설치 레이아웃에서 실행 성공"
+assert_file_exists "$COO_TEST_SANDBOX/cfg3/hypr/bindings.lua" "PREFIX_ROOT/hypr 에서 복사됨"
+
 exit "$ASSERT_FAILURES"
