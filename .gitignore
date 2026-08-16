@@ -7,3 +7,4 @@ vendor/omarchy/
 /packages/*/src/
 /packages/*/*.pkg.tar.*
 /build/*.pkg.tar.*
+packages/cachy-omarchy-shell/omarchy/
