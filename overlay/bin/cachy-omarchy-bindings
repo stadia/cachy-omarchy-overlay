@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+# Install overlay Hyprland bindings and a managed source block.
+# Detect SUPER+SPACE / SUPER+K conflicts. Do not silently override (SPEC 20).
+# Never reload or kill the live compositor (SPEC 19, 66).
+set -uo pipefail
+
+here=$(cd "$(dirname -- "$0")" && pwd)
+SRC_HYPR=$(cd "$here/../hypr" && pwd)
+HYPR_DIR=${COO_HYPR_DIR:-$HOME/.config/hypr}
+CONFIG_DIR=${COO_CONFIG_DIR:-$HOME/.config/cachy-omarchy}
+DEST_HYPR=$CONFIG_DIR/hypr
+FORCE=0
+
+LUA_BEGIN='-- >>> cachy-omarchy >>>'
+LUA_END='-- <<< cachy-omarchy <<<'
+CONF_BEGIN='# >>> cachy-omarchy >>>'
+CONF_END='# <<< cachy-omarchy <<<'
+
+fail() { printf 'error: %s\n' "$1" >&2; exit 1; }
+
+usage() {
+  cat <<'USAGE'
+사용법: cachy-omarchy-bindings [--force]
+
+~/.config/cachy-omarchy/hypr/ 에 오버레이 바인딩을 두고, Hyprland 설정에
+관리 source 블록만 주입한다. 전체 hyprland.lua/conf 를 덮어쓰지 않는다.
+
+SUPER+SPACE 또는 SUPER+K 가 이미 있으면 감지·경고하고 주입하지 않는다.
+--force 만 충돌이 있어도 블록을 넣는다. hyprctl reload 는 하지 않는다.
+
+  --help    이 도움말
+  --force   충돌이 있어도 관리 블록을 주입한다
+USAGE
+}
+
+strip_block() {
+  local begin=$1 end=$2
+  awk -v b="$begin" -v e="$end" '
+    $0 == b {skip=1; next}
+    $0 == e {skip=0; next}
+    !skip {print}
+  '
+}
+
+has_space_conflict() {
+  grep -qiE 'SUPER[[:space:]]*\+[[:space:]]*space|[[:space:]]space["'\'']|,\s*SPACE[[:space:],]' <<<"$1"
+}
+
+has_k_conflict() {
+  grep -qiE 'SUPER[[:space:]]*\+[[:space:]]*K|[[:space:]]\+[[:space:]]*K["'\'']|,\s*K[[:space:],]' <<<"$1"
+}
+
+install_overlay() {
+  mkdir -p "$DEST_HYPR"
+  cp -a "$SRC_HYPR/bindings.conf" "$DEST_HYPR/bindings.conf"
+  cp -a "$SRC_HYPR/bindings.lua" "$DEST_HYPR/bindings.lua"
+}
+
+lua_snippet() {
+  local path=$DEST_HYPR/bindings.lua
+  path=${path//\\/\\\\}
+  path=${path//\"/\\\"}
+  printf '%s\npcall(dofile, "%s")\n%s\n' "$LUA_BEGIN" "$path" "$LUA_END"
+}
+
+conf_snippet() {
+  printf '%s\nsource = %s/bindings.conf\n%s\n' "$CONF_BEGIN" "$DEST_HYPR" "$CONF_END"
+}
+
+inject() {
+  local file=$1 begin=$2 end=$3 snippet=$4
+  if grep -F -e "$begin" "$file" >/dev/null; then
+    return 0
+  fi
+  printf '\n%s\n' "$snippet" >>"$file"
+}
+
+case ${1:-} in
+  --help) usage; exit 0 ;;
+  --force) FORCE=1 ;;
+  "") ;;
+  *) printf 'error: 알 수 없는 인자: %s\n' "$1" >&2; usage >&2; exit 1 ;;
+esac
+
+install_overlay
+
+lua=$HYPR_DIR/hyprland.lua
+conf=$HYPR_DIR/hyprland.conf
+if [[ -f $lua ]]; then
+  kind=lua
+  target=$lua
+  begin=$LUA_BEGIN
+  end=$LUA_END
+  snippet=$(lua_snippet)
+elif [[ -f $conf ]]; then
+  kind=conf
+  target=$conf
+  begin=$CONF_BEGIN
+  end=$CONF_END
+  snippet=$(conf_snippet)
+else
+  fail "Hyprland 설정을 찾을 수 없다: $HYPR_DIR/hyprland.lua 또는 hyprland.conf"
+fi
+
+body=$(strip_block "$begin" "$end" <"$target")
+conflict=0
+msg=""
+if has_space_conflict "$body"; then
+  conflict=1
+  msg="SUPER+SPACE"
+fi
+if has_k_conflict "$body"; then
+  conflict=1
+  [[ -n $msg ]] && msg="$msg, SUPER+K" || msg="SUPER+K"
+fi
+
+if (( conflict == 1 && FORCE == 0 )); then
+  printf 'warning: 기존 설정이 %s 를 이미 바인딩한다. 덮어쓰지 않는다. 교체하려면 --force.\n' "$msg" >&2
+  exit 0
+fi
+
+inject "$target" "$begin" "$end" "$snippet"
+exit 0
