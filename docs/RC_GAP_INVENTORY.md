@@ -24,7 +24,7 @@
 | 일반 앱 launch | 측정됨 | 라이브 런처에서 앱 실행에 성공했다. 이 호스트에 `uwsm` 이 없으므로 compat shim 이 실제로 사용된 증거다(§13.3). |
 | SUPER+K keybinding UI | 측정됨 | 사용자가 실제로 눌러 키바인딩 UI 가 열렸다(§13.1). 업스트림 select-mode 재사용이므로 별도 layer 를 남기지 않는다. |
 | 기존 Hyprland config 보존 | 측정됨 | 2026-08-17 설치된 `cachy-omarchy-init`을 사용자의 실제 `~/.config/hypr/hyprland.lua`에 대해 실행했다. `SUPER+SPACE` 충돌(walker, `:295`)을 감지해 주입을 거부했고 md5는 불변이었다(§12.3). |
-| 기존 Waybar 보존 | 미검증 | init는 Omarchy bar-off 토글만 만들며 기존 Waybar와 공존을 실측하지 않았다. `RUNTIME_STARTUP.md` §9.3. |
+| 기존 Waybar 보존 | 측정됨 (bar 억제); 미검증 (Waybar 공존) | 2026-08-17 `bar-off` 가 있으면 `omarchy-bar` 가 `y=-26` 에 주차되고 `reserved=[0,0,0,0]` 임을 실제 설치본에서 확인했다(§14.4). 이 호스트는 Waybar 를 실행하지 않으므로 Waybar 자체와의 공존은 여전히 미검증이다. |
 | 기존 notification daemon 보존 | 측정됨 | 라이브 세션에서 사용자 `mako`(pid 652539)가 생존했고, 우리 바가 상단 26px 를 점유하자 `y=0 → y=26` 으로 재배치됐다 — 두 layer-shell 클라이언트의 정상 협상(§13.2). |
 | 기존 lock setup 보존 | 미검증 | `disabledPlugins`가 `omarchy.lock`을 끄지만 hyprlock 등과 상호작용을 실측하지 않았다. |
 | newer upstream rebuild 자동화 | 측정됨 | M6 U01–U08 fake git/makepkg/bsdtar 경로가 candidate 검증 후 metadata 발행을 검사한다. `tests/package/test_update_pipeline.sh`. |
