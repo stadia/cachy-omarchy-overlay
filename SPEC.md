@@ -1,1289 +1,912 @@
-# CachyOS Omarchy Quattro Overlay — SPEC.md
+# Cachy Omarchy Overlay — SPEC.md
 
-> Status: Draft v0.2  
-> Updated: 2026-08-15  
-> Target platform: CachyOS + Hyprland  
-> UI runtime: Quickshell  
-> Upstream reference: Omarchy `quattro` branch  
-> Primary goal: Run an Omarchy Quattro-style launcher and keybinding UI on CachyOS without installing or replacing the full Omarchy desktop.
-
----
-
-## 0. Executive Summary
-
-This project is a **CachyOS desktop overlay**, not an Omarchy installer.
-
-The first version originally targeted the older Walker-based Omarchy UX.  
-That design is now replaced by a **Quickshell-based Quattro launcher port**.
-
-The v0.1 product must provide:
-
-```text
-SUPER + SPACE  -> Quattro-style launcher / menu
-SUPER + K      -> searchable keybinding cheat sheet
-```
-
-while preserving:
-
-```text
-CachyOS
-Hyprland
-existing user config
-existing bar
-existing notifications
-existing lock screen
-existing shell
-```
-
-The project must NOT require a full Omarchy installation.
+> Status: **Rewrite / New Architecture**
+> Version: **Spec 1.0**
+> Date: 2026-08-16
+> Target: **CachyOS + Hyprland**
+> Upstream: **Omarchy Quattro**
+> Packaging: **Arch Linux packages**
+>
+> This specification **supersedes all previous Walker-port and custom `coo-shell`
+> specifications**. Existing implementation based on those designs is considered
+> legacy and may be deleted.
 
 ---
 
-# 1. Why the Architecture Changed
+# 1. Executive Summary
 
-Older Omarchy versions used Walker for launcher/menu surfaces.
+The project goal is no longer to reimplement the Omarchy Quattro launcher.
 
-Omarchy Quattro instead runs the desktop UI through a long-lived Quickshell
-process called `omarchy-shell`.
+The new goal is:
 
-In Quattro:
+> **Reuse the original Omarchy Quattro implementation wherever possible, package
+> only the required upstream components for CachyOS, and continuously rebuild
+> those packages as Omarchy evolves.**
 
-```text
-omarchy-shell
-├── bar
-├── menus
-├── overlays
-├── notifications
-├── OSD
-├── lock screen
-├── services
-└── plugins
-```
+The project will produce a CachyOS-safe subset of Omarchy instead of installing
+the official `omarchy` package directly.
 
-The first-party Omarchy command menu is:
+The primary user experience remains:
 
 ```text
-plugin id: omarchy.menu
-entry point: shell/plugins/menu/Menu.qml
-kind: menu
+SUPER + SPACE  -> Omarchy Quattro launcher / menu
+SUPER + K      -> Omarchy-style keybinding UI
 ```
 
-It is summoned through shell IPC rather than started as an independent
-Quickshell program.
+But the implementation strategy changes completely.
+
+Old strategy:
+
+```text
+Omarchy source
+    ↓
+analyze QML
+    ↓
+reimplement / port launcher
+    ↓
+custom coo-shell
+```
+
+New strategy:
+
+```text
+Official Omarchy upstream
+        ↓
+pin exact version + commit
+        ↓
+extract/package required runtime
+        ↓
+minimal compatibility patches only if necessary
+        ↓
+Arch package
+        ↓
+install on CachyOS
+```
+
+The governing rule is:
+
+> **Reuse upstream first. Package second. Patch only when necessary.
+> Reimplement only as a last resort.**
+
+---
+
+# 2. Why This Rewrite Exists
+
+Omarchy Quattro moved core Omarchy runtime files into Arch packages.
+
+The official `omarchy` package contains, among other things:
+
+```text
+/usr/bin/omarchy-*
+/usr/share/omarchy/install/
+/usr/share/omarchy/migrations/
+/usr/share/omarchy/themes/
+/usr/share/omarchy/shell/
+```
+
+The Quickshell desktop shell — including the Quattro menu implementation — is
+therefore already a packaged runtime artifact.
+
+However, the official `omarchy` package is **not safe to install as a
+launcher-only dependency on CachyOS**.
+
+Its dependency tree includes:
+
+```text
+omarchy-settings
+limine
+limine-mkinitcpio-hook
+limine-snapper-sync
+snapper
+sddm
+...
+```
+
+`omarchy-settings` also installs or modifies system-wide configuration,
+including files under:
+
+```text
+/etc
+/usr/lib/systemd
+/usr/share/uwsm
+/etc/sddm.conf.d
+/etc/mkinitcpio.conf.d
+/etc/limine-entry-tool.d
+```
+
+Its install script intentionally overwrites several files, including:
+
+```text
+/etc/os-release
+/etc/security/faillock.conf
+/etc/nsswitch.conf
+/etc/plymouth/plymouthd.conf
+/etc/skel/.bashrc
+```
+
+That behavior is appropriate for a full Omarchy system but unacceptable for
+this project.
+
+Therefore:
+
+```text
+sudo pacman -S omarchy
+```
+
+is explicitly **not** the installation strategy.
+
+Instead, this project creates a **CachyOS-specific package boundary around the
+Omarchy Quattro runtime**.
+
+---
+
+# 3. Product Vision
+
+A CachyOS user should be able to install a small set of packages:
+
+```text
+cachy-omarchy-shell
+cachy-omarchy-overlay
+```
+
+and gain selected Omarchy Quattro desktop UX while keeping CachyOS itself.
 
 Conceptually:
 
 ```text
-keybind
-  ↓
-omarchy-shell shell summon omarchy.menu ...
-  ↓
-PluginRegistry
-  ↓
-Menu.qml
+CachyOS
+├── CachyOS kernel
+├── CachyOS repositories
+├── existing Hyprland config
+├── existing Waybar
+├── existing notification daemon
+├── existing login manager
+│
+├── cachy-omarchy-shell
+│    └── upstream Omarchy Quattro runtime subset
+│
+└── cachy-omarchy-overlay
+     ├── launch wrappers
+     ├── user service
+     ├── Hyprland bindings
+     ├── compatibility environment
+     └── update/build tooling
 ```
 
-This matters because simply copying `Menu.qml` to CachyOS is not sufficient.
-
-The upstream menu expects shell-provided runtime context such as:
-
-```text
-omarchyPath
-shell
-manifest
-pluginRegistry
-shared services
-theme singletons
-IPC lifecycle
-```
-
-Therefore this project needs a **small compatibility host** around the menu.
+The project must not turn CachyOS into Omarchy.
 
 ---
 
-# 2. Project Positioning
+# 4. Primary Goals
 
-Working name:
+## 4.1 Launcher
 
 ```text
-cachy-omarchy-overlay
+SUPER + SPACE
 ```
 
-Short command prefix:
+opens the original or minimally adapted Omarchy Quattro menu.
+
+The preference order is:
+
+1. original upstream component unchanged;
+2. upstream component with environment/path adaptation;
+3. small patch;
+4. maintained compatibility shim;
+5. reimplementation only when unavoidable.
+
+---
+
+## 4.2 Keybinding UI
 
 ```text
-coo
+SUPER + K
+```
+
+should expose a useful keybinding dialog.
+
+Preferred order:
+
+1. reuse existing upstream Quattro mechanism;
+2. adapt it to CachyOS Hyprland configuration;
+3. reuse old project parser code if necessary;
+4. custom UI only as a last resort.
+
+---
+
+## 4.3 Safe CachyOS Integration
+
+The installation must not modify or replace:
+
+```text
+CachyOS identity
+bootloader
+kernel
+initramfs policy
+Plymouth
+SDDM
+system-wide PAM policy
+system-wide NSS configuration
+existing Waybar
+existing notification daemon
+existing lock screen
+```
+
+---
+
+## 4.4 Repeatable Package Rebuilds
+
+The project must support continuously rebuilding packages as upstream Omarchy
+releases new versions.
+
+The update pipeline must support:
+
+```text
+discover upstream release
+        ↓
+pin upstream version + commit
+        ↓
+update source lock
+        ↓
+apply local patches
+        ↓
+build packages
+        ↓
+package audit
+        ↓
+runtime smoke tests
+        ↓
+install only if tests pass
+```
+
+An upstream update must never automatically replace a working installation when
+the new build or tests fail.
+
+---
+
+# 5. Non-Goals
+
+The project does **not** aim to:
+
+- install the full Omarchy distribution;
+- make CachyOS identify itself as Omarchy;
+- use the official `omarchy-settings` package;
+- install the Omarchy boot stack;
+- configure Limine;
+- configure Snapper automatically;
+- replace SDDM;
+- replace UWSM configuration globally;
+- replace PipeWire configuration;
+- replace PAM / faillock policy;
+- copy all Omarchy applications;
+- copy all Omarchy developer tools;
+- maintain a full fork of Omarchy;
+- reimplement the whole Quattro shell;
+- automatically accept every new upstream version.
+
+---
+
+# 6. Architecture Principles
+
+## 6.1 Upstream Is the Source of Truth
+
+Omarchy owns the implementation of Quattro.
+
+This project should not casually fork behavior.
+
+For upstream-derived code:
+
+```text
+basecamp/omarchy
+```
+
+is authoritative.
+
+Our repository owns:
+
+```text
+packaging
+compatibility
+integration
+tests
+update automation
+```
+
+---
+
+## 6.2 Pin Every Build
+
+Never build production packages from a floating branch.
+
+Every package must resolve to:
+
+```text
+upstream version
+upstream commit SHA
+local package revision
+```
+
+Example:
+
+```text
+Omarchy version: 4.0.1
+Commit:          abcdef1234...
+Package:         cachy-omarchy-shell 4.0.1-1
+```
+
+---
+
+## 6.3 Keep Local Diff Small
+
+The preferred local diff is:
+
+```text
+0 patches
+```
+
+If patches are necessary, each patch must:
+
+- have one clear purpose;
+- include a comment explaining why;
+- have an associated test;
+- be reviewed on every upstream bump.
+
+---
+
+## 6.4 Separate Upstream Runtime from Local Integration
+
+Upstream-derived files and CachyOS-specific files must be different packages.
+
+This allows:
+
+```text
+upstream runtime update
+```
+
+without overwriting:
+
+```text
+user integration/configuration
+```
+
+---
+
+## 6.5 Package Ownership Must Be Explicit
+
+Every installed system file should be owned by one of our packages.
+
+Avoid installer scripts that copy arbitrary files into `/usr`.
+
+Preferred:
+
+```text
+pacman owns system files
+```
+
+User configuration may live under:
+
+```text
+~/.config/cachy-omarchy/
+```
+
+---
+
+## 6.6 User Configuration Is Not Package State
+
+Package upgrades should not overwrite user customizations.
+
+Defaults belong under:
+
+```text
+/usr/share/cachy-omarchy/defaults/
+```
+
+Live user configuration belongs under:
+
+```text
+~/.config/cachy-omarchy/
+```
+
+---
+
+# 7. Package Architecture
+
+The project initially builds two packages.
+
+## 7.1 `cachy-omarchy-shell`
+
+### Purpose
+
+Contains the upstream-derived Omarchy Quattro runtime required to run the shell
+and menu.
+
+This package tracks upstream Omarchy versions.
+
+Example:
+
+```text
+cachy-omarchy-shell 4.0.0-1
+cachy-omarchy-shell 4.0.1-1
+cachy-omarchy-shell 4.0.1-2
 ```
 
 Meaning:
 
 ```text
-Cachy Omarchy Overlay
+4.0.1   = upstream Omarchy version
+-2      = our packaging revision
 ```
 
-The project is best understood as:
+### Expected content
+
+The exact content is determined by the dependency audit, but likely includes
+some subset of:
 
 ```text
-CachyOS
-  +
-Hyprland
-  +
-Quickshell
-  +
-small Omarchy-compatible launcher host
+/usr/share/cachy-omarchy/upstream/shell/
+/usr/share/cachy-omarchy/upstream/themes/
+/usr/lib/cachy-omarchy/bin/
 ```
 
-NOT:
+The package MUST NOT install:
 
 ```text
-CachyOS + full Omarchy
+/etc/os-release
+/etc/mkinitcpio.conf.d/*
+/etc/limine-entry-tool.d/*
+/etc/sddm.conf.d/*
+/etc/security/*
+/etc/nsswitch.conf
+/etc/plymouth/*
+/etc/skel/.bashrc
+```
+
+### Dependencies
+
+Dependencies must be derived from actual runtime use.
+
+Expected examples:
+
+```text
+quickshell
+hyprland
+jq
+perl
+```
+
+Potential dependencies must be audited rather than blindly copied from the
+official `omarchy` package.
+
+The official `omarchy` dependency list must **not** be copied wholesale.
+
+---
+
+## 7.2 `cachy-omarchy-overlay`
+
+### Purpose
+
+Owns CachyOS-specific integration.
+
+Expected content:
+
+```text
+/usr/bin/cachy-omarchy-shell
+/usr/bin/cachy-omarchy-launcher
+/usr/bin/cachy-omarchy-keybindings
+
+/usr/lib/systemd/user/cachy-omarchy-shell.service
+
+/usr/share/cachy-omarchy/defaults/
+```
+
+It may depend on:
+
+```text
+cachy-omarchy-shell
+```
+
+It should evolve independently from the upstream version.
+
+Example:
+
+```text
+cachy-omarchy-overlay 0.1.0-1
 ```
 
 ---
 
-# 3. Product Goals
+# 8. Why Two Packages
 
-## 3.1 v0.1 Goals
+A single package would mix two independent concerns:
 
-A user should be able to run:
+```text
+upstream Quattro source
++
+our CachyOS integration
+```
+
+Splitting them gives:
+
+```text
+cachy-omarchy-shell
+    ↑
+changes whenever Omarchy changes
+
+cachy-omarchy-overlay
+    ↑
+changes whenever our integration changes
+```
+
+Benefits:
+
+- smaller upgrade surface;
+- easier rollback;
+- cleaner ownership;
+- easier debugging;
+- fewer conflicts;
+- ability to test new upstream shell builds against stable integration.
+
+---
+
+# 9. Filesystem Layout
+
+## 9.1 Upstream Runtime
+
+Preferred root:
+
+```text
+/usr/share/cachy-omarchy/upstream/
+```
+
+Example:
+
+```text
+/usr/share/cachy-omarchy/upstream/
+├── shell/
+├── themes/
+└── version
+```
+
+Avoid owning:
+
+```text
+/usr/share/omarchy
+```
+
+unless an audit proves that upstream hardcoded paths make relocation
+impractical.
+
+If relocation is impossible, prefer a compatibility symlink or wrapper before
+using the original path.
+
+Any use of:
+
+```text
+/usr/share/omarchy
+```
+
+must be an explicit architecture decision.
+
+---
+
+## 9.2 Project Runtime
+
+```text
+/usr/share/cachy-omarchy/
+├── upstream/
+├── defaults/
+└── metadata/
+```
+
+## 9.3 Executables
+
+```text
+/usr/bin/cachy-omarchy-shell
+/usr/bin/cachy-omarchy-launcher
+/usr/bin/cachy-omarchy-keybindings
+/usr/bin/cachy-omarchy-doctor
+/usr/bin/cachy-omarchy-build
+/usr/bin/cachy-omarchy-update
+```
+
+## 9.4 User Config
+
+```text
+~/.config/cachy-omarchy/
+├── config.jsonc
+├── commands.jsonc
+├── environment
+└── hypr/
+    └── bindings.conf
+```
+
+## 9.5 User State
+
+```text
+~/.local/state/cachy-omarchy/
+├── logs/
+├── backups/
+└── update/
+```
+
+---
+
+# 10. Upstream Lock File
+
+Repository must contain:
+
+```text
+upstream.lock
+```
+
+Example format:
 
 ```bash
-git clone <repo>
-cd cachy-omarchy-overlay
-./install.sh
+OMARCHY_VERSION=4.0.0
+OMARCHY_COMMIT=f0020448ca87329199de7cb12f2015ebc4a3e5e7
+OMARCHY_CHANNEL=stable
+OMARCHY_REPOSITORY=https://github.com/basecamp/omarchy.git
 ```
 
-and gain:
-
-```text
-SUPER + SPACE
-    -> Quattro-style app/command launcher
-
-SUPER + K
-    -> Quattro-style searchable keybinding viewer
-```
-
-The installer should:
-
-- detect CachyOS / Arch-family environment;
-- detect Hyprland;
-- install or validate Quickshell;
-- install the project-owned Quickshell host;
-- install the launcher plugin;
-- install the keybinding plugin;
-- add a small Hyprland source file;
-- preserve all existing configuration;
-- support reinstallation;
-- support uninstall;
-- support diagnosis with `doctor.sh`.
-
----
-
-## 3.2 UX Goals
-
-The launcher should feel close to Omarchy Quattro in:
-
-- window placement;
-- keyboard navigation;
-- rounded visual surface;
-- typography;
-- result spacing;
-- active row treatment;
-- icon presentation;
-- fuzzy search;
-- app discovery;
-- command discovery;
-- near-instant summon time.
-
-Exact pixel parity is desirable but is not a v0.1 requirement.
-
----
-
-## 3.3 Secondary Goals
-
-Later versions may support:
-
-- clipboard overlay;
-- emoji picker;
-- power menu;
-- theme switching;
-- Waybar integration;
-- optional Omarchy-style bar;
-- notifications;
-- OSD;
-- plugin loading;
-- custom user launcher entries;
-- dynamic CachyOS theming.
-
----
-
-# 4. Non-Goals
-
-v0.1 MUST NOT:
-
-- install Omarchy as an operating system;
-- replace CachyOS repositories;
-- replace the CachyOS kernel;
-- replace Hyprland;
-- replace Waybar;
-- replace the user's notification daemon;
-- replace the user's lock screen;
-- replace the user's terminal;
-- replace the user's shell;
-- rewrite `~/.config/hypr`;
-- install the full `omarchy-shell`;
-- require `~/.local/share/omarchy`;
-- depend on an Omarchy upgrade script;
-- automatically track every upstream Quattro commit;
-- implement every Omarchy menu action;
-- execute missing Omarchy commands blindly.
-
----
-
-# 5. Design Principles
-
-## 5.1 Overlay, not replacement
-
-User configuration is authoritative.
-
-Project configuration lives separately:
-
-```text
-~/.config/cachy-omarchy-overlay/
-```
-
-Hyprland only imports one managed source.
-
----
-
-## 5.2 Quickshell-native
-
-The launcher should be implemented as a Quickshell surface.
-
-Do not recreate Quattro UI using Walker unless a fallback is explicitly
-implemented later.
-
----
-
-## 5.3 Upstream-informed, independently runnable
-
-The project may adapt source and ideas from Omarchy Quattro, but the result must
-run independently on CachyOS.
-
-No runtime dependency on:
-
-```text
-$OMARCHY_PATH
-omarchy-shell
-omarchy command
-Omarchy themes directory
-Omarchy shell.json
-```
-
-unless explicitly supplied through an optional compatibility adapter.
-
----
-
-## 5.4 Minimal compatibility layer
-
-Do not port the entire Omarchy shell just to show the launcher.
-
-Only provide the services required by the launcher.
-
-Preferred:
-
-```text
-small host
-+
-small API compatibility layer
-+
-ported menu
-```
-
-Avoid:
-
-```text
-fork entire omarchy-shell
-```
-
----
-
-## 5.5 Reversible
-
-Every existing file modified by the installer must have:
-
-- backup;
-- managed markers;
-- uninstall path.
-
----
-
-## 5.6 Idempotent
-
-Running:
+Optional:
 
 ```bash
-./install.sh
-./install.sh
-./install.sh
+OMARCHY_TAG=v4.0.0
+OMARCHY_SOURCE_SHA256=...
 ```
 
-must not duplicate:
+Rules:
 
-- source blocks;
-- keybindings;
-- services;
-- symlinks;
-- autostart entries.
+- production builds MUST use `OMARCHY_COMMIT`;
+- tag alone is insufficient;
+- updating the lock file is a reviewable change;
+- package version must agree with the lock file.
 
 ---
 
-## 5.7 No hidden privilege escalation
+# 11. Upstream Metadata
 
-The installer itself runs as the normal user.
+Create:
 
-`sudo` may be used only for explicit package installation.
+```text
+UPSTREAM.md
+```
+
+It records:
+
+```text
+Repository
+Version
+Commit
+Release date
+Source license
+Components packaged
+Components intentionally excluded
+Known compatibility patches
+Last tested CachyOS environment
+```
+
+This document is human-readable.
+
+`upstream.lock` is machine-readable.
 
 ---
 
-# 6. Upstream Quattro Model
-
-The relevant upstream model is:
-
-```text
-omarchy-shell
-    │
-    ├── shell host
-    │
-    ├── PluginRegistry
-    │
-    ├── IPC
-    │
-    ├── theme singletons
-    │
-    └── first-party plugins
-             │
-             └── omarchy.menu
-                    └── Menu.qml
-```
-
-Quattro plugin entry points are not standalone `ShellRoot`s.
-
-They are components loaded by the host.
-
-Menu-like plugins expose lifecycle methods conceptually equivalent to:
-
-```qml
-function open(payloadJson)
-function close()
-```
-
-The host supplies context to plugins.
-
-This project must reproduce only the subset required by its launcher.
-
----
-
-# 7. Architecture Options
-
-Three architectures were considered.
-
----
-
-## Option A — Install full upstream `omarchy-shell`
-
-```text
-CachyOS
-└── upstream omarchy-shell
-```
-
-### Advantages
-
-- closest to upstream;
-- minimum code divergence;
-- original plugin system;
-- original theme system.
-
-### Problems
-
-- brings unrelated bar/services/desktop behavior;
-- likely collisions with existing CachyOS components;
-- assumes Omarchy runtime layout;
-- difficult to support cleanly as launcher-only software.
-
-### Decision
-
-```text
-REJECTED for v0.1
-```
-
-May be supported later as an optional "full shell mode".
-
----
-
-## Option B — Standalone Menu.qml only
-
-```text
-quickshell -p Menu.qml
-```
-
-### Advantages
-
-- conceptually simple.
-
-### Problems
-
-`Menu.qml` expects host-injected state and shared services.
-
-### Decision
-
-```text
-REJECTED
-```
-
----
-
-## Option C — Minimal compatibility host
-
-```text
-CachyOS
-└── coo-shell
-     ├── IPC
-     ├── Theme
-     ├── AppIndex
-     ├── CommandIndex
-     ├── compatibility services
-     └── plugins
-          ├── launcher
-          └── keybindings
-```
-
-### Advantages
-
-- preserves Quattro architecture;
-- keeps long-lived process for fast summon;
-- does not own the rest of the desktop;
-- portable;
-- testable;
-- can gradually add plugins.
-
-### Decision
-
-```text
-SELECTED
-```
-
----
-
-# 8. High-Level Architecture
-
-```text
-                        Hyprland
-                           │
-             ┌─────────────┴─────────────┐
-             │                           │
-      SUPER + SPACE                SUPER + K
-             │                           │
-             v                           v
-       coo-launcher               coo-keybindings
-             │                           │
-             └─────────────┬─────────────┘
-                           │ IPC
-                           v
-                  +------------------+
-                  |    coo-shell     |
-                  |   Quickshell     |
-                  +--------+---------+
-                           |
-          +----------------+----------------+
-          |                                 |
-          v                                 v
- +------------------+              +------------------+
- | launcher plugin  |              | keybind plugin   |
- | Quattro-inspired |              | searchable list  |
- +--------+---------+              +---------+--------+
-          |                                  |
-          +---------------+------------------+
-                          |
-                          v
-                +-------------------+
-                | shared services   |
-                +-------------------+
-                | Theme             |
-                | AppIndex          |
-                | CommandIndex      |
-                | Hyprland bindings |
-                | Config            |
-                +-------------------+
-```
-
----
-
-# 9. Process Model
-
-`coo-shell` should be a long-running user process.
-
-Reason:
-
-- app index remains warm;
-- config remains parsed;
-- launcher summons quickly;
-- avoids Quickshell startup on every hotkey;
-- matches the useful part of Quattro's architecture.
-
-Lifecycle:
-
-```text
-login
-  ↓
-coo-shell starts
-  ↓
-waits for IPC
-  ↓
-SUPER + SPACE
-  ↓
-launcher becomes visible
-```
-
-If the process is not running:
-
-```text
-coo-launcher
-```
-
-may start it before retrying the IPC call.
-
----
-
-# 10. Repository Structure
+# 12. Repository Structure
 
 ```text
 cachy-omarchy-overlay/
 ├── SPEC.md
 ├── README.md
 ├── LICENSE
+├── UPSTREAM.md
+├── upstream.lock
 │
-├── install.sh
-├── uninstall.sh
-├── doctor.sh
+├── packages/
+│   ├── cachy-omarchy-shell/
+│   │   ├── PKGBUILD
+│   │   ├── patches/
+│   │   │   └── README.md
+│   │   └── install/
+│   │
+│   └── cachy-omarchy-overlay/
+│       ├── PKGBUILD
+│       ├── src/
+│       └── install/
 │
 ├── bin/
-│   ├── coo-shell
-│   ├── coo-launcher
-│   ├── coo-keybindings
-│   ├── coo-reload
-│   └── coo-generate-keybindings
+│   ├── check-upstream
+│   ├── update-upstream
+│   ├── build-packages
+│   ├── test-packages
+│   ├── install-packages
+│   ├── rollback
+│   └── release
 │
-├── shell/
-│   ├── shell.qml
-│   ├── ipc/
-│   │   └── ShellIpc.qml
+├── overlay/
+│   ├── bin/
+│   │   ├── cachy-omarchy-shell
+│   │   ├── cachy-omarchy-launcher
+│   │   ├── cachy-omarchy-keybindings
+│   │   └── cachy-omarchy-doctor
 │   │
-│   ├── services/
-│   │   ├── Config.qml
-│   │   ├── Theme.qml
-│   │   ├── AppIndex.qml
-│   │   ├── CommandIndex.qml
-│   │   ├── HyprlandBindings.qml
-│   │   └── Compatibility.qml
+│   ├── systemd/
+│   │   └── cachy-omarchy-shell.service
 │   │
-│   ├── components/
-│   │   ├── SearchField.qml
-│   │   ├── ResultList.qml
-│   │   ├── ResultRow.qml
-│   │   ├── Icon.qml
-│   │   └── Surface.qml
-│   │
-│   └── plugins/
-│       ├── launcher/
-│       │   ├── Launcher.qml
-│       │   ├── manifest.json
-│       │   └── model/
-│       │
-│       └── keybindings/
-│           ├── Keybindings.qml
-│           └── manifest.json
+│   ├── defaults/
+│   └── hypr/
 │
-├── config/
-│   ├── config.jsonc
-│   ├── commands.jsonc
-│   └── theme.jsonc
+├── patches/
+│   └── README.md
 │
-├── hypr/
-│   ├── overlay.conf
-│   └── bindings.conf
+├── tests/
+│   ├── package/
+│   ├── runtime/
+│   ├── integration/
+│   └── fixtures/
 │
-├── lib/
-│   ├── common.sh
-│   ├── env.sh
-│   ├── packages.sh
-│   ├── backup.sh
-│   ├── hyprland.sh
-│   ├── quickshell.sh
-│   ├── autostart.sh
-│   └── uninstall.sh
+├── docs/
+│   ├── PACKAGE_AUDIT.md
+│   ├── RUNTIME_DEPENDENCIES.md
+│   ├── COMMAND_AUDIT.md
+│   ├── PLUGIN_AUDIT.md
+│   ├── UPDATE_PROCESS.md
+│   ├── ROLLBACK.md
+│   └── LEGACY_MIGRATION.md
 │
-├── systemd/
-│   └── coo-shell.service
-│
-└── tests/
-    ├── shell/
-    ├── installer/
-    ├── fixtures/
-    └── test.sh
+└── build/
+    └── .gitkeep
 ```
 
 ---
 
-# 11. Installed Runtime Layout
+# 13. Runtime Strategy
 
-Configuration:
-
-```text
-~/.config/cachy-omarchy-overlay/
-├── config.jsonc
-├── commands.jsonc
-├── theme.jsonc
-├── hypr/
-│   ├── overlay.conf
-│   └── bindings.conf
-└── generated/
-    ├── keybindings.json
-    └── app-cache.json
-```
-
-Program data:
-
-```text
-~/.local/share/cachy-omarchy-overlay/
-├── shell/
-├── bin/
-└── VERSION
-```
-
-User state:
-
-```text
-~/.local/state/cachy-omarchy-overlay/
-├── backups/
-├── logs/
-└── install.json
-```
-
-User service:
-
-```text
-~/.config/systemd/user/coo-shell.service
-```
-
-Optional CLI symlinks:
-
-```text
-~/.local/bin/coo-shell
-~/.local/bin/coo-launcher
-~/.local/bin/coo-keybindings
-~/.local/bin/coo-reload
-```
-
----
-
-# 12. Core Runtime Components
-
-## 12.1 `shell.qml`
-
-### Goal
-
-Provide the smallest Quickshell root capable of hosting launcher surfaces.
-
-Responsibilities:
-
-- instantiate core services;
-- expose IPC;
-- keep launcher plugin loaded or load it cheaply;
-- own layer-shell launcher windows;
-- route summon/hide/toggle calls.
-
-MUST NOT:
-
-- create a bar;
-- create notifications;
-- create OSD;
-- create lock screen;
-- act as polkit agent.
-
----
-
-## 12.2 `Compatibility.qml`
-
-### Goal
-
-Provide only the small API surface required by adapted upstream components.
-
-Potential compatibility properties:
-
-```qml
-property string omarchyPath
-property var shell
-property var manifest
-property var pluginRegistry
-```
-
-However the preferred implementation is to progressively eliminate upstream
-Omarchy-specific dependencies.
-
-Target:
-
-```text
-compatibility layer shrinks over time
-```
-
-rather than growing into a full Omarchy shell clone.
-
----
-
-# 13. Launcher Plugin
-
-## 13.1 Goal
-
-Reproduce the useful behavior and visual language of Quattro's `omarchy.menu`.
-
-Launch:
-
-```text
-SUPER + SPACE
-```
-
-CLI:
-
-```bash
-coo-launcher
-```
-
-IPC concept:
-
-```text
-coo-shell launcher toggle
-```
-
----
-
-## 13.2 Modes
-
-v0.1 launcher should search at least:
-
-```text
-Applications
-Commands
-```
-
-Possible later modes:
-
-```text
-Files
-Clipboard
-Emoji
-Web search
-Themes
-Settings
-```
-
----
-
-## 13.3 Application Index
-
-Use freedesktop `.desktop` entries.
-
-Search paths include:
-
-```text
-/usr/share/applications
-~/.local/share/applications
-$XDG_DATA_DIRS/*/applications
-```
-
-Requirements:
-
-- parse `.desktop` metadata;
-- honor `NoDisplay`;
-- honor `Hidden`;
-- resolve application icon;
-- preserve `Exec`;
-- strip desktop field codes safely when launching;
-- support localized `Name` when feasible;
-- refresh on changes.
-
-Normalized model:
-
-```json
-{
-  "type": "application",
-  "id": "org.mozilla.firefox",
-  "name": "Firefox",
-  "keywords": ["browser", "web"],
-  "icon": "firefox",
-  "exec": "firefox"
-}
-```
-
----
-
-## 13.4 Command Index
-
-Do not copy Omarchy commands that cannot work on CachyOS.
-
-Project commands live in:
-
-```text
-~/.config/cachy-omarchy-overlay/commands.jsonc
-```
-
-Example:
-
-```jsonc
-[
-  {
-    "name": "Reload Hyprland",
-    "keywords": ["hypr", "reload"],
-    "action": "hyprctl reload"
-  },
-  {
-    "name": "Open Keybindings",
-    "keywords": ["keys", "hotkeys", "shortcuts"],
-    "action": "coo-keybindings"
-  }
-]
-```
-
-Optional upstream-inspired entries may be provided only when their target
-program is detected.
-
----
-
-## 13.5 Search Ranking
-
-Minimum ranking signals:
-
-```text
-exact name match
-prefix match
-acronym match
-substring match
-keyword match
-fuzzy match
-recent usage (future)
-```
-
-Example:
-
-```text
-"ff" -> Firefox
-"term" -> Ghostty / Kitty / terminal
-```
-
-The ranking algorithm should be deterministic.
-
----
-
-## 13.6 Launcher Actions
-
-Selecting an application:
-
-```text
-Quickshell.execDetached(...)
-```
-
-or equivalent safe detached process launch.
-
-Selecting a command:
-
-```text
-execute configured action
-```
-
-Never concatenate untrusted user search text into a shell command.
-
----
-
-# 14. Launcher UI
-
-## 14.1 Surface
+The desired runtime is the original Omarchy Quattro shell tree.
 
 Preferred:
 
 ```text
-LayerShell surface
-keyboard exclusive while open
-centered
-transparent outer background
-rounded content panel
+Quickshell
+    ↓
+upstream shell.qml
+    ↓
+upstream plugin registry
+    ↓
+omarchy.menu
 ```
 
-## 14.2 Components
+The project should not start by extracting `Menu.qml`.
+
+The smallest acceptable unit is whatever upstream itself requires for the menu
+to function reliably.
+
+This may be:
 
 ```text
-Launcher.qml
-├── Surface
-│   ├── SearchField
-│   └── ResultList
-│       └── ResultRow
+entire shell/ directory
 ```
 
-## 14.3 Keyboard Controls
+That is acceptable.
 
-Required:
-
-```text
-Esc         close
-Up          previous
-Down        next
-Ctrl+P      previous (optional)
-Ctrl+N      next (optional)
-Enter       execute
-Tab         mode/action (future)
-```
-
-## 14.4 Mouse
-
-Mouse support is allowed but keyboard interaction is primary.
+The primary optimization target is **dependency safety**, not minimizing file
+count.
 
 ---
 
-# 15. Theme System
+# 14. `OMARCHY_PATH` Compatibility
 
-Quattro uses shared shell theme roles.
-
-This project will implement a smaller local theme model.
-
-Configuration:
+Official Omarchy commands use:
 
 ```text
-~/.config/cachy-omarchy-overlay/theme.jsonc
+OMARCHY_PATH
 ```
 
-Example:
+to locate shell assets.
 
-```jsonc
-{
-  "font": {
-    "family": "Inter",
-    "mono": "JetBrainsMono Nerd Font",
-    "size": 14
-  },
-
-  "surface": {
-    "background": "#1e1e2e",
-    "border": "#45475a",
-    "radius": 14
-  },
-
-  "text": {
-    "primary": "#cdd6f4",
-    "muted": "#9399b2"
-  },
-
-  "selection": {
-    "background": "#313244"
-  }
-}
-```
-
-Future versions may add adapters for:
-
-- Omarchy theme files;
-- Matugen;
-- pywal;
-- CachyOS themes.
-
----
-
-# 16. Keybinding Cheat Sheet
-
-## 16.1 Goal
-
-```text
-SUPER + K
-```
-
-opens a Quickshell-native searchable list of current shortcuts.
-
-No Walker dependency.
-
----
-
-## 16.2 UI
-
-The keybinding viewer should reuse:
-
-```text
-Surface
-SearchField
-ResultList
-ResultRow
-Theme
-```
-
-from the launcher.
-
-This means launcher and keybindings visually match.
-
----
-
-## 16.3 Data Sources
-
-The viewer combines:
-
-```text
-project-managed bindings
-+
-existing user Hyprland bindings
-```
-
-Supported config declarations:
-
-```text
-bind
-binde
-bindl
-bindm
-bindr
-bindd
-```
-
-`bindd` descriptions are preferred.
-
----
-
-## 16.4 Normalized Binding
-
-```json
-{
-  "mods": ["SUPER"],
-  "key": "K",
-  "description": "Show keybindings",
-  "dispatcher": "exec",
-  "argument": "coo-keybindings",
-  "source": "overlay",
-  "category": "Desktop"
-}
-```
-
----
-
-## 16.5 Recursive `source`
-
-Hyprland configs commonly include:
-
-```conf
-source = ~/.config/hypr/bindings.conf
-```
-
-The parser must:
-
-- resolve `~`;
-- resolve relative paths relative to the containing file;
-- avoid cycles;
-- stop at configurable recursion depth;
-- ignore unreadable files with diagnostics.
-
-Suggested maximum depth:
-
-```text
-20
-```
-
----
-
-## 16.6 Generator
-
-CLI:
+The overlay wrapper may set:
 
 ```bash
-coo-generate-keybindings
-coo-generate-keybindings --format json
-coo-generate-keybindings --format tsv
+export OMARCHY_PATH=/usr/share/cachy-omarchy/upstream
 ```
 
-Output cache:
+before starting or calling the shell.
 
-```text
-~/.config/cachy-omarchy-overlay/generated/keybindings.json
-```
-
-The Quickshell service may later parse configs directly.
-
-For v0.1, a small shell/Python generator is acceptable.
-
----
-
-# 17. Hyprland Integration
-
-The project owns:
-
-```text
-~/.config/cachy-omarchy-overlay/hypr/overlay.conf
-```
-
-User root config receives only:
-
-```conf
-# >>> cachy-omarchy-overlay >>>
-source = ~/.config/cachy-omarchy-overlay/hypr/overlay.conf
-# <<< cachy-omarchy-overlay <<<
-```
-
-Overlay:
-
-```conf
-source = ~/.config/cachy-omarchy-overlay/hypr/bindings.conf
-```
-
-Initial bindings:
-
-```conf
-bindd = SUPER, SPACE, Open launcher, exec, coo-launcher
-bindd = SUPER, K, Show keybindings, exec, coo-keybindings
-```
-
-Actual syntax must be validated against the installed Hyprland version.
-
----
-
-# 18. Keybinding Conflict Policy
-
-Before installation, inspect active config.
-
-If:
-
-```text
-SUPER + SPACE
-```
-
-or:
-
-```text
-SUPER + K
-```
-
-already exists:
-
-default behavior:
-
-```text
-warn + skip conflicting project binding
-```
-
-Do NOT silently override.
-
-Example:
-
-```text
-Conflict detected
-
-SUPER + SPACE
-Existing: exec, walker
-Requested: exec, coo-launcher
-
-Skipped.
-
-Use:
-  ./install.sh --force-bindings
-
-to replace it.
-```
-
-Forced mode may emit:
-
-```conf
-unbind = SUPER, SPACE
-bindd = SUPER, SPACE, Open launcher, exec, coo-launcher
-```
-
-but only in project-owned config.
-
----
-
-# 19. IPC
-
-## 19.1 Goal
-
-Hotkey execution must be cheap.
-
-Desired path:
-
-```text
-coo-launcher
-  ↓
-IPC request
-  ↓
-existing coo-shell process
-  ↓
-toggle launcher
-```
-
-The CLI must not start a new full Quickshell process every time.
-
----
-
-## 19.2 Commands
-
-Public CLI:
+Preferred wrapper behavior:
 
 ```bash
-coo-shell ping
-coo-shell launcher open
-coo-shell launcher close
-coo-shell launcher toggle
-coo-shell keybindings open
-coo-shell keybindings close
-coo-shell keybindings toggle
-coo-shell reload
+#!/usr/bin/env bash
+export OMARCHY_PATH=/usr/share/cachy-omarchy/upstream
+...
 ```
 
-Thin convenience wrappers:
+If upstream components use `/usr/share/omarchy` as a hardcoded path, the
+dependency audit must classify each occurrence.
+
+Classification:
+
+```text
+ENV-COMPATIBLE
+PATCH-REQUIRED
+HELPER-REQUIRED
+UNSAFE
+```
+
+---
+
+# 15. Launcher Invocation
+
+Desired public command:
 
 ```bash
-coo-launcher
-coo-keybindings
+cachy-omarchy-launcher
 ```
+
+Expected logical behavior:
+
+```text
+ensure shell is alive
+        ↓
+IPC
+        ↓
+toggle omarchy.menu
+```
+
+The wrapper should use the same IPC model as upstream when possible.
+
+Conceptually:
+
+```text
+qs ipc ... call shell toggle omarchy.menu ...
+```
+
+Do not reimplement IPC unless required.
 
 ---
 
-## 19.3 Auto-start Recovery
+# 16. Shell Process
 
-If:
+The shell is expected to be long-lived.
+
+Preferred lifecycle:
 
 ```text
-coo-shell ping
+Hyprland session starts
+        ↓
+systemd --user starts cachy-omarchy-shell.service
+        ↓
+Quickshell loads upstream shell tree
+        ↓
+launcher hotkeys send IPC
 ```
 
-fails:
+Benefits:
 
-1. start user service;
-2. wait for ready signal with bounded retries;
-3. retry IPC;
-4. report actionable error.
-
-No unbounded wait.
+- fast launcher;
+- warm app index;
+- same lifecycle model as upstream;
+- fewer startup races.
 
 ---
 
-# 20. Autostart
+# 17. User Service
 
-Preferred:
+Preferred unit:
 
 ```text
-systemd --user
+/usr/lib/systemd/user/cachy-omarchy-shell.service
 ```
 
-Service:
+Conceptual:
 
 ```ini
 [Unit]
-Description=Cachy Omarchy Overlay Shell
+Description=Cachy Omarchy Quattro Shell
+PartOf=graphical-session.target
 After=graphical-session.target
 
 [Service]
-ExecStart=%h/.local/bin/coo-shell --daemon
+ExecStart=/usr/bin/cachy-omarchy-shell --run
 Restart=on-failure
 RestartSec=1
 
@@ -1291,1172 +914,1642 @@ RestartSec=1
 WantedBy=default.target
 ```
 
-Exact Quickshell startup command belongs in `coo-shell`, not directly in the
-unit.
+Exact target ordering must be validated on CachyOS.
 
-Alternative fallback:
+The service must not:
 
-```text
-Hyprland exec-once
-```
-
-Systemd user service is preferred because:
-
-- lifecycle is observable;
-- restart policy is explicit;
-- `doctor.sh` can query it;
-- no duplicated `exec-once`.
+- start a second Hyprland;
+- replace Waybar;
+- start Omarchy lock screen unless explicitly enabled;
+- start unrelated upstream plugins automatically if they conflict.
 
 ---
 
-# 21. Installer
+# 18. Plugin Policy
 
-## 21.1 CLI
+The upstream shell may contain many first-party plugins.
+
+Each plugin must be classified:
+
+```text
+ENABLE
+AVAILABLE
+DISABLE
+UNSUPPORTED
+```
+
+v0.1 target:
+
+```text
+omarchy.menu       ENABLE
+keybindings UI     ENABLE or ADAPT
+```
+
+Examples of likely non-goals:
+
+```text
+bar                DISABLE
+notifications      DISABLE
+lock               DISABLE
+OSD                DISABLE
+```
+
+The dependency audit must determine whether disabled plugins can remain
+packaged but inactive.
+
+Do not delete upstream files just because a plugin is disabled unless doing so
+reduces a real dependency or conflict.
+
+---
+
+# 19. Hyprland Integration
+
+Initial bindings:
+
+```text
+SUPER + SPACE -> cachy-omarchy-launcher
+SUPER + K     -> cachy-omarchy-keybindings
+```
+
+The project must not overwrite the full Hyprland config.
+
+Preferred user integration:
+
+```conf
+source = ~/.config/cachy-omarchy/hypr/bindings.conf
+```
+
+A helper can install a managed block:
+
+```conf
+# >>> cachy-omarchy >>>
+source = ~/.config/cachy-omarchy/hypr/bindings.conf
+# <<< cachy-omarchy <<<
+```
+
+Conflict detection is mandatory.
+
+---
+
+# 20. Conflict Policy
+
+If existing config already binds:
+
+```text
+SUPER + SPACE
+SUPER + K
+```
+
+default behavior:
+
+```text
+detect
+warn
+do not silently override
+```
+
+An explicit command may replace the binding.
+
+Example:
 
 ```bash
-./install.sh
+cachy-omarchy-doctor --bindings
 ```
 
-Equivalent:
+or:
 
 ```bash
-./install.sh --all
-```
-
-Options:
-
-```text
---all
---launcher
---keybindings
---no-packages
---no-service
---dry-run
---force-bindings
---verbose
---help
+cachy-omarchy-configure --force-bindings
 ```
 
 ---
 
-## 21.2 Pipeline
+# 21. Official `omarchy` Package Policy
 
-### Phase 0 — Environment
-
-Detect:
+The project MUST NOT depend on:
 
 ```text
-CachyOS / Arch family
-HOME
-XDG paths
-Hyprland
-current Hyprland config
-Quickshell
-systemd user
+omarchy
+omarchy-settings
 ```
+
+The project may depend on:
+
+```text
+omarchy-keyring
+```
+
+only if a concrete need exists.
+
+Prefer official Arch/CachyOS packages for generic dependencies.
+
+The official Omarchy repository should not be added to the user's global
+pacman configuration merely to install this project unless the user explicitly
+chooses that mode in the future.
 
 ---
 
-### Phase 1 — Dependencies
+# 22. Package Source Policy
 
-Required:
+`cachy-omarchy-shell` should build directly from the pinned upstream Git commit.
 
-```text
-bash
-git
-jq
-quickshell
-hyprctl
-```
-
-Potential helper dependency:
-
-```text
-ripgrep
-```
-
-Quickshell package name must be detected/documented rather than hardcoded
-without verification.
-
-Do not assume an AUR helper.
-
----
-
-### Phase 2 — Backup
-
-Backup every existing user file before mutation.
-
-Store manifest:
-
-```text
-~/.local/state/cachy-omarchy-overlay/backups/<timestamp>/manifest.json
-```
-
----
-
-### Phase 3 — Program Files
-
-Copy:
-
-```text
-shell/
-bin/
-```
-
-to:
-
-```text
-~/.local/share/cachy-omarchy-overlay/
-```
-
-Create CLI symlinks.
-
----
-
-### Phase 4 — Configuration
-
-Install default configuration only when missing.
-
-Existing project configuration should be preserved across upgrades unless a
-migration explicitly modifies it.
-
----
-
-### Phase 5 — Hyprland
-
-Install project overlay.
-
-Insert/update one managed block in root config.
-
----
-
-### Phase 6 — Service
-
-Install:
-
-```text
-coo-shell.service
-```
-
-Then:
+Conceptual PKGBUILD:
 
 ```bash
-systemctl --user daemon-reload
-systemctl --user enable --now coo-shell.service
+pkgname=cachy-omarchy-shell
+pkgver=4.0.0
+pkgrel=1
+
+_commit=f0020448ca87329199de7cb12f2015ebc4a3e5e7
+
+source=(
+  "omarchy::git+https://github.com/basecamp/omarchy.git#commit=${_commit}"
+)
+
+package() {
+  cd "$srcdir/omarchy"
+
+  install -d "$pkgdir/usr/share/cachy-omarchy/upstream"
+
+  cp -a shell     "$pkgdir/usr/share/cachy-omarchy/upstream/"
+}
 ```
 
-unless `--no-service`.
+This example is illustrative.
+
+The real PKGBUILD must be based on the runtime dependency audit.
 
 ---
 
-### Phase 7 — Validation
+# 23. Patch Policy
 
-Check:
+Patches live under:
 
 ```text
-coo-shell ping
-coo-shell launcher open/close
-keybinding generator
-hyprctl reload
+packages/cachy-omarchy-shell/patches/
+```
+
+Naming:
+
+```text
+0001-disable-conflicting-default-services.patch
+0002-relocatable-omarchy-path.patch
+```
+
+Every patch must include metadata in:
+
+```text
+patches/README.md
+```
+
+Example:
+
+```text
+Patch:
+0002-relocatable-omarchy-path.patch
+
+Reason:
+Upstream assumes /usr/share/omarchy for this component.
+
+Upstream issue:
+<optional>
+
+Can remove when:
+Upstream accepts OMARCHY_PATH for this location.
+
+Tests:
+tests/runtime/path-relocation.sh
 ```
 
 ---
 
-# 22. `doctor.sh`
+# 24. Patch Budget
+
+The project should track:
+
+```text
+PATCH_COUNT
+PATCH_LINES_CHANGED
+```
 
 Goal:
 
 ```text
-Why is the Quattro launcher not opening?
+PATCH_COUNT as low as possible
 ```
 
-Checks:
+If patch count continuously grows, stop and reassess architecture.
 
-```text
-[ ] supported OS family
-[ ] Hyprland installed
-[ ] Hyprland session detected
-[ ] Quickshell installed
-[ ] Quickshell version
-[ ] coo-shell files
-[ ] QML import validity
-[ ] systemd user service installed
-[ ] systemd user service running
-[ ] IPC ping
-[ ] launcher plugin loaded
-[ ] launcher IPC
-[ ] app index
-[ ] command index
-[ ] theme config
-[ ] project Hyprland source block
-[ ] SUPER+SPACE conflict
-[ ] SUPER+K conflict
-[ ] ~/.local/bin PATH
-```
-
-Example:
-
-```text
-Cachy Omarchy Overlay Doctor
-
-OS               OK    CachyOS
-Hyprland          OK
-Quickshell         OK
-coo-shell service  OK    active
-IPC                OK    4ms
-Launcher           OK
-Applications       OK    162 entries
-Commands           OK    8 entries
-SUPER+SPACE        WARN  existing Walker binding
-SUPER+K            OK
-
-1 warning
-```
-
-Exit codes:
-
-```text
-0 healthy
-1 warnings
-2 broken
-```
+A patch that imports large parts of a custom replacement shell is a design
+smell.
 
 ---
 
-# 23. Uninstall
+# 25. Build Pipeline
+
+Public command:
 
 ```bash
-./uninstall.sh
+./bin/build-packages
 ```
 
-Steps:
-
-1. stop/disable project user service;
-2. remove managed Hyprland source block;
-3. remove project-owned symlinks;
-4. remove project program files;
-5. optionally keep user configuration;
-6. reload Hyprland.
-
-Default SHOULD preserve:
+Pipeline:
 
 ```text
-~/.config/cachy-omarchy-overlay/
-```
-
-or ask/flag explicitly.
-
-CLI:
-
-```text
---purge
---restore-backup
---dry-run
-```
-
-MUST NOT uninstall Quickshell automatically.
-
----
-
-# 24. Upstream Source Strategy
-
-This project is inspired by and may adapt code from Omarchy.
-
-The implementation must choose deliberately between:
-
-```text
-A. vendor selected upstream code
-B. rewrite compatible components
-C. hybrid
-```
-
-Preferred:
-
-```text
-hybrid
-```
-
-### Vendor
-
-Good candidates:
-
-- visual component structure;
-- search interaction patterns;
-- keyboard behavior;
-- small self-contained QML components.
-
-### Rewrite
-
-Good candidates:
-
-- Omarchy-specific service access;
-- `$OMARCHY_PATH` handling;
-- plugin registry;
-- command execution tied to Omarchy;
-- shell configuration;
-- bar integration;
-- system services.
-
----
-
-# 25. Upstream Pinning
-
-Never copy from a moving branch at install time.
-
-Repository development should record:
-
-```text
-UPSTREAM_REPO
-UPSTREAM_BRANCH
-UPSTREAM_COMMIT
-UPSTREAM_DATE
-```
-
-Example file:
-
-```text
-UPSTREAM.md
-```
-
-with:
-
-```text
-Repository: basecamp/omarchy
-Branch: quattro
-Commit: <pinned SHA>
-Components reviewed:
-- shell/plugins/menu/
-- shell/services/...
-```
-
-Any vendored source must retain required MIT attribution.
-
----
-
-# 26. Compatibility Boundary
-
-The compatibility layer must explicitly define what API it provides.
-
-Example:
-
-```text
-Compatibility API v1
-
-Theme.color(name)
-Theme.metric(name)
-
-Shell.close(pluginId)
-Shell.exec(command)
-
-AppIndex.query(text)
-CommandIndex.query(text)
-
-Config.get(path)
-```
-
-Do not implicitly emulate every Omarchy singleton.
-
-If adapted upstream code requires an API not in the boundary:
-
-1. determine if the dependency is essential;
-2. rewrite it if trivial;
-3. otherwise add a documented compatibility API;
-4. add a test.
-
----
-
-# 27. Security
-
-## 27.1 Commands
-
-Launcher command entries can execute arbitrary user commands by design.
-
-Therefore:
-
-- commands are read only from local user-owned configuration;
-- no remote command feed;
-- no user search string interpolation into shell snippets;
-- dangerous example commands should not be shipped.
-
----
-
-## 27.2 Plugin Model
-
-v0.1 does NOT load third-party plugins.
-
-Reason:
-
-Quickshell plugins execute as the user and are not sandboxed.
-
-A plugin system may be introduced after v0.1 with explicit security warnings.
-
----
-
-## 27.3 Installer
-
-Must not use:
-
-```bash
-curl ... | sh
-```
-
-No automatic execution of remote scripts.
-
----
-
-# 28. Performance Targets
-
-The goal is subjective responsiveness rather than hard real-time guarantees.
-
-Target after service warm-up:
-
-```text
-hotkey -> visible launcher
-< 100ms desired
-< 200ms acceptable for v0.1
-```
-
-Search updates:
-
-```text
-no perceptible lag for normal application counts
-```
-
-Avoid launching:
-
-```text
-find
-grep over entire home
-```
-
-on every keystroke.
-
-Cache/index where appropriate.
-
----
-
-# 29. Logging
-
-Runtime:
-
-```text
-~/.local/state/cachy-omarchy-overlay/logs/
-```
-
-Default logs should be low-volume.
-
-Verbose/debug mode may include:
-
-```text
-IPC requests
-index refresh
-plugin lifecycle
-config reload
-```
-
-Never log:
-
-- clipboard data;
-- search text by default;
-- environment secrets.
-
----
-
-# 30. Reload Model
-
-Config changes:
-
-```text
-theme.jsonc
-commands.jsonc
-```
-
-should ideally reload without restarting the desktop session.
-
-Minimum v0.1:
-
-```bash
-coo-reload
-```
-
-performs:
-
-```text
-reload config
-refresh indexes
-reload/restart coo-shell if needed
-```
-
-Do not require logout.
-
----
-
-# 31. Testing Strategy
-
-## 31.1 Installer Tests
-
-Test with isolated temporary HOME.
-
-Required:
-
-```text
-fresh install
-second install
-Hyprland source insertion
-source update
-binding conflict
-uninstall
-dry-run
-backup
-```
-
----
-
-## 31.2 Parser Tests
-
-Hyprland fixtures:
-
-```conf
-bind =
-bindd =
-source =
-nested source
-relative source
-cyclic source
-```
-
----
-
-## 31.3 Launcher Model Tests
-
-Test:
-
-```text
-desktop parsing
-Hidden
-NoDisplay
-keyword extraction
-exact search
-prefix search
-acronym search
-fuzzy ranking
-duplicate apps
-```
-
----
-
-## 31.4 QML Smoke Test
-
-Provide a development command such as:
-
-```bash
-./dev/run-shell.sh
-```
-
-that starts the QML host from the repository without installation.
-
-It must support an isolated config directory.
-
----
-
-# 32. Milestones
-
-## Milestone 0 — Upstream Dependency Spike
-
-### Goal
-
-Determine the minimal Quattro menu dependency graph before implementing the
-final port.
-
-Tasks:
-
-- inspect `shell/plugins/menu/`;
-- list all imports;
-- list all referenced shared QML singletons;
-- list all shell-injected properties;
-- list all external commands;
-- list theme dependencies;
-- list IPC dependencies;
-- classify each dependency:
-
-```text
-KEEP
-PORT
-REWRITE
-DROP
+load upstream.lock
+        ↓
+validate version/commit
+        ↓
+fetch source
+        ↓
+apply patches
+        ↓
+build cachy-omarchy-shell
+        ↓
+build cachy-omarchy-overlay
+        ↓
+package audit
+        ↓
+store artifacts in build/
 ```
 
 Output:
 
 ```text
-docs/QUATTRO_PORT_MAP.md
+build/
+├── cachy-omarchy-shell-4.0.0-1-any.pkg.tar.zst
+└── cachy-omarchy-overlay-0.1.0-1-any.pkg.tar.zst
 ```
-
-Acceptance:
-
-A developer can explain exactly why upstream `Menu.qml` cannot run alone and
-what minimum compatibility surface is needed.
-
-**This milestone must be completed before large QML implementation work.**
 
 ---
 
-## Milestone 1 — Minimal Quickshell Host
+# 26. Clean Build Requirement
 
-Implement:
+Production/release builds should run in an isolated Arch-compatible build
+environment.
+
+Preferred progression:
+
+## v0.1
 
 ```text
-shell.qml
-IPC
-systemd user service
-coo-shell CLI
+makepkg
 ```
 
-No polished launcher yet.
+supported for local development.
 
-Acceptance:
+## release quality
+
+Use a clean chroot / containerized Arch package build environment.
+
+Reason:
+
+- prevents accidental host dependency leakage;
+- makes dependency declarations trustworthy;
+- makes builds reproducible.
+
+The exact tool may be selected during implementation based on the current Arch
+toolchain.
+
+---
+
+# 27. Package Audit
+
+Before installation, every built package must pass a file audit.
+
+`cachy-omarchy-shell` is forbidden from owning paths such as:
+
+```text
+/etc/os-release
+/etc/security/
+/etc/nsswitch.conf
+/etc/plymouth/
+/etc/mkinitcpio.conf.d/
+/etc/limine-entry-tool.d/
+/etc/sddm.conf.d/
+/boot/
+/efi/
+```
+
+The test should fail the build if forbidden files appear.
+
+Example conceptual check:
 
 ```bash
-coo-shell ping
+bsdtar -tf package.pkg.tar.zst
 ```
 
-works.
-
-IPC can open/close a trivial test surface.
+then compare against forbidden path rules.
 
 ---
 
-## Milestone 2 — Launcher Surface
+# 28. Runtime Dependency Audit
+
+Before Milestone 1 implementation, create:
+
+```text
+docs/RUNTIME_DEPENDENCIES.md
+```
+
+For every required upstream executable or service:
+
+```text
+name
+where referenced
+package providing it
+required/optional
+CachyOS availability
+can disable?
+fallback?
+```
+
+Example:
+
+```text
+quickshell
+  Required: yes
+  Purpose: shell runtime
+  Provider: Arch/CachyOS package
+
+hyprctl
+  Required: yes
+  Purpose: compositor integration
+
+gum
+  Required: unknown
+  Purpose: referenced by helper scripts only?
+  Decision: audit before adding dependency
+```
+
+Do not infer dependency just because official `omarchy` depends on it.
+
+---
+
+# 29. Upstream Update Model
+
+Updates are not ordinary source pulls.
+
+They are controlled packaging events.
+
+Public commands:
+
+```bash
+./bin/check-upstream
+./bin/update-upstream
+```
+
+---
+
+# 30. `check-upstream`
+
+Purpose:
+
+Determine whether a newer compatible upstream Omarchy release exists.
+
+Output example:
+
+```text
+Current:
+  Omarchy 4.0.0
+  f0020448...
+
+Available:
+  Omarchy 4.0.1
+  abcdef12...
+
+Status:
+  update available
+```
+
+This command must not modify files.
+
+---
+
+# 31. `update-upstream`
+
+Purpose:
+
+Prepare an update branch/change locally.
+
+Conceptual pipeline:
+
+```text
+discover new version
+        ↓
+resolve exact commit
+        ↓
+update upstream.lock
+        ↓
+update PKGBUILD pkgver/_commit
+        ↓
+reset pkgrel=1
+        ↓
+attempt patches
+        ↓
+build
+        ↓
+audit
+        ↓
+test
+```
+
+If any stage fails:
+
+```text
+DO NOT INSTALL
+DO NOT MODIFY CURRENT PACKAGE
+```
+
+---
+
+# 32. Update State Machine
+
+```text
+CURRENT WORKING VERSION
+          │
+          ▼
+NEW UPSTREAM FOUND
+          │
+          ▼
+SOURCE PINNED
+          │
+          ▼
+PATCH APPLY
+     ┌────┴────┐
+     │ fail    │
+     ▼         ▼
+  ABORT      BUILD
+               │
+          ┌────┴────┐
+          │ fail    │
+          ▼         ▼
+       ABORT      AUDIT
+                    │
+               ┌────┴────┐
+               │ fail    │
+               ▼         ▼
+            ABORT       TEST
+                          │
+                     ┌────┴────┐
+                     │ fail    │
+                     ▼         ▼
+                  ABORT      READY
+                               │
+                               ▼
+                         OPTIONAL INSTALL
+```
+
+---
+
+# 33. Never Auto-Install a Broken Update
+
+`cachy-omarchy-update` must separate:
+
+```text
+build
+```
+
+from:
+
+```text
+install
+```
+
+Safe default:
+
+```bash
+cachy-omarchy-update
+```
+
+means:
+
+```text
+check + build + test
+```
+
+Installation should require:
+
+```bash
+cachy-omarchy-update --install
+```
+
+or a separate command.
+
+---
+
+# 34. Versioning
+
+## `cachy-omarchy-shell`
+
+Track upstream:
+
+```text
+pkgver = Omarchy version
+pkgrel = packaging revision
+```
+
+Examples:
+
+```text
+4.0.0-1
+4.0.0-2
+4.0.1-1
+```
+
+## `cachy-omarchy-overlay`
+
+Independent semantic version:
+
+```text
+0.1.0-1
+0.2.0-1
+```
+
+---
+
+# 35. Optional `-git` Package
+
+Future:
+
+```text
+cachy-omarchy-shell-git
+```
+
+Purpose:
+
+Track development commits for testing.
+
+It must:
+
+- conflict with stable `cachy-omarchy-shell`;
+- never be installed automatically;
+- be clearly marked experimental.
+
+Stable users should track Omarchy releases, not arbitrary HEAD.
+
+---
+
+# 36. Rollback
+
+Every successful build/install workflow must preserve enough information to
+roll back.
+
+Preferred package cache:
+
+```text
+~/.local/state/cachy-omarchy/packages/
+```
+
+or rely on the pacman cache when reliable.
+
+Rollback command:
+
+```bash
+./bin/rollback
+```
+
+Conceptually:
+
+```text
+current 4.0.1-1
+        ↓
+select previous tested build
+        ↓
+pacman -U 4.0.0-2
+        ↓
+restart shell
+        ↓
+smoke test
+```
+
+Rollback must not restore unrelated CachyOS system files.
+
+---
+
+# 37. Installation
+
+Initial developer installation:
+
+```bash
+./bin/build-packages
+./bin/test-packages
+./bin/install-packages
+```
+
+Eventually:
+
+```bash
+sudo pacman -U   build/cachy-omarchy-shell-*.pkg.tar.zst   build/cachy-omarchy-overlay-*.pkg.tar.zst
+```
+
+No install script should blindly copy files into `/usr`.
+
+---
+
+# 38. User Configuration Initialization
+
+On first use, if:
+
+```text
+~/.config/cachy-omarchy/
+```
+
+does not exist, copy project defaults.
+
+Do this with a user-level helper, not a package post-install script that assumes
+a particular user.
+
+Example:
+
+```bash
+cachy-omarchy-init
+```
+
+---
+
+# 39. Runtime Commands
+
+Minimum commands:
+
+```text
+cachy-omarchy-shell
+cachy-omarchy-launcher
+cachy-omarchy-keybindings
+cachy-omarchy-doctor
+cachy-omarchy-reload
+```
+
+Developer/update commands remain in the source repository initially.
+
+---
+
+# 40. Doctor
+
+`cachy-omarchy-doctor` should check:
+
+```text
+CachyOS / Arch-family
+Hyprland
+Quickshell
+cachy-omarchy-shell package
+cachy-omarchy-overlay package
+OMARCHY_PATH compatibility root
+shell.qml
+shell service
+Quickshell process
+IPC ping
+omarchy.menu availability
+launcher invocation
+Hyprland binding conflict
+keybinding invocation
+```
+
+It should also report installed package versions:
+
+```text
+Upstream Omarchy runtime: 4.0.1-1
+Overlay integration:      0.2.0-1
+```
+
+---
+
+# 41. Logging
+
+Runtime logs:
+
+```text
+journalctl --user -u cachy-omarchy-shell
+```
+
+Optional user log directory:
+
+```text
+~/.local/state/cachy-omarchy/logs/
+```
+
+Do not log:
+
+- clipboard contents;
+- launcher query text by default;
+- environment secrets.
+
+---
+
+# 42. Security Requirements
+
+## 42.1 Source
+
+Production builds use a pinned commit.
+
+Never:
+
+```bash
+curl URL | sh
+```
+
+## 42.2 Packages
+
+Package audit must verify forbidden paths.
+
+## 42.3 Commands
+
+Do not execute upstream Omarchy commands that assume a full Omarchy system
+unless audited.
+
+Every exposed command should be classified:
+
+```text
+SAFE
+ADAPTED
+DISABLED
+```
+
+## 42.4 Privilege
+
+The shell runs as the user.
+
+No Quickshell plugin gets root access.
+
+Package installation uses pacman normally.
+
+---
+
+# 43. Upstream Helper Command Audit
+
+Quattro shell/menu actions may invoke:
+
+```text
+omarchy-*
+```
+
+helpers.
+
+Create:
+
+```text
+docs/COMMAND_AUDIT.md
+```
+
+For each referenced helper:
+
+```text
+command
+called from
+purpose
+dependencies
+safe on CachyOS?
+package/copy/wrapper/disable
+```
+
+Example classification:
+
+```text
+omarchy-shell
+  ADAPT
+  Thin IPC wrapper.
+  Replace with cachy-omarchy-shell wrapper.
+
+omarchy-theme-set
+  DISABLE initially
+  Depends on full Omarchy theme workflow.
+```
+
+---
+
+# 44. Compatibility Shim Policy
+
+Small wrapper commands are preferred over invasive upstream patches.
+
+Example:
+
+```text
+upstream expects:
+omarchy-shell
+
+we provide:
+compat/bin/omarchy-shell
+```
+
+only inside the controlled runtime environment.
+
+Avoid placing large numbers of fake `omarchy-*` commands globally in
+`/usr/bin`.
+
+Preferred search path:
+
+```text
+/usr/lib/cachy-omarchy/compat/bin
+```
+
+prepended only for the shell process.
+
+---
+
+# 45. Environment Isolation
+
+The systemd user service can define:
+
+```text
+OMARCHY_PATH=/usr/share/cachy-omarchy/upstream
+PATH=/usr/lib/cachy-omarchy/compat/bin:...
+```
+
+This allows compatibility helpers without polluting the user's general shell
+environment.
+
+---
+
+# 46. Testing Layers
+
+Testing is divided into four layers.
+
+## 46.1 Package Tests
+
+No graphical session required.
+
+Test:
+
+- package files;
+- forbidden paths;
+- declared dependencies;
+- version metadata;
+- lock consistency;
+- patch application;
+- reproducible source pin.
+
+## 46.2 Static Runtime Tests
+
+Inspect upstream/runtime tree.
+
+Test:
+
+- expected shell entry exists;
+- expected plugin exists;
+- no missing project wrapper;
+- configuration paths resolve.
+
+## 46.3 Shell Smoke Tests
+
+Inside a Hyprland/Wayland session:
+
+```text
+service starts
+IPC responds
+menu plugin exists
+menu can open
+menu can close
+```
+
+## 46.4 Integration Tests
+
+Manual or automated environment:
+
+```text
+SUPER + SPACE
+SUPER + K
+application launch
+shell restart
+package upgrade
+package downgrade
+```
+
+---
+
+# 47. Required Package Tests
+
+At minimum:
+
+```text
+P01 forbidden /etc paths absent
+P02 omarchy-settings not dependency
+P03 limine not dependency
+P04 sddm not dependency
+P05 shell.qml packaged
+P06 omarchy.menu packaged
+P07 upstream commit matches lock
+P08 pkgver matches lock
+P09 patch set applies cleanly
+P10 package can be removed cleanly
+```
+
+---
+
+# 48. Required Runtime Tests
+
+At minimum:
+
+```text
+R01 shell process starts
+R02 shell IPC ping succeeds
+R03 menu plugin is discoverable
+R04 launcher toggles
+R05 Escape closes launcher
+R06 application can be launched
+R07 restarting service recovers
+R08 absence of Waybar modification
+R09 absence of notification daemon replacement
+R10 absence of lock-screen replacement
+```
+
+---
+
+# 49. Required Update Tests
+
+```text
+U01 no-update exits cleanly
+U02 new version updates lock
+U03 pkgrel resets on pkgver update
+U04 local revision can bump pkgrel
+U05 patch failure blocks install
+U06 build failure blocks install
+U07 audit failure blocks install
+U08 runtime failure blocks install
+U09 previous package remains installable
+U10 rollback works
+```
+
+---
+
+# 50. Legacy Architecture Retirement
+
+Previous implementation may contain:
+
+```text
+custom coo-shell
+custom Quickshell host
+ported Menu.qml
+Walker theme
+Walker launcher
+custom app index
+custom command index
+```
+
+These are no longer architectural requirements.
+
+Default action:
+
+```text
+delete or archive
+```
+
+Do not preserve old code merely because it exists.
+
+---
+
+# 51. Legacy Code That May Be Reused
+
+Generic code can be retained if it still fits the new design:
+
+```text
+Hyprland config discovery
+managed source block insertion
+keybinding conflict detection
+backup helpers
+doctor output helpers
+test fixtures
+recursive Hyprland source parser
+```
+
+Reuse must be based on usefulness, not sunk cost.
+
+---
+
+# 52. Migration Rule
+
+A previous implementation feature should be retained only if:
+
+```text
+it solves a requirement in this SPEC
+AND
+it is simpler than using upstream
+AND
+it does not increase maintenance burden
+```
+
+Otherwise remove it.
+
+---
+
+# 53. Milestone 0 — Official Package Audit
+
+## Goal
+
+Understand exactly what can be reused without installing official Omarchy.
+
+## Deliverables
+
+```text
+docs/PACKAGE_AUDIT.md
+docs/RUNTIME_DEPENDENCIES.md
+docs/COMMAND_AUDIT.md
+docs/PLUGIN_AUDIT.md
+```
+
+## Tasks
+
+Inspect official:
+
+```text
+omarchy PKGBUILD
+omarchy-settings PKGBUILD
+omarchy-settings.install
+shell/
+bin/omarchy-shell
+```
+
+Record:
+
+- upstream paths;
+- package dependencies;
+- shell dependencies;
+- helper commands;
+- unsafe system integrations;
+- menu plugin runtime needs.
+
+## Exit Criteria
+
+We can answer:
+
+> "What is the minimum safe subset of Omarchy Quattro required to run
+> `omarchy.menu` on CachyOS?"
+
+No implementation beyond audit is required.
+
+---
+
+# 54. Milestone 1 — Minimal `cachy-omarchy-shell` Package
+
+## Goal
+
+Build the upstream shell runtime as a standalone Arch package.
+
+## Requirements
+
+- pinned upstream source;
+- no `omarchy-settings`;
+- no bootloader dependencies;
+- no global CachyOS identity changes;
+- package audit passes.
+
+## Exit Criteria
+
+```bash
+makepkg
+```
+
+produces:
+
+```text
+cachy-omarchy-shell-<version>-<rel>-any.pkg.tar.zst
+```
+
+and forbidden-path audit passes.
+
+---
+
+# 55. Milestone 2 — Launch Original Quattro Shell
+
+## Goal
+
+Run the packaged upstream shell on CachyOS.
+
+Implement only the compatibility needed to start it.
+
+Likely tools:
+
+```text
+OMARCHY_PATH
+compat PATH
+systemd user service
+small wrapper scripts
+```
+
+## Exit Criteria
+
+```text
+Quickshell process starts
+IPC ping succeeds
+no full Omarchy installation exists
+```
+
+---
+
+# 56. Milestone 3 — Original Quattro Launcher
+
+## Goal
+
+Open the upstream `omarchy.menu`.
 
 Implement:
 
 ```text
-Surface
-SearchField
-ResultList
-keyboard navigation
-theme
+cachy-omarchy-launcher
+SUPER + SPACE integration
 ```
 
-with mock data.
+Audit and disable unsupported menu commands.
 
-Acceptance:
+## Exit Criteria
 
 ```text
 SUPER + SPACE
 ```
 
-opens a fast searchable window.
+opens the original/minimally patched Quattro launcher and launches normal
+desktop applications.
 
 ---
 
-## Milestone 3 — Application Index
+# 57. Milestone 4 — Keybinding UI
 
-Implement:
+## Goal
+
+Provide:
 
 ```text
-.desktop discovery
-parsing
-icons
-application execution
-search ranking
-```
-
-Acceptance:
-
-Launcher can start installed applications.
-
----
-
-## Milestone 4 — Quattro Port Alignment
-
-Use `QUATTRO_PORT_MAP.md`.
-
-Port/adapt the relevant upstream UI/behavior.
-
-Acceptance:
-
-The launcher visually and behaviorally resembles Quattro while remaining free
-of mandatory Omarchy runtime dependencies.
-
----
-
-## Milestone 5 — Command Menu
-
-Implement:
-
-```text
-commands.jsonc
-command search
-command execution
-```
-
-Do not hard-depend on Omarchy commands.
-
-Acceptance:
-
-Apps and commands coexist in one launcher.
-
----
-
-## Milestone 6 — Keybinding Viewer
-
-Implement:
-
-```text
-Hyprland parser
-source recursion
-keybinding cache
-Quickshell keybinding UI
 SUPER + K
 ```
 
-Acceptance:
+Prefer upstream.
 
-Current user's bindings are searchable.
+If upstream assumes Omarchy-specific config, adapt data collection while keeping
+the upstream visual/runtime mechanism.
+
+Use legacy parser only if useful.
 
 ---
 
-## Milestone 7 — Installer Reliability
+# 58. Milestone 5 — Overlay Package
+
+Package all CachyOS-specific integration as:
+
+```text
+cachy-omarchy-overlay
+```
+
+Remove ad-hoc installation scripts from the normal user path.
+
+Exit:
+
+```text
+pacman owns all system integration files
+```
+
+---
+
+# 59. Milestone 6 — Update/Rebuild Pipeline
 
 Implement:
 
 ```text
-backup
-idempotency
-conflict detection
+check-upstream
+update-upstream
+build-packages
+test-packages
+install-packages
+rollback
+```
+
+Exit:
+
+A newer Omarchy release can be adopted without manually rewriting PKGBUILD
+values.
+
+---
+
+# 60. Milestone 7 — Reliability
+
+Implement:
+
+```text
+clean builds
+package audits
+runtime tests
 doctor
-uninstall
-dry-run
-tests
+upgrade test
+rollback test
+documentation
 ```
 
-Acceptance:
-
-v0.1 release candidate.
+This is the v0.1 release candidate.
 
 ---
 
-# 33. v0.1 Acceptance Criteria
+# 61. v0.1 Acceptance Criteria
 
-All must pass:
+All must be true:
 
-- [ ] Project runs on CachyOS without Omarchy installed.
-- [ ] Quickshell is the UI runtime.
-- [ ] `coo-shell` is a long-running user process.
-- [ ] `coo-shell ping` works.
-- [ ] `SUPER + SPACE` opens the launcher.
-- [ ] Launcher indexes installed `.desktop` applications.
-- [ ] Launcher can execute applications.
-- [ ] Launcher supports project command entries.
-- [ ] Launcher keyboard navigation works.
-- [ ] Launcher can close with Escape.
-- [ ] `SUPER + K` opens the keybinding viewer.
-- [ ] Existing Hyprland keybindings are discoverable.
-- [ ] Existing user Hyprland config is not replaced.
-- [ ] Keybinding conflicts are detected.
-- [ ] Installer is idempotent.
-- [ ] Uninstall removes only project-owned integration.
-- [ ] Existing Waybar remains untouched.
-- [ ] Existing notification daemon remains untouched.
-- [ ] Existing lock screen remains untouched.
-- [ ] Omarchy is not a runtime dependency.
-- [ ] Walker is not required.
+- [ ] Runs on CachyOS.
+- [ ] Omarchy OS is not installed.
+- [ ] Official `omarchy` package is not required.
+- [ ] Official `omarchy-settings` package is not required.
+- [ ] Quickshell is used.
+- [ ] Upstream Quattro shell source is reused.
+- [ ] Upstream source is pinned to a commit.
+- [ ] `cachy-omarchy-shell` builds successfully.
+- [ ] Package owns no forbidden system paths.
+- [ ] Long-running shell starts as user.
+- [ ] IPC works.
+- [ ] `SUPER + SPACE` opens Quattro launcher.
+- [ ] Normal applications can launch.
+- [ ] `SUPER + K` opens keybinding UI.
+- [ ] Existing Hyprland config is preserved.
+- [ ] Existing Waybar is preserved.
+- [ ] Existing notification daemon is preserved.
+- [ ] Existing lock setup is preserved.
+- [ ] Rebuild against a newer upstream release is automated.
+- [ ] Failed updates do not install.
+- [ ] Previous working package can be rolled back.
 
 ---
 
-# 34. Deferred Features
+# 62. Update UX
 
-Not v0.1:
+Desired eventual user command:
+
+```bash
+cachy-omarchy-update
+```
+
+Output:
 
 ```text
-clipboard overlay
-emoji picker
-power menu
-bar
-notifications
-OSD
-lock screen
-polkit
-weather
-battery service
-media service
-plugin marketplace
-automatic upstream sync
-```
+Checking Omarchy upstream...
 
-These may be considered only after the launcher is stable.
+Installed runtime:
+  4.0.0-2
+
+Latest supported upstream:
+  4.0.1
+
+Preparing build...
+  source      OK
+  patches     OK
+  package     OK
+  audit       OK
+  smoke test  OK
+
+New package is ready:
+  cachy-omarchy-shell-4.0.1-1
+
+Run with --install to upgrade.
+```
 
 ---
 
-# 35. v0.2 Ideas
+# 63. CI / Automation
 
-Potential:
+Future repository CI should:
 
 ```text
-SUPER + V     clipboard
-SUPER + .     emoji
-power menu
-recent applications
-usage-based ranking
-search providers
-calculator
-web search
-file search
-theme adapters
+check upstream releases
+build packages
+run package audit
+run static tests
+publish build artifacts
 ```
+
+A scheduled upstream check may open an update PR.
+
+The CI must **not** silently publish a release when runtime tests are required
+but unavailable.
 
 ---
 
-# 36. v0.5 Ideas
+# 64. Future Local Repository
 
-Potential:
+Once stable, packages may be served through a small pacman repository.
+
+Example concept:
 
 ```text
-optional Quattro-style bar
-CachyOS theme integration
-notification overlay
-OSD
-multiple plugins
-configuration UI
+[cachy-omarchy]
+Server = ...
 ```
+
+But this is explicitly deferred until:
+
+- package boundaries are stable;
+- signing is implemented;
+- update tests are reliable.
+
+Initial distribution is local `.pkg.tar.zst`.
 
 ---
 
-# 37. v1.0 Vision
+# 65. Signing
 
-A stable framework where CachyOS users can selectively enable Omarchy-inspired
-desktop pieces:
+Future published packages should be signed.
+
+Do not copy the upstream Omarchy repository's trust configuration blindly.
+
+A public package repository requires:
 
 ```text
-CachyOS
-├── Quattro launcher       ON
-├── keybinding viewer      ON
-├── clipboard              optional
-├── emoji                  optional
-├── bar                    optional
-├── notifications          optional
-└── lock                   optional
+own signing key
+documented trust bootstrap
+signed database/packages
 ```
 
-No component should require reinstalling the operating system.
+This is out of scope for v0.1 local builds.
 
 ---
 
-# 38. Architecture Decisions
+# 66. Failure Philosophy
 
-## ADR-001 — Quickshell replaces Walker
-
-Decision:
+The project must prefer:
 
 ```text
-Use Quickshell for the launcher.
+do nothing
 ```
 
-Reason:
-
-The target UX is Quattro, whose desktop surfaces are Quickshell-native.
-
----
-
-## ADR-002 — Do not install full omarchy-shell
-
-Decision:
+over:
 
 ```text
-Build a minimal `coo-shell`.
+break the desktop
 ```
 
-Reason:
+If uncertain:
 
-Avoid ownership conflicts with CachyOS desktop components.
-
----
-
-## ADR-003 — Long-running host
-
-Decision:
-
-```text
-coo-shell remains alive during the session.
-```
-
-Reason:
-
-Fast launcher summon and warm indexes.
+- do not install;
+- do not overwrite;
+- leave previous package in place;
+- print actionable diagnostics.
 
 ---
 
-## ADR-004 — Port plugin behavior, not entire shell
+# 67. Development Rules for Coding Agents
 
-Decision:
+Any AI/code agent implementing this specification MUST:
 
-```text
-Adapt only launcher dependencies.
-```
-
-Reason:
-
-Keep the project maintainable and independent.
-
----
-
-## ADR-005 — Local command definitions
-
-Decision:
-
-```text
-Use commands.jsonc.
-```
-
-Reason:
-
-Omarchy-specific actions may not exist on CachyOS.
-
----
-
-## ADR-006 — Shared QML components
-
-Decision:
-
-```text
-Launcher and keybinding viewer share Surface/Search/Result components.
-```
-
-Reason:
-
-Consistent UX and less code.
+1. Read the entire SPEC.
+2. Treat all earlier Walker/custom-shell specs as obsolete.
+3. Start with Milestone 0.
+4. Do not reimplement the launcher before proving upstream cannot be reused.
+5. Never add `omarchy-settings` as a dependency.
+6. Never add Limine merely because official Omarchy depends on it.
+7. Never copy the official dependency list wholesale.
+8. Pin exact upstream commits.
+9. Keep patches minimal.
+10. Add a test for every patch.
+11. Keep upstream runtime and local integration in separate packages.
+12. Run package forbidden-path audit before installation.
+13. Never auto-install a build that failed tests.
+14. Preserve rollback artifacts.
+15. Avoid modifying `/etc` unless this SPEC explicitly allows it.
+16. Never modify `/etc/os-release`.
+17. Never replace SDDM/Plymouth/bootloader configuration.
+18. Never assume the user's Hyprland config location without discovery.
+19. Keep user settings outside package-owned system directories.
+20. Prefer compatibility wrappers over invasive source patches.
+21. Prefer source patches over full component rewrites.
+22. Report upstream incompatibilities clearly.
+23. Run shell/package tests before declaring a milestone complete.
+24. Do not preserve legacy code solely because it is already implemented.
 
 ---
 
-## ADR-007 — Systemd user service
-
-Decision:
-
-```text
-Prefer systemd --user for coo-shell.
-```
-
-Reason:
-
-Observable and reliable lifecycle management.
-
----
-
-## ADR-008 — Hyprland source overlay
-
-Decision:
-
-```text
-Modify root Hyprland config only by one managed source block.
-```
-
-Reason:
-
-Safe install and uninstall.
-
----
-
-## ADR-009 — Upstream pin
-
-Decision:
-
-```text
-Port from a recorded Quattro commit.
-```
-
-Reason:
-
-Avoid silently breaking against a moving upstream branch.
-
----
-
-# 39. AI Implementation Rules
-
-Any coding agent working from this document MUST:
-
-1. Read the entire specification before editing code.
-2. Complete Milestone 0 first.
-3. Do not begin by copying the whole `omarchy-shell`.
-4. Do not install Omarchy.
-5. Do not rewrite the user's Hyprland directory.
-6. Do not replace Waybar.
-7. Do not replace notifications.
-8. Do not replace lock screen configuration.
-9. Keep user changes reversible.
-10. Keep `install.sh` thin.
-11. Put reusable installer logic in `lib/`.
-12. Use project-owned config paths.
-13. Pin any copied upstream source to a commit.
-14. Preserve applicable license notices.
-15. Add a test for every parser/merge bug.
-16. Run tests before claiming a milestone is done.
-17. Treat Quickshell APIs as version-dependent.
-18. Verify current Quickshell syntax against installed/target version.
-19. Never invent missing Omarchy runtime commands on CachyOS.
-20. Prefer rewriting a small dependency over importing a large unrelated shell subsystem.
-
----
-
-# 40. First Agent Prompt — Dependency Map
-
-Use this before implementation:
+# 68. First Coding-Agent Prompt
 
 ```text
 Read SPEC.md completely.
 
+All previous Walker and custom coo-shell architecture is obsolete.
+
 Implement Milestone 0 only.
 
-Study the current pinned Omarchy `quattro` implementation of `omarchy.menu`.
+Audit the pinned Omarchy Quattro release and produce:
 
-Produce `docs/QUATTRO_PORT_MAP.md`.
+- docs/PACKAGE_AUDIT.md
+- docs/RUNTIME_DEPENDENCIES.md
+- docs/COMMAND_AUDIT.md
+- docs/PLUGIN_AUDIT.md
 
-For every QML file needed by the menu:
-- list imports,
-- list local QML dependencies,
-- list shared shell dependencies,
-- list injected properties,
-- list shell/IPC calls,
-- list theme dependencies,
-- list external commands,
-- classify each dependency as KEEP, PORT, REWRITE, or DROP.
+Focus on determining the minimum safe subset needed to run the original
+Omarchy Quattro `omarchy.menu` on CachyOS.
 
-Do not implement the launcher yet.
+Inspect:
+- official omarchy PKGBUILD
+- official omarchy-settings PKGBUILD
+- omarchy-settings.install
+- shell/
+- bin/omarchy-shell
+- every helper invoked by the menu/shell startup path
 
-The main question is:
+Classify dependencies as:
+- REQUIRED
+- OPTIONAL
+- DISABLE
+- UNSAFE
 
-"What is the smallest Quickshell runtime required to reproduce the
-Omarchy Quattro launcher/menu on CachyOS without installing Omarchy?"
+Classify source adaptations as:
+- NONE
+- ENVIRONMENT
+- WRAPPER
+- PATCH
+- REIMPLEMENT
 
-Record the exact upstream commit SHA used for the analysis.
+Do not implement a custom launcher.
+Do not install omarchy or omarchy-settings.
+Do not modify the host system.
+Record the exact upstream version and commit used.
 ```
 
 ---
 
-# 41. Second Agent Prompt — Minimal Host
-
-After Milestone 0:
+# 69. Second Coding-Agent Prompt
 
 ```text
-Read SPEC.md and docs/QUATTRO_PORT_MAP.md completely.
+Read SPEC.md and all Milestone 0 audit documents.
 
 Implement Milestone 1 only.
 
-Create the minimum long-running Quickshell host:
-- shell.qml
-- IPC
-- coo-shell CLI
-- systemd user service
-- trivial test surface
+Create packages/cachy-omarchy-shell/PKGBUILD.
 
-Do not port the Quattro launcher yet.
-Do not implement a bar, notifications, OSD, lock screen, or polkit.
+Requirements:
+- build from exact commit in upstream.lock
+- package only audited runtime files
+- no omarchy-settings dependency
+- no Limine/Snapper/SDDM dependency unless audit proves a runtime requirement
+- no forbidden /etc paths
+- do not install the package yet
 
-Add a development run command that works from the repository without
-installing into the real HOME.
+Add package tests:
+- forbidden path audit
+- lock/pkgver consistency
+- expected shell files
+- expected menu plugin
+- dependency assertions
 
-Acceptance:
-- coo-shell ping works
-- a test surface can be opened and closed over IPC
-- tests pass
+Build locally and report exact results.
 ```
 
 ---
 
-# 42. Third Agent Prompt — Launcher
-
-After the host works:
+# 70. Third Coding-Agent Prompt
 
 ```text
-Read SPEC.md and docs/QUATTRO_PORT_MAP.md.
+Read SPEC.md and audit documents.
 
-Implement Milestones 2 through 4.
+Implement Milestone 2.
 
-Build the launcher surface, application index, and Quattro-aligned UI.
+Goal:
+Run the packaged original Omarchy Quattro shell on CachyOS.
 
-Use the dependency classifications from QUATTRO_PORT_MAP.md.
-Do not import unrelated Omarchy shell subsystems.
+Use, in preference order:
+1. environment variables
+2. controlled compatibility PATH
+3. wrapper scripts
+4. minimal patches
 
-The result must run with Omarchy completely absent from the machine.
-
-Acceptance:
-- SUPER + SPACE opens the launcher
-- installed desktop applications are searchable
-- keyboard navigation works
-- application launch works
-- Escape closes the UI
-- visual behavior is recognizably Quattro-inspired
-```
-
----
-
-# 43. Fourth Agent Prompt — Keybindings
-
-```text
-Read SPEC.md.
-
-Implement Milestones 5 and 6.
+Do not build a new Quickshell host.
 
 Add:
-- local command search
-- Hyprland keybinding discovery
-- recursive `source` parsing
-- searchable Quickshell keybinding viewer
-- SUPER + K
+- cachy-omarchy-shell wrapper
+- user systemd service
+- IPC ping test
 
-Do not add clipboard, emoji, bar, notifications, or power menu.
-
-Add fixtures and tests for:
-- bind
-- bindd
-- nested source
-- cyclic source
-- duplicate keybindings
-- conflict detection
+Do not enable bar/notifications/lock/OSD unless required for shell startup.
+If upstream cannot start without one of these, document the dependency before
+changing scope.
 ```
 
 ---
 
-# 44. Definition of Done
+# 71. Fourth Coding-Agent Prompt
 
-v0.1 is done when a CachyOS user can run:
+```text
+Implement Milestone 3 only.
 
-```bash
-./install.sh
+Use the running packaged upstream shell.
+
+Create:
+- cachy-omarchy-launcher
+- Hyprland integration for SUPER+SPACE
+
+Invoke the original upstream `omarchy.menu` through its IPC path.
+
+Audit every Omarchy-specific command visible from the launcher:
+- safe commands may remain
+- adaptable commands get wrappers
+- unsafe/full-OS commands are disabled
+
+Do not replace the menu UI with custom QML.
 ```
 
-and receive:
+---
+
+# 72. Fifth Coding-Agent Prompt
+
+```text
+Implement Milestones 4 and 5.
+
+Add SUPER+K keybinding UI, preferring upstream behavior.
+
+Package all CachyOS-specific integration as cachy-omarchy-overlay.
+
+The end state must be installable through pacman packages rather than scripts
+copying files into /usr.
+```
+
+---
+
+# 73. Sixth Coding-Agent Prompt
+
+```text
+Implement Milestones 6 and 7.
+
+Create the upstream update/rebuild pipeline:
+
+check-upstream
+update-upstream
+build-packages
+test-packages
+install-packages
+rollback
+
+Rules:
+- exact upstream commit pin
+- patch failure blocks install
+- build failure blocks install
+- package audit failure blocks install
+- runtime test failure blocks install
+- keep previous known-good package
+- reset pkgrel to 1 when upstream pkgver changes
+- allow pkgrel bump for packaging-only fixes
+```
+
+---
+
+# 74. Definition of Done
+
+The project is successful when:
 
 ```text
 CachyOS
-+
-Hyprland
-+
-Quickshell coo-shell
+    +
+normal existing desktop setup
+    +
+two controlled Arch packages
 ```
 
-with:
+provides the desired Quattro UX:
 
 ```text
-SUPER + SPACE
-    -> Quattro-style launcher
-
-SUPER + K
-    -> searchable hotkey dialog
+SUPER + SPACE -> original/minimally-adapted Quattro launcher
+SUPER + K     -> keybinding UI
 ```
 
-while their existing:
+and can be upgraded with:
 
 ```text
-bar
-notifications
-lock screen
-Hyprland config
-CachyOS packages
+new upstream Omarchy release
+        ↓
+rebuild package
+        ↓
+test
+        ↓
+optional install
 ```
 
-remain intact.
+without converting the machine into Omarchy.
 
-The core principle is:
+---
 
-> **Port the Quattro launcher experience, not the entire Omarchy desktop.**
+# 75. Final Architecture Statement
+
+The project is **not a launcher port**.
+
+The project is **not a partial Omarchy installer**.
+
+The project is:
+
+> **A continuously rebuildable, CachyOS-safe Arch packaging and compatibility
+> layer for selected Omarchy Quattro runtime components.**
+
+The maintenance strategy is:
+
+```text
+UPSTREAM
+  first
+
+PACKAGE
+  what we need
+
+ISOLATE
+  CachyOS-specific integration
+
+PATCH
+  only incompatibilities
+
+TEST
+  every update
+
+INSTALL
+  only known-good builds
+
+ROLL BACK
+  whenever necessary
+```
+
+That is the architecture going forward.

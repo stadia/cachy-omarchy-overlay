@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-# Thin wrapper: reload config and refresh indexes without a session restart.
-exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/coo-shell" reload "$@"

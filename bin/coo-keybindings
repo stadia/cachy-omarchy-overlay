@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-# Thin wrapper: toggle the keybinding viewer. Bound to SUPER + K.
-exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/coo-shell" keybindings toggle "$@"
