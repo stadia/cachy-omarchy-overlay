@@ -19,6 +19,9 @@
 #   3. static_bindings() (Omarchy webapp 전용 SHIFT ALT L/D 2행) 를 뺀다.
 #      CachyOS 에는 그 대상이 없다.
 #   4. 인자 처리(--help/--print)와 셸 기동 pre-flight 는 우리 래퍼 관례를 따른다.
+#   5. 사용자 Lua는 제한 환경 loadfile(..., "t", env)로만 읽는다. config에는
+#      fake hl, 순수 Lua 기본 기능, 읽기 전용 string/table/math, os.getenv만 보이며
+#      io/package/require/debug/dofile/loadfile은 없다.
 #
 # IPC 를 재발명하지 않는다: 선택 UI 는 omarchy-menu-select 가
 # `omarchy-shell shell summon omarchy.menu` 를 부르고, compat 의 omarchy-shell
@@ -289,15 +292,50 @@ hl = setmetatable({
   end,
 })
 
-local config = os.getenv("HOME") .. "/.config/hypr/hyprland.lua"
-local file = io.open(config, "r")
+-- User configuration is untrusted input. load it as text in a deliberately
+-- small environment: no io/package/require/debug/dofile/loadfile reach config.
+-- Read-only proxies also stop a config from mutating this scanner's standard
+-- library tables after they are whitelisted for normal bind expressions.
+local function readonly(source)
+  return setmetatable({}, {
+    __index = source,
+    __newindex = function()
+      error("attempt to modify restricted Lua scan environment", 2)
+    end,
+    __metatable = false,
+  })
+end
 
-if file then
-  file:close()
-  local ok, err = pcall(dofile, config)
-  if not ok and os.getenv("DEBUG") == "1" then
+local system_getenv = os.getenv
+local scan_env = {
+  assert = assert,
+  error = error,
+  ipairs = ipairs,
+  next = next,
+  pairs = pairs,
+  pcall = pcall,
+  select = select,
+  tonumber = tonumber,
+  tostring = tostring,
+  type = type,
+  unpack = table.unpack,
+  hl = hl,
+  math = readonly(math),
+  string = readonly(string),
+  table = readonly(table),
+  os = readonly({ getenv = system_getenv }),
+}
+scan_env._G = scan_env
+
+local config = system_getenv("HOME") .. "/.config/hypr/hyprland.lua"
+local chunk, load_err = loadfile(config, "t", scan_env)
+if chunk then
+  local ok, err = pcall(chunk)
+  if not ok and system_getenv("DEBUG") == "1" then
     io.stderr:write("[DEBUG] lua bind scan failed: " .. tostring(err) .. "\n")
   end
+elseif load_err and system_getenv("DEBUG") == "1" then
+  io.stderr:write("[DEBUG] lua bind scan load failed: " .. tostring(load_err) .. "\n")
 end
 LUA
   )

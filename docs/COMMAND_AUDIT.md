@@ -89,6 +89,12 @@ omarchy-launch-about (브랜딩/os-release)
 - 결론: 업스트림은 description 달린 Omarchy lua 설정을 가정한다 (SPEC §57).
   시각/런타임(`omarchy-menu-select` + `summon omarchy.menu`)은 유지하고
   **데이터 수집만 적응**하는 `cachy-omarchy-keybindings` 가 M4 Task 2 의 산출물.
+- 보안: 적응 카피의 사용자 `hyprland.lua` 스캔은 `dofile` 하지 않는다.
+  `loadfile(config, "t", env)` 제한 환경에서 `pcall(chunk)`만 실행하며, config에는
+  fake `hl`, 순수 Lua 기본 기능, 읽기 전용 `string`/`table`/`math`, `os.getenv`만
+  보인다. `io`/`package`/`require`/`debug`/`dofile`/`loadfile` 및 `os.execute` 등은
+  config 환경에 없다. 회귀 테스트는 `os.execute("touch ...")`가 실행되지 않으며
+  그 앞 bind는 계속 수집됨을 확인한다.
 
 호스트 도구 실측: `hyprctl` `lua` `jq` `xkbcli` `perl`(JSON::PP) `awk` `sort`
 `sha256sum` 모두 존재. `gum` 도 설치돼 있으나 이 경로는 부르지 않는다.

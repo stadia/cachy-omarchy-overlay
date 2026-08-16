@@ -84,12 +84,15 @@ assert_contains "$out" "omarchy-menu-select" "오류가 무엇이 없는지 말�
 command -v lua >/dev/null || { echo "skip: lua 없음"; exit "$ASSERT_FAILURES"; }
 
 mkdir -p "$HOME/.config/hypr"
-cat >"$HOME/.config/hypr/hyprland.lua" <<'LUA'
+side_effect_marker="$COO_TEST_SANDBOX/lua-side-effect"
+cat >"$HOME/.config/hypr/hyprland.lua" <<LUA
 local mainMod = "SUPER"
 hl.bind(mainMod .. " + T", hl.dsp.exec_cmd("ghostty"))
 hl.bind(mainMod .. " + C", hl.dsp.window.close())
 hl.bind(mainMod .. " + D", hl.dsp.exec_cmd("discord"), { description = "Discord" })
 hl.bind(mainMod .. " + X", hl.dsp.exec_cmd("foo --label=a,b"))
+-- Regression: a prior dofile(config) scanner would execute this after T/X.
+os.execute("touch $side_effect_marker")
 LUA
 
 stubbin="$COO_TEST_SANDBOX/stubbin"
@@ -128,9 +131,11 @@ out=$(PATH="$stubbin:$PATH" XDG_CACHE_HOME="$cachehome" \
   COO_OMARCHY_PATH="$root" COO_COMPAT_BIN="$REPO_ROOT/overlay/compat/bin" \
   "$K" --print 2>&1); code=$?
 assert_eq "$code" "0" "--print 는 셸 없이 목록을 만든다 (exit 0)"
+[[ -e $side_effect_marker ]] && side_effect=1 || side_effect=0
+assert_eq "$side_effect" "0" "제한 Lua 환경은 os.execute 부작용을 실행하지 않는다"
 [[ $out == *"STALE V11 RECORD"* ]] && stale=1 || stale=0
 assert_eq "$stale" "0" "v11 캐시 레코드는 선택되지 않는다"
-assert_contains "$out" "SUPER + T" "description-less lua bind 가 목록에 산다"
+assert_contains "$out" "SUPER + T" "악성 행 전의 description-less lua bind 가 계속 수집된다"
 assert_contains "$out" "ghostty" "exec_cmd 인자가 표시된다"
 assert_contains "$out" "window.close()" "lua dispatcher 는 hl.dsp. 를 벗긴 설명을 얻는다"
 assert_contains "$out" "Discord" "description 이 있는 bind 는 그것을 쓴다"
