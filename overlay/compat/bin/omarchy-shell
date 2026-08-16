@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# compat shim: 업스트림 헬퍼(omarchy-menu-select 등)가 부르는 `omarchy-shell`
+# 을 우리 IPC 래퍼 cachy-omarchy-shell --ipc 로 연결한다 (SPEC 44).
+# IPC 를 재발명하지 않는다. WAYLAND_DISPLAY 복구는 하지 않는다 — 호출자는
+# 세션 안(키바인딩/메뉴)이라 이미 설정돼 있다.
+set -uo pipefail
+
+QUIET=0
+if [[ ${1:-} == "-q" ]]; then
+  QUIET=1
+  shift
+fi
+
+# 업스트림 omarchy-shell 과 같이, 3인자 summon/toggle 은 빈 payload 를 채운다.
+if [[ $# -eq 3 && ${1:-} == "shell" && ( ${2:-} == "summon" || ${2:-} == "toggle" ) ]]; then
+  set -- "$1" "$2" "$3" "{}"
+fi
+
+SHELL_BIN=${COO_SHELL_BIN:-cachy-omarchy-shell}
+
+if (( QUIET )); then
+  "$SHELL_BIN" --ipc "$@" >/dev/null 2>&1 || true
+  exit 0
+fi
+
+exec "$SHELL_BIN" --ipc "$@"
