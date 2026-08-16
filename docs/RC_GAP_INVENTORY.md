@@ -43,7 +43,7 @@
 | R04 launcher toggles | 미검증 | 기존 extracted-tree launcher test는 있으나 실제 menu surface 관측은 `COO_RUN_LIVE=1` opt-in이다. |
 | R05 Escape closes launcher | 미검증 | 실제 `wtype Escape`는 `COO_RUN_LIVE=1`과 사용자 승인 없이는 실행하지 않는다. |
 | R06 application launch | 추론됨 | 추출 `uwsm-app` wrapper와 desktop-launch fixture는 검증했으나 live 입력/앱 공존은 미검증이다. |
-| R07 restarting service recovers | 측정됨 (wrapper supervisor) | 추출 wrapper를 기동→자식 PID만 TERM/KILL→재기동하여 두 번째 IPC `ok`를 확인했다. host systemd user service는 시작하지 않았다. |
+| R07 restarting service recovers | 미검증 (systemd service) | 추출 wrapper를 수동 기동→그 자식 PID만 TERM/KILL→수동 재기동하여 두 번째 IPC `ok`를 확인한 것은 **manual wrapper-restart evidence**일 뿐이다. 승인된 user-systemd test 없이 `Restart=on-failure` service recovery는 **미검증**이다. |
 | R08 absence of Waybar modification | 측정됨 (package ownership) | archive/extracted tree에 `/etc`, system unit, home/Waybar path, `.INSTALL`이 없음을 확인했다. 실제 사용자 Waybar 공존은 여전히 미검증이다. |
 | R09 absence of notification replacement | 측정됨 (package ownership) | `omarchy.notifications`는 disabledPlugins에 있고 notification `/etc`·system-unit path가 없다. **dunst/mako 등 live user daemon 보존은 미검증**이다. |
 | R10 absence of lock replacement | 측정됨 (package ownership) | `omarchy.lock`은 disabledPlugins에 있고 lock `/etc`·system-unit path가 없다. **hyprlock 등 live lock setup 보존은 미검증**이다. |
@@ -56,7 +56,9 @@ M7 test는 `systemctl --user is-active graphical-session.target` 및
 테스트는 `enable`, `start`, `daemon-reload`, reload를 호출하지 않는다.
 `WantedBy=graphical-session.target`은 package unit의 의도일 뿐이며 target을 실제로
 activate하여 service가 pull-in된 것을 관측하지 않았으므로 automatic start는
-**미검증**이다.
+**미검증**이다. 마찬가지로 approved user-systemd test가 없으므로
+`Restart=on-failure`에 의한 R07 service recovery도 **미검증**이다; manual wrapper
+restart IPC 관측을 systemd supervision으로 해석하지 않는다.
 
 ## M7 doctor와 연결
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # M7 R01-R10 reliability evidence.  Package files are tested from the two
-# extracted archives; the R07 smoke is deliberately limited to a sandbox HOME.
+# extracted archives; the manual wrapper-restart smoke is deliberately limited
+# to a sandbox HOME. It is not a systemd Restart=on-failure service test.
 # It never enables/starts a user unit or changes a live user configuration.
 set -uo pipefail
 REPO_ROOT="${REPO_ROOT:?}"
@@ -21,7 +22,7 @@ W="$root/usr/bin/cachy-omarchy-shell"
 defaults="$root/usr/share/cachy-omarchy/defaults/shell.json"
 overlay_artifact=$(coo_overlay_artifact)
 
-assert_file_exists "$W" "R01-R07 extracted wrapper exists"
+assert_file_exists "$W" "R01-R06 and manual-restart extracted wrapper exists"
 assert_file_exists "$defaults" "R08-R10 extracted defaults exist"
 assert_file_exists "$root/usr/share/cachy-omarchy/upstream/shell/shell.qml" \
   "R01-R03 extracted shell.qml exists"
@@ -77,15 +78,15 @@ else
 fi
 printf '%s\n' '      FINDING: no target activation was requested; automatic start is UNVERIFIED.'
 
-# R07 is a real extracted-tree smoke when a Wayland runtime is available.  A
-# local supervisor restarts the wrapper after its own child is killed, modeling
-# Restart=on-failure without touching the host user service manager.
+# This is a manual extracted-tree wrapper-restart smoke when a Wayland runtime
+# is available. It does not exercise systemd Restart=on-failure: no user unit
+# is enabled, started, or supervised by systemd in this test.
 if ! command -v quickshell >/dev/null || ! command -v qs >/dev/null || \
    ! command -v systemd-cat >/dev/null || [[ -z ${WAYLAND_DISPLAY:-} ]]; then
   # This is deliberately a note, not a skip: the package-ownership R08-R10
   # assertions above did run.  M6 treats `skip:` as required-test failure;
   # the unavailable live recovery remains explicit evidence, not false green.
-  printf '%s\n' 'note: R07 live extracted-tree recovery UNVERIFIED (needs quickshell, qs, systemd-cat, and WAYLAND_DISPLAY)'
+  printf '%s\n' 'note: manual wrapper-restart smoke UNVERIFIED (needs quickshell, qs, systemd-cat, and WAYLAND_DISPLAY); R07 systemd service recovery remains UNVERIFIED'
   exit "$ASSERT_FAILURES"
 fi
 
@@ -125,13 +126,13 @@ trap 'stop_shell; exit 143' TERM
 
 start_shell
 first_reply=$(wait_ping 2>/dev/null || true)
-assert_eq "$first_reply" "ok" "R07 first extracted wrapper start responds to IPC"
+assert_eq "$first_reply" "ok" "manual wrapper first start responds to IPC"
 if [[ $first_reply == ok ]]; then
   # This is our just-created wrapper PID, never a broad pkill/killall match.
   stop_shell
   start_shell
   recovered_reply=$(wait_ping 2>/dev/null || true)
-  assert_eq "$recovered_reply" "ok" "R07 restart after wrapper kill recovers IPC"
+  assert_eq "$recovered_reply" "ok" "manual wrapper restart after owned PID kill recovers IPC"
 fi
 
 exit "$ASSERT_FAILURES"
