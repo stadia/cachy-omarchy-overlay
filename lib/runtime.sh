@@ -53,6 +53,19 @@ coo_overlay_artifact() {
 # 이 함수에서만 처음부터 올바르게 만든다.
 coo_extract_overlay() {
   local dest=${1:?dest}
+  # rm -rf 대상을 최소한으로 검증한다: 슬래시가 없는 값(단일 이름, 예: "foo")이나
+  # COO_TEST_SANDBOX 자체는 거부한다. 후자를 막는 이유는 미래의 테스트가 실수로
+  # dest=$COO_TEST_SANDBOX 를 넘기면 이 함수가 샌드박스 전체를 스위트 도중에
+  # 지워버리기 때문이다(M5 리뷰 지적). 정상 호출자는 항상 샌드박스 "아래"의
+  # 하위 디렉터리를 넘기므로 이 검사에 걸리지 않는다.
+  if [[ $dest != */* ]]; then
+    printf 'error: coo_extract_overlay: 슬래시 없는 dest 거부: %s\n' "$dest" >&2
+    return 1
+  fi
+  if [[ -n ${COO_TEST_SANDBOX:-} && $dest == "$COO_TEST_SANDBOX" ]]; then
+    printf 'error: coo_extract_overlay: dest 가 COO_TEST_SANDBOX 자체다 — 거부: %s\n' "$dest" >&2
+    return 1
+  fi
   local artifact; artifact=$(coo_overlay_artifact) || return 1
   rm -rf "$dest"
   mkdir -p "$dest"
