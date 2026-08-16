@@ -8,7 +8,9 @@ mkdir -p "$root/packages" "$root/bin"
 cp -a "$REPO_ROOT/upstream.lock" "$root/"
 cp -a "$REPO_ROOT/packages/cachy-omarchy-shell" "$root/packages/"
 cp -a "$REPO_ROOT/packages/cachy-omarchy-overlay" "$root/packages/"
-cp -a "$REPO_ROOT/bin/check-upstream" "$REPO_ROOT/bin/build-packages" "$root/bin/"
+cp -a "$REPO_ROOT/bin/check-upstream" "$REPO_ROOT/bin/build-packages" \
+  "$REPO_ROOT/bin/validated-build.sh" "$REPO_ROOT/bin/test-packages" \
+  "$REPO_ROOT/bin/install-packages" "$REPO_ROOT/bin/rollback" "$root/bin/"
 chmod +x "$root/bin"/*
 fake=$COO_TEST_SANDBOX/fake
 mkdir -p "$fake"
@@ -64,6 +66,23 @@ cat >"$fake/mv" <<'EOF'
 last=${!#}
 if [[ ${COO_FAKE_POINTER_FAIL:-0} == 1 && $last == */validated-build.manifest ]]; then exit 10; fi
 /usr/bin/mv "$@"
+EOF
+cat >"$fake/pacman" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"$COO_PACMAN_LOG"
+[[ ${COO_FAKE_PACMAN_FAIL:-0} != 1 ]] || exit 11
+EOF
+cat >"$fake/test-runner" <<'EOF'
+#!/usr/bin/env bash
+case ${COO_FAKE_TEST_MODE:-pass} in
+  pass) printf 'all test coverage ran\n' ;;
+  skip) printf 'skip: installed tree absent\n' ;;
+  fail) printf 'FAIL: runtime\n'; exit 9 ;;
+esac
+EOF
+cat >"$fake/smoke" <<'EOF'
+#!/usr/bin/env bash
+printf 'smoke\n' >>"$COO_PACMAN_LOG"
 EOF
 chmod +x "$fake"/*
 
@@ -151,5 +170,75 @@ dynamic_manifest=$(cat "$COO_TEST_SANDBOX/dynamic-state/validated-build.manifest
 assert_contains "$dynamic_manifest" "OMARCHY_VERSION=4.0.1" "dynamic lock version reaches manifest"
 assert_contains "$dynamic_manifest" "cachy-omarchy-shell-4.0.1-1-any.pkg.tar.zst" "dynamic shell artifact name is used"
 assert_contains "$dynamic_manifest" "cachy-omarchy-overlay-0.1.0-1-any.pkg.tar.zst" "overlay version remains independent"
+
+# U08: testing requires a current manifest first, and any skip is a failure.
+missing_state=$COO_TEST_SANDBOX/missing-state
+code=0
+out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$missing_state" COO_TEST_RUNNER="$fake/test-runner" "$root/bin/test-packages" 2>&1) || code=$?
+assert_eq "$code" "1" "U08 missing manifest blocks tests before false green"
+assert_contains "$out" "validated manifest missing" "U08 reports missing manifest"
+code=0
+out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$COO_TEST_SANDBOX/state" COO_TEST_RUNNER="$fake/test-runner" COO_FAKE_TEST_MODE=skip "$root/bin/test-packages" 2>&1) || code=$?
+assert_eq "$code" "1" "U08 skipped installed-tree coverage fails"
+assert_contains "$out" "skip:" "U08 preserves runner skip evidence"
+code=0
+out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$COO_TEST_SANDBOX/state" COO_TEST_RUNNER="$fake/test-runner" COO_FAKE_TEST_MODE=fail "$root/bin/test-packages" 2>&1) || code=$?
+assert_eq "$code" "9" "U08 failed runner blocks validation"
+out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$COO_TEST_SANDBOX/state" COO_TEST_RUNNER="$fake/test-runner" COO_FAKE_TEST_MODE=pass "$root/bin/test-packages" 2>&1); code=$?
+assert_eq "$code" "0" "U08 non-skipped runner passes"
+
+# Seed a complete prior installed pair. It must be archived before fake pacman.
+prior=$COO_TEST_SANDBOX/state/packages/previous-old
+mkdir -p "$prior/artifacts"
+old_shell=cachy-omarchy-shell-3.9.9-1-any.pkg.tar.zst
+old_overlay=cachy-omarchy-overlay-0.0.9-1-any.pkg.tar.zst
+printf old-shell >"$prior/artifacts/$old_shell"
+printf old-overlay >"$prior/artifacts/$old_overlay"
+old_shell_sum=$(sha256sum "$prior/artifacts/$old_shell" | awk '{print $1}')
+old_overlay_sum=$(sha256sum "$prior/artifacts/$old_overlay" | awk '{print $1}')
+cat >"$prior/validated-build.manifest" <<EOF
+RELEASE=packages/previous-old
+OMARCHY_VERSION=3.9.9
+OMARCHY_COMMIT=9999999999999999999999999999999999999999
+ARTIFACT=$old_shell $old_shell_sum
+ARTIFACT=$old_overlay $old_overlay_sum
+EOF
+cp "$prior/validated-build.manifest" "$COO_TEST_SANDBOX/state/installed-build.manifest"
+paclog=$COO_TEST_SANDBOX/pacman.log
+: >"$paclog"
+code=0
+out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$COO_TEST_SANDBOX/state" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$root/bin/install-packages" 2>&1) || code=$?
+assert_eq "$code" "1" "explicit install refusal blocks pacman"
+assert_eq "$(wc -l <"$paclog")" "0" "refused install invokes no pacman"
+COO_REPO_ROOT="$root" COO_STATE_DIR="$COO_TEST_SANDBOX/state" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$root/bin/install-packages" --install >/dev/null
+assert_contains "$(cat "$paclog")" "-U" "U09 install calls fake pacman explicitly"
+assert_contains "$(cat "$paclog")" "cachy-omarchy-shell-4.0.0-1-any.pkg.tar.zst" "U09 installs exact current shell"
+assert_eq "$(cat "$prior/artifacts/$old_shell")" "old-shell" "U09 previous shell remains archived"
+assert_eq "$(cat "$prior/artifacts/$old_overlay")" "old-overlay" "U09 previous overlay remains archived"
+archived_count=$(find "$COO_TEST_SANDBOX/state/packages" -name validated-build.manifest | wc -l)
+[[ $archived_count -ge 2 ]] && archived=0 || archived=1
+assert_eq "$archived" "0" "U09 install archives prior validated pair"
+
+# U10: rollback uses exactly the newest complete archived pair and optional smoke.
+: >"$paclog"
+COO_REPO_ROOT="$root" COO_STATE_DIR="$COO_TEST_SANDBOX/state" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" COO_ROLLBACK_SMOKE_BIN="$fake/smoke" "$root/bin/rollback" >/dev/null
+rollback_line=$(head -n1 "$paclog")
+assert_contains "$rollback_line" "-U" "U10 rollback invokes fake pacman with -U"
+assert_contains "$rollback_line" "cachy-omarchy-shell-3.9.9-1-any.pkg.tar.zst" "U10 rollback selects prior shell only"
+assert_contains "$rollback_line" "cachy-omarchy-overlay-0.0.9-1-any.pkg.tar.zst" "U10 rollback selects prior overlay only"
+assert_eq "$(tail -n1 "$paclog")" "smoke" "U10 smoke runs only after pacman"
+
+# Missing/corrupt prior state must not invoke pacman.
+: >"$paclog"
+code=0
+out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$COO_TEST_SANDBOX/no-prior" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$root/bin/rollback" 2>&1) || code=$?
+assert_eq "$code" "1" "U10 missing prior state fails safely"
+assert_eq "$(wc -l <"$paclog")" "0" "missing prior invokes no pacman"
+mkdir -p "$COO_TEST_SANDBOX/corrupt-state/packages/previous-z/artifacts"
+printf 'RELEASE=packages/previous-z\nOMARCHY_VERSION=3.9.9\nOMARCHY_COMMIT=9999999999999999999999999999999999999999\nARTIFACT=bad.pkg.tar.zst deadbeef\nARTIFACT=bad2.pkg.tar.zst deadbeef\n' >"$COO_TEST_SANDBOX/corrupt-state/packages/previous-z/validated-build.manifest"
+code=0
+out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$COO_TEST_SANDBOX/corrupt-state" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$root/bin/rollback" 2>&1) || code=$?
+assert_eq "$code" "1" "U10 corrupt prior state fails safely"
+assert_eq "$(wc -l <"$paclog")" "0" "corrupt prior invokes no pacman"
 
 exit "$ASSERT_FAILURES"

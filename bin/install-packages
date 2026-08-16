@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Explicitly install only the current checksum-validated pair (SPEC §33).
+set -euo pipefail
+
+repo_root=${COO_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}
+state_dir=${COO_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/cachy-omarchy}
+sha256_bin=${COO_SHA256_BIN:-sha256sum}
+install_bin=${COO_INSTALL_BIN:-install}
+pacman_bin=${COO_PACMAN_BIN:-pacman}
+# shellcheck disable=SC1091
+source "$repo_root/bin/validated-build.sh"
+
+usage() { printf 'Usage: install-packages --install\n'; }
+[[ ${1:-} == --install && $# -eq 1 ]] || { usage >&2; exit 1; }
+
+manifest=$state_dir/validated-build.manifest
+coo_validate_current_manifest "$repo_root" "$state_dir" "$manifest" "$sha256_bin" || exit 1
+current_release_dir=$COO_RELEASE_DIR
+current_artifacts=("${COO_ARTIFACT_NAMES[@]}")
+
+# Preserve the previously installed validated pair before any package manager
+# invocation. A missing installed pointer simply means this is the first install.
+installed=$state_dir/installed-build.manifest
+if [[ -e $installed ]]; then
+  coo_validate_manifest "$state_dir" "$installed" "$sha256_bin" || exit 1
+  coo_archive_validated_release "$state_dir" "$installed" "$install_bin" "$sha256_bin" >/dev/null \
+    || { coo_fail 'could not archive previous validated pair'; exit 1; }
+fi
+
+"$pacman_bin" -U "$current_release_dir/artifacts/${current_artifacts[0]}" \
+  "$current_release_dir/artifacts/${current_artifacts[1]}"
+
+pointer_tmp=$(mktemp "$state_dir/.installed-build.manifest-XXXXXX")
+cp "$manifest" "$pointer_tmp"
+mv "$pointer_tmp" "$installed"
+printf 'installed validated build: %s\n' "$installed"
