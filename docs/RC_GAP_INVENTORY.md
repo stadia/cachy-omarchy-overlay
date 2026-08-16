@@ -9,23 +9,23 @@
 
 | §61 기준 | 상태 | 현재 증거 / 다음 갭 |
 | --- | --- | --- |
-| CachyOS에서 실행 | 측정됨 (설치); 미검증 (세션 실행) | 2026-08-17 실제 CachyOS 호스트에서 `pacman -U`로 두 패키지를 설치하고 11개 경로 소유·무해성을 확인했다. `docs/RUNTIME_STARTUP.md` §12.2. 셸을 서비스로 기동하지는 않았다(§12.7). |
+| CachyOS에서 실행 | 측정됨 | 2026-08-17 실제 설치(§12.2) 후 설치 경로에서 셸을 기동해 런처·키바인딩 UI·앱 실행을 직접 조작했다(§13). systemd service 로서의 기동은 여전히 미검증이다(§13.6). |
 | Omarchy OS 미설치 | 측정됨 | M6 종료 관측에서 `pacman -Q omarchy omarchy-settings`가 둘 다 없었다. M7 doctor는 두 package를 각각 read-only query하며, `tests/runtime/test_doctor.sh`의 controlled pacman fixture가 두 query와 present=FAIL을 검증한다. |
 | 공식 `omarchy` 불필요 | 측정됨 | 실제 `pacman -U` 트랜잭션이 `inotify-tools` 하나만 추가로 끌어왔고 공식 패키지를 요구하지 않았다(§12.2). 근거는 clean build가 아니다 — 그 경로는 `--nodeps`라 의존을 해석하지 않는다(§12.5). |
 | 공식 `omarchy-settings` 불필요 | 측정됨 | 위와 동일. 실제 설치 후에도 `pacman -Q omarchy-settings`는 부재다(§12.2). |
-| Quickshell 사용 | 추론됨 | `cachy-omarchy-shell --run`이 `quickshell -n -p`를 실행한다. live process/IPC는 미검증이다. |
+| Quickshell 사용 | 측정됨 | 라이브 세션에서 `quickshell -n -p /usr/share/cachy-omarchy/upstream/shell` (pid 3041286) 이 8분 32초 무중단 동작했고 IPC ping 이 `ok` 였다(§13.1). |
 | upstream Quattro source 재사용 | 측정됨 | shell PKGBUILD/staging이 pin된 upstream `shell/`만 패키징한다. `docs/COMMAND_AUDIT.md` 참조. |
 | upstream commit pin | 측정됨 | `upstream.lock`과 shell PKGBUILD `_commit` 정적 검사 및 `tests/package/test_clean_build.sh`가 clean source HEAD 일치를 검사한다. |
 | shell package build 성공 | 측정됨 (real chroot) | 2026-08-17 `devtools 1:1.5.1-1` + `mkarchroot`로 만든 Arch chroot에서 `build-packages --clean`이 두 패키지를 빌드했고, 산출물 파일 목록·권한이 호스트 빌드본과 동일했다(§12.5). 단 `--nodeps`이므로 의존 선언의 충분성은 이 경로로 검증되지 않는다. |
 | forbidden system path 미소유 | 측정됨 | M6 archive audit 및 `tests/package/test_forbidden.sh`, `tests/runtime/test_runtime_reliability.sh`가 금지 경로를 검사한다. |
 | long-running shell user start | 측정됨 (extracted wrapper); 미검증 (user service) | `tests/runtime/test_runtime_reliability.sh`는 test-owned extracted wrapper의 생존을 확인한다. `graphical-session.target`이 inactive였고 enable/start하지 않아 실제 user service start는 미검증이다. |
-| IPC 동작 | 측정됨 (extracted); 미검증 (live session) | `tests/runtime/test_runtime_reliability.sh`와 `tests/runtime/test_doctor.sh` fixture가 extracted/fake IPC ping을 검사한다. 실제 Quickshell session ping은 미검증이다. |
-| SUPER+SPACE launcher | 추론됨 | `tests/runtime/test_launcher_toggle.sh`와 binding static tests가 wrapper/binding reachability를 검사한다. live key injection 및 surface 관측은 미검증이다. |
-| 일반 앱 launch | 추론됨 | `tests/runtime/test_app_launch.sh`의 extracted desktop/`uwsm-app` fixture가 launch path를 검사한다. 실제 session application coexistence는 미검증이다. |
-| SUPER+K keybinding UI | 추론됨 | `tests/runtime/test_keybindings_toggle.sh`와 wrapper/static tests가 경로를 검사한다. live UI 호출은 미검증이다. |
+| IPC 동작 | 측정됨 (live session) | 라이브 셸에 `cachy-omarchy-shell --ipc shell ping` → `ok`, `listPlugins` 응답 확인(§13.1, §13.5). |
+| SUPER+SPACE launcher | 측정됨 | 사용자가 실제로 눌러 원본 Quattro 런처가 열렸고 `Escape` 로 닫혔다(§13.1). 관리 블록은 `--force` 로 주입됐으며 Hyprland 가 재로드해 바인딩 48→49, `SUPER+space` 중복 0(§13.4). |
+| 일반 앱 launch | 측정됨 | 라이브 런처에서 앱 실행에 성공했다. 이 호스트에 `uwsm` 이 없으므로 compat shim 이 실제로 사용된 증거다(§13.3). |
+| SUPER+K keybinding UI | 측정됨 | 사용자가 실제로 눌러 키바인딩 UI 가 열렸다(§13.1). 업스트림 select-mode 재사용이므로 별도 layer 를 남기지 않는다. |
 | 기존 Hyprland config 보존 | 측정됨 | 2026-08-17 설치된 `cachy-omarchy-init`을 사용자의 실제 `~/.config/hypr/hyprland.lua`에 대해 실행했다. `SUPER+SPACE` 충돌(walker, `:295`)을 감지해 주입을 거부했고 md5는 불변이었다(§12.3). |
 | 기존 Waybar 보존 | 미검증 | init는 Omarchy bar-off 토글만 만들며 기존 Waybar와 공존을 실측하지 않았다. `RUNTIME_STARTUP.md` §9.3. |
-| 기존 notification daemon 보존 | 미검증 | `disabledPlugins`가 `omarchy.notifications`를 끄지만 dunst/mako 등과 중복·충돌을 실측하지 않았다. |
+| 기존 notification daemon 보존 | 측정됨 | 라이브 세션에서 사용자 `mako`(pid 652539)가 생존했고, 우리 바가 상단 26px 를 점유하자 `y=0 → y=26` 으로 재배치됐다 — 두 layer-shell 클라이언트의 정상 협상(§13.2). |
 | 기존 lock setup 보존 | 미검증 | `disabledPlugins`가 `omarchy.lock`을 끄지만 hyprlock 등과 상호작용을 실측하지 않았다. |
 | newer upstream rebuild 자동화 | 측정됨 | M6 U01–U08 fake git/makepkg/bsdtar 경로가 candidate 검증 후 metadata 발행을 검사한다. `tests/package/test_update_pipeline.sh`. |
 | failed update 미설치 | 측정됨 (fake) | `tests/package/test_update_pipeline.sh` U05–U08은 fake pacman 호출 없이 원래 lock/PKGBUILD를 보존한다. |
@@ -42,9 +42,9 @@
 | R01 shell process starts | 측정됨 | 추출 트리 wrapper가 sandbox HOME에서 기동하고 IPC 전까지 생존했다. |
 | R02 IPC ping succeeds | 측정됨 | 위 추출 트리의 `shell ping`이 `ok`를 반환했다. |
 | R03 menu discoverable | 추론됨 | 추출 `shell.qml` 존재와 기존 `test_shell_smoke.sh`의 `listPlugins` 검증이 있다. 승인된 live 재관측은 별도다. |
-| R04 launcher toggles | 미검증 | 기존 extracted-tree launcher test는 있으나 실제 menu surface 관측은 `COO_RUN_LIVE=1` opt-in이다. |
-| R05 Escape closes launcher | 미검증 | 실제 `wtype Escape`는 `COO_RUN_LIVE=1`과 사용자 승인 없이는 실행하지 않는다. |
-| R06 application launch | 추론됨 | 추출 `uwsm-app` wrapper와 desktop-launch fixture는 검증했으나 live 입력/앱 공존은 미검증이다. |
+| R04 launcher toggles | 측정됨 (수동) | 사용자가 `SUPER+SPACE` 로 런처를 열었다(§13.1). `COO_RUN_LIVE=1` 자동화 테스트는 여전히 미실행이다. |
+| R05 Escape closes launcher | 측정됨 (수동) | 사용자가 `Escape` 로 런처를 닫았다(§13.1). `wtype` 자동 주입은 여전히 미실행이다. |
+| R06 application launch | 측정됨 | 라이브 런처에서 앱이 실행됐다(§13.1). compat PATH 격리도 `/proc/<pid>/environ` 으로 실측했다(§13.3). |
 | R07 restarting service recovers | 미검증 (systemd service) | 추출 wrapper를 수동 기동→그 자식 PID만 TERM/KILL→수동 재기동하여 두 번째 IPC `ok`를 확인한 것은 **manual wrapper-restart evidence**일 뿐이다. 승인된 user-systemd test 없이 `Restart=on-failure` service recovery는 **미검증**이다. |
 | R08 absence of Waybar modification | 측정됨 (package ownership) | archive/extracted tree에 `/etc`, system unit, home/Waybar path, `.INSTALL`이 없음을 확인했다. 실제 사용자 Waybar 공존은 여전히 미검증이다. |
 | R09 absence of notification replacement | 측정됨 (package ownership) | `omarchy.notifications`는 disabledPlugins에 있고 notification `/etc`·system-unit path가 없다. **dunst/mako 등 live user daemon 보존은 미검증**이다. |

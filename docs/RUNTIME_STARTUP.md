@@ -767,3 +767,99 @@ warning: 기존 설정이 SUPER+SPACE 를 이미 바인딩한다. 덮어쓰지 �
   않는다는 것은 측정됐지만(§11.3 R08–R10), 동시 실행은 관측하지 않았다.
 - `graphical-session.target` 자동 기동(§9.4 — 타깃이 여전히 inactive).
 - `COO_RUN_LIVE=1` 키 주입.
+
+---
+
+## 13. 라이브 세션 승인 검증 (2026-08-17)
+
+사용자가 `bar-off` 토글을 삭제하고 `cachy-omarchy-bindings --force` 로 관리 블록을
+주입한 뒤, `cachy-omarchy-shell --run` 을 포그라운드로 기동해 직접 조작했다.
+서비스를 enable 하지 않았고 종료는 Ctrl-C 였다.
+
+### 13.1 관측된 사실
+
+셸은 **설치 경로**에서 기동했다 —
+`quickshell -n -p /usr/share/cachy-omarchy/upstream/shell` (pid 3041286),
+`INFO: Configuration Loaded`, 무중단 8분 32초.
+
+| 항목 | 결과 |
+| --- | --- |
+| IPC ping | `ok` |
+| `SUPER+SPACE` → 원본 Quattro 런처 | 열림 |
+| `Escape` | 닫힘 |
+| 앱 실행 | 성공 |
+| `SUPER+K` → 키바인딩 UI | 열림 |
+| QML 오류 / `ERROR` 레벨 | **0건** |
+
+레이어 구성:
+
+```
+omarchy-bar     xywh: 0 0 3072 26     pid 3041286   (우리 셸)
+notifications   xywh: 2752 26 320 63  pid 652539    (사용자 mako)
+```
+
+### 13.2 기존 데스크톱 구성요소와의 공존 — 측정됨
+
+사용자의 `mako`(pid 652539)가 **살아남았고**, 우리 바가 상단 26px 를 점유하자
+`y=0` 에서 `y=26` 으로 재배치됐다. 두 layer-shell 클라이언트가 정상 협상한 것이며,
+**우리 셸이 알림 데몬을 대체하지 않았다**는 직접 증거다(SPEC §61 R09). 지금까지
+R08–R10 은 "패키지가 해당 경로를 소유하지 않는다"는 정적 증거뿐이었고, 동시 실행
+관측은 이것이 처음이다.
+
+### 13.3 compat PATH 격리 — 측정됨
+
+사용자가 `uwsm-app` 을 찾지 못한다고 보고했다. **이는 설계대로다.**
+
+```
+사용자 셸        : uwsm-app 없음
+shim            : /usr/lib/cachy-omarchy/compat/bin/uwsm-app (root:root 755)
+셸 프로세스 PATH : /usr/lib/cachy-omarchy/compat/bin  ← 첫 항목
+```
+
+`/proc/3041286/environ` 을 직접 읽어 확인했다. compat 디렉터리는 **셸 프로세스에만**
+붙고 사용자 일반 환경에는 없다 — SPEC §44(‘/usr/bin 에 가짜 omarchy-* 대량 설치 금지’)
+와 §45(환경 격리)가 동시에 성립한다. 이 호스트에 `uwsm` 이 없으므로 앱이 실행됐다는
+사실 자체가 **shim 이 실제로 사용됐다**는 증거다. M3 이래 `WRAPPER` 로 분류만 하고
+라이브 검증은 못 했던 경로다.
+
+### 13.4 관리 블록 — 측정됨
+
+`--force` 주입 결과가 `~/.config/hypr/hyprland.lua:391-393` 에 다음과 같이 들어갔다:
+
+```lua
+-- >>> cachy-omarchy >>>
+pcall(dofile, "/home/<user>/.config/cachy-omarchy/hypr/bindings.lua")
+-- <<< cachy-omarchy <<<
+```
+
+M2 에서 확립한 두 방어가 사용자의 실제 설정에서 동작한다 — Lua 주석 마커 `--`
+(`#` 였다면 길이 연산자로 해석돼 이 파일 전체가 죽는다) 와 `pcall` 가드
+(오버레이 디렉터리가 사라져도 사용자 설정이 깨지지 않는다).
+
+Hyprland 가 설정을 다시 읽었음이 바인딩 수로 확인된다 — 48 → 49 개, `SUPER+K` 가
+신규 생성, `SUPER+space` 는 **1개**(`hl.unbind` 후 재바인딩이므로 중복 없음).
+
+### 13.5 우리 결함이 아닌 것 두 가지
+
+**메뉴 아이콘 누락 WARN.** `Cannot open: file:///home/<user>/.local/share/omakub/
+applications/icons/*.png` 가 반복된다. 업스트림 셸 트리에 `omakub` 참조는 **0건**이며,
+사용자 자신의 `.desktop` 3개(`Activity`·`About`·`Docker`)가 존재하지 않는 디렉터리를
+가리킨다. 메뉴는 사용자 `.desktop` 을 올바르게 읽고 있다.
+
+**`listPlugins` 의 `omarchy.menu enabled=false`.** 런처가 실제로 열리는데도 이 값이
+`false` 다. `shell.qml:952-976` 의 bar-widget 분기가 `inBar(id)` 를 반환하기 때문이며,
+`kinds` 에 `bar-widget` 이 있는 플러그인에서 이 필드는 '바에 위젯으로 올라가 있는가'
+를 뜻한다. 우리 기본값이 바 레이아웃을 비웠으므로 `false` 가 맞고, 메뉴는
+`keepLoaded: true` 로 살아 있다. M5 에서 논증으로만 확인했던 것이 **런처가 열리는
+것으로 실증됐다**.
+
+### 13.6 이 세션이 여전히 검증하지 않은 것
+
+- **systemd user service 로서의 기동.** 포그라운드 `--run` 이었고 서비스는
+  `disabled`/`inactive` 그대로다. `Restart=on-failure` 복구(R07)와
+  `graphical-session.target` 자동 기동(§9.4)은 미검증이다.
+- **`bar-off` 가 있을 때의 동작.** 사용자가 토글을 삭제한 상태로 관측했으므로 바가
+  떴다. 토글이 있을 때 바가 숨는지는 §12.3 이후 라이브로 재확인하지 않았다.
+- **lock 화면 공존.** `omarchy.lock` 은 `disabledPlugins` 로 꺼져 있으나 hyprlock 등과
+  동시 동작은 관측하지 않았다.
+- `COO_RUN_LIVE=1` 키 주입 자동화 테스트.
