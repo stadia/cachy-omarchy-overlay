@@ -55,6 +55,96 @@ assert_contains "$out" "not running" "autostart retry with no shell says 'not ru
 [[ $elapsed -le 15 ]] && b=0 || b=1
 assert_eq "$b" "0" "autostart retry loop is bounded (took ${elapsed}s, expected <=15s)"
 
+# Fix round 2 residual: a timed-out retry (rc 4) must keep polling, not end
+# the loop. Full 25.5s hang ceiling stays untested by ruling; this narrower
+# PATH-scoped qs stub proves the loop guard itself. coo_quickshell_bin()
+# resolves a bare `qs` name via command -v, so a prepended stub is enough
+# (same PATH-isolation pattern as test_quickshell_detect.sh).
+stub_dir="$COO_TEST_SANDBOX/qs-stub"
+mkdir -p "$stub_dir"
+stub_count="$stub_dir/count"
+stub_hangs=2
+cat > "$stub_dir/qs" <<'STUB'
+#!/usr/bin/env bash
+# Invocation 1: fail-fast (enter autostart retry). Next HANGS calls: hang
+# until `timeout` kills us (rc 4). After that: answer ok.
+set -uo pipefail
+count_file=${COO_QS_STUB_COUNT:?}
+hangs=${COO_QS_STUB_HANGS:?}
+n=$(cat "$count_file")
+n=$((n + 1))
+printf '%s\n' "$n" > "$count_file"
+if (( n == 1 )); then
+  printf 'No running instances for "stub"\n'
+  exit 255
+fi
+if (( n <= 1 + hangs )); then
+  exec sleep infinity
+fi
+printf 'ok\n'
+exit 0
+STUB
+chmod +x "$stub_dir/qs"
+
+run_stub_ping() {
+  local cli=$1
+  # Reset counter for each run so red/green share the same stub script.
+  printf '0\n' > "$stub_count"
+  COO_SHELL_PATH="$REPO_ROOT/shell" \
+  COO_IPC_TIMEOUT=0.3s \
+  COO_IPC_RETRY_TIMEOUT=0.15s \
+  COO_QS_STUB_COUNT="$stub_count" \
+  COO_QS_STUB_HANGS="$stub_hangs" \
+  PATH="$stub_dir:$PATH" \
+  WAYLAND_DISPLAY=coo-nonexistent-display \
+  "$cli" ping 2>&1
+}
+
+# Red: break the loop guard so rc 4 exits early → must fail "not responding".
+# Copy must still resolve lib/ against the real repo: a naive cp into the
+# sandbox makes SELF_DIR/REPO_ROOT point at /tmp and dies before the guard.
+broken_cli="$COO_TEST_SANDBOX/coo-shell-broken-rc4"
+if ! grep -qF '(( rc == 1 || rc == 4 )) || break' "$CLI"; then
+  echo "fatal: expected rc-4 continue guard missing from coo-shell" >&2
+  exit 1
+fi
+sed \
+  -e "s|^SELF_DIR=.*|SELF_DIR=\"$REPO_ROOT/bin\"|" \
+  -e "s|^REPO_ROOT=.*|REPO_ROOT=\"$REPO_ROOT\"|" \
+  -e 's/(( rc == 1 || rc == 4 )) || break/(( rc == 1 )) || break/' \
+  "$CLI" > "$broken_cli"
+chmod +x "$broken_cli"
+grep -qF '(( rc == 1 )) || break' "$broken_cli" || {
+  echo "fatal: failed to inject broken rc-4 guard" >&2
+  exit 1
+}
+SECONDS=0
+out=$(run_stub_ping "$broken_cli"); code=$?
+elapsed=$SECONDS
+assert_eq "$code" "1" "broken rc-4 guard exits 1 (red)"
+assert_contains "$out" "not responding" "broken rc-4 guard says not responding (red)"
+[[ $elapsed -le 5 ]] && b=0 || b=1
+assert_eq "$b" "0" "broken-guard stub run stays fast (took ${elapsed}s, expected <=5s)"
+
+# Green: real CLI recovers after timed-out retries and returns ok.
+SECONDS=0
+out=$(run_stub_ping "$CLI"); code=$?
+elapsed=$SECONDS
+assert_eq "$code" "0" "rc-4 continue guard recovers after timed-out retries (green)"
+assert_eq "$out" "ok" "rc-4 continue guard returns ok (green)"
+[[ $elapsed -le 5 ]] && b=0 || b=1
+assert_eq "$b" "0" "rc-4 stub recovery stays fast (took ${elapsed}s, expected <=5s)"
+
+# No stub child may survive timeout --kill-after (never pkill; match our path).
+leftover=0
+while read -r pid; do
+  [[ -n $pid ]] || continue
+  leftover=1
+  kill "$pid" 2>/dev/null
+  wait "$pid" 2>/dev/null
+done < <(pgrep -f "$stub_dir/qs" || true)
+assert_eq "$leftover" "0" "qs stub left no leftover processes"
+
 # Against a live shell, ping and the test surface work end to end.
 if coo_quickshell_bin >/dev/null && [[ -n ${WAYLAND_DISPLAY:-} ]]; then
   export COO_CONFIG_ROOT="$COO_TEST_SANDBOX/config"
