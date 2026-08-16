@@ -26,4 +26,20 @@ assert_eq "$(grep -ci 'quickshell' "$U")" "0" "유닛은 quickshell 을 직접 �
 # 컴포지터를 띄우려 하면 안 된다.
 assert_eq "$(grep -ci 'hyprland' "$U")" "0" "유닛은 Hyprland 를 띄우지 않는다"
 
+# --- 패키징된 유닛 (M5 Task 4) ---
+source "$REPO_ROOT/lib/runtime.sh"
+if coo_overlay_artifact >/dev/null 2>&1; then
+  dest="$COO_TEST_SANDBOX/ov"
+  coo_extract_overlay "$dest"
+  staged="$dest/usr/lib/systemd/user/cachy-omarchy-shell.service"
+  assert_file_exists "$staged" "유닛이 /usr/lib/systemd/user 에 패키징됨"
+  assert_eq "$(cat "$staged")" "$(cat "$REPO_ROOT/overlay/systemd/cachy-omarchy-shell.service")" \
+    "패키징된 유닛 == 저장소 정본"
+  # 유저 유닛은 /usr/lib/systemd/user 에만. system 유닛으로 새면 안 된다.
+  n=$(bsdtar -tf "$(coo_overlay_artifact)" | grep -c "^usr/lib/systemd/system/" || true)
+  assert_eq "$n" "0" "system 유닛 미소유"
+else
+  echo "note: 오버레이 아티팩트 없음 — 유닛 패키징 검증 생략"
+fi
+
 exit "$ASSERT_FAILURES"
