@@ -47,11 +47,51 @@ omarchy-launch-about (브랜딩/os-release)
 
 | command | called from | purpose | class | action |
 | --- | --- | --- | --- | --- |
-| `omarchy-menu-keybindings` | 메뉴 `learn.keybindings` | `hyprctl binds` + Lua 캐시 + 검색 메뉴 | ADAPTED | wrapper/copy — SUPER+K가 이 명령을 부르게. 데이터는 CachyOS Hyprland 설정. gum/jq/lua/xkbcli 의존 감사는 M4 |
+| `omarchy-menu-keybindings` | 메뉴 `learn.keybindings` | `hyprctl binds` + Lua 캐시 + 검색 메뉴 | ADAPTED | copy+adapt — SUPER+K가 이 명령을 부르게. **M4 실측 완료**(아래). 데이터 수집만 CachyOS Hyprland 설정에 맞춘다 |
 | `omarchy-menu-tmux-keybindings` | 메뉴 | Tmux 전용 | DISABLED | disable |
 | `omarchy-menu-herdr-keybindings` | 메뉴 | Herdr 전용 | DISABLED | disable |
 
 별도 QML 키바인드 플러그인은 없다. UI는 이 헬퍼(+ 메뉴 오버레이)다.
+
+### M4 실측 (핀 @ f0020448, 호스트 hyprland 0.56.2-1)
+
+호출 그래프 (핀된 스크립트 줄 단위 정독 + 호스트 실행으로 확인):
+
+- `omarchy-menu-keybindings`
+  - 동적 수집: **plain `hyprctl binds`** (`-j` 아님 — 업스트림 주석: Hyprland
+    0.56.0 의 binds JSON 은 필드 정렬이 깨진다). awk 파싱.
+  - Lua 캐시: `omarchy-cmd-present lua` 가드 → `lua` heredoc 이
+    `~/.config/hypr/hyprland.lua` 를 가짜 `hl` 샌드박스로 `pcall(dofile)`.
+    **`opts.description` 이 있는 bind 만 기록.** 조인 키 `modmask,description`.
+  - `code:NNN` 해석: `xkbcli compile-keymap` (+ 하드코딩 폴백 테이블).
+  - 정적 행: SHIFT ALT L/D (web app copy/download) 2개 하드코딩.
+  - 캐시: `${XDG_CACHE_HOME:-~/.cache}/omarchy/keybindings-<sha256>.records`.
+    dynamic 이 비면 refresh 실패 → 캐시 파일을 남기지 않는다.
+  - 선택 후 dispatch: `hyprctl dispatch` (exec 경로는 `jq -Rnr @json` 으로 Lua
+    문자열 인용 — `lua_string()`).
+  - `--print`/`-p`: 메뉴 없이 목록만 출력.
+- `omarchy-menu-select` — payload 는 `perl -MJSON::PP` (2회 호출),
+  `omarchy-shell shell summon omarchy.menu "$payload"`, doneFile 0.05s 폴링,
+  selectionFile 출력 또는 exit 1.
+- `omarchy-cmd-present` — `command -v` 루프뿐.
+- **gum 미사용** — 세 스크립트에 `gum` 0 매치(grep 실측). 이 경로의 선택 UI 는
+  TUI 가 아니라 메뉴 오버레이(`summon omarchy.menu` select mode)다.
+
+호스트 실측 (CachyOS, `~/.config/hypr/hyprland.lua` 만 사용):
+
+- 호스트 설정은 hyprland.lua 뿐. `hl.bind` 30개, **description 0개**.
+- `hyprctl binds` 는 48개 bind 를 전부 `dispatcher: __lua` + 빈 description +
+  숫자 arg 로 보고.
+- 스크립트의 `[[ -z $description && $dispatcher == "__lua" ]] && continue` 가
+  이 48개를 **전부 drop**.
+- 재현: `XDG_CACHE_HOME=$(mktemp -d) PATH=<pin>/bin:$PATH omarchy-menu-keybindings --print`
+  → **정적 2행만** 출력, 캐시 파일 없음, exit 0.
+- 결론: 업스트림은 description 달린 Omarchy lua 설정을 가정한다 (SPEC §57).
+  시각/런타임(`omarchy-menu-select` + `summon omarchy.menu`)은 유지하고
+  **데이터 수집만 적응**하는 `cachy-omarchy-keybindings` 가 M4 Task 2 의 산출물.
+
+호스트 도구 실측: `hyprctl` `lua` `jq` `xkbcli` `perl`(JSON::PP) `awk` `sort`
+`sha256sum` 모두 존재. `gum` 도 설치돼 있으나 이 경로는 부르지 않는다.
 
 ---
 
