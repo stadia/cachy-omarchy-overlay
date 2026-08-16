@@ -59,6 +59,12 @@ cat >"$fake/install" <<'EOF'
 [[ ${COO_FAKE_COPY_FAIL:-0} != 1 ]] || exit 8
 /usr/bin/install "$@"
 EOF
+cat >"$fake/mv" <<'EOF'
+#!/usr/bin/env bash
+last=${!#}
+if [[ ${COO_FAKE_POINTER_FAIL:-0} == 1 && $last == */validated-build.manifest ]]; then exit 10; fi
+/usr/bin/mv "$@"
+EOF
 chmod +x "$fake"/*
 
 # U01: discovery is read-only and does not invoke build tools.
@@ -84,6 +90,8 @@ assert_file_exists "$manifest" "validated manifest exists"
 manifest_src=$(cat "$manifest")
 assert_contains "$manifest_src" "OMARCHY_COMMIT=f0020448ca87329199de7cb12f2015ebc4a3e5e7" "manifest binds commit"
 assert_contains "$manifest_src" "cachy-omarchy-overlay-0.1.0-1-any.pkg.tar.zst" "manifest binds overlay artifact"
+release=$(awk -F= '$1 == "RELEASE" { print $2 }' "$manifest")
+assert_file_exists "$COO_TEST_SANDBOX/state/$release/artifacts/cachy-omarchy-shell-4.0.0-1-any.pkg.tar.zst" "manifest points to immutable shell release"
 
 # U06: failed build publishes neither artifacts nor a manifest.
 rm -f "$log"
@@ -103,23 +111,45 @@ assert_eq "$published" "0" "U07 no manifest after audit failure"
 # Transaction regression: checksum/copy failure leaves an old validated pair untouched.
 trans_build=$COO_TEST_SANDBOX/transaction-build
 trans_state=$COO_TEST_SANDBOX/transaction-state
-mkdir -p "$trans_build" "$trans_state"
+mkdir -p "$trans_build" "$trans_state/validated-builds/old/artifacts"
 printf 'old-shell' >"$trans_build/cachy-omarchy-shell-3.9.9-1-any.pkg.tar.zst"
 printf 'old-overlay' >"$trans_build/cachy-omarchy-overlay-0.0.9-1-any.pkg.tar.zst"
-printf 'old-manifest\n' >"$trans_state/validated-build.manifest"
-old_sum=$(sha256sum "$trans_build"/* "$trans_state/validated-build.manifest")
+printf 'old-shell' >"$trans_state/validated-builds/old/artifacts/cachy-omarchy-shell-3.9.9-1-any.pkg.tar.zst"
+printf 'old-overlay' >"$trans_state/validated-builds/old/artifacts/cachy-omarchy-overlay-0.0.9-1-any.pkg.tar.zst"
+printf 'RELEASE=validated-builds/old\nARTIFACT=old old\n' >"$trans_state/validated-build.manifest"
+old_pointer=$(cat "$trans_state/validated-build.manifest")
+old_sum=$(sha256sum "$trans_build"/* "$trans_state/validated-builds/old/artifacts"/* "$trans_state/validated-build.manifest")
 code=0
 out=$(COO_TOOL_LOG="$log" COO_FAKE_SHA_FAIL=1 COO_REPO_ROOT="$root" COO_BUILD_DIR="$trans_build" COO_STATE_DIR="$trans_state" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_SHA256_BIN="$fake/sha256sum" COO_INSTALL_BIN="$fake/install" "$root/bin/build-packages" 2>&1) || code=$?
 assert_eq "$code" "9" "checksum failure blocks publication"
-assert_eq "$(sha256sum "$trans_build"/* "$trans_state/validated-build.manifest")" "$old_sum" "checksum failure preserves old pair and manifest"
+assert_eq "$(sha256sum "$trans_build"/* "$trans_state/validated-builds/old/artifacts"/* "$trans_state/validated-build.manifest")" "$old_sum" "checksum failure preserves old pair and manifest"
 code=0
 out=$(COO_TOOL_LOG="$log" COO_FAKE_COPY_FAIL=1 COO_REPO_ROOT="$root" COO_BUILD_DIR="$trans_build" COO_STATE_DIR="$trans_state" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_SHA256_BIN="$fake/sha256sum" COO_INSTALL_BIN="$fake/install" "$root/bin/build-packages" 2>&1) || code=$?
 assert_eq "$code" "8" "copy failure blocks publication"
-assert_eq "$(sha256sum "$trans_build"/* "$trans_state/validated-build.manifest")" "$old_sum" "copy failure preserves old pair and manifest"
+assert_eq "$(sha256sum "$trans_build"/* "$trans_state/validated-builds/old/artifacts"/* "$trans_state/validated-build.manifest")" "$old_sum" "copy failure preserves old pair and manifest"
 code=0
-out=$(COO_FAKE_EXTRA=1 COO_REPO_ROOT="$root" COO_BUILD_DIR="$COO_TEST_SANDBOX/ambiguous-build" COO_STATE_DIR="$COO_TEST_SANDBOX/ambiguous-state" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" "$root/bin/build-packages" 2>&1) || code=$?
+out=$(COO_TOOL_LOG="$log" COO_FAKE_EXTRA=1 COO_REPO_ROOT="$root" COO_BUILD_DIR="$COO_TEST_SANDBOX/ambiguous-build" COO_STATE_DIR="$COO_TEST_SANDBOX/ambiguous-state" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" "$root/bin/build-packages" 2>&1) || code=$?
 assert_eq "$code" "1" "ambiguous artifacts are rejected"
+assert_contains "$out" "ambiguous build artifacts" "extra artifact reaches ambiguity guard"
 [[ -e $COO_TEST_SANDBOX/ambiguous-state/validated-build.manifest ]] && published=1 || published=0
 assert_eq "$published" "0" "ambiguous artifacts publish no manifest"
+
+# Pointer rename is final commit: failure preserves the old pointer/release.
+code=0
+out=$(COO_TOOL_LOG="$log" COO_FAKE_POINTER_FAIL=1 COO_REPO_ROOT="$root" COO_BUILD_DIR="$trans_build" COO_STATE_DIR="$trans_state" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_MV_BIN="$fake/mv" "$root/bin/build-packages" 2>&1) || code=$?
+assert_eq "$code" "10" "manifest replacement failure blocks validation commit"
+assert_eq "$(cat "$trans_state/validated-build.manifest")" "$old_pointer" "pointer failure preserves old manifest"
+assert_file_exists "$trans_state/validated-builds/old/artifacts/cachy-omarchy-shell-3.9.9-1-any.pkg.tar.zst" "pointer failure preserves referenced old release"
+
+# Dynamic shell version comes from fixture lock/PKGBUILD, not hard-coded names.
+dyn=$COO_TEST_SANDBOX/dynamic-repo
+cp -a "$root" "$dyn"
+sed -i 's/OMARCHY_VERSION=4.0.0/OMARCHY_VERSION=4.0.1/; s/f0020448ca87329199de7cb12f2015ebc4a3e5e7/5555555555555555555555555555555555555555/' "$dyn/upstream.lock"
+sed -i "s/pkgver=4.0.0/pkgver=4.0.1/; s/_commit='[0-9a-f]*'/_commit='5555555555555555555555555555555555555555'/" "$dyn/packages/cachy-omarchy-shell/PKGBUILD"
+COO_TOOL_LOG="$log" COO_REPO_ROOT="$dyn" COO_BUILD_DIR="$COO_TEST_SANDBOX/dynamic-build" COO_STATE_DIR="$COO_TEST_SANDBOX/dynamic-state" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" "$dyn/bin/build-packages" >/dev/null
+dynamic_manifest=$(cat "$COO_TEST_SANDBOX/dynamic-state/validated-build.manifest")
+assert_contains "$dynamic_manifest" "OMARCHY_VERSION=4.0.1" "dynamic lock version reaches manifest"
+assert_contains "$dynamic_manifest" "cachy-omarchy-shell-4.0.1-1-any.pkg.tar.zst" "dynamic shell artifact name is used"
+assert_contains "$dynamic_manifest" "cachy-omarchy-overlay-0.1.0-1-any.pkg.tar.zst" "overlay version remains independent"
 
 exit "$ASSERT_FAILURES"
