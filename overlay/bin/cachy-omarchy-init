@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# 최초 사용 시 사용자 설정을 만든다. 패키지 post-install 이 아니라 유저 레벨
+# 헬퍼다 (SPEC 38). 기존 사용자 파일을 절대 덮어쓰지 않는다 (SPEC 6.6).
+set -uo pipefail
+
+here=$(cd "$(dirname -- "$0")" && pwd)
+
+PREFIX_ROOT=${COO_PREFIX_ROOT:-/usr/share/cachy-omarchy}
+CONFIG_DIR=${COO_CONFIG_DIR:-$HOME/.config/cachy-omarchy}
+STATE_DIR=${COO_STATE_DIR:-$HOME/.local/state/omarchy}
+TOGGLES_DIR=$STATE_DIR/toggles
+DRY=0
+
+fail() { printf 'error: %s\n' "$1" >&2; exit 1; }
+note() { printf '%s\n' "$1"; }
+act()  { (( DRY )) && printf 'would: %s\n' "$1" || printf '%s\n' "$1"; }
+
+usage() {
+  cat <<'USAGE'
+사용법: cachy-omarchy-init [--dry-run] [--force]
+
+최초 사용 시 사용자 설정을 만든다. 이미 있는 파일은 건드리지 않는다.
+
+만드는 것:
+  ~/.config/cachy-omarchy/shell.json            셸 설정 (패키지 기본값 복사)
+  ~/.config/cachy-omarchy/hypr/bindings.{conf,lua}
+  ~/.local/state/omarchy/toggles/bar-off        Omarchy 내장 바 숨김
+  사용자 Hyprland 설정에 관리 source 블록       (충돌 시 주입하지 않음)
+
+중요: 이 명령을 실행하지 않으면 Omarchy 내장 바가 화면 상단에 나타나
+26px 를 예약한다. 패키지 기본값만으로는 그 바를 끌 수 없다.
+
+옵션:
+  --dry-run  무엇을 할지 출력만 하고 아무것도 쓰지 않는다.
+  --force    바인딩 충돌이 있어도 관리 블록을 넣는다 (사용자 줄은 지우지 않음).
+  --help     이 도움말.
+USAGE
+}
+
+FORCE_ARGS=()
+while (( $# )); do
+  case $1 in
+    --dry-run) DRY=1 ;;
+    --force)   FORCE_ARGS+=(--force) ;;
+    --help|-h) usage; exit 0 ;;
+    *) printf 'error: 알 수 없는 인자: %s\n' "$1" >&2; usage >&2; exit 1 ;;
+  esac
+  shift
+done
+
+DEFAULTS=$PREFIX_ROOT/defaults/shell.json
+[[ -f $DEFAULTS ]] || fail "기본 설정을 찾을 수 없다: $DEFAULTS (COO_PREFIX_ROOT 로 지정 가능)"
+
+# 1) 셸 설정. 파일 단위로 판단한다 — 디렉터리만 보고 건너뛰면 사용자가 일부만
+#    지웠을 때 나머지를 복구하지 못한다.
+if [[ -e $CONFIG_DIR/shell.json ]]; then
+  note "유지: $CONFIG_DIR/shell.json (이미 존재)"
+else
+  act "생성: $CONFIG_DIR/shell.json"
+  if ! (( DRY )); then
+    mkdir -p "$CONFIG_DIR" || fail "설정 디렉터리를 만들 수 없다: $CONFIG_DIR"
+    cp -a "$DEFAULTS" "$CONFIG_DIR/shell.json"
+  fi
+fi
+
+# 2) bar-off 토글. toggles 디렉터리가 아직 없을 때만 만든다. 디렉터리는 있는데
+#    파일이 없다면 사용자가 일부러 지운 것이고, 그것은 "바를 보겠다"는 의사다.
+if [[ -d $TOGGLES_DIR ]]; then
+  note "유지: $TOGGLES_DIR (사용자 상태 존재 — bar-off 를 되살리지 않는다)"
+else
+  act "생성: $TOGGLES_DIR/bar-off"
+  if ! (( DRY )); then
+    mkdir -p "$TOGGLES_DIR" || fail "토글 디렉터리를 만들 수 없다: $TOGGLES_DIR"
+    : > "$TOGGLES_DIR/bar-off"
+  fi
+fi
+
+# 3) Hyprland 바인딩. 충돌 감지와 --force 정책을 재구현하지 않고 위임한다
+#    (SPEC 20). bindings 헬퍼는 형제로 설치돼 있다.
+BINDINGS=$here/cachy-omarchy-bindings
+[[ -x $BINDINGS ]] || BINDINGS=$(command -v cachy-omarchy-bindings 2>/dev/null || true)
+[[ -n $BINDINGS && -x $BINDINGS ]] || fail "cachy-omarchy-bindings 를 찾을 수 없다"
+
+if (( DRY )); then
+  note "would: $BINDINGS ${FORCE_ARGS[*]-} (관리 블록 설치)"
+else
+  COO_CONFIG_DIR=$CONFIG_DIR "$BINDINGS" "${FORCE_ARGS[@]-}" \
+    || fail "바인딩 설치 실패 — 위 메시지를 확인할 것"
+fi
+
+(( DRY )) && note "--dry-run: 아무것도 쓰지 않았다."
+exit 0
