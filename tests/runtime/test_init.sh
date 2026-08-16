@@ -46,4 +46,55 @@ rm -f "$HOME/.local/state/omarchy/toggles/bar-off"
 [[ -e "$HOME/.local/state/omarchy/toggles/bar-off" ]] && back=1 || back=0
 assert_eq "$back" "0" "사용자가 지운 bar-off 를 되살리지 않는다"
 
+# 회귀: FORCE_ARGS 확장이 빈 배열일 때 인자를 하나도 넘기지 않는지 검증한다.
+# "${arr[@]-}" 는 빈 배열에서도 빈 문자열 인자 하나를 넘긴다 — 부작용에
+# 의존하지 않도록, cachy-omarchy-bindings 형제 탐색을 피해서 init 스크립트만
+# 별도 디렉터리에 두고 PATH 맨 앞에 인자를 검사하는 stub 을 세운다.
+STUB_DIR="$COO_TEST_SANDBOX/stubbin-noargs"
+mkdir -p "$STUB_DIR"
+cat > "$STUB_DIR/cachy-omarchy-bindings" <<'STUB'
+#!/usr/bin/env bash
+if (( $# != 0 )); then
+  printf 'stub: unexpected args: %s\n' "$*" >&2
+  exit 1
+fi
+exit 0
+STUB
+chmod +x "$STUB_DIR/cachy-omarchy-bindings"
+
+STUB_FORCE_DIR="$COO_TEST_SANDBOX/stubbin-force"
+mkdir -p "$STUB_FORCE_DIR"
+cat > "$STUB_FORCE_DIR/cachy-omarchy-bindings" <<'STUB'
+#!/usr/bin/env bash
+if [[ "$*" == "--force" ]]; then
+  exit 0
+fi
+printf 'stub: expected exactly --force, got: %s\n' "$*" >&2
+exit 1
+STUB
+chmod +x "$STUB_FORCE_DIR/cachy-omarchy-bindings"
+
+# init 스크립트만 복사해서 형제 cachy-omarchy-bindings 를 못 찾게 만든다 —
+# 그래야 PATH 의 stub 으로 강제 폴백한다.
+ISOLATED_INIT="$COO_TEST_SANDBOX/isolated-init/cachy-omarchy-init"
+mkdir -p "$(dirname "$ISOLATED_INIT")"
+cp "$I" "$ISOLATED_INIT"
+chmod +x "$ISOLATED_INIT"
+
+REG_HYPR="$COO_TEST_SANDBOX/regress-hypr"
+mkdir -p "$REG_HYPR"
+: > "$REG_HYPR/hyprland.conf"
+
+REG_CONFIG="$COO_TEST_SANDBOX/regress-config-noargs"
+REG_STATE="$COO_TEST_SANDBOX/regress-state-noargs"
+out=$(PATH="$STUB_DIR:$PATH" COO_CONFIG_DIR="$REG_CONFIG" COO_STATE_DIR="$REG_STATE" \
+      COO_HYPR_DIR="$REG_HYPR" "$ISOLATED_INIT" 2>&1); code=$?
+assert_eq "$code" "0" "인자 없는 실행이 stub 에 빈 인자를 넘기지 않는다 (regression)"
+
+REG_CONFIG2="$COO_TEST_SANDBOX/regress-config-force"
+REG_STATE2="$COO_TEST_SANDBOX/regress-state-force"
+out=$(PATH="$STUB_FORCE_DIR:$PATH" COO_CONFIG_DIR="$REG_CONFIG2" COO_STATE_DIR="$REG_STATE2" \
+      COO_HYPR_DIR="$REG_HYPR" "$ISOLATED_INIT" --force 2>&1); code=$?
+assert_eq "$code" "0" "--force 는 stub 에 정확히 --force 하나만 넘긴다"
+
 exit "$ASSERT_FAILURES"
