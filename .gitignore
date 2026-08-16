@@ -3,3 +3,7 @@ vendor/omarchy/
 *.log
 .coo-dev/
 .superpowers/
+/packages/*/pkg/
+/packages/*/src/
+/packages/*/*.pkg.tar.*
+/build/*.pkg.tar.*
