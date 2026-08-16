@@ -33,6 +33,17 @@ defaults="$REPO_ROOT/overlay/defaults/shell.json"
 # 밖으로 주차시킨다. HOME 은 tests/test.sh 가 샌드박스로 바꿔 두므로 사용자의
 # 실제 상태는 건드리지 않는다. 패키지 기본값이 바를 정말로 없애기 전까지의
 # 임시 방편이며, 아래 "화면 점유" 단언이 그 임시 방편이 실제로 듣는지 검증한다.
+#
+# 아래 쓰기는 전적으로 $HOME 에 의존한다. 지금 안전한 이유는 tests/test.sh 가
+# HOME 을 샌드박스로 덮어써 주기 때문일 뿐이고, 그건 이 파일 밖의 사정이다.
+# 이 파일을 직접 실행하거나 순서를 바꾸면 사용자의 진짜
+# ~/.local/state/omarchy/ 에 쓰게 된다. 우연이 아니라 구조로 막는다.
+[[ ${HOME:-} == "${COO_TEST_SANDBOX:?}" ]] || {
+  printf 'FAIL: HOME 이 샌드박스가 아니다 — 사용자 상태를 건드릴 수 있어 중단한다\n' >&2
+  printf '      HOME=%q COO_TEST_SANDBOX=%q\n' "${HOME:-}" "$COO_TEST_SANDBOX" >&2
+  exit 1
+}
+
 mkdir -p "$HOME/.local/state/omarchy/toggles"
 : > "$HOME/.local/state/omarchy/toggles/bar-off"
 
@@ -50,14 +61,40 @@ since=$(date '+%Y-%m-%d %H:%M:%S')
 "$W" --run > "$stdout_log" 2>&1 &
 shell_pid=$!
 
+# 라이브 세션 위에서 도는 테스트이므로 정리는 중단 경로에서도 반드시 돈다.
+# EXIT 만 걸면 Ctrl-C 가 사용자의 진짜 데스크톱에 quickshell 과 그 layer 표면을
+# 그대로 두고 간다 (SPEC 66). 그리고 wait 는 자식이 TERM 을 무시하면 영원히
+# 막히므로 2초 감시자로 상한을 준다. 죽이는 대상은 언제나 우리 PID 하나뿐이다
+# — pkill/killall 은 사용자의 컴포지터까지 잡는다.
 cleanup() {
   [[ -n ${shell_pid:-} ]] || return 0
-  kill "$shell_pid" 2>/dev/null
-  wait "$shell_pid" 2>/dev/null
+  local pid=$shell_pid
+  shell_pid=""
+  kill -TERM "$pid" 2>/dev/null
+  { sleep 2; kill -KILL "$pid" 2>/dev/null; } &
+  local watchdog=$!
+  wait "$pid" 2>/dev/null
+  # 감시자와 그 sleep 자식까지 PID 로만 정리한다. 서브셸만 죽이면 sleep 이
+  # 고아로 2초 더 떠 있는다.
+  local sleeper
+  sleeper=$(ps -o pid= --ppid "$watchdog" 2>/dev/null | tr -d ' ')
+  kill "$watchdog" 2>/dev/null
+  [[ -n $sleeper ]] && kill "$sleeper" 2>/dev/null
+  wait "$watchdog" 2>/dev/null
+  return 0
 }
+# INT/TERM 은 정리 후 즉시 빠져나간다. bash 는 트랩이 끝나면 원래 자리로
+# 돌아가므로, exit 를 붙이지 않으면 중단된 실행이 남은 단언을 계속 돌려
+# 초록으로 끝난다. EXIT 트랩이 cleanup 을 한 번 더 부르지만 멱등이다.
 trap cleanup EXIT
+trap 'cleanup; exit 130' INT
+trap 'cleanup; exit 143' TERM
 
-# 유계 대기: 40 x 250ms = 10s 상한.
+# 대기 상한. ping 이 즉답하는 정상 경로에서는 40 x 250ms = 10s 이지만, IPC 가
+# 매번 걸리면 한 번의 --ipc 가 COO_IPC_TIMEOUT(기본 2s) 을 다 쓴다:
+# 40 x (2s + 250ms) = 90s, timeout 의 --kill-after=1s 유예까지 매번 소진되면
+# 40 x (3s + 250ms) = 130s 가 최악이다. 실무에서는 아래 kill -0 이 죽은
+# 프로세스를 즉시 잡아내 루프를 끊는다. 실측은 2회차(~0.5s)에 응답.
 reply=""
 for _ in $(seq 1 40); do
   reply=$("$W" --ipc shell ping 2>/dev/null) && [[ -n $reply ]] && break
@@ -141,6 +178,23 @@ if command -v hyprctl >/dev/null && (( alive == 0 )); then
   our_layers=$(hyprctl -j layers 2>/dev/null | jq -c --argjson pid "$shell_pid" \
     '[ to_entries[].value.levels | to_entries[].value[] | select(.pid == $pid) ]') || our_layers='[]'
   mons=$(hyprctl -j monitors 2>/dev/null | jq -c '[ .[] | select(.disabled | not) ]') || mons='[]'
+
+  # 아래 "화면 점유 없음" 은 our_layers 가 비면 아무것도 검사하지 않고 통과한다.
+  # systemd-cat 이 exec 대신 fork 하거나 hyprctl JSON 모양이 바뀌면 PID 필터가
+  # 조용히 빈 집합을 내고, 밀리스톤에서 제일 중요한 안전 단언이 공짜가 된다.
+  # 그래서 표본이 실제로 있었다는 것부터 단언한다.
+  #
+  # (a) 는 JSON 파싱과 모양이 멀쩡하다는 증거로 바가 사라져도 유효하다.
+  # (b) 는 오늘의 비공허성 증거이며, 내장 바가 진짜로 제거되는 날
+  #     (Finding A 해결) 실패하게 된다. 그때는 다른 비공허성 증거로 교체할 것.
+  total_layers=$(hyprctl -j layers 2>/dev/null | jq -r '[ to_entries[].value.levels | to_entries[].value[] ] | length')
+  [[ $total_layers =~ ^[0-9]+$ ]] || total_layers=0
+  assert_eq "$(( total_layers > 0 ? 1 : 0 ))" "1" "(a) hyprctl layers 를 파싱해 표면을 관측했다 (전체 $total_layers개)"
+
+  layer_count=$(jq -r 'length' <<<"$our_layers" 2>/dev/null)
+  [[ $layer_count =~ ^[0-9]+$ ]] || layer_count=0
+  assert_eq "$(( layer_count > 0 ? 1 : 0 ))" "1" "(b) PID 필터가 우리 표면을 실제로 잡았다 ($layer_count개)"
+
   onscreen=$(jq -r -n --argjson l "$our_layers" --argjson m "$mons" '
     [ $l[] as $layer | $m[] as $mon
       | select($layer.x < ($mon.x + $mon.width / $mon.scale)
@@ -149,13 +203,15 @@ if command -v hyprctl >/dev/null && (( alive == 0 )); then
            and ($layer.y + $layer.h) > $mon.y)
       | $layer.namespace ] | unique | join(",")')
   assert_eq "$onscreen" "" "우리 셸의 layer 표면이 화면을 점유하지 않는다 (SPEC 4.3)"
-  printf '      FINDING: 매핑된 layer 표면 = %s\n' "$(jq -c '[.[] | {namespace, x, y, w, h}]' <<<"$our_layers")"
+  # 화면 밖(y<0)에 있는 것은 기본값이 바를 없앴기 때문이 아니라 이 테스트가
+  # bar-off 가드를 켜 두었기 때문이다. 출력만 보는 사람이 반대로 읽지 않도록
+  # 그 사실을 증거 옆에 붙여 둔다.
+  printf '      FINDING: 매핑된 layer 표면 = %s (bar-off 가드로 주차된 상태 — 패키지 기본값이 바를 없앤 것이 아니다)\n' \
+    "$(jq -c '[.[] | {namespace, x, y, w, h}]' <<<"$our_layers")"
 fi
 
 # ------------------------------------------------------------------ 기동 로그
-kill "$shell_pid" 2>/dev/null
-wait "$shell_pid" 2>/dev/null
-shell_pid=""
+cleanup
 sleep 0.5   # journald 플러시.
 
 if [[ -n $cursor ]]; then
