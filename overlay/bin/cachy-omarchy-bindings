@@ -119,5 +119,9 @@ if (( conflict == 1 && FORCE == 0 )); then
   exit 0
 fi
 
+if (( conflict == 1 && FORCE == 1 )); then
+  printf 'warning: --force로 관리 블록을 추가한다. 기존 설정은 삭제하지 않는다.\n' >&2
+fi
+
 inject "$target" "$begin" "$end" "$snippet"
 exit 0

@@ -19,17 +19,19 @@ assert_file_exists "$LUA" "정본 bindings.lua"
 csrc=$(cat "$CONF")
 assert_contains "$csrc" "SUPER, SPACE" "conf 가 SUPER+SPACE 를 바인딩한다"
 assert_contains "$csrc" "cachy-omarchy-launcher" "conf 대상은 런처"
-assert_contains "$csrc" "cachy-omarchy-keybindings" "conf 에 SUPER+K 자리(M4)"
+assert_contains "$csrc" "unbind = SUPER, K" "conf 는 SUPER+K 를 먼저 unbind 한다"
+assert_contains "$csrc" "bind = SUPER, K, exec, cachy-omarchy-keybindings" "conf 가 SUPER+K 를 keybindings 명령에 바인딩한다"
 [[ $csrc == *"bind = SUPER, K,"* ]] && klive=1 || klive=0
-assert_eq "$klive" "0" "conf 는 SUPER+K 를 아직 활성화하지 않는다"
+assert_eq "$klive" "1" "conf 는 SUPER+K 를 활성화한다"
 
 lsrc=$(cat "$LUA")
 assert_contains "$lsrc" 'SUPER + space' "lua 가 SUPER+SPACE 를 바인딩한다"
 assert_contains "$lsrc" "cachy-omarchy-launcher" "lua 대상은 런처"
 assert_contains "$lsrc" "hl.unbind" "lua 는 unbind 후 bind 한다"
-assert_contains "$lsrc" "cachy-omarchy-keybindings" "lua 에 SUPER+K 자리(M4)"
+assert_contains "$lsrc" 'hl.unbind("SUPER + K")' "lua 는 SUPER+K 를 먼저 unbind 한다"
+assert_contains "$lsrc" 'hl.bind("SUPER + K", hl.dsp.exec_cmd("cachy-omarchy-keybindings"))' "lua 가 SUPER+K 를 keybindings 명령에 바인딩한다"
 [[ $lsrc == *'hl.bind("SUPER + K"'* ]] && klive=1 || klive=0
-assert_eq "$klive" "0" "lua 는 SUPER+K 를 아직 활성화하지 않는다"
+assert_eq "$klive" "1" "lua 는 SUPER+K 를 활성화한다"
 
 hsrc=$(cat "$H")
 if grep -Eiq '^[[:space:]]*hyprctl[[:space:]]+reload' <<<"$hsrc"; then
@@ -96,6 +98,27 @@ assert_eq "$code" "0" "--force 는 충돌이 있어도 주입한다"
 body=$(cat "$hypr/hyprland.lua")
 assert_contains "$body" "-- >>> cachy-omarchy >>>" "--force 후 관리 블록"
 assert_contains "$body" "walker" "--force 는 기존 bind 줄을 지우지 않는다"
+assert_contains "$out" "기존 설정은 삭제하지 않는다" "--force 는 기존 설정 보존을 고지한다"
+
+# --- lua K-only conflict ----------------------------------------------------
+cat >"$hypr/hyprland.lua" <<'EOF'
+local mainMod = "SUPER"
+hl.bind(mainMod .. " + K", hl.dsp.exec_cmd("existing-k"))
+hl.bind(mainMod .. " + Return", hl.dsp.exec_cmd("ghostty"))
+EOF
+before=$(cat "$hypr/hyprland.lua")
+out=$(COO_HYPR_DIR="$hypr" COO_CONFIG_DIR="$HOME/.config/cachy-omarchy" "$H" 2>&1); code=$?
+assert_eq "$code" "0" "SUPER+K 단독 충돌도 기본 모드는 주입하지 않는다"
+assert_contains "$out" "SUPER+K" "K 단독 충돌 경고가 SUPER+K 를 말한다"
+after=$(cat "$hypr/hyprland.lua")
+assert_eq "$after" "$before" "K 단독 충돌 시 lua 본문이 그대로다"
+
+out=$(COO_HYPR_DIR="$hypr" COO_CONFIG_DIR="$HOME/.config/cachy-omarchy" "$H" --force 2>&1); code=$?
+assert_eq "$code" "0" "--force 는 K 단독 충돌에도 주입한다"
+assert_contains "$out" "기존 설정은 삭제하지 않는다" "K 충돌 --force 전 보존 고지"
+body=$(cat "$hypr/hyprland.lua")
+assert_contains "$body" "-- >>> cachy-omarchy >>>" "K 충돌 --force 후 관리 블록"
+assert_contains "$body" "existing-k" "K 충돌 --force 도 기존 bind 줄을 지우지 않는다"
 
 # --- conf, no conflict ------------------------------------------------------
 rm -f "$hypr/hyprland.lua"
