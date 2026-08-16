@@ -47,7 +47,13 @@ has_space_conflict() {
 }
 
 has_k_conflict() {
-  grep -qiE 'SUPER[[:space:]]*\+[[:space:]]*K|[[:space:]]\+[[:space:]]*K["'\'']|,\s*K[[:space:],]' <<<"$1"
+  awk '
+    /^[[:space:]]*(#|--)/ { next }
+    /^[[:space:]]*hl\.bind[[:space:]]*\([[:space:]]*["\047]SUPER[[:space:]]*\+[[:space:]]*K["\047]/ { found=1; exit }
+    /^[[:space:]]*hl\.bind[[:space:]]*\([[:space:]]*mainMod[[:space:]]*\.\.[[:space:]]*["\047][[:space:]]*\+[[:space:]]*K["\047]/ { found=1; exit }
+    /^[[:space:]]*bind[[:space:]]*=[[:space:]]*(SUPER|\$mainMod)[[:space:]]*,[[:space:]]*K([[:space:]]*,|$)/ { found=1; exit }
+    END { exit !found }
+  ' <<<"$1"
 }
 
 install_overlay() {
@@ -117,6 +123,10 @@ fi
 if (( conflict == 1 && FORCE == 0 )); then
   printf 'warning: 기존 설정이 %s 를 이미 바인딩한다. 덮어쓰지 않는다. 교체하려면 --force.\n' "$msg" >&2
   exit 0
+fi
+
+if (( conflict == 1 && FORCE == 1 )); then
+  printf 'warning: --force로 관리 블록을 추가한다. 기존 설정은 삭제하지 않는다.\n' >&2
 fi
 
 inject "$target" "$begin" "$end" "$snippet"

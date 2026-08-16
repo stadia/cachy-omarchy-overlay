@@ -41,6 +41,7 @@ for bad in omarchy-settings limine snapper sddm plymouth omarchy-keyring perl; d
 done
 assert_contains "$deps" "quickshell" "depends quickshell"
 assert_contains "$deps" "hyprland" "depends hyprland"
+assert_contains "$deps" "inotify-tools" "depends inotify-tools (§28 실측)"
 printf 'ok:   P02-P04 unsafe deps absent (if no FAIL above)\n'
 
 [[ $ASSERT_FAILURES -eq 0 ]]

@@ -6,7 +6,7 @@ pkgdesc='Pinned Omarchy Quattro shell runtime for CachyOS (no omarchy-settings)'
 arch=('any')
 url='https://github.com/basecamp/omarchy'
 license=('MIT')
-depends=('quickshell' 'hyprland')
+depends=('quickshell' 'hyprland' 'inotify-tools')
 makedepends=('git')
 _commit='f0020448ca87329199de7cb12f2015ebc4a3e5e7'
 

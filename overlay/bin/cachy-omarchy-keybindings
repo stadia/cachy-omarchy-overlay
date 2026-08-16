@@ -1,0 +1,731 @@
+#!/usr/bin/env bash
+# SUPER+K 키바인딩 UI — 업스트림 bin/omarchy-menu-keybindings 의 CachyOS 적응 카피.
+#
+# 원본: basecamp/omarchy @ f0020448ca87329199de7cb12f2015ebc4a3e5e7 (MIT),
+# bin/omarchy-menu-keybindings. 시각/런타임 메커니즘은 업스트림 그대로다:
+# hyprctl binds 수집 → Lua 소스 캐시 → omarchy-menu-select (summon omarchy.menu
+# select mode) → 선택 bind dispatch. 새 QML 뷰어를 만들지 않는다 (SPEC 4.2, 57).
+#
+# 적응 (데이터 수집만, SPEC 57 — 업스트림은 description 달린 Omarchy lua 설정을
+# 가정한다. CachyOS 기본 hyprland.lua 는 description 이 0개라 업스트림 그대로는
+# 정적 2행만 나온다 — docs/COMMAND_AUDIT.md "M4 실측"):
+#   1. Lua 캐시가 description 유무와 무관하게 모든 hl.bind 를 기록한다.
+#      description 이 없으면 합성한다: exec_cmd 는 명령 문자열, 그 외
+#      hl.dsp.* 는 "hl.dsp." 를 벗긴 식 (window.close() 등).
+#   2. 캐시 조인 키는 modmask+description 이 아니라 modmask+key 다.
+#      description 없이는 description 조인이 전부 충돌/미스이기 때문이다.
+#      code:NNN bind 는 hyprctl 이 심볼을 안 주면 조인이 빗나갈 수 있다
+#      (이 호스트 실측: code: bind 0개 — 문서 한계로 남긴다).
+#   3. static_bindings() (Omarchy webapp 전용 SHIFT ALT L/D 2행) 를 뺀다.
+#      CachyOS 에는 그 대상이 없다.
+#   4. 인자 처리(--help/--print)와 셸 기동 pre-flight 는 우리 래퍼 관례를 따른다.
+#   5. 사용자 Lua는 제한 환경 loadfile(..., "t", env)로만 읽는다. config에는
+#      fake hl, 순수 Lua 기본 기능, 읽기 전용 string/table/math, os.getenv만 보이며
+#      io/package/require/debug/dofile/loadfile은 없다.
+#
+# IPC 를 재발명하지 않는다: 선택 UI 는 omarchy-menu-select 가
+# `omarchy-shell shell summon omarchy.menu` 를 부르고, compat 의 omarchy-shell
+# shim 이 cachy-omarchy-shell --ipc 로 전달한다.
+set -uo pipefail
+
+here=$(cd "$(dirname -- "$0")" && pwd)
+if [[ -n ${COO_SHELL_BIN:-} ]]; then
+  SHELL_BIN=$COO_SHELL_BIN
+elif [[ -x $here/cachy-omarchy-shell ]]; then
+  SHELL_BIN=$here/cachy-omarchy-shell
+else
+  SHELL_BIN=cachy-omarchy-shell
+fi
+
+PREFIX_ROOT=${COO_PREFIX_ROOT:-/usr/share/cachy-omarchy}
+OMARCHY_PATH=${COO_OMARCHY_PATH:-$PREFIX_ROOT/upstream}
+COMPAT_BIN=${COO_COMPAT_BIN:-/usr/lib/cachy-omarchy/compat/bin}
+
+fail() { printf 'error: %s\n' "$1" >&2; exit 1; }
+
+usage() {
+  cat <<'USAGE'
+사용법: cachy-omarchy-keybindings [--print]
+
+SUPER+K 로 여는 키바인딩 검색 메뉴. 핀된 업스트림 omarchy-menu-keybindings
+(basecamp/omarchy @ f0020448, MIT) 의 CachyOS 적응 카피다. 시각/런타임은
+업스트림 메커니즘(omarchy-menu-select + omarchy.menu select mode)이고,
+데이터 수집만 CachyOS Hyprland 설정(description-less lua 포함)에 맞췄다.
+
+  --print, -p   메뉴를 열지 않고 목록만 출력한다 (셸 불필요)
+  --help        이 도움말
+
+인자 없이 실행하면 실행 중인 cachy-omarchy-shell 에 검색 메뉴를 연다.
+환경: COO_OMARCHY_PATH, COO_COMPAT_BIN, COO_SHELL_BIN (래퍼와 동일).
+USAGE
+}
+
+# --- 적응 1+2: Lua 소스 캐시 (모든 bind, modmask+key 조인) -------------------
+declare -A LUA_BIND_DISPATCHER_MAP
+declare -A LUA_BIND_ARG_MAP
+declare -A LUA_BIND_DESCRIPTION_MAP
+
+# Hyprland reports XKB keycodes for code: bindings. Resolve them to symbols
+# via the compiled keymap, with a small fallback for common keys so the menu
+# remains readable if xkbcli cannot resolve a symbol.
+parse_keycodes() {
+  awk '
+    BEGIN {
+      split("10=1 11=2 12=3 13=4 14=5 15=6 16=7 17=8 18=9 19=0 20=MINUS 21=EQUAL 59=COMMA 60=PERIOD 61=SLASH", fallbacks, " ")
+      for (i in fallbacks) {
+        separator = index(fallbacks[i], "=")
+        keycode_symbol[substr(fallbacks[i], 1, separator - 1)] = substr(fallbacks[i], separator + 1)
+      }
+
+      # </dev/null keeps xkbcli from consuming the binding records on stdin
+      keymap_cmd = "xkbcli compile-keymap </dev/null"
+      section = ""
+      while ((keymap_cmd | getline line) > 0) {
+        if (line ~ /xkb_keycodes/) { section = "codes"; continue }
+        if (line ~ /xkb_symbols/)  { section = "syms";  continue }
+        if (section == "codes" && match(line, /<([A-Za-z0-9_]+)>\s*=\s*([0-9]+)\s*;/, m)) code_by_name[m[1]] = m[2]
+        if (section == "syms" && match(line, /key\s*<([A-Za-z0-9_]+)>\s*\{\s*\[\s*([^, \]]+)/, m)) sym_by_name[m[1]] = m[2]
+      }
+      close(keymap_cmd)
+
+      for (name in code_by_name) {
+        code = code_by_name[name]
+        symbol = sym_by_name[name]
+        if (code != "" && symbol != "" && symbol != "NoSymbol") keycode_symbol[code] = toupper(symbol)
+      }
+
+      mouse_symbol["272"] = "LEFT MOUSE BUTTON"
+      mouse_symbol["273"] = "RIGHT MOUSE BUTTON"
+      mouse_symbol["274"] = "MIDDLE MOUSE BUTTON"
+    }
+    {
+      if (match($0, /code:([0-9]+)/, match_parts)) {
+        code = match_parts[1]
+        symbol = keycode_symbol[code]
+        if (symbol == "") symbol = "code:" code
+        sub("code:" code, symbol)
+      } else if (match($0, /mouse:([0-9]+)/, match_parts)) {
+        code = match_parts[1]
+        symbol = mouse_symbol[code]
+        if (symbol == "") symbol = "mouse:" code
+        sub("mouse:" code, symbol)
+      }
+
+      print
+    }
+  '
+}
+
+# Supplement `hyprctl binds` for Lua-only binds that Hyprland currently
+# reports as dispatcher __lua and without their original key for code: binds.
+#
+# ADAPTED: upstream records only binds with a description opt and joins on
+# modmask+description. CachyOS hyprland.lua sets no descriptions, so we
+# record every bind and join on modmask+key, synthesizing a display
+# description when the source has none.
+build_lua_bind_cache() {
+  local modmask key dispatcher arg description
+
+  omarchy-cmd-present lua || return 0
+
+  while IFS=$'\t' read -r modmask key dispatcher arg description; do
+    [[ -z $modmask || -z $key ]] && continue
+
+    LUA_BIND_DISPATCHER_MAP["$modmask,$key"]="$dispatcher"
+    LUA_BIND_ARG_MAP["$modmask,$key"]="$arg"
+    LUA_BIND_DESCRIPTION_MAP["$modmask,$key"]="$description"
+  done < <(
+    lua <<'LUA'
+local modifiers = { SHIFT = 1, CTRL = 4, CONTROL = 4, ALT = 8, SUPER = 64 }
+
+local function split_keys(keys)
+  local modmask = 0
+  local key = ""
+
+  for part in string.gmatch(tostring(keys or ""), "[^+]+") do
+    local value = part:gsub("^%s+", ""):gsub("%s+$", "")
+    local modifier = modifiers[string.upper(value)]
+
+    if modifier then
+      modmask = modmask + modifier
+    else
+      key = value
+    end
+  end
+
+  return modmask, key
+end
+
+local function lua_literal(value)
+  local value_type = type(value)
+
+  if value_type == "string" then
+    return string.format("%q", value)
+  elseif value_type == "number" or value_type == "boolean" then
+    return tostring(value)
+  elseif value_type == "table" then
+    local parts = {}
+    local keys = {}
+    local array_length = #value
+
+    for index = 1, array_length do
+      parts[#parts + 1] = lua_literal(value[index])
+    end
+
+    for key in pairs(value) do
+      if not (type(key) == "number" and key >= 1 and key <= array_length and math.floor(key) == key) then
+        keys[#keys + 1] = key
+      end
+    end
+
+    table.sort(keys, function(left, right)
+      return tostring(left) < tostring(right)
+    end)
+
+    for _, key in ipairs(keys) do
+      local key_prefix
+      if type(key) == "string" and key:match("^[%a_][%w_]*$") then
+        key_prefix = key .. " = "
+      else
+        key_prefix = "[" .. lua_literal(key) .. "] = "
+      end
+
+      parts[#parts + 1] = key_prefix .. lua_literal(value[key])
+    end
+
+    return "{ " .. table.concat(parts, ", ") .. " }"
+  elseif value_type == "nil" then
+    return "nil"
+  else
+    return "nil"
+  end
+end
+
+local function call_expression(path, ...)
+  local args = {}
+
+  for index = 1, select("#", ...) do
+    args[index] = lua_literal(select(index, ...))
+  end
+
+  return path .. "(" .. table.concat(args, ", ") .. ")"
+end
+
+local function dispatcher(kind, arg, expr)
+  return {
+    __omarchy_dispatcher = true,
+    kind = kind or "",
+    arg = arg or "",
+    expr = expr or "",
+  }
+end
+
+local function dsp_proxy(path)
+  return setmetatable({ path = path }, {
+    __index = function(self, key)
+      return dsp_proxy(self.path .. "." .. tostring(key))
+    end,
+    __call = function(self, ...)
+      local first_arg = ...
+      local expr = call_expression(self.path, ...)
+
+      if self.path == "hl.dsp.exec_cmd" and type(first_arg) == "string" then
+        return dispatcher("exec", first_arg, expr)
+      end
+
+      return dispatcher("lua", expr, expr)
+    end,
+  })
+end
+
+local noop
+noop = setmetatable({}, {
+  __index = function()
+    return noop
+  end,
+  __call = function()
+    return noop
+  end,
+})
+
+hl = setmetatable({
+  dsp = dsp_proxy("hl.dsp"),
+  bind = function(keys, bind_dispatcher, opts)
+    opts = opts or {}
+
+    local modmask, key = split_keys(keys)
+    if key == "" then
+      return noop
+    end
+
+    local kind = ""
+    local arg = ""
+
+    if type(bind_dispatcher) == "table" and bind_dispatcher.__omarchy_dispatcher then
+      kind = bind_dispatcher.kind or ""
+      arg = bind_dispatcher.arg or bind_dispatcher.expr or ""
+    elseif type(bind_dispatcher) == "string" and bind_dispatcher ~= "" then
+      kind = "exec"
+      arg = bind_dispatcher
+    end
+
+    -- ADAPTED: synthesize a readable description when the config sets none.
+    local description = opts.description or ""
+    if description == "" then
+      if kind == "exec" then
+        description = arg
+      elseif kind == "lua" then
+        description = (arg:gsub("^hl%.dsp%.", ""))
+      end
+    end
+
+    print(table.concat({ tostring(modmask), key, kind, arg, description }, "\t"))
+
+    return noop
+  end,
+  get_config = function()
+    return nil
+  end,
+}, {
+  __index = function()
+    return noop
+  end,
+})
+
+-- User configuration is untrusted input. load it as text in a deliberately
+-- small environment: no io/package/require/debug/dofile/loadfile reach config.
+-- Read-only proxies also stop a config from mutating this scanner's standard
+-- library tables after they are whitelisted for normal bind expressions.
+local function readonly(source)
+  return setmetatable({}, {
+    __index = source,
+    __newindex = function()
+      error("attempt to modify restricted Lua scan environment", 2)
+    end,
+    __metatable = false,
+  })
+end
+
+local system_getenv = os.getenv
+local scan_env = {
+  assert = assert,
+  error = error,
+  ipairs = ipairs,
+  next = next,
+  pairs = pairs,
+  pcall = pcall,
+  select = select,
+  tonumber = tonumber,
+  tostring = tostring,
+  type = type,
+  unpack = table.unpack,
+  hl = hl,
+  math = readonly(math),
+  string = readonly(string),
+  table = readonly(table),
+  os = readonly({ getenv = system_getenv }),
+}
+scan_env._G = scan_env
+
+local config = system_getenv("HOME") .. "/.config/hypr/hyprland.lua"
+local chunk, load_err = loadfile(config, "t", scan_env)
+if chunk then
+  local ok, err = pcall(chunk)
+  if not ok and system_getenv("DEBUG") == "1" then
+    io.stderr:write("[DEBUG] lua bind scan failed: " .. tostring(err) .. "\n")
+  end
+elseif load_err and system_getenv("DEBUG") == "1" then
+  io.stderr:write("[DEBUG] lua bind scan load failed: " .. tostring(load_err) .. "\n")
+end
+LUA
+  )
+}
+
+modmask_to_text() {
+  case "$1" in
+    0)  printf '' ;;
+    1)  printf 'SHIFT' ;;
+    4)  printf 'CTRL' ;;
+    5)  printf 'SHIFT CTRL' ;;
+    8)  printf 'ALT' ;;
+    9)  printf 'SHIFT ALT' ;;
+    12) printf 'CTRL ALT' ;;
+    13) printf 'SHIFT CTRL ALT' ;;
+    64) printf 'SUPER' ;;
+    65) printf 'SUPER SHIFT' ;;
+    68) printf 'SUPER CTRL' ;;
+    69) printf 'SUPER SHIFT CTRL' ;;
+    72) printf 'SUPER ALT' ;;
+    73) printf 'SUPER SHIFT ALT' ;;
+    76) printf 'SUPER CTRL ALT' ;;
+    77) printf 'SUPER SHIFT CTRL ALT' ;;
+    *)  printf '%s' "$1" ;;
+  esac
+}
+
+# Fetch dynamic keybindings from Hyprland.
+#
+# Also do some pre-processing:
+# - Fill missing Lua __lua dispatch metadata from the Lua source cache
+# - Remove standard Omarchy bin path prefix
+# - Map numeric modifier key mask to a textual rendition
+# - Output unit-separator-delimited values so command arguments may contain commas
+#
+# ADAPTED: the cache join key is modmask+key (upstream: modmask+description).
+# Internal records use ASCII unit separator (0x1f), which preserves commas in
+# command arguments and synthetic descriptions.
+dynamic_bindings() {
+  local modmask key keycode description dispatcher arg modifiers cache_key
+
+  # Parse the plain `hyprctl binds` output rather than `hyprctl -j binds`:
+  # Hyprland 0.56.0 emits invalid JSON for binds (misaligned fields in
+  # bindsRequest), and older versions broke on quotes in bind args.
+  hyprctl binds | awk '
+    function emit() {
+      if (!seen) return
+      seen = 0
+      printf "%s\x1f%s\x1f%s\x1f%s\x1f%s\x1f%s\n", f["modmask"], f["key"], f["keycode"], f["description"], f["dispatcher"], f["arg"]
+    }
+    /^bind/ { emit(); seen = 1; delete f; next }
+    seen && match($0, /^\t[a-z]+: /) { f[substr($0, 2, RLENGTH - 3)] = substr($0, RLENGTH + 1) }
+    END { emit() }
+  ' |
+    while IFS=$'\x1f' read -r modmask key keycode description dispatcher arg; do
+      # Lua binds report their full display key ("SUPER + code:20"); the
+      # modifiers are already carried separately in modmask.
+      key="${key##* + }"
+
+      if [[ -z $key && $keycode != "0" ]]; then
+        key="code:$keycode"
+      fi
+
+      # Lua binds are opaque in hyprctl (dispatcher __lua, numeric arg).
+      # Resolve them from the source cache; drop the row only when the
+      # source has no such bind (e.g. created at runtime outside the file).
+      if [[ $dispatcher == "__lua" ]]; then
+        cache_key="$modmask,$key"
+        [[ -z ${LUA_BIND_DISPATCHER_MAP["$cache_key"]+set} ]] && continue
+        dispatcher="${LUA_BIND_DISPATCHER_MAP["$cache_key"]}"
+        arg="${LUA_BIND_ARG_MAP["$cache_key"]}"
+        [[ -z $description ]] && description="${LUA_BIND_DESCRIPTION_MAP["$cache_key"]}"
+      fi
+
+      # The Copilot key just duplicates an existing binding, so keep it hidden
+      [[ $key == "code:201" ]] && continue
+
+      case "$key" in
+        comma) key="COMMA" ;;
+        period) key="PERIOD" ;;
+        minus) key="MINUS" ;;
+        equal) key="EQUAL" ;;
+        slash) key="SLASH" ;;
+      esac
+
+      modifiers=$(modmask_to_text "$modmask")
+      arg="${arg//~\/.local\/share\/omarchy\/bin\//}"
+
+      printf '%s\x1f%s\x1f%s\x1f%s\x1f%s\n' "$modifiers" "$key" "$description" "$dispatcher" "$arg"
+    done
+}
+
+# Parse and format keybindings
+#
+# `awk` does the heavy lifting:
+# - Set the field separator to ASCII unit separator (0x1f), not comma.
+# - Joins the key combination (e.g., "SUPER + Q").
+# - Keeps command arguments containing commas intact.
+# - Prints display text and dispatch metadata as tab-separated fields.
+parse_binding_records() {
+  awk -F '\037' '
+{
+    # Combine the modifier and key (first two fields)
+    key_combo = $1 " + " $2;
+
+    # Clean up: strip leading "+" if present, trim spaces
+    gsub(/^[ \t]*\+?[ \t]*/, "", key_combo);
+    gsub(/[ \t]+$/, "", key_combo);
+
+    # Use description, if set
+    action = $3;
+    dispatcher = $4;
+
+    # Fields are unit-separator-delimited, so commas in args stay intact.
+    arg = $5;
+
+    if (action == "") {
+        # Reconstruct the command from dispatcher and arg.
+        action = dispatcher "," arg;
+
+        # Clean up leading "exec, ", and trim
+        gsub(/(^|,)[[:space:]]*exec[[:space:]]*,?/, "", action);
+        gsub(/(^|[[:space:]])uwsm(-app| app)[[:space:]]+--[[:space:]]+/, "", action);
+        gsub(/^[ \t]+|[ \t]+$/, "", action);
+        gsub(/[ \t]+/, " ", key_combo);  # Collapse multiple spaces to one
+    }
+
+    if (action != "") {
+        printf "%-35s → %s\t%s\t%s\n", key_combo, action, dispatcher, arg;
+    }
+}'
+}
+
+prioritize_entries() {
+  awk -F '\t' '
+  {
+    line = $1
+    prio = 50
+    if (match(line, /Keybindings/)) prio = 0
+    if (match(line, /Omarchy menu/))  prio = 1
+    if (match(line, /Terminal/)) prio = 2
+    if (match(line, /Browser/) && !match(line, /Browser[[:space:]]*\(/) && !match(line, /SUPER SHIFT.*\+.*B.*→.*Browser/)) prio = 3
+    if (match(line, /File manager/) && !match(line, /File manager \(cwd\)/))  prio = 4
+    if (match(line, /Launch apps/))  prio = 5
+    if (match(line, /System menu/))  prio = 6
+    if (match(line, /Theme menu/))  prio = 7
+    if (match(line, /Full screen/))  prio = 8
+    if (match(line, /Full width/))  prio = 9
+    if (match(line, /Close window/))  prio = 10
+    if (match(line, /Close all windows/))  prio = 11
+    if (match(line, /Lock system/))  prio = 12
+    if (match(line, /Toggle window floating/))  prio = 13
+    if (match(line, /Toggle window split/))  prio = 14
+    if (match(line, /Pop window/))  prio = 15
+    if (match(line, /Universal/))  prio = 16
+    if (match(line, /Clipboard/))  prio = 17
+    if (match(line, /Audio controls/))  prio = 18
+    if (match(line, /Bluetooth controls/))  prio = 19
+    if (match(line, /Wifi controls/))  prio = 20
+    if (match(line, /Emojis/))  prio = 21
+    if (match(line, /Color picker/))  prio = 22
+    if (match(line, /Screenshot/))  prio = 23
+    if (match(line, /Screenrecording/))  prio = 24
+    if (match(line, /Tmux/)) prio = 25
+    if (match(line, /Herdr/)) prio = 26
+    if (match(line, /SUPER SHIFT.*\+.*B.*→.*Browser/)) prio = 27
+    if (match(line, /File manager \(cwd\)/))  prio = 28
+    if (match(line, /(Switch|Next|Former|Previous).*workspace/))  prio = 29
+    if (match(line, /Move window to workspace/))  prio = 30
+    if (match(line, /Move window silently to workspace/))  prio = 31
+    if (match(line, /Swap window/))  prio = 32
+    if (match(line, /Focus/))  prio = 33
+    if (match(line, /Move window$/))  prio = 34
+    if (match(line, /Resize window/))  prio = 35
+    if (match(line, /Expand window/))  prio = 36
+    if (match(line, /Shrink window/))  prio = 37
+    if (match(line, /scratchpad/))  prio = 38
+    if (match(line, /notification/))  prio = 39
+    if (match(line, /Toggle window transparency/))  prio = 40
+    if (match(line, /Toggle workspace gaps/))  prio = 41
+    if (match(line, /Toggle nightlight/))  prio = 42
+    if (match(line, /Toggle locking/))  prio = 43
+    if (match(line, /group/))  prio = 94
+    if (match(line, /Scroll active workspace/))  prio = 95
+    if (match(line, /Cycle to/))  prio = 96
+    if (match(line, /Reveal active/))  prio = 97
+    if (match(line, /Apple Display/))  prio = 98
+    if (match(line, /XF86/))  prio = 99
+    if (match(line, /Tmux keybindings/)) prio = 100
+    if (match(line, /Herdr keybindings/)) prio = 101
+
+    # print "priority<TAB>record"
+    printf "%d\t%s\n", prio, $0
+  }' |
+  sort -k1,1n -k2,2 |
+  cut -f2-
+}
+
+output_binding_records_uncached() {
+  local dynamic
+
+  build_lua_bind_cache
+  dynamic=$(dynamic_bindings)
+
+  # Fail when Hyprland reported no binds so the fallout of a broken hyprctl
+  # is never cached. (ADAPTED: no static fallback rows — the upstream
+  # hardcoded Omarchy webapp rows are meaningless on CachyOS.)
+  [[ -n $dynamic ]] || return 1
+
+  printf '%s\n' "$dynamic" |
+    sort -u |
+    parse_keycodes |
+    parse_binding_records |
+    prioritize_entries
+}
+
+keybindings_cache_key() {
+  {
+    # v12 invalidates upstream v11 records: this adapted command changes both
+    # record encoding and the source-derived Lua metadata.
+    printf 'v12\n'
+    hyprctl devices 2>/dev/null | grep -F 'active keymap:'
+    hyprctl binds 2>/dev/null
+  } | sha256sum | awk '{ print $1 }'
+}
+
+refresh_keybindings_cache() {
+  local cache_dir="$1"
+  local cache_file="$2"
+  local cache_name="$3"
+  local tmp_file
+
+  tmp_file=$(mktemp "$cache_dir/keybindings.XXXXXX") || return 1
+
+  if output_binding_records_uncached >"$tmp_file"; then
+    mv "$tmp_file" "$cache_file"
+    find "$cache_dir" -maxdepth 1 -type f -name 'keybindings-*.records' ! -name "$cache_name" -delete 2>/dev/null || true
+  else
+    rm -f "$tmp_file"
+    return 1
+  fi
+}
+
+output_binding_records() {
+  local cache_dir cache_file cache_name
+
+  cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/omarchy"
+  cache_name="keybindings-$(keybindings_cache_key).records"
+  cache_file="$cache_dir/$cache_name"
+
+  if [[ -s $cache_file ]]; then
+    cat "$cache_file"
+  elif mkdir -p "$cache_dir" 2>/dev/null && refresh_keybindings_cache "$cache_dir" "$cache_file" "$cache_name"; then
+    cat "$cache_file"
+  else
+    output_binding_records_uncached
+  fi
+}
+
+output_keybindings() {
+  output_binding_records | cut -f1
+}
+
+trim() {
+  local value="$1"
+
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+
+  printf '%s\n' "$value"
+}
+
+lua_string() {
+  jq -Rnr --arg value "$1" '$value | @json'
+}
+
+dispatch_lua_expression() {
+  local expression="$1"
+  local output status
+
+  output=$(hyprctl dispatch "$expression" 2>&1)
+  status=$?
+
+  if (( status == 0 )) && [[ -z $output || $output == "ok" ]]; then
+    [[ -n $output ]] && printf '%s\n' "$output"
+    return 0
+  fi
+
+  return 1
+}
+
+dispatch_exec_binding() {
+  local command="$1"
+
+  dispatch_lua_expression "hl.dsp.exec_cmd($(lua_string "$command"))" || hyprctl dispatch exec "$command"
+}
+
+dispatch_sendshortcut_binding() {
+  local arg="$1"
+  local mods key window rest
+
+  IFS=, read -r mods key window rest <<<"$arg"
+  mods=$(trim "$mods")
+  key=$(trim "$key")
+  window=$(trim "$window")
+
+  [[ -z $window ]] && window="activewindow"
+
+  if [[ -n $key ]] && dispatch_lua_expression "hl.dsp.send_key_state({ mods = $(lua_string "$mods"), key = $(lua_string "$key"), state = \"down\", window = $(lua_string "$window") })"; then
+    sleep 0.05
+    dispatch_lua_expression "hl.dsp.send_key_state({ mods = $(lua_string "$mods"), key = $(lua_string "$key"), state = \"up\", window = $(lua_string "$window") })"
+    return
+  fi
+
+  hyprctl dispatch sendshortcut "$arg"
+}
+
+dispatch_binding() {
+  local dispatcher="$1"
+  local arg="$2"
+
+  case "$dispatcher" in
+    exec)
+      [[ -n $arg ]] && dispatch_exec_binding "$arg"
+      ;;
+    sendshortcut)
+      [[ -n $arg ]] && dispatch_sendshortcut_binding "$arg"
+      ;;
+    lua)
+      [[ -n $arg ]] && hyprctl dispatch "$arg"
+      ;;
+    "") return 1 ;;
+    *)
+      if [[ -n $arg ]]; then
+        hyprctl dispatch "$dispatcher" "$arg"
+      else
+        hyprctl dispatch "$dispatcher"
+      fi
+      ;;
+  esac
+}
+
+# --- 우리 래퍼 계약: 인자 처리 + 환경 + pre-flight -----------------------------
+
+case ${1:-} in
+  --help) usage; exit 0 ;;
+  --print|-p) MODE=print ;;
+  "") MODE=interactive ;;
+  *) printf 'error: 알 수 없는 인자: %s\n' "$1" >&2; usage >&2; exit 1 ;;
+esac
+
+[[ -f $OMARCHY_PATH/shell/shell.qml ]] \
+  || fail "셸 트리를 찾을 수 없다: $OMARCHY_PATH/shell/shell.qml"
+
+# compat shim 과 스테이징된 업스트림 헬퍼는 이 프로세스와 그 자식에만 보인다.
+# 사용자의 일반 PATH 를 오염시키지 않는다 (SPEC 44, 45).
+export OMARCHY_PATH
+export COO_OMARCHY_PATH=$OMARCHY_PATH
+export COO_SHELL_BIN=$SHELL_BIN
+[[ -d $COMPAT_BIN ]] && PATH="$COMPAT_BIN:$PATH"
+PATH="$OMARCHY_PATH/bin:$PATH"
+export PATH
+
+if [[ $MODE == interactive ]]; then
+  [[ -x $OMARCHY_PATH/bin/omarchy-menu-select ]] \
+    || fail "업스트림 선택 헬퍼를 찾을 수 없다: $OMARCHY_PATH/bin/omarchy-menu-select"
+
+  out=$("$SHELL_BIN" --ipc shell ping 2>&1)
+  code=$?
+  if (( code != 0 )); then
+    printf '%s\n' "$out" >&2
+    if [[ $out == *"셸이 실행 중이 아니다"* || $out == *"셸이 응답하지 않는다"* ]]; then
+      printf 'error: 셸이 기동되어 있지 않다. cachy-omarchy-shell --run 을 먼저 실행하라.\n' >&2
+    fi
+    exit 1
+  fi
+fi
+
+if [[ $MODE == print ]]; then
+  output_keybindings
+else
+  records=$(output_binding_records)
+  selection=$(cut -f1 <<<"$records" |
+    omarchy-menu-select 'Keybindings' -- --width 800 --height 500)
+
+  if [[ -n $selection ]]; then
+    record=$(awk -F '\t' -v selection="$selection" '$1 == selection { print; exit }' <<<"$records")
+    dispatcher=$(cut -f2 <<<"$record")
+    arg=$(cut -f3- <<<"$record")
+
+    dispatch_binding "$dispatcher" "$arg"
+  fi
+fi

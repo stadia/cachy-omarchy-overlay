@@ -261,8 +261,63 @@ esac
   `omarchy-menu-keybindings`, `omarchy-restart-shell`). 나머지 DISABLED/disable.
   비활성 경로 = 공식 bin 미설치 + when 가드. JSONC 패치 없음
 
-### M4 다음 단계
+## 8. M4 결과 — 업스트림 키바인딩 UI
 
-`omarchy-menu-keybindings` / SUPER+K (`SPEC.md` §57·§72). 바인딩 파일의 주석
-자리를 활성화하고, 업스트림 시각을 우선한다. `gum`/`jq` 의존은 키바인드 UI 에서
-재측정.
+브랜치 `feature/spec-1.0-m4`. `SUPER+K`의 공개 명령은
+`cachy-omarchy-keybindings`다. 이는 핀된 `bin/omarchy-menu-keybindings`
+(`f0020448ca87329199de7cb12f2015ebc4a3e5e7`, MIT)의 **적응 카피**이며, 별도
+**커스텀 QML** 키바인딩 뷰어는 만들지 않았다. 시각/런타임 경로는 업스트림 그대로
+`omarchy-menu-select` → compat `omarchy-shell` →
+`shell summon omarchy.menu` select mode 다.
+
+### 데이터 수집 적응과 한계
+
+호스트 CachyOS Lua 설정은 `description` 없는 `__lua` bind 48개를 보고한다. 원본
+스크립트는 description 조인 때문에 webapp 정적 2행만 출력했다. 적응 카피는
+`modmask+key`로 Lua 캐시를 조인하고 설명을 합성하며, CachyOS에 없는 정적 webapp
+행은 제거했다. 실사용 설정으로 한 `--print`는 정확히 **48** record를 출력한다.
+캐시 schema는 업스트림 v11을 재사용하지 않는 **v12**다.
+
+`code:NNN` bind가 Hyprland에서 기호 키를 주지 않으면 조인이 빗나갈 수 있고, 같은
+modmask+key를 submap/중복 정의하면 마지막 Lua source record가 이긴다. 이 두 한계는
+M4에서 해소하지 않았다.
+
+사용자 Lua source는 실행 가능한 신뢰 입력으로 취급하지 않는다. 스캐너는
+`loadfile(config, "t", env)` 제한 환경에서만 `pcall(chunk)` 하며 **dofile 하지 않는다**.
+config에는 fake `hl`, 순수 Lua 기능, 읽기 전용 `string`/`table`/`math`, `os.getenv`만
+보이고 `io`/`package`/`require`/`debug`/`dofile`/`loadfile`은 없다. `os.execute`로
+marker를 만들려는 회귀 fixture가 실행되지 않음을 검증했다. 지원하지 않는 config API는
+fail-closed 되므로 그 뒤 bind가 누락될 수 있다.
+
+### compat·패키지 표면
+
+패키지 upstream tree에는 필요한 두 원본만 stage한다:
+`upstream/bin/omarchy-menu-select`, `upstream/bin/omarchy-cmd-present`.
+`overlay/compat/bin/omarchy-shell`은 `cachy-omarchy-shell --ipc`로 전달한다. compat에
+`omarchy-menu-keybindings` **동명 shim**은 두지 않았으므로, upstream 메뉴의
+`learn.keybindings` action은 여전히 범위 밖이며 실패한다. 범위는 SUPER+K / 공개 명령만이다.
+공식 omarchy를 설치하거나 대량의 가짜 `omarchy-*`를 `/usr/bin`에 설치하지 않았다.
+
+### 라이브 샌드박스 실측
+
+`tests/test.sh`의 샌드박스 HOME에 실제 `hyprland.lua`를 읽기 전용 복사하고 `bar-off`
+상태에서 추출 tree 셸을 기동했다. helper는 `omarchy-menu` layer를 열었고 측정 기하는
+**1920×1080 @ 0,0** 이었다. Lua cache는 정확히 48행이었다. binding을 선택하지 않고
+`Escape`만 보내면 layer가 닫히고 dispatch 없이 **helper exit 0**으로 끝났다. journal에는
+`Configuration Loaded` 한 줄, QML 오류/`ERROR` 없음, PID cleanup 후 남은 menu layer도
+없었다.
+
+이는 테스트 샌드박스 결과일 뿐 **Waybar 보존을 성공으로 선언하지 않는다**. `bar-off`는
+M4 데모 격리용이며 사용자 상태/기존 Waybar 문제 해결이 아니다.
+
+### 관리 바인딩과 범위
+
+`overlay/hypr/bindings.conf`와 `bindings.lua`는 `SUPER+K`를 unbind 뒤
+`cachy-omarchy-keybindings`에 bind한다. 기본은 기존 SUPER+K 충돌을 거부하고, `--force`는
+한 줄 경고 후 기존 사용자 bind 줄을 지우지 않은 채 관리 블록만 추가한다. 문서화된
+SUPER/mainMod 형식만 충돌로 인식한다. 테스트는 사용자 설정을 바꾸지 않으며
+**hyprctl reload 없음**을 정적으로 검증한다.
+
+패치 수 0을 유지한다(`packages/cachy-omarchy-shell/patches/README.md`: `none`).
+overlay 패키지, `cachy-omarchy-init`, Waybar 처리와 실제 설치 통합은 **M5 범위 밖**이며,
+사용자 지시 전에는 구현하거나 merge/handoff 하지 않는다.
