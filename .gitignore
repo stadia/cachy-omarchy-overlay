@@ -1,4 +1,5 @@
 vendor/omarchy/
+/build/omarchy/
 *.log
 .coo-dev/
 .superpowers/
