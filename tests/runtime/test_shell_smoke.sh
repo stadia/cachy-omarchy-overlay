@@ -59,6 +59,9 @@ since=$(date '+%Y-%m-%d %H:%M:%S')
 
 "$W" --run > "$stdout_log" 2>&1 &
 shell_pid=$!
+# cleanup() 이 재진입 방지로 shell_pid 를 비우므로, 종료 후 잔여물 검사가
+# 참조할 PID 는 여기서 별도로 보존해 둔다 (아래 "잔여물 없음" 절 참고).
+our_shell_pid=$shell_pid
 
 # 라이브 세션 위에서 도는 테스트이므로 정리는 중단 경로에서도 반드시 돈다.
 # EXIT 만 걸면 Ctrl-C 가 사용자의 진짜 데스크톱에 quickshell 과 그 layer 표면을
@@ -233,9 +236,16 @@ warns=$(grep -aE "WARN" "$journal_log" | sed 's/\x1b\[[0-9;]*m//g')
 [[ -n $warns ]] && printf '      FINDING: 기동 경고\n%s\n' "$(sed 's/^/        /' <<<"$warns")"
 
 # ------------------------------------------------------------------ 잔여물 없음
-if command -v hyprctl >/dev/null; then
-  remaining=$(hyprctl layers 2>/dev/null | grep -ci "omarchy" || true)
-  assert_eq "$remaining" "0" "종료 후 omarchy layer 표면이 남지 않는다"
+#
+# 이름이 아니라 우리 PID 로 판정한다 (line ~177 의 화면 점유 검사와 동일한
+# 스코핑). 이름 기반(grep -i omarchy)은 사용자의 라이브 셸처럼 이 테스트가
+# 만들지 않은 다른 프로세스의 omarchy-named 표면까지 우리 잔여물로 잘못
+# 세어, 그 프로세스가 실제 사용 중일 때마다 이 단언만 거짓으로 실패한다.
+if command -v hyprctl >/dev/null && command -v jq >/dev/null; then
+  remaining=$(hyprctl -j layers 2>/dev/null | jq -r --argjson pid "$our_shell_pid" \
+    '[ to_entries[].value.levels | to_entries[].value[] | select(.pid == $pid) ] | length') || remaining=""
+  [[ $remaining =~ ^[0-9]+$ ]] || remaining=0
+  assert_eq "$remaining" "0" "종료 후 우리 셸의 layer 표면이 남지 않는다"
 fi
 
 if (( ASSERT_FAILURES )); then
