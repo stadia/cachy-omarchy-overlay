@@ -10,6 +10,7 @@ command -v quickshell >/dev/null || { echo "skip: quickshell 없음"; exit 0; }
 command -v jq >/dev/null || { echo "skip: jq 없음"; exit 0; }
 command -v hyprctl >/dev/null || { echo "skip: hyprctl 없음"; exit 0; }
 command -v wtype >/dev/null || { echo "skip: wtype 없음 (Escape)"; exit 0; }
+[[ ${COO_RUN_LIVE:-0} == 1 ]] || { echo "skip: 라이브 키 주입 (COO_RUN_LIVE=1 필요)"; exit 0; }
 [[ -n ${WAYLAND_DISPLAY:-} ]] || { echo "skip: WAYLAND_DISPLAY 없음"; exit 0; }
 coo_pkg_artifact >/dev/null || { echo "skip: build/*.pkg.tar.zst 없음"; exit 0; }
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs every tests/**/test_*.sh in an isolated HOME. Exit 0 = all green.
-# COO_RUN_LIVE=1 ./tests/test.sh includes live key-injection tests (R05/R06); default runs static+startup checks only.
+# COO_RUN_LIVE=1 ./tests/test.sh includes live key-injection tests (R05/R06 + M4 keybinding UI); default skips them and runs static+startup checks only.
 set -uo pipefail
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 export REPO_ROOT
