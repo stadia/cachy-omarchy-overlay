@@ -48,6 +48,34 @@
 | R09 absence of notification replacement | 측정됨 (package ownership) | `omarchy.notifications`는 disabledPlugins에 있고 notification `/etc`·system-unit path가 없다. **dunst/mako 등 live user daemon 보존은 미검증**이다. |
 | R10 absence of lock replacement | 측정됨 (package ownership) | `omarchy.lock`은 disabledPlugins에 있고 lock `/etc`·system-unit path가 없다. **hyprlock 등 live lock setup 보존은 미검증**이다. |
 
+## M7 upgrade / rollback RC (U01–U10)
+
+`tests/package/test_update_pipeline.sh`는 git, makepkg, bsdtar, checksum, pacman을
+모두 sandbox fake로 대체한다. 따라서 아래 `측정됨`은 **fake lane의 fail-closed
+workflow evidence**이며 실제 `pacman -U` 설치 증거가 아니다.
+
+| Update 기준 | 상태 | M7 RC 증거 / 경계 |
+| --- | --- | --- |
+| U01 no-update exits cleanly | 측정됨 (fake) | fake git discovery/update no-op가 lock·PKGBUILD·pacman log를 바꾸지 않는다. |
+| U02 new version updates lock | 측정됨 (fake) | peeled v4.0.1 commit candidate가 build/audit/default suite 뒤 metadata와 immutable validated manifest를 publish한다. doctor는 이 **미설치** validated manifest를 PASS, installed pointer 부재를 WARN으로 구분한다. |
+| U03 pkgrel resets on pkgver update | 측정됨 (fake) | U02 candidate에서 shell pkgrel만 1로 reset되고 overlay version은 독립적으로 유지된다. |
+| U04 local revision can bump pkgrel | 측정됨 (fake) | `bump-pkgrel`은 lock/pkgver를 바꾸지 않고 local pkgrel만 증가시킨다. |
+| U05 patch failure blocks install | 측정됨 (fake) | candidate patch failure는 metadata publish/pacman 전에 abort한다. |
+| U06 build failure blocks install | 측정됨 (fake) | fake makepkg failure는 artifact/manifest publish 및 pacman을 막는다. |
+| U07 audit failure blocks install | 측정됨 (fake) | fake bsdtar forbidden-path audit failure는 manifest/pacman 전에 abort한다. |
+| U08 runtime failure blocks install | 측정됨 (fake) | candidate test skip/failure는 metadata publish 및 pacman을 막는다. |
+| U09 previous package remains installable | 측정됨 (fake) | `--install`은 prior validated pair를 immutable `packages/previous-*`에 archive한 뒤에만 fake pacman `-U`를 호출하고, 성공 시 `installed-build.manifest`를 기록한다. doctor는 checksum-valid installed pointer를 PASS한다. |
+| U10 rollback works | 측정됨 (fake) | rollback은 newest complete archived shell+overlay pair만 fake pacman에 전달하고 installed pointer를 그 pair로 atomically 갱신한다. doctor는 rollback된 version을 PASS한다. missing/corrupt prior pair는 pacman 전에 fail한다. |
+
+### Pending/rollback fail-closed linkage
+
+install 또는 rollback에서 pacman 성공 뒤 `installed-build.manifest` 확정이 실패하면
+`install-pending.manifest`는 남아 있다. `cachy-omarchy-doctor`는 이를 **FAIL**로
+보고하며 install과 rollback 모두 pacman 호출 전에 거부한다. 이는 stale installed
+pointer를 성공으로 해석하거나 자동 recovery하는 대신 operator가 실제 package state를
+검증하도록 남기는 경계다. doctor는 validated build pointer와 installed/rolled-back
+pointer를 각각 checksum 검증하지만 설치·복구·reload를 수행하지 않는다.
+
 ### Automatic start observation
 
 M7 test는 `systemctl --user is-active graphical-session.target` 및

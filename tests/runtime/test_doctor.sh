@@ -131,6 +131,15 @@ write_valid_manifest
 out=$(run_doctor); code=$?
 assert_eq "$code" 0 "strict valid manifest passes"
 assert_contains "$out" "PASS: validated artifact/manifest" "valid manifest is reported validated"
+cp "$state/validated-build.manifest" "$state/installed-build.manifest"
+out=$(run_doctor); code=$?
+assert_eq "$code" 0 "valid installed manifest passes"
+assert_contains "$out" "PASS: installed artifact/manifest" "installed manifest is reported separately"
+printf 'broken installed pointer\n' >"$state/installed-build.manifest"
+out=$(run_doctor); code=$?
+assert_eq "$code" 1 "malformed installed manifest fails"
+assert_contains "$out" "FAIL: installed artifact/manifest mismatch" "installed mismatch is explicit"
+rm -f "$state/installed-build.manifest"
 printf 'ARTIFACT=cachy-omarchy-shell-4.0.0-1-any.pkg.tar.zst %s\n' "$shell_sum" >>"$state/validated-build.manifest"
 out=$(run_doctor); code=$?
 assert_eq "$code" 1 "duplicate shell artifact fails"

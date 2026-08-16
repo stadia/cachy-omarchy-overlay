@@ -117,6 +117,44 @@ printf 'smoke\n' >>"$COO_PACMAN_LOG"
 EOF
 chmod +x "$fake"/*
 
+# M7 RC doctor fixture reads only the fake-lane state.  It deliberately has no
+# access to the caller's packages, session, or user configuration.
+doctor_root=$COO_TEST_SANDBOX/doctor-root
+doctor_prefix=$doctor_root/usr/share/cachy-omarchy
+doctor_compat=$doctor_root/usr/lib/cachy-omarchy/compat/bin
+doctor_fake=$COO_TEST_SANDBOX/doctor-fake
+mkdir -p "$doctor_prefix/upstream/shell" "$doctor_prefix/upstream/default/omarchy" \
+  "$doctor_compat" "$doctor_root/usr/bin" "$doctor_root/usr/lib/systemd/user" "$doctor_fake"
+printf '// fixture shell\n' >"$doctor_prefix/upstream/shell/shell.qml"
+printf '{}\n' >"$doctor_prefix/upstream/default/omarchy/omarchy-menu.jsonc"
+printf '[Unit]\n' >"$doctor_root/usr/lib/systemd/user/cachy-omarchy-shell.service"
+for command in cachy-omarchy-shell cachy-omarchy-launcher cachy-omarchy-bindings cachy-omarchy-keybindings; do
+  printf '#!/usr/bin/env bash\nexit 0\n' >"$doctor_root/usr/bin/$command"
+  chmod +x "$doctor_root/usr/bin/$command"
+done
+printf '#!/usr/bin/env bash\nexit 0\n' >"$doctor_compat/omarchy-shell"
+chmod +x "$doctor_compat/omarchy-shell"
+cat >"$doctor_fake/pacman" <<'EOF'
+#!/usr/bin/env bash
+[[ ${1:-} == -Q ]] || exit 2
+case ${2:-} in
+  cachy-omarchy-shell|cachy-omarchy-overlay) printf '%s 0.1.0-1\n' "$2"; exit 0 ;;
+  omarchy|omarchy-settings) exit 1 ;;
+  *) exit 1 ;;
+esac
+EOF
+for command in pgrep hyprctl quickshell; do printf '#!/usr/bin/env bash\nexit 1\n' >"$doctor_fake/$command"; done
+chmod +x "$doctor_fake"/*
+printf 'ID=arch\n' >"$doctor_root/os-release"
+run_rc_doctor() {
+  local state=$1
+  PATH="$doctor_fake:/usr/bin:/bin" WAYLAND_DISPLAY= \
+    COO_OS_RELEASE="$doctor_root/os-release" COO_PREFIX_ROOT="$doctor_prefix" COO_COMPAT_BIN="$doctor_compat" \
+    COO_HYPR_DIR="$COO_TEST_SANDBOX/doctor-hypr" COO_CONFIG_DIR="$COO_TEST_SANDBOX/doctor-config" \
+    COO_OMARCHY_CONFIG_DIR="$COO_TEST_SANDBOX/doctor-omarchy" COO_STATE_DIR="$state" \
+    "$REPO_ROOT/overlay/bin/cachy-omarchy-doctor" 2>&1
+}
+
 # U01: discovery is read-only and does not invoke build tools.
 lock_before=$(sha256sum "$root/upstream.lock")
 pkg_before=$(sha256sum "$root/packages/cachy-omarchy-shell/PKGBUILD")
@@ -269,6 +307,11 @@ assert_contains "$(cat "$paclog")" "-U" "U09 install calls fake pacman explicitl
 assert_contains "$(cat "$paclog")" "cachy-omarchy-shell-4.0.0-1-any.pkg.tar.zst" "U09 installs exact current shell"
 assert_eq "$(cat "$prior/artifacts/$old_shell")" "old-shell" "U09 previous shell remains archived"
 assert_eq "$(cat "$prior/artifacts/$old_overlay")" "old-overlay" "U09 previous overlay remains archived"
+assert_file_exists "$COO_TEST_SANDBOX/state/installed-build.manifest" "U09 finalizes installed build pointer"
+code=0
+out=$(run_rc_doctor "$COO_TEST_SANDBOX/state") || code=$?
+assert_eq "$code" "0" "U09 installed pair is doctor-healthy"
+assert_contains "$out" "PASS: installed artifact/manifest (4.0.0" "U09 doctor reads installed pair"
 archived_count=$(find "$COO_TEST_SANDBOX/state/packages" -name validated-build.manifest | wc -l)
 [[ $archived_count -ge 2 ]] && archived=0 || archived=1
 assert_eq "$archived" "0" "U09 install archives prior validated pair"
@@ -281,6 +324,11 @@ assert_contains "$rollback_line" "-U" "U10 rollback invokes fake pacman with -U"
 assert_contains "$rollback_line" "cachy-omarchy-shell-3.9.9-1-any.pkg.tar.zst" "U10 rollback selects prior shell only"
 assert_contains "$rollback_line" "cachy-omarchy-overlay-0.0.9-1-any.pkg.tar.zst" "U10 rollback selects prior overlay only"
 assert_eq "$(tail -n1 "$paclog")" "smoke" "U10 smoke runs only after pacman"
+assert_contains "$(cat "$COO_TEST_SANDBOX/state/installed-build.manifest")" "OMARCHY_VERSION=3.9.9" "U10 rollback records the installed prior pair"
+code=0
+out=$(run_rc_doctor "$COO_TEST_SANDBOX/state") || code=$?
+assert_eq "$code" "0" "U10 rolled-back pair is doctor-healthy"
+assert_contains "$out" "PASS: installed artifact/manifest (3.9.9" "U10 doctor reflects rolled-back pair"
 
 # Missing/corrupt prior state must not invoke pacman.
 : >"$paclog"
@@ -333,6 +381,14 @@ assert_contains "$updated_pkg" "_commit='222222222222222222222222222222222222222
 assert_eq "$(grep -m1 '^pkgver=' "$root/packages/cachy-omarchy-overlay/PKGBUILD")" "pkgver=0.1.0" "U02 overlay version is independent"
 assert_eq "$(wc -l <"$pac_update")" "0" "U02 update never invokes pacman"
 assert_contains "$out" "UPSTREAM.md requires human" "UPSTREAM.md deferred with explicit reason"
+
+# M7 U02 linkage: a successful candidate update leaves a checksum-valid
+# manifest that the read-only doctor reports as healthy.  It is not installed.
+code=0
+out=$(run_rc_doctor "$update_state") || code=$?
+assert_eq "$code" "0" "U02 update manifest is doctor-healthy"
+assert_contains "$out" "PASS: validated artifact/manifest (4.0.1" "U02 doctor reads updated manifest"
+assert_contains "$out" "WARN: installed artifact/manifest not present" "U02 doctor distinguishes uninstalled build"
 
 # U04 is explicit local packaging revision only: no lock or version mutation.
 lock_before_bump=$(sha256sum "$root/upstream.lock")
@@ -405,6 +461,10 @@ out=$(COO_REPO_ROOT="$postroot" COO_STATE_DIR="$poststate" COO_PACMAN_BIN="$fake
 assert_eq "$code" "14" "post-pacman installed pointer failure is reported"
 assert_file_exists "$poststate/install-pending.manifest" "post-pacman failure leaves explicit pending state"
 assert_eq "$(wc -l <"$paclog")" "1" "post-pacman failure ran pacman exactly once"
+code=0
+out=$(run_rc_doctor "$poststate") || code=$?
+assert_eq "$code" "1" "pending post-pacman state fails doctor"
+assert_contains "$out" "FAIL: incomplete install state" "pending doctor diagnosis requires operator recovery"
 : >"$paclog"
 code=0
 out=$(COO_REPO_ROOT="$postroot" COO_STATE_DIR="$poststate" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$postroot/bin/install-packages" --install 2>&1) || code=$?

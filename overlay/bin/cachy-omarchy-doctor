@@ -163,21 +163,35 @@ read_manifest() {
     || { MANIFEST_ERROR="artifact order/type is invalid"; return 1; }
 }
 
-check_manifest() {
-  local manifest=$STATE_DIR/validated-build.manifest i path actual
-  [[ -e $manifest ]] || { warn "validated artifact/manifest not present"; return; }
-  read_manifest "$manifest" || { fail "artifact/manifest mismatch: $MANIFEST_ERROR"; return; }
+# Validate either state pointer without changing it.  The validated pointer
+# describes the build eligible for installation; the installed pointer records
+# the exact pair last requested from pacman (which may be an older rollback).
+check_build_manifest() {
+  local label=$1 manifest=$2 i path actual prefix
+  # Preserve the original validated diagnostic wording; installed state is the
+  # new, separately named pointer so operators can distinguish the two.
+  [[ $label == validated ]] && prefix="" || prefix="$label "
+  [[ -e $manifest ]] || { warn "${prefix}artifact/manifest not present"; return; }
+  read_manifest "$manifest" || { fail "${prefix}artifact/manifest mismatch: $MANIFEST_ERROR"; return; }
   if ! command -v "$SHA256_BIN" >/dev/null 2>&1; then
-    fail "artifact/manifest mismatch: checksum tool unavailable ($SHA256_BIN)"
+    fail "${prefix}artifact/manifest mismatch: checksum tool unavailable ($SHA256_BIN)"
     return
   fi
   for i in "${!MANIFEST_NAMES[@]}"; do
     path=$STATE_DIR/$MANIFEST_RELEASE/artifacts/${MANIFEST_NAMES[$i]}
-    [[ -f $path ]] || { fail "artifact/manifest mismatch: missing ${MANIFEST_NAMES[$i]}"; return; }
+    [[ -f $path ]] || { fail "${prefix}artifact/manifest mismatch: missing ${MANIFEST_NAMES[$i]}"; return; }
     actual=$("$SHA256_BIN" "$path" 2>/dev/null | awk '{print $1}')
-    [[ $actual == "${MANIFEST_SUMS[$i]}" ]] || { fail "artifact/manifest mismatch: checksum ${MANIFEST_NAMES[$i]}"; return; }
+    [[ $actual == "${MANIFEST_SUMS[$i]}" ]] || { fail "${prefix}artifact/manifest mismatch: checksum ${MANIFEST_NAMES[$i]}"; return; }
   done
-  pass "validated artifact/manifest ($MANIFEST_VERSION, $MANIFEST_COMMIT)"
+  pass "$label artifact/manifest ($MANIFEST_VERSION, $MANIFEST_COMMIT)"
+}
+
+check_manifest() {
+  check_build_manifest "validated" "$STATE_DIR/validated-build.manifest"
+}
+
+check_installed_manifest() {
+  check_build_manifest "installed" "$STATE_DIR/installed-build.manifest"
 }
 
 has_binding_conflict() {
@@ -249,6 +263,7 @@ fi
   && pass "incomplete install state absent" \
   || fail "incomplete install state: install-pending.manifest requires operator recovery"
 check_manifest
+check_installed_manifest
 
 if [[ -e $CONFIG_DIR/shell.json ]]; then
   warn "inert shell.json: $CONFIG_DIR/shell.json is a reference copy; shell reads $USER_OMARCHY_CONFIG_DIR/shell.json"

@@ -6,6 +6,7 @@ repo_root=${COO_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}
 state_dir=${COO_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/cachy-omarchy}
 sha256_bin=${COO_SHA256_BIN:-sha256sum}
 pacman_bin=${COO_PACMAN_BIN:-pacman}
+mv_bin=${COO_MV_BIN:-mv}
 smoke_bin=${COO_ROLLBACK_SMOKE_BIN:-}
 # shellcheck disable=SC1091
 source "$repo_root/bin/validated-build.sh"
@@ -33,8 +34,36 @@ coo_validate_manifest "$state_dir" "$selected" "$sha256_bin" || {
   exit 1
 }
 
+# Make post-pacman state explicit before the transaction.  A failed pointer
+# finalization is ambiguous, so the existing pending guard must block another
+# install or rollback until an operator verifies the actual package state.
+pending=$state_dir/install-pending.manifest
+pending_tmp=$(mktemp "$state_dir/.install-pending.manifest-XXXXXX")
+cp "$selected" "$pending_tmp"
+"$mv_bin" "$pending_tmp" "$pending"
+
+set +e
 "$pacman_bin" -U "$COO_RELEASE_DIR/artifacts/${COO_ARTIFACT_NAMES[0]}" \
   "$COO_RELEASE_DIR/artifacts/${COO_ARTIFACT_NAMES[1]}"
+status=$?
+set -e
+if (( status != 0 )); then
+  rm -f "$pending"
+  exit "$status"
+fi
+
+pointer_tmp=$(mktemp "$state_dir/.installed-build.manifest-XXXXXX")
+cp "$selected" "$pointer_tmp"
+set +e
+COO_INSTALL_FINALIZE=1 "$mv_bin" "$pointer_tmp" "$state_dir/installed-build.manifest"
+status=$?
+set -e
+if (( status != 0 )); then
+  coo_fail 'pacman rollback succeeded but installed state finalization failed; pending state retained' || :
+  exit "$status"
+fi
+rm -f "$pending" || { coo_fail 'rollback state finalized but pending marker could not be removed'; exit 1; }
+
 if [[ -n $smoke_bin ]]; then
   "$smoke_bin"
 fi
