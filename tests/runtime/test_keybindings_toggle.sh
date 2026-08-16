@@ -136,12 +136,12 @@ printf '      FINDING: 열린 keybindings layer = %s\n' "$(menu_layers)"
 # the layer geometry above is the render proof. Never press Return or select.
 cache_file=$(find "$HOME/.cache/omarchy" -maxdepth 1 -type f -name 'keybindings-*.records' -print -quit 2>/dev/null || true)
 assert_file_exists "${cache_file:-/missing/keybindings.records}" "샌드박스 keybindings 캐시가 생겼다"
+cache_count=0
 if [[ -n $cache_file && -f $cache_file ]]; then
   cache_count=$(wc -l <"$cache_file" | tr -d ' ')
-  [[ $cache_count =~ ^[0-9]+$ && $cache_count -gt 2 ]] && usable=0 || usable=1
-  assert_eq "$usable" "0" "실사용 Lua 바인드 캐시가 2행 초과다 ($cache_count)"
-  printf '      FINDING: keybindings cache records = %s\n' "$cache_count"
 fi
+assert_eq "$cache_count" "48" "실사용 CachyOS Lua 바인드 48개가 모두 수집됐다"
+printf '      FINDING: keybindings cache records = %s\n' "$cache_count"
 
 # Allow the select menu to receive exclusive focus, then cancel only.
 sleep 0.3
