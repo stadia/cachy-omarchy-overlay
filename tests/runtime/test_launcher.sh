@@ -42,9 +42,7 @@ fi
 
 # ---------------------------------------------------------------- IPC 오류 문자열 실측 (M2 발견 3)
 # 메뉴 토글은 하지 않는다. 잘못된 target/method 만 호출한다.
-command -v quickshell >/dev/null || { exit "$ASSERT_FAILURES"; }
-command -v qs >/dev/null || { exit "$ASSERT_FAILURES"; }
-[[ -n ${WAYLAND_DISPLAY:-} ]] || { exit "$ASSERT_FAILURES"; }
+coo_live_runtime_usable || { exit "$ASSERT_FAILURES"; }
 coo_pkg_artifact >/dev/null || { exit "$ASSERT_FAILURES"; }
 [[ -n ${root:-} ]] || { exit "$ASSERT_FAILURES"; }
 

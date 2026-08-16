@@ -517,8 +517,9 @@ M6 공개 명령은 `bin/check-upstream`, `bin/update-upstream`, `bin/build-pack
 `validated-build.manifest`가 먼저 있어야 한다. 전체 테스트 출력에서 `skip:`을
 실패로 승격한다. 특히 `tests/runtime/test_installed_tree.sh`의 아티팩트 부재
 스킵은 절대 PASS가 아니다. 기본적으로 허용되는 것은 명시적
-`COO_RUN_LIVE=1` 없이 생기는 라이브 키 주입 스킵과 `WAYLAND_DISPLAY` 없는
-라이브 전용 스모크 스킵뿐이며, 이 예외도 설치 트리/패키지 검증 성공을 뜻하지
+`COO_RUN_LIVE=1` 없이 생기는 라이브 키 주입 스킵과 라이브 Wayland 런타임
+없음(소켓 부재 또는 systemd-cat/journald 사용 불가 — `command -v` 존재만으로
+판단하지 않는다) 스킵뿐이며, 이 예외도 설치 트리/패키지 검증 성공을 뜻하지
 않는다.
 
 ### 10.2 validated release와 명시적 설치

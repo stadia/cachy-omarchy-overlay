@@ -39,3 +39,22 @@ assert_exit() {
   "$@" >/dev/null 2>&1 || code=$?
   assert_eq "$code" "$expected" "$label (exit)"
 }
+
+# Live-runtime usability probe for tests that start `cachy-omarchy-shell --run`.
+#
+# `command -v` proves only that a binary is on PATH, not that it works.  The
+# wrapper execs through `systemd-cat`, so in a sandbox/container without
+# journald access systemd-cat fails ("Operation not permitted") and the
+# Quickshell process dies before any IPC can answer.  A non-empty
+# WAYLAND_DISPLAY likewise proves nothing until the socket actually exists.
+# Tests gate on this probe instead of bare presence, so a broken environment is
+# honestly noted/skipped rather than misjudged as runnable and failing for the
+# wrong reason.
+coo_live_runtime_usable() {
+  command -v quickshell >/dev/null || return 1
+  command -v qs >/dev/null || return 1
+  command -v systemd-cat >/dev/null || return 1
+  printf 'probe\n' | systemd-cat -t coo-live-runtime-probe >/dev/null 2>&1 || return 1
+  [[ -n ${WAYLAND_DISPLAY:-} ]] || return 1
+  [[ -S ${XDG_RUNTIME_DIR:-}/$WAYLAND_DISPLAY ]] || return 1
+}

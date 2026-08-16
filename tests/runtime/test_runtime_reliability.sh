@@ -81,12 +81,11 @@ printf '%s\n' '      FINDING: no target activation was requested; automatic star
 # This is a manual extracted-tree wrapper-restart smoke when a Wayland runtime
 # is available. It does not exercise systemd Restart=on-failure: no user unit
 # is enabled, started, or supervised by systemd in this test.
-if ! command -v quickshell >/dev/null || ! command -v qs >/dev/null || \
-   ! command -v systemd-cat >/dev/null || [[ -z ${WAYLAND_DISPLAY:-} ]]; then
+if ! coo_live_runtime_usable; then
   # This is deliberately a note, not a skip: the package-ownership R08-R10
   # assertions above did run.  M6 treats `skip:` as required-test failure;
   # the unavailable live recovery remains explicit evidence, not false green.
-  printf '%s\n' 'note: manual wrapper-restart smoke UNVERIFIED (needs quickshell, qs, systemd-cat, and WAYLAND_DISPLAY); R07 systemd service recovery remains UNVERIFIED'
+  printf '%s\n' 'note: manual wrapper-restart smoke UNVERIFIED (needs a working systemd-cat/journald, quickshell, qs, and a live WAYLAND_DISPLAY socket); R07 systemd service recovery remains UNVERIFIED'
   exit "$ASSERT_FAILURES"
 fi
 

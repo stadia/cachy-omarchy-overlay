@@ -36,13 +36,12 @@ rm -f "$marker"
 wrap=$(cat "$W")
 assert_contains "$wrap" 'COMPAT_BIN' "래퍼가 compat PATH 를 셸 프로세스에만 붙인다"
 
-command -v quickshell >/dev/null || { exit "$ASSERT_FAILURES"; }
 command -v jq >/dev/null || { exit "$ASSERT_FAILURES"; }
 command -v hyprctl >/dev/null || { exit "$ASSERT_FAILURES"; }
 command -v wtype >/dev/null || { echo "skip: wtype 없음 (R06 라이브)"; exit "$ASSERT_FAILURES"; }
 [[ ${COO_RUN_LIVE:-0} == 1 ]] || { echo "skip: 라이브 키 주입 (COO_RUN_LIVE=1 필요)"; exit 0; }
 command -v gtk-launch >/dev/null || { echo "skip: gtk-launch 없음"; exit "$ASSERT_FAILURES"; }
-[[ -n ${WAYLAND_DISPLAY:-} ]] || { exit "$ASSERT_FAILURES"; }
+coo_live_runtime_usable || { exit "$ASSERT_FAILURES"; }
 coo_pkg_artifact >/dev/null || { exit "$ASSERT_FAILURES"; }
 
 [[ ${HOME:-} == "${COO_TEST_SANDBOX:?}" ]] || {

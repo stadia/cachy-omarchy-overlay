@@ -9,9 +9,8 @@ REPO_ROOT="${REPO_ROOT:?}"
 source "$REPO_ROOT/tests/lib/assert.sh"
 source "$REPO_ROOT/lib/runtime.sh"
 
-command -v quickshell >/dev/null || { echo "skip: quickshell 없음"; exit 0; }
 command -v jq >/dev/null || { echo "skip: jq 없음"; exit 0; }
-[[ -n ${WAYLAND_DISPLAY:-} ]] || { echo "skip: WAYLAND_DISPLAY 없음"; exit 0; }
+coo_live_runtime_usable || { echo "skip: 라이브 Wayland 런타임 없음 (quickshell/qs/systemd-cat 사용 불가 또는 WAYLAND_DISPLAY 소켓 없음)"; exit 0; }
 coo_pkg_artifact >/dev/null || { echo "skip: build/*.pkg.tar.zst 없음"; exit 0; }
 
 dest="$COO_TEST_SANDBOX/pkg"

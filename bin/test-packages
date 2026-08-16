@@ -32,8 +32,9 @@ if (( status != 0 )); then
   exit "$status"
 fi
 # Artifact/source skips are false-green failures. The only allowed skips are
-# explicit opt-in key injection and absent Wayland for live-only smoke checks.
-unexpected_skips=$(grep -F 'skip:' "$out" | grep -Fv 'skip: 라이브 키 주입 (COO_RUN_LIVE=1 필요)' | grep -Fv 'skip: WAYLAND_DISPLAY 없음' || true)
+# explicit opt-in key injection and an absent/unusable Wayland runtime for
+# live-only smoke checks.
+unexpected_skips=$(grep -F 'skip:' "$out" | grep -Fv 'skip: 라이브 키 주입 (COO_RUN_LIVE=1 필요)' | grep -Fv 'skip: 라이브 Wayland 런타임 없음 (quickshell/qs/systemd-cat 사용 불가 또는 WAYLAND_DISPLAY 소켓 없음)' || true)
 if [[ -n $unexpected_skips ]]; then
   printf '%s\n' "$unexpected_skips" >&2
   coo_fail 'test runner skipped required coverage'
