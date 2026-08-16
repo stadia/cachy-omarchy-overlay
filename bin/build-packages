@@ -6,14 +6,39 @@ repo_root=${COO_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}
 build_dir=${COO_BUILD_DIR:-$repo_root/build}
 state_dir=${COO_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/cachy-omarchy}
 makepkg_bin=${COO_MAKEPKG_BIN:-makepkg}
+makechrootpkg_bin=${COO_MAKECHROOTPKG_BIN:-makechrootpkg}
 bsdtar_bin=${COO_BSDTAR_BIN:-bsdtar}
 sha256_bin=${COO_SHA256_BIN:-sha256sum}
 install_bin=${COO_INSTALL_BIN:-install}
 mv_bin=${COO_MV_BIN:-mv}
+tar_bin=${COO_TAR_BIN:-tar}
+clean=0
+clean_chroot_dir=${COO_CLEAN_CHROOT_DIR:-}
+clean_omarchy_source=${COO_CLEAN_OMARCHY_SOURCE:-$repo_root/build/omarchy}
+
+usage() {
+  cat <<'USAGE'
+Usage: build-packages [--clean]
+
+Build shell and overlay packages without installing them. --clean stages
+transient source tarballs in each bind-mounted package context and invokes
+makechrootpkg. Set COO_CLEAN_CHROOT_DIR to an existing clean-chroot root.
+This command never passes makepkg -i.
+USAGE
+}
+
+while (($#)); do
+  case $1 in
+    --clean) clean=1 ;;
+    -h|--help) usage; exit 0 ;;
+    *) printf 'error: unknown argument: %s\n' "$1" >&2; usage >&2; exit 2 ;;
+  esac
+  shift
+done
+
 lock=$repo_root/upstream.lock
 shell_pkg=$repo_root/packages/cachy-omarchy-shell/PKGBUILD
 overlay_pkg=$repo_root/packages/cachy-omarchy-overlay/PKGBUILD
-
 fail() { printf 'error: %s\n' "$1" >&2; exit 1; }
 [[ -f $lock && -f $shell_pkg && -f $overlay_pkg ]] || fail 'repository package metadata is incomplete'
 # shellcheck disable=SC1090
@@ -25,6 +50,13 @@ shell_rel=$(pkg_field "$shell_pkg" pkgrel)
 overlay_ver=$(pkg_field "$overlay_pkg" pkgver)
 overlay_rel=$(pkg_field "$overlay_pkg" pkgrel)
 [[ $shell_rel =~ ^[0-9]+$ && $overlay_ver =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && $overlay_rel =~ ^[0-9]+$ ]] || fail 'invalid PKGBUILD version metadata'
+
+if (( clean )); then
+  [[ -n $clean_chroot_dir ]] || fail '--clean requires COO_CLEAN_CHROOT_DIR (a prepared makechrootpkg root)'
+  [[ -d $clean_chroot_dir ]] || fail "clean chroot root is not a directory: $clean_chroot_dir"
+  command -v "$makechrootpkg_bin" >/dev/null 2>&1 || fail "makechrootpkg unavailable: $makechrootpkg_bin"
+  [[ -d $clean_omarchy_source && ${clean_omarchy_source##*/} == omarchy ]] || fail "--clean requires the pinned local upstream tree named omarchy: $clean_omarchy_source"
+fi
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/coo-build-XXXXXX")
 mkdir -p "$build_dir" "$state_dir/validated-builds"
@@ -42,8 +74,44 @@ run_makepkg() {
       "$makepkg_bin" --nodeps
   )
 }
-run_makepkg "$repo_root/packages/cachy-omarchy-shell"
-run_makepkg "$repo_root/packages/cachy-omarchy-overlay"
+
+stage_clean_package() {
+  local name=$1 source_dir=$2 clean_dir=$work/clean-$name
+  mkdir -p "$clean_dir"
+  cp -a "$source_dir/." "$clean_dir/"
+  case $name in
+    cachy-omarchy-shell)
+      "$tar_bin" -C "$(dirname "$clean_omarchy_source")" -cf "$clean_dir/clean-omarchy.tar" "${clean_omarchy_source##*/}"
+      "$tar_bin" -C "$repo_root" -cf "$clean_dir/clean-overlay-defaults.tar" overlay/defaults
+      ;;
+    cachy-omarchy-overlay)
+      "$tar_bin" -C "$repo_root" -cf "$clean_dir/clean-overlay.tar" overlay
+      ;;
+    *) fail "unknown clean package: $name" ;;
+  esac
+  printf '%s\n' "$clean_dir"
+}
+
+run_clean_package() {
+  local name=$1 source_dir=$2 clean_dir artifact
+  clean_dir=$(stage_clean_package "$name" "$source_dir")
+  # makechrootpkg bind-mounts only $PWD. All package inputs are therefore
+  # transient archives below $clean_dir; no tracked overlay copy is created.
+  ( cd "$clean_dir"
+    "$makechrootpkg_bin" -r "$clean_chroot_dir" -- --nodeps
+  )
+  artifact=$(find "$clean_dir" -maxdepth 1 -type f -name "$name-*.pkg.tar.zst" -print -quit)
+  [[ -n $artifact ]] || fail "clean build artifact missing: $name"
+  "$install_bin" -m 644 "$artifact" "$pkgdest/${artifact##*/}"
+}
+
+if (( clean )); then
+  run_clean_package cachy-omarchy-shell "$repo_root/packages/cachy-omarchy-shell"
+  run_clean_package cachy-omarchy-overlay "$repo_root/packages/cachy-omarchy-overlay"
+else
+  run_makepkg "$repo_root/packages/cachy-omarchy-shell"
+  run_makepkg "$repo_root/packages/cachy-omarchy-overlay"
+fi
 
 shell_name="cachy-omarchy-shell-${OMARCHY_VERSION}-${shell_rel}-any.pkg.tar.zst"
 overlay_name="cachy-omarchy-overlay-${overlay_ver}-${overlay_rel}-any.pkg.tar.zst"

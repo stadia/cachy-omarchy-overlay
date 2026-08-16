@@ -50,6 +50,13 @@
 ## 릴리스 전 남은 순서
 
 1. 단일 정본을 유지한 clean chroot/container build와 archive audit을 실제로 재현한다.
+   `bin/build-packages --clean`은 임시 package context에 `clean-omarchy.tar`와
+   `clean-overlay*.tar`만 생성해 `makechrootpkg -r "$COO_CLEAN_CHROOT_DIR" -- --nodeps`로
+   호출한다. tracked `packages/` 아래에는 overlay 사본을 만들지 않으며, source tar는
+   종료 시 삭제된다. 사용 전 prepared chroot root와 `build/omarchy` pinned tree가 필요하다.
+   현재 호스트에서는 `makechrootpkg`, `archbuild`, `devtools`가 PATH에 없고
+   `pacman -Q devtools`도 package not found를 반환했다. sudo/host package 변경 없이
+   실제 chroot를 만들 수 없어 fake makechrootpkg transport+archive audit만 측정됐다.
 2. 승인된 격리 Wayland 세션에서 shell start, IPC, launcher, app/keybinding UI와 기존
    Waybar/notification/lock daemon 공존을 관측한다.
 3. 실제 `pacman -U`는 별도 사용자 승인 후 격리 환경에서만 upgrade/rollback smoke로
