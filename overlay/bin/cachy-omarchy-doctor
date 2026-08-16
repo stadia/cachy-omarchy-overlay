@@ -1,0 +1,280 @@
+#!/usr/bin/env bash
+# Read-only release diagnostics for the Cachy Omarchy overlay (SPEC §40).
+# It deliberately never installs, edits configuration, reloads Hyprland, or
+# attempts to recover incomplete package-manager state.
+set -uo pipefail
+
+PREFIX_ROOT=${COO_PREFIX_ROOT:-/usr/share/cachy-omarchy}
+COMPAT_BIN=${COO_COMPAT_BIN:-/usr/lib/cachy-omarchy/compat/bin}
+HYPR_DIR=${COO_HYPR_DIR:-$HOME/.config/hypr}
+CONFIG_DIR=${COO_CONFIG_DIR:-$HOME/.config/cachy-omarchy}
+STATE_DIR=${COO_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/cachy-omarchy}
+USER_OMARCHY_CONFIG_DIR=${COO_OMARCHY_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/omarchy}
+INSTALL_ROOT=$(dirname "$(dirname "$PREFIX_ROOT")")
+BIN_DIR=$INSTALL_ROOT/bin
+SERVICE_FILE=$INSTALL_ROOT/lib/systemd/user/cachy-omarchy-shell.service
+OMARCHY_PATH=${COO_OMARCHY_PATH:-$PREFIX_ROOT/upstream}
+SHA256_BIN=${COO_SHA256_BIN:-sha256sum}
+IPC_TIMEOUT_RAW=${COO_IPC_TIMEOUT-2s}
+IPC_TIMEOUT=""
+IPC_TIMEOUT_VALID=0
+
+failures=0
+pass() { printf 'PASS: %s\n' "$1"; }
+warn() { printf 'WARN: %s\n' "$1"; }
+fail() { printf 'FAIL: %s\n' "$1"; failures=$((failures + 1)); }
+
+usage() {
+  cat <<'USAGE'
+Usage: cachy-omarchy-doctor
+
+Read-only diagnostics for the installed or extracted Cachy Omarchy tree.
+Environment overrides: COO_PREFIX_ROOT, COO_COMPAT_BIN, COO_HYPR_DIR,
+COO_CONFIG_DIR, COO_STATE_DIR, COO_OMARCHY_PATH, COO_OMARCHY_CONFIG_DIR,
+COO_IPC_TIMEOUT (1–10 seconds, optional `s` suffix).
+USAGE
+}
+
+case ${1:-} in
+  "") ;;
+  --help|-h) usage; exit 0 ;;
+  *) printf 'error: unknown argument: %s\n' "$1" >&2; usage >&2; exit 2 ;;
+esac
+
+check_os() {
+  local release=${COO_OS_RELEASE:-/etc/os-release} id=""
+  if [[ -r $release ]]; then
+    id=$(awk -F= '$1 == "ID" { gsub(/"/, "", $2); print tolower($2); exit }' "$release")
+    case $id in
+      cachyos|arch) pass "Arch-family OS ($id)" ;;
+      *) warn "Arch-family OS not confirmed (${id:-unknown})" ;;
+    esac
+  else
+    warn "Arch-family OS not measurable"
+  fi
+}
+
+check_command_version() {
+  local label=$1 command=$2
+  if command -v "$command" >/dev/null 2>&1; then
+    pass "$label available ($(command -v "$command"))"
+  else
+    warn "$label not measurable (command missing)"
+  fi
+}
+
+check_file() {
+  local label=$1 path=$2
+  [[ -f $path ]] && pass "$label ($path)" || fail "$label missing: $path"
+}
+
+check_executable() {
+  local label=$1 path=$2
+  [[ -x $path ]] && pass "$label reachable ($path)" || fail "$label missing or not executable: $path"
+}
+
+check_packages() {
+  local pkg out status
+  if ! command -v pacman >/dev/null 2>&1; then
+    warn "installed package versions not measurable (pacman missing)"
+    warn "official package absence not measurable (pacman missing)"
+    return
+  fi
+  for pkg in cachy-omarchy-shell cachy-omarchy-overlay; do
+    status=0; out=$(pacman -Q "$pkg" 2>/dev/null) || status=$?
+    if [[ $status -eq 0 ]]; then
+      pass "package version: $out"
+    elif [[ $status -eq 1 ]]; then
+      warn "package not installed: $pkg"
+    else
+      warn "package query failed: $pkg"
+    fi
+  done
+  for pkg in omarchy omarchy-settings; do
+    status=0; out=$(pacman -Q "$pkg" 2>/dev/null) || status=$?
+    if [[ $status -eq 0 ]]; then
+      fail "official package present: $out"
+    elif [[ $status -eq 1 ]]; then
+      pass "official package absent: $pkg"
+    else
+      warn "official package query failed: $pkg"
+    fi
+  done
+}
+
+validate_ipc_timeout() {
+  local seconds
+  if [[ $IPC_TIMEOUT_RAW =~ ^([1-9]|10)s?$ ]]; then
+    seconds=${BASH_REMATCH[1]}
+    IPC_TIMEOUT="${seconds}s"
+    IPC_TIMEOUT_VALID=1
+    return 0
+  fi
+  return 1
+}
+
+# Keep this parser schema-equivalent to bin/validated-build.sh. Doctor is
+# shipped separately from the repository helper, so it cannot source that file
+# from an installed tree.
+read_manifest() {
+  local manifest=$1 line value name sum
+  local seen_release=0 seen_version=0 seen_commit=0 seen_shell=0 seen_overlay=0
+  MANIFEST_ERROR="" MANIFEST_RELEASE="" MANIFEST_VERSION="" MANIFEST_COMMIT=""
+  MANIFEST_NAMES=() MANIFEST_SUMS=()
+  [[ -f $manifest ]] || { MANIFEST_ERROR="manifest is not a regular file"; return 1; }
+
+  while IFS= read -r line || [[ -n $line ]]; do
+    case $line in
+      RELEASE=*)
+        [[ $seen_release -eq 0 ]] || { MANIFEST_ERROR="duplicate RELEASE"; return 1; }
+        seen_release=1; MANIFEST_RELEASE=${line#RELEASE=} ;;
+      OMARCHY_VERSION=*)
+        [[ $seen_version -eq 0 ]] || { MANIFEST_ERROR="duplicate OMARCHY_VERSION"; return 1; }
+        seen_version=1; MANIFEST_VERSION=${line#OMARCHY_VERSION=} ;;
+      OMARCHY_COMMIT=*)
+        [[ $seen_commit -eq 0 ]] || { MANIFEST_ERROR="duplicate OMARCHY_COMMIT"; return 1; }
+        seen_commit=1; MANIFEST_COMMIT=${line#OMARCHY_COMMIT=} ;;
+      ARTIFACT=*)
+        value=${line#ARTIFACT=}; name=${value%% *}; sum=${value#* }
+        [[ $name != "$value" && $name =~ ^[A-Za-z0-9._+-]+\.pkg\.tar\.zst$ && $sum =~ ^[0-9a-fA-F]{64}$ ]] \
+          || { MANIFEST_ERROR="invalid ARTIFACT"; return 1; }
+        case $name in
+          cachy-omarchy-shell-*)
+            [[ $seen_shell -eq 0 ]] || { MANIFEST_ERROR="duplicate shell artifact"; return 1; }
+            seen_shell=1 ;;
+          cachy-omarchy-overlay-*)
+            [[ $seen_overlay -eq 0 ]] || { MANIFEST_ERROR="duplicate overlay artifact"; return 1; }
+            seen_overlay=1 ;;
+          *) MANIFEST_ERROR="unknown artifact type"; return 1 ;;
+        esac
+        MANIFEST_NAMES+=("$name"); MANIFEST_SUMS+=("$sum") ;;
+      "") ;;
+      *) MANIFEST_ERROR="unknown manifest field"; return 1 ;;
+    esac
+  done <"$manifest"
+
+  [[ $seen_release -eq 1 && $seen_version -eq 1 && $seen_commit -eq 1 && $seen_shell -eq 1 && $seen_overlay -eq 1 ]] \
+    || { MANIFEST_ERROR="missing required singleton fields"; return 1; }
+  [[ $MANIFEST_RELEASE =~ ^(validated-builds|packages)/[A-Za-z0-9._+-]+$ ]] \
+    || { MANIFEST_ERROR="unsafe RELEASE"; return 1; }
+  [[ $MANIFEST_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && $MANIFEST_COMMIT =~ ^[0-9a-fA-F]{40}$ ]] \
+    || { MANIFEST_ERROR="invalid upstream pin"; return 1; }
+  [[ ${#MANIFEST_NAMES[@]} -eq 2 && ${MANIFEST_NAMES[0]} == cachy-omarchy-shell-* && ${MANIFEST_NAMES[1]} == cachy-omarchy-overlay-* ]] \
+    || { MANIFEST_ERROR="artifact order/type is invalid"; return 1; }
+}
+
+# Validate either state pointer without changing it.  The validated pointer
+# describes the build eligible for installation; the installed pointer records
+# the exact pair last requested from pacman (which may be an older rollback).
+check_build_manifest() {
+  local label=$1 manifest=$2 i path actual prefix
+  # Preserve the original validated diagnostic wording; installed state is the
+  # new, separately named pointer so operators can distinguish the two.
+  [[ $label == validated ]] && prefix="" || prefix="$label "
+  [[ -e $manifest || -L $manifest ]] || { warn "${prefix}artifact/manifest not present"; return; }
+  read_manifest "$manifest" || { fail "${prefix}artifact/manifest mismatch: $MANIFEST_ERROR"; return; }
+  if ! command -v "$SHA256_BIN" >/dev/null 2>&1; then
+    fail "${prefix}artifact/manifest mismatch: checksum tool unavailable ($SHA256_BIN)"
+    return
+  fi
+  for i in "${!MANIFEST_NAMES[@]}"; do
+    path=$STATE_DIR/$MANIFEST_RELEASE/artifacts/${MANIFEST_NAMES[$i]}
+    [[ -f $path ]] || { fail "${prefix}artifact/manifest mismatch: missing ${MANIFEST_NAMES[$i]}"; return; }
+    actual=$("$SHA256_BIN" "$path" 2>/dev/null | awk '{print $1}')
+    [[ $actual == "${MANIFEST_SUMS[$i]}" ]] || { fail "${prefix}artifact/manifest mismatch: checksum ${MANIFEST_NAMES[$i]}"; return; }
+  done
+  pass "$label artifact/manifest ($MANIFEST_VERSION, $MANIFEST_COMMIT)"
+}
+
+check_manifest() {
+  check_build_manifest "validated" "$STATE_DIR/validated-build.manifest"
+}
+
+check_installed_manifest() {
+  check_build_manifest "installed" "$STATE_DIR/installed-build.manifest"
+}
+
+has_binding_conflict() {
+  local f body
+  for f in "$HYPR_DIR/hyprland.conf" "$HYPR_DIR/hyprland.lua"; do
+    [[ -f $f ]] || continue
+    body=$(grep -vE '^[[:space:]]*(#|--)' "$f" || true)
+    if grep -qiE 'SUPER[[:space:]]*\+[[:space:]]*(SPACE|K)|bind[[:space:]]*=[[:space:]]*(SUPER|\$mainMod)[[:space:]]*,[[:space:]]*(SPACE|K)([[:space:]]*,|$)' <<<"$body"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+if ! validate_ipc_timeout; then
+  fail "IPC timeout invalid: ${IPC_TIMEOUT_RAW@Q} (use an integer from 1s through 10s)"
+fi
+
+check_os
+check_command_version "Hyprland" hyprctl
+check_command_version "Quickshell" quickshell
+check_packages
+
+[[ -d $OMARCHY_PATH ]] && pass "OMARCHY_PATH compatibility root ($OMARCHY_PATH)" \
+  || fail "OMARCHY_PATH compatibility root missing: $OMARCHY_PATH"
+check_file "shell.qml" "$OMARCHY_PATH/shell/shell.qml"
+check_file "shell service" "$SERVICE_FILE"
+check_file "omarchy.menu availability" "$OMARCHY_PATH/default/omarchy/omarchy-menu.jsonc"
+check_executable "shell wrapper" "$BIN_DIR/cachy-omarchy-shell"
+check_executable "launcher invocation" "$BIN_DIR/cachy-omarchy-launcher"
+check_executable "binding helper" "$BIN_DIR/cachy-omarchy-bindings"
+check_executable "keybinding invocation" "$BIN_DIR/cachy-omarchy-keybindings"
+check_executable "compat omarchy-shell" "$COMPAT_BIN/omarchy-shell"
+
+if has_binding_conflict; then
+  fail "Hyprland binding conflict: SUPER+SPACE or SUPER+K already bound"
+elif [[ -f $HYPR_DIR/hyprland.conf || -f $HYPR_DIR/hyprland.lua ]]; then
+  pass "Hyprland binding conflict absent"
+else
+  warn "Hyprland binding conflict not measurable (no config)"
+fi
+
+if command -v pgrep >/dev/null 2>&1 && pgrep -x quickshell >/dev/null 2>&1; then
+  pass "Quickshell process running"
+  if [[ $IPC_TIMEOUT_VALID -ne 1 ]]; then
+    warn "IPC ping not attempted (invalid timeout)"
+  elif ! command -v qs >/dev/null 2>&1; then
+    warn "IPC ping not measurable (qs missing)"
+  elif [[ -z ${WAYLAND_DISPLAY:-} ]]; then
+    warn "IPC ping not measurable (WAYLAND_DISPLAY missing)"
+  elif ! command -v timeout >/dev/null 2>&1; then
+    warn "IPC ping not measurable (timeout missing)"
+  else
+    ipc_output=$(COO_OMARCHY_PATH="$OMARCHY_PATH" COO_COMPAT_BIN="$COMPAT_BIN" \
+      timeout --kill-after=1s "$IPC_TIMEOUT" "$BIN_DIR/cachy-omarchy-shell" --ipc shell ping 2>&1)
+    ipc_status=$?
+    if [[ $ipc_status -eq 0 ]]; then
+      pass "IPC ping${ipc_output:+ ($ipc_output)}"
+    else
+      fail "IPC ping failed${ipc_output:+: $ipc_output}"
+    fi
+  fi
+else
+  warn "Quickshell process not observed"
+  warn "IPC ping not measurable (shell not observed)"
+fi
+
+[[ ! -e $STATE_DIR/install-pending.manifest && ! -L $STATE_DIR/install-pending.manifest ]] \
+  && pass "incomplete install state absent" \
+  || fail "incomplete install state: install-pending.manifest requires operator recovery"
+check_manifest
+check_installed_manifest
+
+if [[ -e $CONFIG_DIR/shell.json ]]; then
+  warn "inert shell.json: $CONFIG_DIR/shell.json is a reference copy; shell reads $USER_OMARCHY_CONFIG_DIR/shell.json"
+else
+  pass "inert shell.json reference copy absent"
+fi
+if [[ -e $USER_OMARCHY_CONFIG_DIR/shell.json ]]; then
+  warn "user shell override present: $USER_OMARCHY_CONFIG_DIR/shell.json"
+else
+  pass "user shell override absent"
+fi
+warn "graphical-session auto-start unverified; unit intent is not observed startup"
+
+exit "$failures"

@@ -9,14 +9,26 @@ license=('MIT')
 # 업스트림 버전과 독립적으로 진화한다 (SPEC 6.4, 8). 공식 omarchy /
 # omarchy-settings 에는 절대 의존하지 않는다 (SPEC 21).
 depends=('cachy-omarchy-shell' 'bash')
-source=()
-sha256sums=()
+
+# bin/build-packages --clean creates this source archive only in its temporary
+# context. No overlay copy is tracked under packages/, so overlay/ remains the
+# single source of truth for normal and clean builds alike.
+if [[ -f $startdir/clean-overlay.tar ]]; then
+  source=('clean-overlay.tar')
+  sha256sums=('SKIP')
+  _clean_context=1
+else
+  source=()
+  sha256sums=()
+  _clean_context=0
+fi
 
 package() {
-  # NOTE (chroot limitation, tracked for Milestone 7): overlay/ lives two
-  # levels above this PKGBUILD. A clean chroot build only bind-mounts the
-  # PKGBUILD's own directory, so this path will not resolve there. SPEC §26
-  # permits plain `makepkg` for v0.1 and defers chroot to release quality.
-  # Same trade-off already accepted in packages/cachy-omarchy-shell/PKGBUILD.
-  bash "$startdir/stage-overlay.sh" "$startdir/../../overlay" "$pkgdir"
+  if (( _clean_context )); then
+    bash "$startdir/stage-overlay.sh" "$srcdir/overlay" "$pkgdir"
+  else
+    # Direct makepkg keeps the developer repository layout. A clean chroot
+    # must use the temporary source archive produced by build-packages --clean.
+    bash "$startdir/stage-overlay.sh" "$startdir/../../overlay" "$pkgdir"
+  fi
 }

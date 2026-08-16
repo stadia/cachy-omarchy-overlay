@@ -10,22 +10,33 @@ depends=('quickshell' 'hyprland' 'inotify-tools')
 makedepends=('git')
 _commit='f0020448ca87329199de7cb12f2015ebc4a3e5e7'
 
-if [[ -n ${COO_OMARCHY_GIT:-} ]]; then
+# bin/build-packages --clean creates these source archives only in a temporary
+# makechrootpkg context. They keep the repository overlay as the single
+# tracked source of truth while making every package input available inside
+# the bind-mounted PKGBUILD directory.
+if [[ -f $startdir/clean-omarchy.tar && -f $startdir/clean-overlay-defaults.tar ]]; then
+  source=('clean-omarchy.tar' 'clean-overlay-defaults.tar')
+  sha256sums=('SKIP' 'SKIP')
+  _clean_context=1
+elif [[ -n ${COO_OMARCHY_GIT:-} ]]; then
   source=("omarchy::git+file://${COO_OMARCHY_GIT}#commit=${_commit}")
+  sha256sums=('SKIP')
+  _clean_context=0
 else
   source=("omarchy::git+https://github.com/basecamp/omarchy.git#commit=${_commit}")
+  sha256sums=('SKIP')
+  _clean_context=0
 fi
-sha256sums=('SKIP')
 
 package() {
-  # NOTE (chroot limitation, tracked for Milestone 7): overlay/defaults lives
-  # two levels above this PKGBUILD, outside packages/cachy-omarchy-shell/. A
-  # clean chroot build (makechrootpkg/archbuild) only bind-mounts the
-  # PKGBUILD's own directory into the build root, so this path will not
-  # resolve there. SPEC §26 permits plain `makepkg` for v0.1 and defers
-  # chroot support to release quality, so this is accepted for now rather
-  # than duplicating overlay/defaults/shell.json into this package directory
-  # (which would create two sources of truth for the same file).
-  bash "$startdir/stage-upstream.sh" "$srcdir/omarchy" "$pkgdir" \
-    "$startdir/../../overlay/defaults"
+  if (( _clean_context )); then
+    bash "$startdir/stage-upstream.sh" "$srcdir/omarchy" "$pkgdir" \
+      "$srcdir/overlay/defaults"
+  else
+    # The direct makepkg fallback retains the repository layout for developers.
+    # A clean chroot cannot see this parent path; use bin/build-packages --clean
+    # rather than copying overlay/defaults into this tracked package directory.
+    bash "$startdir/stage-upstream.sh" "$srcdir/omarchy" "$pkgdir" \
+      "$startdir/../../overlay/defaults"
+  fi
 }
