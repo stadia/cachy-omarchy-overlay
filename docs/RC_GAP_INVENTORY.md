@@ -103,9 +103,11 @@ restart IPC 관측을 systemd supervision으로 해석하지 않는다.
 - `install-pending.manifest`는 **FAIL**이다. doctor는 recovery·install·reload를 시도하지
   않으며 operator recovery가 필요하다고만 보고한다.
 - validated manifest와 immutable artifact checksum이 맞지 않으면 **FAIL**이다.
-- `~/.config/cachy-omarchy/shell.json`은 init가 만드는 참조용 inert copy이고, 실제 shell은
-  `~/.config/omarchy/shell.json`을 읽는다. 전자가 있으면 **WARN**이고 후자는 user override
-  **WARN**이다. 자동 경로 bridge는 만들지 않는다.
+- init는 `~/.config/cachy-omarchy/shell.json`을 만들지 않는다. 패키지 기본값은
+  `/usr/share/cachy-omarchy/upstream/config/omarchy/shell.json`으로 스테이징되고 init 없이
+  셸이 적용한다. 실제 shell은 `~/.config/omarchy/shell.json`을 읽는다. 이전 버전에서 남은
+  legacy `~/.config/cachy-omarchy/shell.json`이 있으면 doctor가 **WARN**으로 알리고, user
+  override `~/.config/omarchy/shell.json`도 **WARN**이다. 자동 경로 bridge는 만들지 않는다.
 - `graphical-session.target`의 자동 기동은 unit 의도만으로 증명되지 않아 **WARN**이다.
 
 ## 릴리스 전 남은 순서

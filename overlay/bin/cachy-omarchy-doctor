@@ -266,9 +266,9 @@ check_manifest
 check_installed_manifest
 
 if [[ -e $CONFIG_DIR/shell.json ]]; then
-  warn "inert shell.json: $CONFIG_DIR/shell.json is a reference copy; shell reads $USER_OMARCHY_CONFIG_DIR/shell.json"
+  warn "inert shell.json: $CONFIG_DIR/shell.json is a legacy copy (init no longer creates it); shell reads $USER_OMARCHY_CONFIG_DIR/shell.json"
 else
-  pass "inert shell.json reference copy absent"
+  pass "inert shell.json legacy copy absent"
 fi
 if [[ -e $USER_OMARCHY_CONFIG_DIR/shell.json ]]; then
   warn "user shell override present: $USER_OMARCHY_CONFIG_DIR/shell.json"

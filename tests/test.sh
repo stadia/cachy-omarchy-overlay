@@ -29,4 +29,8 @@ while IFS= read -r t; do
 done < <(find "$REPO_ROOT/tests" -name 'test_*.sh' -type f | sort)
 
 printf '\n%d/%d test files passed\n' "$((total - failed))" "$total"
+if [[ $total -eq 0 ]]; then
+  printf 'error: no test files matched%s\n' "${only:+ filter: $only}" >&2
+  exit 1
+fi
 [[ $failed -eq 0 ]]
