@@ -65,6 +65,7 @@ cat >"$fake/mv" <<'EOF'
 #!/usr/bin/env bash
 last=${!#}
 if [[ ${COO_FAKE_POINTER_FAIL:-0} == 1 && $last == */validated-build.manifest ]]; then exit 10; fi
+if [[ ${COO_FAKE_ARCHIVE_MV_FAIL:-0} == 1 && $last == */packages/previous-* ]]; then exit 12; fi
 /usr/bin/mv "$@"
 EOF
 cat >"$fake/pacman" <<'EOF'
@@ -74,6 +75,7 @@ printf '%s\n' "$*" >>"$COO_PACMAN_LOG"
 EOF
 cat >"$fake/test-runner" <<'EOF'
 #!/usr/bin/env bash
+[[ -n ${COO_TEST_LOG:-} ]] && printf 'runner\n' >>"$COO_TEST_LOG"
 case ${COO_FAKE_TEST_MODE:-pass} in
   pass) printf 'all test coverage ran\n' ;;
   skip) printf 'skip: installed tree absent\n' ;;
@@ -177,6 +179,21 @@ code=0
 out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$missing_state" COO_TEST_RUNNER="$fake/test-runner" "$root/bin/test-packages" 2>&1) || code=$?
 assert_eq "$code" "1" "U08 missing manifest blocks tests before false green"
 assert_contains "$out" "validated manifest missing" "U08 reports missing manifest"
+
+# Strict parser regression: an empty singleton must still count as present,
+# so a later valid duplicate cannot reach the runner.
+manifest_backup=$(cat "$COO_TEST_SANDBOX/state/validated-build.manifest")
+printf 'RELEASE=\n%s\n' "$manifest_backup" >"$COO_TEST_SANDBOX/state/validated-build.manifest"
+runner_log=$COO_TEST_SANDBOX/runner.log
+rm -f "$runner_log"
+code=0
+out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$COO_TEST_SANDBOX/state" COO_TEST_RUNNER="$fake/test-runner" COO_TEST_LOG="$runner_log" "$root/bin/test-packages" 2>&1) || code=$?
+assert_eq "$code" "1" "duplicate empty RELEASE blocks manifest"
+assert_contains "$out" "duplicate RELEASE" "duplicate empty RELEASE is diagnosed"
+[[ -e $runner_log ]] && runner_called=1 || runner_called=0
+assert_eq "$runner_called" "0" "malformed manifest invokes no runner"
+printf '%s\n' "$manifest_backup" >"$COO_TEST_SANDBOX/state/validated-build.manifest"
+
 code=0
 out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$COO_TEST_SANDBOX/state" COO_TEST_RUNNER="$fake/test-runner" COO_FAKE_TEST_MODE=skip "$root/bin/test-packages" 2>&1) || code=$?
 assert_eq "$code" "1" "U08 skipped installed-tree coverage fails"
@@ -210,6 +227,14 @@ code=0
 out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$COO_TEST_SANDBOX/state" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$root/bin/install-packages" 2>&1) || code=$?
 assert_eq "$code" "1" "explicit install refusal blocks pacman"
 assert_eq "$(wc -l <"$paclog")" "0" "refused install invokes no pacman"
+
+# The archive rename is a hard precondition: a failed archive must block pacman.
+: >"$paclog"
+code=0
+out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$COO_TEST_SANDBOX/state" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" COO_MV_BIN="$fake/mv" COO_FAKE_ARCHIVE_MV_FAIL=1 "$root/bin/install-packages" --install 2>&1) || code=$?
+assert_eq "$code" "1" "archive rename failure blocks install"
+assert_eq "$(wc -l <"$paclog")" "0" "archive rename failure invokes no pacman"
+
 COO_REPO_ROOT="$root" COO_STATE_DIR="$COO_TEST_SANDBOX/state" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$root/bin/install-packages" --install >/dev/null
 assert_contains "$(cat "$paclog")" "-U" "U09 install calls fake pacman explicitly"
 assert_contains "$(cat "$paclog")" "cachy-omarchy-shell-4.0.0-1-any.pkg.tar.zst" "U09 installs exact current shell"

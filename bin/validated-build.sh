@@ -7,6 +7,8 @@ coo_fail() { printf 'error: %s\n' "$1" >&2; return 1; }
 # COO_VERSION, COO_COMMIT, COO_ARTIFACT_NAMES, and COO_ARTIFACT_SUMS.
 coo_read_manifest() {
   local manifest=$1 line key value name sum
+  local seen_release=0 seen_version=0 seen_commit=0
+  local seen_shell=0 seen_overlay=0 seen_shell_sha256=0 seen_overlay_sha256=0
   COO_RELEASE="" COO_VERSION="" COO_COMMIT=""
   COO_ARTIFACT_NAMES=() COO_ARTIFACT_SUMS=()
   [[ -f $manifest ]] || { coo_fail "validated manifest missing: $manifest"; return 1; }
@@ -14,15 +16,18 @@ coo_read_manifest() {
   while IFS= read -r line || [[ -n $line ]]; do
     case $line in
       RELEASE=*)
-        [[ -z $COO_RELEASE ]] || { coo_fail 'duplicate RELEASE in manifest'; return 1; }
+        [[ $seen_release -eq 0 ]] || { coo_fail 'duplicate RELEASE in manifest'; return 1; }
+        seen_release=1
         COO_RELEASE=${line#RELEASE=}
         ;;
       OMARCHY_VERSION=*)
-        [[ -z $COO_VERSION ]] || { coo_fail 'duplicate OMARCHY_VERSION in manifest'; return 1; }
+        [[ $seen_version -eq 0 ]] || { coo_fail 'duplicate OMARCHY_VERSION in manifest'; return 1; }
+        seen_version=1
         COO_VERSION=${line#OMARCHY_VERSION=}
         ;;
       OMARCHY_COMMIT=*)
-        [[ -z $COO_COMMIT ]] || { coo_fail 'duplicate OMARCHY_COMMIT in manifest'; return 1; }
+        [[ $seen_commit -eq 0 ]] || { coo_fail 'duplicate OMARCHY_COMMIT in manifest'; return 1; }
+        seen_commit=1
         COO_COMMIT=${line#OMARCHY_COMMIT=}
         ;;
       ARTIFACT=*)
@@ -31,6 +36,19 @@ coo_read_manifest() {
         sum=${value#* }
         [[ $name != "$value" && $name =~ ^[A-Za-z0-9._+-]+\.pkg\.tar\.zst$ && $sum =~ ^[0-9a-fA-F]{64}$ ]] \
           || { coo_fail 'invalid ARTIFACT in manifest'; return 1; }
+        case $name in
+          cachy-omarchy-shell-*)
+            [[ $seen_shell -eq 0 && $seen_shell_sha256 -eq 0 ]] || { coo_fail 'duplicate shell artifact in manifest'; return 1; }
+            seen_shell=1
+            seen_shell_sha256=1
+            ;;
+          cachy-omarchy-overlay-*)
+            [[ $seen_overlay -eq 0 && $seen_overlay_sha256 -eq 0 ]] || { coo_fail 'duplicate overlay artifact in manifest'; return 1; }
+            seen_overlay=1
+            seen_overlay_sha256=1
+            ;;
+          *) coo_fail 'unknown artifact type in manifest'; return 1 ;;
+        esac
         COO_ARTIFACT_NAMES+=("$name")
         COO_ARTIFACT_SUMS+=("$sum")
         ;;
@@ -39,6 +57,10 @@ coo_read_manifest() {
     esac
   done <"$manifest"
 
+  [[ $seen_release -eq 1 && $seen_version -eq 1 && $seen_commit -eq 1 \
+     && $seen_shell -eq 1 && $seen_overlay -eq 1 \
+     && $seen_shell_sha256 -eq 1 && $seen_overlay_sha256 -eq 1 ]] \
+    || { coo_fail 'manifest is missing required singleton fields'; return 1; }
   [[ $COO_RELEASE =~ ^(validated-builds|packages)/[A-Za-z0-9._+-]+$ ]] \
     || { coo_fail 'unsafe RELEASE in manifest'; return 1; }
   [[ $COO_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && $COO_COMMIT =~ ^[0-9a-fA-F]{40}$ ]] \
@@ -91,12 +113,12 @@ coo_validate_current_manifest() {
 # manifest must have been validated immediately before calling this function.
 # $1=state dir, $2=manifest source, $3=install command, $4=sha256 command.
 coo_archive_validated_release() {
-  local state_dir=$1 source_manifest=$2 install_bin=$3 sha256_bin=$4 stamp stage rel manifest i sum
-  stamp=$(date +%s%N)
-  mkdir -p "$state_dir/packages"
+  local state_dir=$1 source_manifest=$2 install_bin=$3 sha256_bin=$4 mv_bin=${5:-mv} stamp stage rel manifest i sum
+  stamp=$(date +%s%N) || return 1
+  mkdir -p "$state_dir/packages" || return 1
   stage=$(mktemp -d "$state_dir/packages/.candidate-XXXXXX") || return 1
   rel="packages/previous-$stamp"
-  mkdir -p "$stage/artifacts"
+  mkdir -p "$stage/artifacts" || { rm -rf "$stage"; return 1; }
   for i in "${!COO_ARTIFACT_NAMES[@]}"; do
     "$install_bin" -m 644 "$COO_RELEASE_DIR/artifacts/${COO_ARTIFACT_NAMES[$i]}" "$stage/artifacts/${COO_ARTIFACT_NAMES[$i]}" \
       || { rm -rf "$stage"; return 1; }
@@ -112,6 +134,6 @@ coo_archive_validated_release() {
       printf 'ARTIFACT=%s %s\n' "${COO_ARTIFACT_NAMES[$i]}" "$sum"
     done
   } >"$manifest" || { rm -rf "$stage"; return 1; }
-  mv "$stage" "$state_dir/$rel"
+  "$mv_bin" "$stage" "$state_dir/$rel" || { rm -rf "$stage"; return 1; }
   printf '%s\n' "$state_dir/$rel/validated-build.manifest"
 }
