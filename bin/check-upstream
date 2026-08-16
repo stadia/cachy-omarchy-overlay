@@ -9,12 +9,19 @@ lock=$repo_root/upstream.lock
 # shellcheck disable=SC1090
 source "$lock"
 
-refs=$($git_bin ls-remote --tags --refs "$OMARCHY_REPOSITORY") || {
+# Do not pass --refs: annotated tags need the peeled ^{} record to identify
+# the commit that a release tag names rather than its tag-object SHA.
+refs=$($git_bin ls-remote --tags "$OMARCHY_REPOSITORY") || {
   echo "error: unable to query upstream tags" >&2; exit 1;
 }
 latest=$(awk '$2 ~ /^refs\/tags\/v[0-9]+\.[0-9]+\.[0-9]+$/ { sub("refs/tags/v", "", $2); print $2 }' <<<"$refs" | sort -V | tail -n1)
 [[ -n $latest ]] || { echo "error: no stable semver tags found" >&2; exit 1; }
-commit=$(awk -v tag="refs/tags/v$latest" '$2 == tag { print $1; exit }' <<<"$refs")
+tag_ref="refs/tags/v$latest"
+# Annotated tag: prefer refs/tags/vX.Y.Z^{} (target commit). Lightweight tag:
+# that line is absent, so use the direct ref SHA.
+peeled=$(awk -v tag="${tag_ref}^{}" '$2 == tag { print $1; exit }' <<<"$refs")
+direct=$(awk -v tag="$tag_ref" '$2 == tag { print $1; exit }' <<<"$refs")
+commit=${peeled:-$direct}
 [[ $commit =~ ^[0-9a-fA-F]{40}$ ]] || { echo "error: invalid commit for v$latest" >&2; exit 1; }
 
 printf 'Current:\n  Omarchy %s\n  %s\n\n' "$OMARCHY_VERSION" "$OMARCHY_COMMIT"

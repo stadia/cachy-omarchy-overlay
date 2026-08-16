@@ -8,6 +8,7 @@ state_dir=${COO_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/cachy-omarchy}
 makepkg_bin=${COO_MAKEPKG_BIN:-makepkg}
 bsdtar_bin=${COO_BSDTAR_BIN:-bsdtar}
 sha256_bin=${COO_SHA256_BIN:-sha256sum}
+install_bin=${COO_INSTALL_BIN:-install}
 lock=$repo_root/upstream.lock
 shell_pkg=$repo_root/packages/cachy-omarchy-shell/PKGBUILD
 overlay_pkg=$repo_root/packages/cachy-omarchy-overlay/PKGBUILD
@@ -25,9 +26,13 @@ overlay_rel=$(pkg_field "$overlay_pkg" pkgrel)
 [[ $shell_rel =~ ^[0-9]+$ && $overlay_ver =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && $overlay_rel =~ ^[0-9]+$ ]] || fail 'invalid PKGBUILD version metadata'
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/coo-build-XXXXXX")
-trap 'rm -rf "$work"' EXIT
+mkdir -p "$build_dir" "$state_dir"
+# Keep all candidate copies and checksum work outside published artifact names.
+# A failed copy/hash therefore leaves the prior validated pair untouched.
+stage=$(mktemp -d "$build_dir/.coo-stage-XXXXXX")
+trap 'rm -rf "$work" "$stage"' EXIT
 pkgdest=$work/pkgdest
-mkdir -p "$pkgdest" "$build_dir" "$state_dir"
+mkdir -p "$pkgdest" "$stage/artifacts"
 
 run_makepkg() {
   local dir=$1
@@ -56,17 +61,26 @@ audit() {
 audit "$pkgdest/$shell_name" || fail "archive audit failed: $shell_name"
 audit "$pkgdest/$overlay_name" || fail "archive audit failed: $overlay_name"
 
-# Publication happens only after both builds and audits succeeded.
-install -m 644 "$pkgdest/$shell_name" "$build_dir/$shell_name"
-install -m 644 "$pkgdest/$overlay_name" "$build_dir/$overlay_name"
-manifest_tmp=$(mktemp "$state_dir/validated-build.XXXXXX")
+# Stage exact copies, checksums and manifest before touching published files.
+for name in "$shell_name" "$overlay_name"; do
+  "$install_bin" -m 644 "$pkgdest/$name" "$stage/artifacts/$name"
+done
+manifest_tmp=$stage/validated-build.manifest
 {
   printf 'OMARCHY_VERSION=%s\n' "$OMARCHY_VERSION"
   printf 'OMARCHY_COMMIT=%s\n' "$OMARCHY_COMMIT"
   for name in "$shell_name" "$overlay_name"; do
-    sum=$($sha256_bin "$build_dir/$name" | awk '{print $1}') || exit 1
+    sum=$($sha256_bin "$stage/artifacts/$name" | awk '{print $1}')
+    [[ $sum =~ ^[0-9a-fA-F]{64}$ ]] || exit 1
     printf 'ARTIFACT=%s %s\n' "$name" "$sum"
   done
 } >"$manifest_tmp"
+
+# Only a complete staged pair is published. Remove stale pair archives only
+# now, then rename staged files on the same filesystem; no failed stage can
+# overwrite or coexist with files under build/.
+find "$build_dir" -maxdepth 1 -type f \( -name 'cachy-omarchy-shell-*.pkg.tar.zst' -o -name 'cachy-omarchy-overlay-*.pkg.tar.zst' \) -delete
+mv "$stage/artifacts/$shell_name" "$build_dir/$shell_name"
+mv "$stage/artifacts/$overlay_name" "$build_dir/$overlay_name"
 mv "$manifest_tmp" "$state_dir/validated-build.manifest"
 printf 'validated build: %s\n' "$state_dir/validated-build.manifest"
