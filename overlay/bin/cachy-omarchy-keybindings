@@ -26,10 +26,12 @@
 set -uo pipefail
 
 here=$(cd "$(dirname -- "$0")" && pwd)
-if [[ -x $here/cachy-omarchy-shell ]]; then
+if [[ -n ${COO_SHELL_BIN:-} ]]; then
+  SHELL_BIN=$COO_SHELL_BIN
+elif [[ -x $here/cachy-omarchy-shell ]]; then
   SHELL_BIN=$here/cachy-omarchy-shell
 else
-  SHELL_BIN=${COO_SHELL_BIN:-cachy-omarchy-shell}
+  SHELL_BIN=cachy-omarchy-shell
 fi
 
 PREFIX_ROOT=${COO_PREFIX_ROOT:-/usr/share/cachy-omarchy}
@@ -329,9 +331,11 @@ modmask_to_text() {
 # - Fill missing Lua __lua dispatch metadata from the Lua source cache
 # - Remove standard Omarchy bin path prefix
 # - Map numeric modifier key mask to a textual rendition
-# - Output comma-separated values that the parser can understand
+# - Output unit-separator-delimited values so command arguments may contain commas
 #
 # ADAPTED: the cache join key is modmask+key (upstream: modmask+description).
+# Internal records use ASCII unit separator (0x1f), which preserves commas in
+# command arguments and synthetic descriptions.
 dynamic_bindings() {
   local modmask key keycode description dispatcher arg modifiers cache_key
 
@@ -382,19 +386,19 @@ dynamic_bindings() {
       modifiers=$(modmask_to_text "$modmask")
       arg="${arg//~\/.local\/share\/omarchy\/bin\//}"
 
-      printf '%s,%s,%s,%s,%s\n' "$modifiers" "$key" "$description" "$dispatcher" "$arg"
+      printf '%s\x1f%s\x1f%s\x1f%s\x1f%s\n' "$modifiers" "$key" "$description" "$dispatcher" "$arg"
     done
 }
 
 # Parse and format keybindings
 #
 # `awk` does the heavy lifting:
-# - Set the field separator to a comma ','.
+# - Set the field separator to ASCII unit separator (0x1f), not comma.
 # - Joins the key combination (e.g., "SUPER + Q").
-# - Joins the command that the key executes.
+# - Keeps command arguments containing commas intact.
 # - Prints display text and dispatch metadata as tab-separated fields.
 parse_binding_records() {
-  awk -F, '
+  awk -F '\037' '
 {
     # Combine the modifier and key (first two fields)
     key_combo = $1 " + " $2;
@@ -407,20 +411,14 @@ parse_binding_records() {
     action = $3;
     dispatcher = $4;
 
-    # Reconstruct the dispatcher arg from the remaining fields
-    arg = "";
-    for (i = 5; i <= NF; i++) {
-        arg = arg $i (i < NF ? "," : "");
-    }
+    # Fields are unit-separator-delimited, so commas in args stay intact.
+    arg = $5;
 
     if (action == "") {
-        # Reconstruct the command from the remaining fields
-        for (i = 4; i <= NF; i++) {
-            action = action $i (i < NF ? "," : "");
-        }
+        # Reconstruct the command from dispatcher and arg.
+        action = dispatcher "," arg;
 
-        # Clean up trailing commas, remove leading "exec, ", and trim
-        sub(/,$/, "", action);
+        # Clean up leading "exec, ", and trim
         gsub(/(^|,)[[:space:]]*exec[[:space:]]*,?/, "", action);
         gsub(/(^|[[:space:]])uwsm(-app| app)[[:space:]]+--[[:space:]]+/, "", action);
         gsub(/^[ \t]+|[ \t]+$/, "", action);
@@ -518,7 +516,9 @@ output_binding_records_uncached() {
 
 keybindings_cache_key() {
   {
-    printf 'v11\n'
+    # v12 invalidates upstream v11 records: this adapted command changes both
+    # record encoding and the source-derived Lua metadata.
+    printf 'v12\n'
     hyprctl devices 2>/dev/null | grep -F 'active keymap:'
     hyprctl binds 2>/dev/null
   } | sha256sum | awk '{ print $1 }'

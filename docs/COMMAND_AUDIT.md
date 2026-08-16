@@ -47,7 +47,7 @@ omarchy-launch-about (브랜딩/os-release)
 
 | command | called from | purpose | class | action |
 | --- | --- | --- | --- | --- |
-| `omarchy-menu-keybindings` | 메뉴 `learn.keybindings` | `hyprctl binds` + Lua 캐시 + 검색 메뉴 | ADAPTED | wrapper — `cachy-omarchy-keybindings`(적응 카피) + compat `omarchy-shell` + 스테이징 `omarchy-menu-select`/`omarchy-cmd-present`. **M4 실측 완료**(아래). 데이터 수집만 CachyOS Hyprland 설정에 맞춘다 |
+| `omarchy-menu-keybindings` | 메뉴 `learn.keybindings` | `hyprctl binds` + Lua 캐시 + 검색 메뉴 | ADAPTED | **SUPER+K / `cachy-omarchy-keybindings` 전용** wrapper — 적응 카피 + compat `omarchy-shell` + 스테이징 `omarchy-menu-select`/`omarchy-cmd-present`. 메뉴의 동명 action 은 compat shim 이 없어 여전히 실패(전수 표 참조). **M4 실측 완료**(아래). 데이터 수집만 CachyOS Hyprland 설정에 맞춘다 |
 | `omarchy-menu-tmux-keybindings` | 메뉴 | Tmux 전용 | DISABLED | disable |
 | `omarchy-menu-herdr-keybindings` | 메뉴 | Herdr 전용 | DISABLED | disable |
 
