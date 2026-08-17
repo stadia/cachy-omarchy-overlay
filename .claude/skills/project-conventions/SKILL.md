@@ -41,10 +41,14 @@ user-invocable: false
   `$COO_TEST_SANDBOX` 자체를 넘기면 거부하도록 가드돼 있다 — 그 가드를 우회하지 않는다.
 
 ## 언어 규칙
-- **산출물 문서는 한국어.** `docs/*.md`, README의 본문, 핸드오프·원장.
+- **산출물 문서는 한국어.** `docs/*.md`, 핸드오프·원장.
+- **README 는 예외 — 영어가 정본이다** (2026-08-18, 저장소 public 전환 후 결정).
+  `README.md` = 영어, `README.ko-KR.md` = 한국어이며 둘은 서로 링크한다.
+  **둘 중 하나를 고치면 반드시 나머지도 같이 고친다** — 내용이 갈라지면 안 된다.
+  README.md 를 한국어로 되돌리지 말 것.
 - **코드·식별자·커밋 메시지·테스트가 검사하는 리터럴은 영어.** 테스트가 특정 영어 문자열을
   `grep`/`assert_contains`로 검사하는 경우가 흔하다 — 그런 리터럴을 번역하면 테스트가 어긋난다.
-- 이미 커밋된 영어 docs(UPSTREAM.md, README, docs/QUATTRO_PORT_MAP.md)는 소급 번역하지 않는다("앞으로"만 적용).
+- 이미 커밋된 영어 docs(UPSTREAM.md, docs/QUATTRO_PORT_MAP.md)는 소급 번역하지 않는다("앞으로"만 적용).
 
 ## 워크플로 (Subagent-Driven Development)
 - 한 번에 한 구현 에이전트만 브랜치에서 실행.

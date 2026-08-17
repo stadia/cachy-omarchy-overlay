@@ -735,7 +735,8 @@ This document is human-readable.
 ```text
 cachy-omarchy-overlay/
 ├── SPEC.md
-├── README.md
+├── README.md              # English (primary)
+├── README.ko-KR.md        # Korean
 ├── LICENSE
 ├── UPSTREAM.md
 ├── upstream.lock

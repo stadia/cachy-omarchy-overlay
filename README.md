@@ -1,128 +1,135 @@
 # Cachy Omarchy Overlay
 
-CachyOS + Hyprland에서 [Omarchy](https://github.com/basecamp/omarchy) Quattro 셸을
-**업스트림 그대로** 구동하기 위한 Arch 패키지 오버레이.
+*[한국어 README](README.ko-KR.md)*
 
-런처를 재구현하지 않는다. 공식 Omarchy 저장소를 커밋 단위로 핀하고, 필요한 런타임만
-추출·패키징하며, 패치가 꼭 필요할 때만 최소한으로 적용한다(SPEC §1).
+An Arch package overlay that runs the [Omarchy](https://github.com/basecamp/omarchy)
+Quattro shell **as upstream ships it** on CachyOS + Hyprland.
+
+It does not reimplement the launcher. It pins the official Omarchy repository to a
+specific commit, extracts and packages only the runtime it needs, and patches only
+where a patch is unavoidable (SPEC §1).
 
 ```text
-SUPER + SPACE  →  Omarchy Quattro 런처 / 메뉴
-SUPER + K      →  Omarchy 스타일 키바인딩 뷰어
+SUPER + SPACE  →  Omarchy Quattro launcher / menu
+SUPER + K      →  Omarchy-style keybinding viewer
 ```
 
-## 구성 요소
+## Components
 
-두 개의 Arch 패키지를 만든다.
+Two Arch packages are produced.
 
-| 패키지 | 버전 | 역할 |
+| Package | Version | Role |
 |---|---|---|
-| `cachy-omarchy-shell` | 4.0.0-5 | 핀된 Omarchy Quattro 셸 런타임 (Quickshell 트리, `omarchy-settings` 제외) |
-| `cachy-omarchy-overlay` | 0.4.0-1 | CachyOS 통합 계층 (래퍼 명령, Hyprland 바인딩, 기본값) |
+| `cachy-omarchy-shell` | 4.0.0-5 | The pinned Omarchy Quattro shell runtime (Quickshell tree, `omarchy-settings` excluded) |
+| `cachy-omarchy-overlay` | 0.4.0-1 | The CachyOS integration layer (wrapper commands, Hyprland bindings, defaults) |
 
-업스트림 핀은 `upstream.lock`이 관리한다 (현재 `basecamp/omarchy @ v4.0.0`,
+The upstream pin is managed by `upstream.lock` (currently `basecamp/omarchy @ v4.0.0`,
 `f0020448`).
 
-설치되는 공개 명령 7개 (`/usr/bin`):
+Seven public commands are installed into `/usr/bin`:
 
-- `cachy-omarchy-shell` — 셸 기동(`--run`)·IPC(`--ipc`)·수동 재기동(`--restart`)
-- `cachy-omarchy-launcher` — 런처 토글 (SUPER + SPACE)
-- `cachy-omarchy-keybindings` — 키바인딩 뷰어 토글 (SUPER + K)
-- `cachy-omarchy-bindings` — 사용자 Hyprland 설정에 관리 source 블록 주입/제거
-- `cachy-omarchy-init` — 최초 1회 사용자 설정 생성 (기존 파일 덮어쓰지 않음)
-- `cachy-omarchy-doctor` — 읽기 전용 진단 (테마 상태 포함)
-- `cachy-omarchy-theme-set` — 테마 적용 (업스트림 `omarchy-theme-set` 얇은 래퍼)
+- `cachy-omarchy-shell` — start the shell (`--run`), talk to it (`--ipc`), restart it manually (`--restart`)
+- `cachy-omarchy-launcher` — toggle the launcher (SUPER + SPACE)
+- `cachy-omarchy-keybindings` — toggle the keybinding viewer (SUPER + K)
+- `cachy-omarchy-bindings` — inject/remove the managed source block in your Hyprland config
+- `cachy-omarchy-init` — one-time user setup (never overwrites existing files)
+- `cachy-omarchy-doctor` — read-only diagnostics (including theme state)
+- `cachy-omarchy-theme-set` — apply a theme (thin wrapper over upstream `omarchy-theme-set`)
 
-## 테마
+## Themes
 
-업스트림 테마 파이프라인을 그대로 쓴다 (M9). 첫 `cachy-omarchy-init` 이 테마가
-없을 때만 "Tokyo Night" 를 시드한다.
-
-```bash
-cachy-omarchy-theme-set "Nord"     # 전환 — 셸 재시작 없이 바·메뉴에 반영
-```
-
-또는 런처 메뉴의 `Style > Theme`. 테마 상태는 업스트림과 같은
-`~/.local/state/omarchy/current/theme/` 에 있고, 사용자 오버레이
-(`~/.config/omarchy/themes/<name>/`)가 패키지 테마 위에 합쳐진다.
-
-## 유틸리티 플러그인 (M10)
-
-업스트림 first-party 플러그인 다섯 개 — clipboard·emojis·image-picker·
-reminders·OSD — 는 업스트림 규칙상 기본 로드된다. M10 은 그 QML 이 부르는
-helper 와 런타임 의존성(`jq`, `wl-clipboard`, `wtype`, `wireplumber`,
-`pipewire-pulse`, `xdg-utils`)을 패키지가 닫는다.
-
-- **Clipboard** — 메뉴의 clipboard 항목 또는 `omarchy.clipboard` 토글. 히스토리는
-  업스트림과 같은 `~/.local/state/omarchy/clipboard-history.json` (최대 300개,
-  로컬 전용)에 기록되며, 민감한 selection(비밀번호 관리자 hint 등)은 저장하지
-  않는다. `cachy-omarchy-doctor` 가 경로와 항목 수를 읽기 전용으로 보고한다.
-  지우는 것은 사용자의 명시 동작뿐이다.
-- **Emojis** — 메뉴의 Emoji 항목. 선택한 emoji 를 clipboard 에 넣고 focused 앱에
-  한 번 붙여넣는다. 취소는 아무 side effect 도 없다.
-- **Image picker** — 테마/배경 선택 등에 쓰이는 업스트림 image-grid (M9 의
-  `omarchy-menu-images` 경로 그대로).
-- **Reminders** — `omarchy-reminder -i`/메뉴에서 설정. user systemd 타이머
-  (`omarchy-reminder-*.timer`)와 `${XDG_RUNTIME_DIR:-/tmp}/omarchy-reminders/`
-  메타데이터만 사용한다 — system 유닛·`/etc`·root 없음.
-- **OSD** — 볼륨/마이크 뮤트 helper 와 `omarchy-osd` 가 upstream `omarchy.osd`
-  패널을 띄운다. 이 helper 들은 `$OMARCHY_PATH/bin` 아래 스테이징되며 일반
-  사용자 PATH 에는 없다 — 직접 호출하려면 셸 환경의 PATH(셸이 붙이는 경로)나
-  절대 경로가 필요하다. XF86 미디어 키 바인딩은 주입하지 않는다 — 도달 경로는
-  명시적 CLI/메뉴뿐이다 (화면 밝기 체인은 범위 밖).
-
-## 기동 모델
-
-셸은 systemd 유닛이 아니라 **Hyprland autostart**로 뜬다 — 업스트림 omarchy와 같은
-모델이다. `bindings.lua`가 `hyprland.start` 이벤트(세션 시작 시 1회)에
-`cachy-omarchy-shell --run`을 실행한다. 크래시 시 자동 재기동은 없으며
-`cachy-omarchy-shell --restart`로 수동 복구한다.
-
-## 빌드와 설치
+The upstream theme pipeline is used as-is (M9). The first `cachy-omarchy-init` seeds
+"Tokyo Night" only when no theme is present.
 
 ```bash
-bin/build-packages           # 두 패키지 빌드 + 감사 (build/*.pkg.tar.zst)
-bin/install-packages         # 빌드 산출물 설치
-cachy-omarchy-init           # 최초 1회: 바인딩 + 사용자 상태 생성
+cachy-omarchy-theme-set "Nord"     # switch — bar and menu update without a shell restart
 ```
 
-업스트림 추적:
+You can also use `Style > Theme` in the launcher menu. Theme state lives where upstream
+puts it, `~/.local/state/omarchy/current/theme/`, and a user overlay
+(`~/.config/omarchy/themes/<name>/`) is merged over the packaged themes.
+
+## Utility plugins (M10)
+
+Five upstream first-party plugins — clipboard, emojis, image-picker, reminders, and OSD —
+are loaded by default per upstream's own rules. M10 closes the gap by packaging the
+helpers their QML calls and the runtime dependencies they need (`jq`, `wl-clipboard`,
+`wtype`, `wireplumber`, `pipewire-pulse`, `xdg-utils`).
+
+- **Clipboard** — the clipboard entry in the menu, or the `omarchy.clipboard` toggle.
+  History is written to the same file upstream uses,
+  `~/.local/state/omarchy/clipboard-history.json` (300 entries max, local only), and
+  sensitive selections (password-manager hints and the like) are not stored.
+  `cachy-omarchy-doctor` reports the path and entry count read-only. Nothing clears the
+  history but an explicit user action.
+- **Emojis** — the Emoji entry in the menu. Puts the chosen emoji on the clipboard and
+  pastes it once into the focused application. Cancelling has no side effects.
+- **Image picker** — the upstream image grid used for theme and background selection
+  (the same `omarchy-menu-images` path as M9).
+- **Reminders** — configured through `omarchy-reminder -i` or the menu. Uses only user
+  systemd timers (`omarchy-reminder-*.timer`) and metadata under
+  `${XDG_RUNTIME_DIR:-/tmp}/omarchy-reminders/` — no system units, no `/etc`, no root.
+- **OSD** — the volume and microphone-mute helpers plus `omarchy-osd` raise the upstream
+  `omarchy.osd` panel. These helpers are staged under `$OMARCHY_PATH/bin` and are
+  deliberately absent from a normal user PATH — calling them directly requires either the
+  shell environment's PATH or an absolute path. No XF86 media-key bindings are injected;
+  the only reachable paths are the explicit CLI and the menu. (The screen-brightness chain
+  is out of scope.)
+
+## Startup model
+
+The shell starts from **Hyprland autostart**, not from a systemd unit — the same model
+upstream omarchy uses. `bindings.lua` runs `cachy-omarchy-shell --run` on the
+`hyprland.start` event (once per session). There is no automatic restart after a crash;
+recover manually with `cachy-omarchy-shell --restart`.
+
+## Build and install
 
 ```bash
-bin/check-upstream           # 핀 대비 업스트림 변경 확인
-bin/update-upstream          # 핀 갱신 + 재빌드 파이프라인
-bin/rollback                 # 이전 핀으로 복귀
+bin/build-packages           # build both packages + audit (build/*.pkg.tar.zst)
+bin/install-packages         # install the build output
+cachy-omarchy-init           # one-time: create bindings and user state
 ```
 
-## 개발
+Upstream tracking:
 
 ```bash
-./tests/test.sh              # 전체 테스트 (각 테스트는 격리 샌드박스 HOME에서 실행)
-./tests/test.sh wrapper      # 필터 실행
+bin/check-upstream           # check upstream for changes against the pin
+bin/update-upstream          # refresh the pin + rebuild pipeline
+bin/rollback                 # return to the previous pin
 ```
 
-문서 지도:
+## Development
 
-- `SPEC.md` — 최종 권위 명세
-- `UPSTREAM.md` — 업스트림 핀/추적 정책
-- `docs/RUNTIME_STARTUP.md` — 기동 경로·플러그인 비활성화 실측
-마일스톤 설계·구현 플랜은 비공개 개발 트리에 남겨 두고 이 저장소에는 담지 않는다.
-공개 문서에서 설계 기록을 인용할 때는 파일명만 밝힌다.
+```bash
+./tests/test.sh              # full suite (each test runs in an isolated sandbox HOME)
+./tests/test.sh wrapper      # run a filtered subset
+```
 
-## 로드맵
+Document map:
 
-- **v0.1** — 런타임 패키징 + 런처 + 키바인딩 + 업데이트/재빌드. 완료.
-- **v0.2 (Milestone 8)** — `omarchy.bar` 채택. 완료(`v0.2.0`). 업스트림 바를
-  켠 채로 출고한다. Waybar를 대체하지는 않는다 — 둘을 함께 띄우면 겹치지 않고
-  쌓이며(세로 예약 `36 → 62px`), 우리는 Waybar를 중지·제거하지 않는다.
-- **v0.3 (Milestone 9)** — 업스트림 테마 런타임 채택. 완료(`v0.3.0`).
-  `themes/`+`default/themed/`+테마 helper 를 같은 핀에서 스테이징하고,
-  `cachy-omarchy-theme-set` 래퍼로 업스트림 `omarchy-theme-set` 을 무패치
-  실행한다. 실측: `docs/RUNTIME_STARTUP.md` §18.6.
-- **v0.4 (Milestone 10)** — 유틸리티 플러그인(clipboard·emojis·image-picker·
-  reminders·OSD) helper/의존성 채택. 완료(`v0.4.0`). 실측:
+- `SPEC.md` — the authoritative specification
+- `UPSTREAM.md` — upstream pin and tracking policy
+- `docs/RUNTIME_STARTUP.md` — measured startup paths and plugin disablement
+
+Milestone design and implementation plans are kept in a private development tree and are
+not part of this repository. Where public documents cite a design record, they name the
+file only.
+
+## Roadmap
+
+- **v0.1** — runtime packaging + launcher + keybindings + update/rebuild. Done.
+- **v0.2 (Milestone 8)** — adopt `omarchy.bar`. Done (`v0.2.0`). The upstream bar ships
+  enabled. It does not replace Waybar — running both stacks them rather than overlapping
+  them (vertical reservation `36 → 62px`), and we neither stop nor remove Waybar.
+- **v0.3 (Milestone 9)** — adopt the upstream theme runtime. Done (`v0.3.0`). Stages
+  `themes/` + `default/themed/` + the theme helpers from the same pin, and runs upstream
+  `omarchy-theme-set` unpatched through the `cachy-omarchy-theme-set` wrapper.
+  Measurements: `docs/RUNTIME_STARTUP.md` §18.6.
+- **v0.4 (Milestone 10)** — adopt the utility plugin helpers and dependencies
+  (clipboard, emojis, image-picker, reminders, OSD). Done (`v0.4.0`). Measurements:
   `docs/RUNTIME_STARTUP.md` §19.2.
 
-## 라이선스
+## License
 
-MIT (`LICENSE`). 업스트림 Omarchy 또한 MIT.
+MIT (`LICENSE`). Upstream Omarchy is MIT as well.
