@@ -1163,3 +1163,90 @@ INFO 항목들은 테스트 스위트가 만든 샌드박스 셸이지 라이브
 - 잠금화면 공존(§61 #18, hyprlock 미관측).
 - `COO_RUN_LIVE=1` 자동화 키 주입 테스트(R04/R05 자동화).
 - 셸 크래시 후 자동 재기동은 이 모델에 **존재하지 않는다**(위 16.6).
+
+---
+
+## 17. M8 — 업스트림 기본 바 라이브 실측 (2026-08-17)
+
+v0.2.0 의 억제 해제(원칙 0)를 빌드된 아티팩트로 실제 검증했다. `sudo` 없이,
+격리 트리 + 격리 HOME 으로 사용자 세션 위에 띄웠다.
+
+### 17.1 절차
+
+```bash
+tmp=$(mktemp -d); ovl=$(mktemp -d); H=$(mktemp -d)
+source lib/runtime.sh
+coo_extract_pkg "$tmp"; coo_extract_overlay "$ovl"
+UP="$tmp/usr/share/cachy-omarchy/upstream"
+env HOME="$H" COO_OMARCHY_PATH="$UP" \
+    COO_COMPAT_BIN="$ovl/usr/lib/cachy-omarchy/compat/bin" \
+    "$ovl/usr/bin/cachy-omarchy-shell" --run &
+```
+
+### 17.2 측정 — 바가 y=0 에 실제로 그려진다
+
+```console
+$ hyprctl -j layers | jq -r '...'
+level 0: omarchy-background xywh 0 0 3072 1728 pid 4073942   # 격리 인스턴스
+level 2: omarchy-bar        xywh 0 0 3072 26   pid 4073942   # 격리 인스턴스
+level 2: omarchy-bar        xywh 0 -26 3072 26 pid 3910280   # 기존 셸(bar-off)
+level 2: notifications      xywh 2752 26 320 63 pid 3949882  # mako
+```
+
+- **`omarchy-bar` 가 `y=0` 에 매핑됐다** — 패키지 기본값만으로 바가 뜬다. 패치 0건.
+- `omarchy-background` 가 level 0(모든 창 아래) 에 전체화면으로 깔린다.
+- 대조: 같은 화면의 기존 셸(pid 3910280)은 `bar-off` 때문에 `y=-26` 에 주차돼
+  있다. 같은 패키지, 다른 사용자 상태 — 토글이 바를 없애는 게 아니라 옮긴다는
+  §3 의 발견이 두 인스턴스로 나란히 재현됐다.
+
+### 17.3 측정 — helper 격차 0건
+
+```console
+$ grep -c 'binary could not be found' shell.journal
+0
+$ grep -iE 'error|exception' shell.journal
+(없음)
+```
+
+M8 평가 시점의 helper 미해결 7건이 **전부 닫혔다.** Tier A·B 13개 스테이징 +
+셸 프로세스 PATH 에 `$OMARCHY_PATH/bin` 연결 + compat shim 1개
+(`omarchy-update-available`) 로 해결했고, 업스트림 본문 패치는 0건이다.
+Tier D 밝기 helper 는 `omarchy-monitor-state` 내부 가드에 걸려 이 grep 에 잡히지
+않는다(잡히면 가드가 깨진 것).
+
+### 17.4 🔴 정정 — mako 는 인계되지 않는다
+
+기동 로그의 유일한 WARN 2줄:
+
+```console
+WARN quickshell.service.notifications: Could not register notification server at
+  org.freedesktop.Notifications, presumably because one is already registered.
+WARN quickshell.service.notifications: Registration will be attempted again if
+  the active service is unregistered.
+$ busctl --user status org.freedesktop.Notifications
+PID=3949882  Comm=mako
+```
+
+**M8 평가 문서의 "mako 인계는 D-Bus 이름 회수로 1초 내 성립" 은 이 조건에서
+재현되지 않았다.** 실제 동작은 그 반대다: `org.freedesktop.Notifications` 를
+이미 누가 잡고 있으면 셸의 알림 서비스는 **이름을 뺏지 않고 물러나** 해제될
+때까지 재시도한다. mako 가 계속 알림을 처리한다.
+
+결과적으로 이것은 SPEC §66 의 "감지→보고→사용자 결정" 과 정확히 같은 모양이고,
+사용자에게 더 나은 동작이다. 다만 문언을 사실에 맞춰야 한다:
+
+- 셸이 알림을 제공하려면 사용자가 **먼저 mako 를 중지**해야 한다. 우리 코드가
+  mako 를 죽이지 않는다는 R09 는 여기서도 지켜진다 — 이번엔 자제해서가 아니라
+  D-Bus 선점 규칙 때문에 애초에 뺏을 수 없기 때문이다.
+- "인계" 는 mako 가 없는 호스트에서만 일어난다. 이 호스트에서는 mako 가 이겼다.
+
+### 17.5 정리 — 잔여물 없음
+
+```console
+$ kill 4073942 && sleep 2
+$ hyprctl -j layers | jq '[... | select(.pid == 4073942)] | length'
+0
+```
+
+우리 PID 의 표면이 하나도 남지 않았고, 사용자의 기존 셸(3910280)과 mako(3949882)
+는 그대로다. 되돌리기는 프로세스 종료 하나뿐이다.

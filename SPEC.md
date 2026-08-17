@@ -240,9 +240,14 @@ side is unusable rather than merely redundant.
 What replaced "must not modify" for the surfaces that left the list is not
 "may do anything". No package of ours owns a path under `/etc` or a system
 unit for a competing daemon, and no command of ours stops, masks, disables or
-uninstalls a running one. Taking over is something the user consents to; a
-D-Bus name changing hands when the shell starts is the mechanism, and it is
-reversible by not starting the shell.
+uninstalls a running one.
+
+Measured on this host (RUNTIME_STARTUP §17.4): the shell does not in fact
+displace a running notification daemon. `org.freedesktop.Notifications` is
+first-come, so with mako already holding the name the shell's notification
+service backs off and retries rather than taking it. The shell provides
+notifications only where nothing else claimed the name — which means the user
+stopping mako is what hands the surface over, not us.
 
 ---
 
@@ -952,7 +957,8 @@ This was written for v0.1, which shipped a `shell.json` with an empty
 
 ```text
 bar                UPSTREAM DEFAULT  (user opts out via the bar-off toggle)
-notifications      UPSTREAM DEFAULT  (takes over mako's D-Bus name; measured)
+notifications      UPSTREAM DEFAULT  (yields to a daemon already holding the
+                                     D-Bus name; measured §17.4)
 lock               UPSTREAM DEFAULT
 OSD                UPSTREAM DEFAULT
 ```
@@ -1858,13 +1864,18 @@ R09 no notification daemon is stopped, masked or uninstalled by us
 R10 no lock helper is stopped, masked or uninstalled by us
 ```
 
-R09 and R10 were reworded in v0.2.0. They used to read "absence of ... 
+R09 and R10 were reworded in v0.2.0. They used to read "absence of ...
 replacement", which the packaged defaults satisfied by disabling the upstream
-plugins outright. That suppression is gone: the shell now provides
-notifications and lock, and on this host it takes over mako's D-Bus name when
-it starts. What survives, and what these criteria measure, is that we never
-own a `/etc` path or system unit for a competing daemon and never stop one —
-`tests/runtime/test_runtime_reliability.sh` audits both directions.
+plugins outright. That suppression is gone: the shell now ships the
+notification and lock plugins enabled. What survives, and what these criteria
+measure, is that we never own a `/etc` path or system unit for a competing
+daemon and never stop one — `tests/runtime/test_runtime_reliability.sh` audits
+both directions.
+
+Measured (RUNTIME_STARTUP §17.4): with mako running, the shell could not
+register `org.freedesktop.Notifications` and backed off. R09 holds here for a
+stronger reason than restraint — the D-Bus name is first-come and there was
+nothing to take.
 
 ---
 
@@ -2170,7 +2181,7 @@ All must be true:
 - [x] `SUPER + K` opens keybinding UI.
 - [x] Existing Hyprland config is preserved.
 - [ ] An installed Waybar is not removed or stopped by us. *(이 호스트에 Waybar 가 설치돼 있지 않아 공존은 여전히 미검증)*
-- [x] A running notification daemon is not stopped, masked or uninstalled by us. *(v0.2.0 개정 — 셸이 알림을 제공하고 mako 의 D-Bus 이름을 인계받는다. 데몬을 죽이지는 않는다)*
+- [x] A running notification daemon is not stopped, masked or uninstalled by us. *(v0.2.0 개정 — 셸이 알림 플러그인을 켠 채로 뜨지만, mako 가 D-Bus 이름을 쥐고 있으면 물러난다. §17.4 실측)*
 - [ ] An installed lock helper is not removed or stopped by us. *(미검증 — hyprlock 등 live lock 설정과 상호작용 실측 안 함)*
 - [x] Rebuild against a newer upstream release is automated.
 - [x] Failed updates do not install.
@@ -2308,9 +2319,11 @@ surface is detect, report, and let the user decide:
 - user state is never deleted to change a default. A `bar-off` toggle written
   by 0.1.x survives the upgrade; `doctor` prints the one-line `rm` and stops
   there;
-- where a takeover is inherent to the mechanism — a D-Bus name changing hands
-  when the shell starts — it must be measured, written down, and reversible by
-  not starting the shell.
+- where a takeover looks inherent to the mechanism, measure it before writing
+  it down as fact. The claim that starting the shell hands `mako`'s D-Bus name
+  over did not survive measurement (RUNTIME_STARTUP §17.4): the name is
+  first-come and the shell yields. Whatever the mechanism turns out to be, it
+  must be reversible by not starting the shell.
 
 ---
 
