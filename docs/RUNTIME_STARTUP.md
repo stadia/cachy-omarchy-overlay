@@ -1284,3 +1284,47 @@ $ hyprctl -j layers | jq '[... | select(.pid == 4073942)] | length'
 
 우리 PID 의 표면이 하나도 남지 않았고, 사용자의 기존 셸(3910280)과 mako(3949882)
 는 그대로다. 되돌리기는 프로세스 종료 하나뿐이다.
+
+### 17.6 Waybar 공존 — §61 미검증 항목 해소 (2026-08-17, waybar 설치 후)
+
+M8 평가 시점에 waybar 는 이 호스트에 없었고, 그래서 §61 의 "Existing Waybar is
+preserved" 는 v0.1 부터 계속 미검증으로 남아 있었다. 사용자가 `waybar 0.15.0-2.1`
+을 설치해 처음으로 측정 가능해졌다.
+
+**baseline** (셸의 바는 `bar-off` 로 주차, waybar 미실행):
+
+```console
+$ hyprctl -j monitors | jq -c '.[] | {name, reserved}'
+{"name":"DP-1","reserved":[0,0,0,0]}
+```
+
+**waybar 단독:**
+
+```console
+level 2: waybar xywh 0 0 3072 36 pid 4180851
+{"name":"DP-1","reserved":[0,36,0,0]}
+```
+
+**waybar + omarchy.bar 동시** (격리 HOME 에 `bar-off` 없음 = 바가 보이는 기본 상태):
+
+```console
+level 2: waybar     xywh 0  0 3072 36 pid 4180851
+level 2: omarchy-bar xywh 0 36 3072 26 pid 4181106   # ← waybar 아래에 쌓인다
+level 0: omarchy-background xywh 0 0 3072 1728
+{"name":"DP-1","reserved":[0,62,0,0]}
+```
+
+**결과 — 겹치지 않는다.** layer-shell 앵커링이 exclusive zone 을 누적 적용해
+`omarchy-bar` 를 `y=36`, 즉 waybar **바로 아래**에 배치한다. 가림도 없고 z-order
+싸움도 없다. 비용은 화면 세로 `36 → 62px` 예약뿐이다.
+
+**waybar 는 살아남았다.** 우리 셸을 띄우는 동안에도 종료 후에도 pid 4180851 이
+그대로다. 우리 코드는 waybar 를 중지·mask·제거하지 않는다 (R08). 우리 셸을
+죽이자 예약은 `62 → 36` 으로 되돌아갔다 — 되돌리기는 프로세스 종료 하나.
+
+> **🔴 SPEC §4.3 문언 정정.** v0.2.0 개정에서 "바는 두 개가 나란히 있으면 단순
+> 중복이 아니라 사용 불가라서 Waybar 만 비수정 목록에 남긴다" 고 적었는데, 그
+> 근거는 **추론이었고 측정에서 틀렸다.** 두 바는 깔끔하게 쌓이며 결과는 정확히
+> "단순 중복" 이다. Waybar 를 목록에 남기는 이유는 사용 불가라서가 아니라,
+> **세로 공간을 두 번 먹는 것이 사용자가 원한 결과가 아닐 가능성이 높기 때문**
+> 이다 — 그건 감지해서 알릴 일이지 우리가 결정할 일이 아니다 (§66).

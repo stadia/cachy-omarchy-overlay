@@ -234,8 +234,13 @@ Revised in v0.2.0 (M8). The desktop-surface entries — notification daemon and
 lock screen — left this list. Installing cachy-omarchy is a statement that you
 want what Omarchy provides, so its bar, notifications, OSD and lock come up on
 upstream defaults; suppression is now the opt-out, not the default. Waybar
-stays on the list because a bar is the one surface where two of them side by
-side is unusable rather than merely redundant.
+stays on the list, but not for the reason first written here: two bars were
+assumed to be unusable together, and measurement showed otherwise. They stack
+cleanly — layer-shell accumulates the exclusive zones, so the omarchy bar
+anchors directly below Waybar with no overlap, and the only cost is 62px of
+reserved height instead of 36 (RUNTIME_STARTUP §17.6). Waybar stays on the
+list because paying for two bars is unlikely to be what the user wanted, and
+that is something to detect and report rather than decide for them (§66).
 
 What replaced "must not modify" for the surfaces that left the list is not
 "may do anything". No package of ours owns a path under `/etc` or a system
@@ -2189,7 +2194,7 @@ All must be true:
 - [x] Normal applications can launch.
 - [x] `SUPER + K` opens keybinding UI.
 - [x] Existing Hyprland config is preserved.
-- [ ] An installed Waybar is not removed or stopped by us. *(이 호스트에 Waybar 가 설치돼 있지 않아 공존은 여전히 미검증)*
+- [x] An installed Waybar is not removed or stopped by us. *(2026-08-17 실측 — waybar 0.15.0 설치·실행 상태에서 바를 켠 셸을 띄웠고 waybar 프로세스는 그대로였다. 두 바는 겹치지 않고 쌓인다(예약 36→62px). RUNTIME_STARTUP §17.6)*
 - [x] A running notification daemon is not stopped, masked or uninstalled by us. *(v0.2.0 개정 — 셸이 알림 플러그인을 켠 채로 뜬다. mako 가 이름을 쥐고 있으면 물러나고, 셸이 먼저 잡으면 mako 는 활성화되지 않는다 — 밀어내기가 아니라 순서. §17.4 실측)*
 - [ ] An installed lock helper is not removed or stopped by us. *(미검증 — hyprlock 등 live lock 설정과 상호작용 실측 안 함)*
 - [x] Rebuild against a newer upstream release is automated.
@@ -2197,8 +2202,9 @@ All must be true:
 - [x] Previous working package can be rolled back.
 
 Evidence ledger: `docs/RC_GAP_INVENTORY.md` (측정됨 / 미검증 / 추론됨 구분). 라이브
-실측 기록은 `docs/RUNTIME_STARTUP.md` §12–§16. 19/21 측정됨; 2건(Waybar 공존, lock
-공존)은 호스트 환경 제약으로 미검증 — 패키지 설계는 보존하지만 라이브 입증은 안 됨.
+실측 기록은 `docs/RUNTIME_STARTUP.md` §12–§17. 20/21 측정됨; Waybar 공존은
+2026-08-17 waybar 설치 후 §17.6 에서 해소됐고, 남은 1건(lock 공존)은 hyprlock 과의
+라이브 상호작용을 아직 측정하지 않았다.
 0.1.2 release (cachy-omarchy-overlay 0.1.2-1) 시점 기준. R07 자동 복구는
 systemd 유닛 제거(4c5731b)로 더 이상 shipped feature 가 아님(§16.6) — 이는 §61 의
 명시 항목이 아님.
