@@ -30,6 +30,12 @@
 ### `cachy-omarchy-shell` (`packages/cachy-omarchy-shell/stage-upstream.sh`)
 
 - `shell/` 전체 (Quickshell 셸 트리) → `/usr/share/cachy-omarchy/upstream/shell/`
+- `themes/` + `default/themed/` (M9) — 테마 런타임. `colors.toml` 과 `*.tpl` 은
+  같이 진화하는 한 쌍이라 반드시 셸과 같은 핀 커밋에서 온다.
+- `bin/omarchy-theme-*` + 연쇄 helper (M9) — Tier A(코어 체인)·Tier B(post 훅)만
+  스테이징. Tier C(네트워크 설치·/etc 쓰기·하드웨어 전용)는 제외하고, 그중
+  `omarchy-theme-set-browser`·`-keyboard` 는 오버레이의 no-op compat shim 이
+  대신 메운다(SPEC "Milestone 9 — Theme Runtime").
 - `version` (핀 표시·doctor)
 - `default/omarchy/omarchy-menu.jsonc` (메뉴 정의)
 - `config/omarchy/shell.json` — **업스트림 것이 아니라 우리 기본값**(`overlay/defaults/shell.json`).
@@ -64,7 +70,9 @@
 - `install/`, `migrations/`, libalpm hooks, `/etc/skel` 마커
 - Limine / Snapper / SDDM / Plymouth / `/etc/os-release` 오버라이드
 - 공식 `bin/` 전체의 `/usr/bin` 설치
-- 테마 워크플로, 락/OSD/바/알림의 기본 활성
+- 테마 Tier C helper(`omarchy-theme-install/update/remove`, plymouth/browser/
+  keyboard 훅)의 스테이징 — M9 부터 나머지 테마 워크플로는 채택했다
+- 락/OSD/알림의 기본 활성
 
 ## Minimum safe subset
 

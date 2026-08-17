@@ -593,8 +593,16 @@ Example:
 /usr/share/cachy-omarchy/upstream/
 ├── shell/
 ├── themes/
+├── default/themed/
+├── bin/
+├── config/
 └── version
 ```
+
+`themes/`, `default/themed/`, and the staged `bin/omarchy-theme-*` helpers
+ship from the same pinned commit as the shell (M9). `colors.toml` and
+`default/themed/*.tpl` evolve together; staging them from a different pin
+would silently desync every rebase.
 
 Avoid owning:
 
@@ -634,6 +642,7 @@ must be an explicit architecture decision.
 /usr/bin/cachy-omarchy-launcher
 /usr/bin/cachy-omarchy-keybindings
 /usr/bin/cachy-omarchy-doctor
+/usr/bin/cachy-omarchy-theme-set
 /usr/bin/cachy-omarchy-build
 /usr/bin/cachy-omarchy-update
 ```
@@ -1592,6 +1601,13 @@ Example:
 cachy-omarchy-init
 ```
 
+Since v0.3.0 (M9) init also seeds the default theme: if
+`~/.local/state/omarchy/current/theme.name` is absent *or empty* (the same
+`[[ ! -s ]]` test upstream's `install/user/theme.sh` uses), it applies
+"Tokyo Night" via `cachy-omarchy-theme-set` — headless (symlink only) when
+no shell is running, through the live path otherwise. An existing theme is
+never overwritten (§6.6).
+
 ---
 
 # 39. Runtime Commands
@@ -1737,8 +1753,10 @@ omarchy-shell
   Replace with cachy-omarchy-shell wrapper.
 
 omarchy-theme-set
-  DISABLE initially
-  Depends on full Omarchy theme workflow.
+  ADOPT (M9 — was "DISABLE initially" at M2)
+  Run upstream verbatim through the cachy-omarchy-theme-set wrapper,
+  which exports OMARCHY_PATH and prepends compat/bin. Theme runtime
+  ships from the same pin (§9.1).
 ```
 
 ---
@@ -2175,6 +2193,41 @@ documentation
 ```
 
 This is the v0.1 release candidate.
+
+---
+
+# Milestone 9 — Theme Runtime
+
+*(번호 없는 절 — §61 이하의 기존 번호를 유지한다. M8 도 같은 방식으로
+기존 절에 개정 주석으로 녹였다.)*
+
+Adopt the upstream theme pipeline instead of reimplementing it. The decision
+record is `docs/superpowers/plans/2026-08-17-m9-theme-runtime-design.md`
+(D1–D8); in short:
+
+- `themes/`, `default/themed/`, and the theme helper tier ship from the same
+  pinned commit as the shell — `colors.toml` and `*.tpl` are one co-evolving
+  pair (§9.1).
+- Theme application is upstream `omarchy-theme-set` run verbatim through the
+  thin wrapper `cachy-omarchy-theme-set` (OMARCHY_PATH + PATH only, §14/§44).
+- Theme state stays at `~/.local/state/omarchy/current/theme/` — the paths
+  Quattro's `shell/Commons/Color.qml` already reads. No relocation.
+- The first-run default is "Tokyo Night", seeded by `cachy-omarchy-init`
+  only when no theme exists yet (§38).
+- Tier C helpers are not staged: `omarchy-theme-install/update/remove`
+  (network installs), `omarchy-plymouth-set-by-theme` (writes /etc),
+  `omarchy-theme-set-browser` (writes /etc policies),
+  `omarchy-theme-set-keyboard*` (hardware-specific). Because
+  `omarchy-theme-set` unconditionally calls the browser/keyboard hooks by
+  name, both ship as no-op compat shims (`compat/bin/`, §44) — without them
+  every theme switch leaks "command not found" to stderr while exiting 0.
+  The menu entries for excluded helpers remain visible as dead entries; that
+  is accepted rather than patching the staged `omarchy-menu.jsonc`.
+
+The shell-side palette requires no code change: Color.qml watches
+`current/theme/colors.toml` and `shell.toml`, and the generated
+`hyprland.lua` reaches Hyprland through the managed source block (guarded
+load in `bindings.lua`; conditional `source =` line in the conf snippet).
 
 ---
 

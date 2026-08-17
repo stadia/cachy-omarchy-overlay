@@ -23,13 +23,28 @@ SUPER + K      →  Omarchy 스타일 키바인딩 뷰어
 업스트림 핀은 `upstream.lock`이 관리한다 (현재 `basecamp/omarchy @ v4.0.0`,
 `f0020448`).
 
-설치되는 공개 명령 5개 (`/usr/bin`):
+설치되는 공개 명령 7개 (`/usr/bin`):
 
 - `cachy-omarchy-shell` — 셸 기동(`--run`)·IPC(`--ipc`)·수동 재기동(`--restart`)
 - `cachy-omarchy-launcher` — 런처 토글 (SUPER + SPACE)
 - `cachy-omarchy-keybindings` — 키바인딩 뷰어 토글 (SUPER + K)
 - `cachy-omarchy-bindings` — 사용자 Hyprland 설정에 관리 source 블록 주입/제거
 - `cachy-omarchy-init` — 최초 1회 사용자 설정 생성 (기존 파일 덮어쓰지 않음)
+- `cachy-omarchy-doctor` — 읽기 전용 진단 (테마 상태 포함)
+- `cachy-omarchy-theme-set` — 테마 적용 (업스트림 `omarchy-theme-set` 얇은 래퍼)
+
+## 테마
+
+업스트림 테마 파이프라인을 그대로 쓴다 (M9). 첫 `cachy-omarchy-init` 이 테마가
+없을 때만 "Tokyo Night" 를 시드한다.
+
+```bash
+cachy-omarchy-theme-set "Nord"     # 전환 — 셸 재시작 없이 바·메뉴에 반영
+```
+
+또는 런처 메뉴의 `Style > Theme`. 테마 상태는 업스트림과 같은
+`~/.local/state/omarchy/current/theme/` 에 있고, 사용자 오버레이
+(`~/.config/omarchy/themes/<name>/`)가 패키지 테마 위에 합쳐진다.
 
 ## 기동 모델
 

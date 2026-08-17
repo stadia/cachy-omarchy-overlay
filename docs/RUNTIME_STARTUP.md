@@ -367,6 +367,12 @@ overlay 패키지, `cachy-omarchy-init`, Waybar 처리와 실제 설치 통합�
 | 11 | `usr/share/cachy-omarchy/hypr/bindings.lua` |
 | 12 | `usr/lib/cachy-omarchy/compat/bin/omarchy-update-available` (v0.2.0) |
 
+> **M9 갱신 (v0.3.0)**: 위 표는 M5 시점의 실측 스냅샷이다. 현재 오버레이 패키지는
+> 여기에 `usr/bin/cachy-omarchy-doctor`·`usr/bin/cachy-omarchy-theme-set` 과
+> compat no-op shim 2개(`omarchy-theme-set-browser`·`-keyboard`)를 더 소유한다.
+> 셸 패키지는 M9 부터 `themes/`·`default/themed/`·테마 helper Tier A/B 도
+> 스테이징한다 — §18 참조.
+
 v0.2.0 부터 셸 패키지는 바 위젯이 bare name 으로 부르는 업스트림 helper 도 함께
 스테이징한다 (`usr/share/cachy-omarchy/upstream/bin/`): Tier A `omarchy-menu-select`
 `omarchy-cmd-present` `omarchy-audio-output-sink` `omarchy-network-status`
@@ -1410,3 +1416,70 @@ $ pgrep -a waybar
 
 `cachy-omarchy-doctor` 는 24개 검사 **전부 PASS**, WARN/FAIL 0건이다
 (`bar-off toggle absent (bar shows by default)` 포함).
+---
+
+## 18. M9 — 테마 런타임 채택 (구현, 2026-08-17)
+
+설계 결정(D1–D8)과 전수 감사 근거는
+`docs/superpowers/plans/2026-08-17-m9-theme-runtime-design.md` 에 있다. 이 절은
+구현 실태만 기록한다. 라이브 실측(R06/R07)은 Task 9 에서 이 절에 덧붙인다.
+
+### 18.1 스테이징
+
+- `themes/` 22개 + `default/themed/*.tpl` 17개 — 셸과 같은 핀 커밋
+  (`colors.toml`·`*.tpl` 은 한 쌍). `tests/package/test_staged_themes.sh` 가
+  개수·핵심 파일·원본 동일성을 단언한다.
+- Tier A helper 20개 — 코어 체인(`omarchy-theme-set`·`-set-templates`·`-color`
+  등) + 배경 묶음 + `omarchy-menu-images`(메뉴 미리보기). Tier B 훅 7개
+  (foot/tmux/gnome/pi/claude/vscode/obsidian). 목록과 근거는 설계 문서
+  "helper 분류", 단언은 `tests/package/test_staged_theme_helpers.sh`.
+- Tier C 11개 미스테이징 — 네트워크 설치(`theme-install/update/remove`),
+  `/etc` 쓰기(plymouth, browser), 하드웨어 전용(keyboard*), 개발 도구.
+  `omarchy-theme-set` 이 post 훅으로 browser/keyboard 를 **무조건** 호출하고
+  `set -e` 가 없어 부재 시 "command not found" 만 stderr 로 새고 exit 는 0 이다
+  — 이 조용한 실패를 메우기 위해 `compat/bin/omarchy-theme-set-{browser,keyboard}`
+  no-op shim 2개를 둔다. `test_installed_tree.sh` 가 compat 디렉터리를 순회해
+  모든 shim 의 통제 경로 존재·`/usr/bin` 누출 부재·no-op 내용을 단언한다.
+
+### 18.2 진입점
+
+- `cachy-omarchy-theme-set` (공개 래퍼, D6) — `OMARCHY_PATH` 를 export 하고
+  `compat/bin:$OMARCHY_PATH/bin` 을 PATH 앞에 붙인 뒤 업스트림
+  `omarchy-theme-set` 을 exec 한다. 테마 로직 재구현 없음.
+  `tests/runtime/test_theme_set_wrapper.sh` 가 샌드박스 HOME 에서 headless
+  끝단 적용(colors.toml·shell.toml·theme.name·background symlink)과 사용자
+  오버레이(`~/.config/omarchy/themes/<name>/`) 우선순위를 실측한다.
+- `cachy-omarchy-init` 시드(D4) — `~/.local/state/omarchy/current/theme.name`
+  이 없거나 **비어 있으면**(upstream `install/user/theme.sh` 와 같은
+  `[[ ! -s ]]`) "Tokyo Night" 를 시드한다. 셸이 떠 있으면 일반 경로, 아니면
+  `OMARCHY_THEME_HEADLESS=1`. 기존 테마는 절대 덮어쓰지 않는다(SPEC §6.6).
+  시드는 바인딩 주입보다 먼저 온다 — conf 관리 블록의 테마 `source =` 조건이
+  성립해야 하기 때문(D5).
+
+### 18.3 Hyprland 연결 (D5)
+
+- lua 사용자: 관리 파일 `bindings.lua` 끝의 가드 블록이
+  `current/theme/hyprland.lua` 를 존재할 때만 `pcall(dofile)` 한다. 파일
+  부재는 정상 경로(조용히 지나감)라 무조건 dofile 하는 것과 달리 reload 마다
+  오류가 나지 않는다.
+- conf 사용자: 관리 블록 스니펫이 테마 파일이 있을 때만
+  `source = ~/.local/state/omarchy/current/theme/hyprland.lua` 를 포함한다
+  (conf 에는 조건식이 없어 존재 시에만 넣는다). M9 이전에 주입된 구형 블록은
+  `cachy-omarchy-bindings --force` 가 블록을 새 스니펫으로 교체해 따라온다
+  (--force 재주입은 M9 에서 추가). `cachy-omarchy-doctor` 가 구형 주입을
+  `WARN` 으로 보고한다.
+
+### 18.4 의존성
+
+`cachy-omarchy-shell` `depends` 에 `libvips`(menu-images 썸네일)·
+`procps-ng`(pgrep/pkill)·`psmisc`(killall) 추가, `optdepends` 에 `jq`(Tier B
+중 vscode/pi/claude/obsidian 훅)·`tmux`·`foot` 추가. `yq` 는 핀 커밋의
+theme-set 경로에서 불필요(감사 실측 — 설계 문서).
+
+### 18.5 알려진 범위 밖
+
+- Tier C 를 부르는 메뉴 항목(Install/Update/Remove theme, Plymouth,
+  Browser/Keyboard 훅)은 `omarchy-menu.jsonc` 에 그대로 남는다 — 무패치 원칙상
+  죽은 항목으로 둔다 (D3).
+- 헤드리스 모드는 post 훅 전체를 건너뛴다 — 샌드박스 테스트는 훅을 검증하지
+  않는다. 훅 체인의 유일한 검증은 라이브 비헤드리스 실측(§18.6 예정)이다.
