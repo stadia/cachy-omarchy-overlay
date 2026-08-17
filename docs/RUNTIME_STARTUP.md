@@ -1561,10 +1561,35 @@ watch 하므로 파일 교체 자체가 전파 경로다(IPC 로그가 없는 �
 - `tests/runtime/test_doctor.sh` — clipboard history 경로·항목 수 읽기 전용
   보고(내용 미출력·미수정), 경로는 Clipboard.qml:20 의 HOME 고정 경로.
 
-### 19.2 라이브 실측 (예약)
+### 19.2 라이브 실측 (2026-08-17 20:50–21:00 KST)
 
-TODO(M10 Task 7): 사용자 고지 후 진행. clipboard capture/clear, emoji
-격리 타깃 type, image-picker summon/cancel, reminder user timer
-create/list/clear, `omarchy-osd` direct + audio helper 의 패널 표시·자동
-숨김·QML error 0 을 기록한다. XF86 키 주입·display brightness 변경은
-범위 밖 — 그 증거는 여기에 섞지 않는다.
+고지된 범위로만 실행: 현재 클립보드 읽기/복사(직후 정리), sandbox user timer
+1개(즉시 clear), 격리 kitty 타깃에 emoji 입력, 임시 OSD. XF86 키 주입과
+display brightness 변경은 하지 않았다. 방식은 §17 과 같은 격리 인스턴스 —
+빌드 아티팩트를 추출한 트리 + sandbox HOME 의 두 번째 셸(pid 808698)을 띄우고,
+`qs ipc -n -p <격리 OMARCHY_PATH>` 경로 타기팅으로 사용자 실제 셸
+(pid 22315)과 격리했다.
+
+| 항목 | 기대 | 실측 |
+| --- | --- | --- |
+| clipboard text capture | history 에 마커 추가 | `M10-LIVE-MARKER-7f3a` 복사 후 1→2개, `[0].text` = 마커 |
+| clipboard sensitive | 미저장 (D3) | `wl-copy --sensitive` 마커 후 history 2개 유지, 마커 문자열 0건 |
+| emoji type | 격리 타깃에 1회 | staged `omarchy-menu-emoji-insert` exit 0. 단 kitty 는 `shift+insert` 를 **primary selection** 붙여넣기로 매핑 — clipboard 는 helper 가 놓지만 kitty 에는 primary 를 둬야 표시됨. primary+clipboard 모두 설정 후 shift+Insert 키 경로로 😀(F0 9F 98 80) 정확히 1회 도달 확인. 헬퍼의 copy 경로는 단위 테스트가 담당 |
+| image-picker | summon → 표면 → 취소 | `omarchy-menu-images` → `omarchy-image-selector` 레이어가 격리 pid 에 매핑, `wtype -k Escape` 취소 시 출력 0바이트·stderr 없음·표면 해제 |
+| reminders | user timer 만 | `omarchy-reminder 60` → `omarchy-reminder-60m-*.timer` user timer 등록 + runtime dir message 파일, `show --json` count=1·label 일치, `clear` 후 timer·message 0건. 만료 대기는 하지 않음 |
+| OSD direct | 표시·자동 숨김 | `omarchy-osd -d 1200` → `omarchy-osd` 레이어 격리 pid 에 표시, 1.5초 후 0개 |
+| OSD audio bridge | volume/mic 경로 | `omarchy-audio-output-volume lower`: 100%→95%, OSD 표시, 100% 복원. `omarchy-audio-input-mute` ×2: unmuted→MUTED→unmuted 원복, OSD 표시. 이 호스트는 micmute LED 노드·brightnessctl 부재 — `omarchy-brightness-keyboard-mute` 는 설계대로 no-op |
+| QML error | 0 | 저널에 polkit 에이전트 중복 등록 WARN(실제 셸이 점유 — 격리 기동 시 상수)와 가짜 PNG 바이트 디코드 WARN(테스트 파일이 진짜 PNG 가 아니라 의도된 결과)만. M10 플러그인 관련 QML error/exception 0건 |
+
+정리 확인: 격리 셸 종료, 격리 kitty 2개 종료, 클립보드 clear, reminder
+timer/message 0건, 볼륨 100%·마이크 unmuted 원복.
+
+**부수 발견 2건 (이번 마일스톤의 동작 변경 아님):**
+
+1. 이 호스트의 Hyprland 0.56.2 는 `hyprctl dispatch focuswindow class:...`
+   단축 문법을 Lua 로 해석해 거부한다 — `hl.dsp.focus({ window = "address:..." })`
+   형식이 필요. staged `omarchy-hyprland-focus-app` 은 이미 이 fallback 을
+   내장하고 있어 영향 없음.
+2. 디버깅 중 `wtype hello`·`wtype -k Return` 이 실제 포커스 창(firefox)에
+   1회 입력됐다 — 라이브 키 주입의 타깃 확인 절차가 필요하다는 교훈.
+   이후 측정은 전부 격리 kitty(주소 포커스 확인 후)로만 진행했다.
