@@ -171,14 +171,22 @@ assert_eq "$(jq -r '(.disabledPlugins // []) | index("omarchy.menu") // "none"' 
 
 # ------------------------------------------------------------- 화면 점유 금지
 #
-# SPEC 4.3 — 우리 셸이 사용자 화면을 가져가면 안 된다. 네임스페이스 이름이
-# 아니라 기하학으로 판정한다: 우리 PID 의 layer 표면 중 어떤 모니터의 가시
-# 영역과 겹치는 것이 있으면 실패다.
+# M8 이후 이 단언의 범위가 좁아졌다. 업스트림 기본값을 그대로 쓰기로 한 뒤
+# (원칙 0) 셸은 의도적으로 화면에 그린다 — 상단 바와 전체화면 배경 레이어다.
+# 그래도 이 테스트는 사용자의 진짜 데스크톱 위에서 돌기 때문에, 테스트가
+# 러너의 창을 밀어내는 일만은 여전히 막아야 한다.
+#
+# 그래서 layer level 로 판정한다. hyprctl 의 level 0(background)·1(bottom) 은
+# 모든 창 아래에 깔리므로 창을 밀어내지 않는다 — omarchy-background 가 여기
+# 산다. level 2(top)·3(overlay) 만이 사용자 창 위로 올라오고 exclusion zone 을
+# 잡는다 — omarchy-bar 가 여기 살며, 위쪽 bar-off 가드가 그것을 화면 밖으로
+# 주차시킨다. 판정은 네임스페이스 이름이 아니라 level + 기하학으로 한다.
 our_layers='[]'
 onscreen=""
 if command -v hyprctl >/dev/null && (( alive == 0 )); then
   our_layers=$(hyprctl -j layers 2>/dev/null | jq -c --argjson pid "$shell_pid" \
-    '[ to_entries[].value.levels | to_entries[].value[] | select(.pid == $pid) ]') || our_layers='[]'
+    '[ to_entries[].value.levels | to_entries[] as $lv | $lv.value[]
+       | select(.pid == $pid) | . + {level: ($lv.key | tonumber)} ]') || our_layers='[]'
   mons=$(hyprctl -j monitors 2>/dev/null | jq -c '[ .[] | select(.disabled | not) ]') || mons='[]'
 
   # 아래 "화면 점유 없음" 은 our_layers 가 비면 아무것도 검사하지 않고 통과한다.
@@ -199,17 +207,25 @@ if command -v hyprctl >/dev/null && (( alive == 0 )); then
 
   onscreen=$(jq -r -n --argjson l "$our_layers" --argjson m "$mons" '
     [ $l[] as $layer | $m[] as $mon
+      | select($layer.level >= 2)
       | select($layer.x < ($mon.x + $mon.width / $mon.scale)
            and ($layer.x + $layer.w) > $mon.x
            and $layer.y < ($mon.y + $mon.height / $mon.scale)
            and ($layer.y + $layer.h) > $mon.y)
       | $layer.namespace ] | unique | join(",")')
-  assert_eq "$onscreen" "" "우리 셸의 layer 표면이 화면을 점유하지 않는다 (SPEC 4.3)"
-  # 화면 밖(y<0)에 있는 것은 기본값이 바를 없앴기 때문이 아니라 이 테스트가
-  # bar-off 가드를 켜 두었기 때문이다. 출력만 보는 사람이 반대로 읽지 않도록
-  # 그 사실을 증거 옆에 붙여 둔다.
-  printf '      FINDING: 매핑된 layer 표면 = %s (bar-off 가드로 주차된 상태 — 패키지 기본값이 바를 없앤 것이 아니다)\n' \
-    "$(jq -c '[.[] | {namespace, x, y, w, h}]' <<<"$our_layers")"
+  assert_eq "$onscreen" "" "우리 셸의 top/overlay 표면이 러너의 창을 밀어내지 않는다"
+
+  # 반대 방향 증거: 배경 레이어는 실제로 그려져야 한다. 억제를 걷어낸 뒤
+  # omarchy.background 가 살아 있다는 것이 원칙 0 이 먹혔다는 관측이다.
+  below=$(jq -r '[ .[] | select(.level < 2) | .namespace ] | unique | join(",")' <<<"$our_layers")
+  assert_contains "$below" "omarchy-background" \
+    "억제 해제 후 배경 레이어가 창 아래(level<2)에 실제로 그려진다"
+
+  # 상단 바가 화면 밖(y<0)에 있는 것은 패키지 기본값이 바를 없앴기 때문이
+  # 아니라 이 테스트가 bar-off 가드를 켜 두었기 때문이다. 출력만 보는 사람이
+  # 반대로 읽지 않도록 그 사실을 증거 옆에 붙여 둔다.
+  printf '      FINDING: 매핑된 layer 표면 = %s (bar 는 bar-off 가드로 주차된 상태 — 패키지 기본값은 바를 그린다)\n' \
+    "$(jq -c '[.[] | {namespace, level, x, y, w, h}]' <<<"$our_layers")"
 fi
 
 # ------------------------------------------------------------------ 기동 로그
