@@ -1318,6 +1318,18 @@ level 0: omarchy-background xywh 0 0 3072 1728
 `omarchy-bar` 를 `y=36`, 즉 waybar **바로 아래**에 배치한다. 가림도 없고 z-order
 싸움도 없다. 비용은 화면 세로 `36 → 62px` 예약뿐이다.
 
+**쌓이는 순서는 고정이 아니다 — 먼저 매핑한 쪽이 위를 가진다.** 같은 날 사용자가
+실제 홈의 `bar-off` 토글을 지워 라이브 셸의 바가 켜졌을 때는 반대로 나왔다:
+
+```console
+level 2: omarchy-bar xywh 0  0 3072 26 pid 3910280   # 이번엔 셸이 위
+level 2: waybar      xywh 0 26 3072 36 pid 4180851
+```
+
+격리 실험에서는 waybar 가 먼저 떠 있었고, 이 경우엔 셸이 먼저였다. 어느 쪽이든
+결론은 같다 — 겹치지 않고 쌓이며, 총 예약은 62px 다. 위치를 고정하고 싶으면
+그건 사용자가 각 바의 앵커/레이어 설정으로 정할 일이지 우리가 강제할 것이 아니다.
+
 **waybar 는 살아남았다.** 우리 셸을 띄우는 동안에도 종료 후에도 pid 4180851 이
 그대로다. 우리 코드는 waybar 를 중지·mask·제거하지 않는다 (R08). 우리 셸을
 죽이자 예약은 `62 → 36` 으로 되돌아갔다 — 되돌리기는 프로세스 종료 하나.
@@ -1328,3 +1340,36 @@ level 0: omarchy-background xywh 0 0 3072 1728
 > "단순 중복" 이다. Waybar 를 목록에 남기는 이유는 사용 불가라서가 아니라,
 > **세로 공간을 두 번 먹는 것이 사용자가 원한 결과가 아닐 가능성이 높기 때문**
 > 이다 — 그건 감지해서 알릴 일이지 우리가 결정할 일이 아니다 (§66).
+
+### 17.7 다음 세션에서 확인할 것 (미검증 인계)
+
+§17.4.1 의 "셸이 이름을 먼저 잡으면 mako 는 활성화되지 않는다" 는 **아직 관측이
+아니다.** 0.2.0 이 설치된 상태(2026-08-17 14:06)로 세션을 새로 시작하면 그대로
+측정된다. 로그인 직후, 알림이 하나라도 도착하기 전에:
+
+```bash
+# 1) 알림 이름의 주인이 우리 셸인가
+busctl --user call org.freedesktop.DBus /org/freedesktop/DBus \
+  org.freedesktop.DBus GetNameOwner s org.freedesktop.Notifications
+busctl --user call org.freedesktop.DBus /org/freedesktop/DBus \
+  org.freedesktop.DBus GetConnectionUnixProcessID s "<위에서 나온 :1.x>"
+# 기대: quickshell PID
+
+# 2) mako 가 아예 뜨지 않았는가
+systemctl --user is-active mako.service      # 기대: inactive
+journalctl --user -u mako.service -b         # 기대: 이번 부팅 기동 기록 없음
+
+# 3) 셸 로그에 알림 서버 등록 실패 WARN 이 없는가
+journalctl --user -t cachy-omarchy-shell -b | grep -i "notification"
+# 기대: "Could not register notification server" 없음
+```
+
+세 개가 모두 기대대로면 §17.4.1 의 추론이 관측으로 승격되고, `omarchy.notifications`
+가 실제로 알림을 담당하게 된 것이다. 하나라도 어긋나면 그 출력을 §17.4.1 에
+반대 증거로 적는다.
+
+부수적으로 같이 볼 것:
+
+- 바가 `y=0` 에 뜨는가 (사용자 실제 홈의 `bar-off` 토글은 2026-08-17 14:16 에
+  제거됐다). waybar 를 계속 쓴다면 §17.6 대로 둘이 쌓여 62px 를 예약한다.
+- `cachy-omarchy-doctor` 가 전부 PASS 인가 (로그아웃 직전 기준 WARN/FAIL 0건).
