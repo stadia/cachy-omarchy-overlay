@@ -66,14 +66,18 @@ bin/rollback                 # 이전 핀으로 복귀
 - `SPEC.md` — 최종 권위 명세
 - `UPSTREAM.md` — 업스트림 핀/추적 정책
 - `docs/RUNTIME_STARTUP.md` — 기동 경로·플러그인 비활성화 실측
-- `docs/superpowers/plans/` — 마일스톤 설계 문서
+- `docs/superpowers/plans/` — 마일스톤 설계·구현 문서.
+  **먼저 `docs/superpowers/plans/INDEX.md`를 읽을 것** — 완료된 플랜에 남아 있는,
+  이후 실측이 뒤집은 주장들을 모아뒀다.
 
 ## 로드맵
 
-- **v0.1** — 런타임 패키징 + 런처 + 키바인딩 + 업데이트/재빌드 (현재)
-- **v0.2 (Milestone 8)** — `omarchy.bar` 평가: 업스트림 바를 그대로 채택할지
-  결정 (`docs/superpowers/plans/2026-08-17-m8-omarchy-bar-evaluation.md`).
-  채택 시 Waybar → `omarchy.bar` 전환.
+- **v0.1** — 런타임 패키징 + 런처 + 키바인딩 + 업데이트/재빌드. 완료.
+- **v0.2 (Milestone 8)** — `omarchy.bar` 채택. 완료(`v0.2.0`). 업스트림 바를
+  켠 채로 출고한다. Waybar를 대체하지는 않는다 — 둘을 함께 띄우면 겹치지 않고
+  쌓이며(세로 예약 `36 → 62px`), 우리는 Waybar를 중지·제거하지 않는다.
+- **v0.3 (Milestone 9)** — 업스트림 테마 런타임 채택. 진행 중
+  (`docs/superpowers/plans/2026-08-17-m9-theme-runtime-design.md`).
 
 ## 라이선스
 
