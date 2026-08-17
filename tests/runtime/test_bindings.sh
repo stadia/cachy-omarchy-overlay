@@ -266,4 +266,73 @@ out=$(COO_PREFIX_ROOT="$inst/usr/share/cachy-omarchy" \
 assert_eq "$code" "0" "설치 레이아웃에서 실행 성공"
 assert_file_exists "$COO_TEST_SANDBOX/cfg3/hypr/bindings.lua" "PREFIX_ROOT/hypr 에서 복사됨"
 
+# --- --force 재주입 안전성 (M9 후속, 리뷰 블로커) -----------------------------
+# inject() --force 경로는 이 스크립트 최초의 파괴적 쓰기다(그 전까지 append 만).
+# 게다가 doctor 가 구형 주입에 --force 를 안내하므로 실사용자가 반드시 밟는다.
+# 세 가지를 단언한다:
+#   ① 스니펫이 같으면 파일을 다시 쓰지 않는다 (mtime 유지 — churn 없음)
+#   ② 블록이 파일 중간에 있어도 제자리에서 교체된다 (끝으로 밀지 않는다)
+#   ③ 교체가 실패하면 원본을 한 바이트도 건드리지 않는다 (awk 실패 주입)
+
+fresh="$COO_TEST_SANDBOX/fresh-hypr"
+mkdir -p "$fresh"
+printf 'monitor=,preferred,auto,1\n' > "$fresh/hyprland.conf"
+run_fresh() {
+  COO_HYPR_DIR="$fresh" COO_CONFIG_DIR="$COO_TEST_SANDBOX/fresh-cfg" "$H" "$@"
+}
+run_fresh >/dev/null 2>&1
+mt1=$(stat -c %Y "$fresh/hyprland.conf")
+sleep 1.1
+run_fresh --force >/dev/null 2>&1
+mt2=$(stat -c %Y "$fresh/hyprland.conf")
+assert_eq "$mt2" "$mt1" "--force 는 스니펫이 같으면 다시 쓰지 않는다"
+
+# ② 제자리 교체: 블록이 중간에 있고, 스니펫이 달라지는 경우(DEST_HYPR 경로 변경)
+mid="$COO_TEST_SANDBOX/mid-hypr"
+mkdir -p "$mid"
+cat >"$mid/hyprland.conf" <<EOF
+monitor=,preferred,auto,1
+
+# >>> cachy-omarchy >>>
+source = $COO_TEST_SANDBOX/old-cfg/hypr/bindings.conf
+# <<< cachy-omarchy <<<
+
+bind = SUPER, Return, exec, ghostty
+EOF
+out=$(COO_HYPR_DIR="$mid" COO_CONFIG_DIR="$COO_TEST_SANDBOX/new-cfg" \
+      "$H" --force 2>&1); code=$?
+assert_eq "$code" "0" "스니펫 변경 --force → exit 0"
+assert_contains "$(cat "$mid/hyprland.conf")" \
+  "source = $COO_TEST_SANDBOX/new-cfg/hypr/bindings.conf" "블록 내용이 새 스니펫으로 교체된다"
+end_ln=$(grep -n 'cachy-omarchy <<<' "$mid/hyprland.conf" | cut -d: -f1)
+user_ln=$(grep -n 'ghostty' "$mid/hyprland.conf" | cut -d: -f1)
+[[ -n $end_ln && -n $user_ln && $user_ln -gt $end_ln ]] && pos=0 || pos=1
+assert_eq "$pos" "0" "교체 후에도 블록은 제자리 (사용자 줄이 블록 뒤에 남는다)"
+n=$(grep -c 'cachy-omarchy >>>' "$mid/hyprland.conf" || true)
+assert_eq "$n" "1" "교체 후에도 관리 블록은 한 번만 있다"
+
+# ③ 실패 주입: awk 가 항상 실패하는 환경에서 --force — 원본 보존 + 비정상 종료
+failbin="$COO_TEST_SANDBOX/fail-bin"
+mkdir -p "$failbin"
+printf '#!/usr/bin/env bash\nexit 1\n' > "$failbin/awk"
+chmod +x "$failbin/awk"
+victim="$COO_TEST_SANDBOX/victim-hypr"
+mkdir -p "$victim"
+cat >"$victim/hyprland.conf" <<EOF
+monitor=,preferred,auto,1
+
+# >>> cachy-omarchy >>>
+source = $COO_TEST_SANDBOX/old-cfg/hypr/bindings.conf
+# <<< cachy-omarchy <<<
+
+bind = SUPER, Return, exec, ghostty
+EOF
+cp "$victim/hyprland.conf" "$COO_TEST_SANDBOX/victim.orig"
+out=$(PATH="$failbin:$PATH" COO_HYPR_DIR="$victim" \
+      COO_CONFIG_DIR="$COO_TEST_SANDBOX/victim-cfg" "$H" --force 2>&1); code=$?
+assert_eq "$code" "1" "교체 실패 시 exit 1 (조용한 성공 아님)"
+assert_contains "$out" "건드리지 않았다" "실패 시 무엇을 안 했는지 명시한다"
+cmp -s "$victim/hyprland.conf" "$COO_TEST_SANDBOX/victim.orig" && same=0 || same=1
+assert_eq "$same" "0" "교체 실패 시 원본은 한 바이트도 변하지 않는다"
+
 exit "$ASSERT_FAILURES"

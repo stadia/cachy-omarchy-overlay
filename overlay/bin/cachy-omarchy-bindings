@@ -124,18 +124,51 @@ conf_snippet() {
 
 inject() {
   local file=$1 begin=$2 end=$3 snippet=$4
-  if grep -F -e "$begin" "$file" >/dev/null; then
-    if (( FORCE )); then
-      # --force 는 관리 블록을 새 스니펫으로 교체한다 (스니펫 생성 규칙이
-      # 바뀌었을 때 따라오는 길 — 예: M9 테마 source 줄). 블록 밖 사용자
-      # 본문은 strip_block 이 그대로 보존한다.
-      local body
-      body=$(strip_block "$begin" "$end" <"$file")
-      printf '%s\n%s\n' "$body" "$snippet" >"$file"
-    fi
+  if ! grep -F -e "$begin" "$file" >/dev/null; then
+    printf '\n%s\n' "$snippet" >>"$file"
     return 0
   fi
-  printf '\n%s\n' "$snippet" >>"$file"
+  (( FORCE )) || return 0
+  # --force 재주입: 관리 블록을 새 스니펫으로 교체한다 (스니펫 생성 규칙이
+  # 바뀌었을 때 따라오는 길 — 예: M9 테마 source 줄). 이 스크립트가 사용자
+  # 설정을 덮어쓰는 유일한 경로이고 set -e 가 없으므로, 원자적으로 간다:
+  # 임시 파일에 쓰고 → 성공 확인 후 → mv. 실패하면 원본을 한 바이트도
+  # 건드리지 않는다. 블록은 제자리에서 교체한다 (끝으로 밀지 않는다).
+  local current
+  if ! current=$(awk -v b="$begin" -v e="$end" '
+    $0 == b {inb=1}
+    inb {print}
+    $0 == e {inb=0}
+  ' "$file"); then
+    printf 'error: 관리 블록 읽기 실패 — %s 를 건드리지 않았다\n' "$file" >&2
+    return 1
+  fi
+  # 스니펫이 같으면 다시 쓰지 않는다 (mtime/백업 churn 방지).
+  [[ $current == "$snippet" ]] && return 0
+  local tmp
+  if ! tmp=$(mktemp "${file}.XXXXXX"); then
+    printf 'error: 임시 파일 생성 실패 — %s 를 건드리지 않았다\n' "$file" >&2
+    return 1
+  fi
+  # 스니펫은 환경으로 넘긴다 — awk -v 는 값의 백슬래시를 이스케이프 해석해서
+  # 경로에 \\ 가 있으면 깨진다.
+  if ! SNIPPET=$snippet awk -v b="$begin" -v e="$end" '
+    $0 == b { print ENVIRON["SNIPPET"]; skip=1; next }
+    $0 == e { skip=0; next }
+    !skip { print }
+  ' "$file" >"$tmp"; then
+    rm -f "$tmp"
+    printf 'error: 관리 블록 교체 실패 — %s 를 건드리지 않았다\n' "$file" >&2
+    return 1
+  fi
+  # 원본이 비어있지 않은데 결과가 비면 교체가 잘못된 것이다 — 파괴적 mv 중단.
+  if [[ -s $file && ! -s $tmp ]]; then
+    rm -f "$tmp"
+    printf 'error: 교체 결과가 비었다 — %s 를 건드리지 않았다\n' "$file" >&2
+    return 1
+  fi
+  chmod --reference="$file" "$tmp" 2>/dev/null || true
+  mv "$tmp" "$file"
 }
 
 case ${1:-} in
@@ -186,5 +219,6 @@ if (( conflict == 1 && FORCE == 1 )); then
   printf 'warning: --force로 관리 블록을 추가한다. 기존 설정은 삭제하지 않는다.\n' >&2
 fi
 
-inject "$target" "$begin" "$end" "$snippet"
+inject "$target" "$begin" "$end" "$snippet" \
+  || fail "관리 블록 주입/교체 실패 — $target 은 원본 그대로다"
 exit 0
