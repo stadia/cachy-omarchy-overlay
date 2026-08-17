@@ -15,6 +15,7 @@ out=$("$W" --help 2>&1); code=$?
 assert_eq "$code" "0" "--help exit 0"
 assert_contains "$out" "--run" "--help 가 --run 을 설명"
 assert_contains "$out" "--ipc" "--help 가 --ipc 를 설명"
+assert_contains "$out" "--restart" "--help 가 --restart 를 설명"
 
 # OMARCHY_PATH 가 없는 곳을 가리키면 조용히 성공하지 말고 실패해야 한다.
 out=$(COO_OMARCHY_PATH=/nonexistent "$W" --ipc shell ping 2>&1); code=$?

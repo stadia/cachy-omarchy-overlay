@@ -21,6 +21,7 @@ usage() {
   --run                       Quickshell 을 포그라운드로 기동한다 (systemd ExecStart 용).
   --ipc <target> <method> ..  실행 중인 셸에 IPC 호출을 전달한다.
   --path                      해석된 OMARCHY_PATH 를 출력한다.
+  --restart                   실행 중 셸을 kill 하고 새 인스턴스를 detached 로 띄운다.
   --help                      이 도움말.
 
 환경:
@@ -91,10 +92,32 @@ cmd_ipc() {
   return 0
 }
 
+cmd_restart() {
+  require_tree
+  # 정밀 매칭: qs ipc 프로세스(qs ipc -n -p <경로> call)는 cmdline 에
+  # "quickshell -n -p <경로>" 가 없으므로 false positive 안 남(#5).
+  local pat="quickshell -n -p $OMARCHY_PATH/shell"
+  local pids n=0
+  pids=$(pgrep -f "$pat" 2>/dev/null || true)
+  if [[ -n $pids ]]; then
+    kill -TERM $pids 2>/dev/null || true
+    while pgrep -f "$pat" >/dev/null 2>&1 && (( n < 30 )); do
+      sleep 0.1; n=$((n + 1))
+    done
+    pids=$(pgrep -f "$pat" 2>/dev/null || true)
+    [[ -n $pids ]] && kill -KILL $pids 2>/dev/null || true
+  fi
+  # cmd_run 을 재사용(자체 멱등 가드·Qt 핀·file-watcher off·systemd-cat 로깅).
+  # detached 로 띄워 명령이 반환하게 한다.
+  setsid "$0" --run </dev/null >/dev/null 2>&1 &
+  disown 2>/dev/null || true
+}
+
 case ${1:-} in
-  --run)  shift; cmd_run "$@" ;;
-  --ipc)  shift; cmd_ipc "$@" ;;
-  --path) printf '%s\n' "$OMARCHY_PATH" ;;
+  --run)     shift; cmd_run "$@" ;;
+  --restart) shift; cmd_restart "$@" ;;
+  --ipc)     shift; cmd_ipc "$@" ;;
+  --path)    printf '%s\n' "$OMARCHY_PATH" ;;
   --help|"") usage ;;
   *) printf 'error: 알 수 없는 인자: %s\n' "$1" >&2; usage >&2; exit 1 ;;
 esac
