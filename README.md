@@ -106,9 +106,8 @@ bin/rollback                 # 이전 핀으로 복귀
 - `SPEC.md` — 최종 권위 명세
 - `UPSTREAM.md` — 업스트림 핀/추적 정책
 - `docs/RUNTIME_STARTUP.md` — 기동 경로·플러그인 비활성화 실측
-- `docs/superpowers/plans/` — 마일스톤 설계·구현 문서.
-  **먼저 `docs/superpowers/plans/INDEX.md`를 읽을 것** — 완료된 플랜에 남아 있는,
-  이후 실측이 뒤집은 주장들을 모아뒀다.
+마일스톤 설계·구현 플랜은 비공개 개발 트리에 남겨 두고 이 저장소에는 담지 않는다.
+공개 문서에서 설계 기록을 인용할 때는 파일명만 밝힌다.
 
 ## 로드맵
 

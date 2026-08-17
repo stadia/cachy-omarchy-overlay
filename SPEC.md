@@ -2202,8 +2202,8 @@ This is the v0.1 release candidate.
 기존 절에 개정 주석으로 녹였다.)*
 
 Adopt the upstream theme pipeline instead of reimplementing it. The decision
-record is `docs/superpowers/plans/2026-08-17-m9-theme-runtime-design.md`
-(D1–D8); in short:
+record lives in the private development tree
+(`2026-08-17-m9-theme-runtime-design.md`, D1–D8); in short:
 
 - `themes/`, `default/themed/`, and the theme helper tier ship from the same
   pinned commit as the shell — `colors.toml` and `*.tpl` are one co-evolving
@@ -2238,8 +2238,8 @@ load in `bindings.lua`; conditional `source =` line in the conf snippet).
 Close the helper and dependency contract for the five first-party utility
 plugins that upstream default-enables (`omarchy.clipboard`, `omarchy.emojis`,
 `omarchy.image-picker`, `omarchy.reminders`, `omarchy.osd`). The decision
-record is `docs/superpowers/plans/2026-08-17-m10-utility-plugins-design.md`
-(D1–D7, P01–P10); in short:
+record lives in the private development tree
+(`2026-08-17-m10-utility-plugins-design.md`, D1–D7, P01–P10); in short:
 
 - These plugins are already loaded — `plugins: []` plus absent
   `disabledPlugins` means first-party non-bar plugins default-enable

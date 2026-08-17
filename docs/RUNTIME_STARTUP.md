@@ -892,8 +892,8 @@ Hyprland 가 설정을 다시 읽었음이 바인딩 수로 확인된다 — 48 
 
 **메뉴 아이콘 누락 WARN.** `Cannot open: file:///home/<user>/.local/share/omakub/
 applications/icons/*.png` 가 반복된다. 업스트림 셸 트리에 `omakub` 참조는 **0건**이며,
-사용자 자신의 `.desktop` 3개(`Activity`·`About`·`Docker`)가 존재하지 않는 디렉터리를
-가리킨다. 메뉴는 사용자 `.desktop` 을 올바르게 읽고 있다.
+호스트에 남아 있던 사용자 `.desktop` 3개가 존재하지 않는 디렉터리를 가리킨다.
+메뉴는 사용자 `.desktop` 을 올바르게 읽고 있다.
 
 **`listPlugins` 의 `omarchy.menu enabled=false`.** 런처가 실제로 열리는데도 이 값이
 `false` 다. `shell.qml:952-976` 의 bar-widget 분기가 `inBar(id)` 를 반환하기 때문이며,
@@ -1420,8 +1420,8 @@ $ pgrep -a waybar
 
 ## 18. M9 — 테마 런타임 채택 (구현, 2026-08-17)
 
-설계 결정(D1–D8)과 전수 감사 근거는
-`docs/superpowers/plans/2026-08-17-m9-theme-runtime-design.md` 에 있다. 이 절은
+설계 결정(D1–D8)과 전수 감사 근거는 비공개 개발 트리의 설계 기록
+(`2026-08-17-m9-theme-runtime-design.md`)에 있다. 이 절은
 구현 실태만 기록한다. 라이브 실측(R06/R07)은 Task 9 에서 이 절에 덧붙인다.
 
 ### 18.1 스테이징
