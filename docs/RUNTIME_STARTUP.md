@@ -1017,3 +1017,28 @@ shim 이 위임했다는 직접 증거다. 구 shim 이었다면 `exec` 만 해�
 `graphical-session.target` 은 여전히 inactive 이고 자동 기동은 미검증이다.
 전환하려면 GDM 에서 uwsm 계열 세션을 선택해 재로그인해야 하며, 기존
 `hyprland.desktop` 엔트리가 남아 있어 되돌릴 수 있다.
+
+### 15.6 검증 환경 드리프트 — 이 호스트는 더 이상 "uwsm 없는 CachyOS"의 대표가 아니다
+
+`uwsm` 을 설치한 것은 `graphical-session.target` 진단(§15.1) 때문이었는데, 그
+부수 효과로 **이 호스트는 원래 타깃 환경과 달라졌다.** 이 프로젝트의 원래
+전제는 uwsm 없는 CachyOS 였고 — shim 이 존재하는 이유가 그거고, M3 부터
+`uwsm-app` 을 WRAPPER 등급으로 분류해온 근거이기도 하다. 이제 이 호스트에서는
+shim 의 **Tier 1(fallback, `--` 벗기고 exec)** 이 라이브에서 발동하지 않는다.
+Tier 1 은 통제된 PATH 테스트(`test_uwsm_app_shim.sh` path B,
+`test_uwsm_scope.sh` 음성 대조)에서만 실측된다.
+
+이 드리프트가 실제 결함을 숨길 뻔했다. uwsm 이 설치되기 전까지는 shim 의
+폴백이 항상 발동했고, 그 폴백은 앱을 `cachy-omarchy-shell.service` cgroup 에
+그대로 남겨 §14.2 의 `Restart=on-failure` 복구가 사용자 앱을 함께 죽이는
+상태였다. 이 호스트에서 Tier 1 이 항상 발동하던 시절에는 그 degraded 상태가
+드러나지 않았다 — **검증 환경이 목표 환경에서 멀어지면 이런 게 생긴다.**
+
+이를 막기 위해 `test_uwsm_scope.sh` 를 추가했다. 이 테스트는 PATH 를 통제해
+실제 `uwsm-app` 을 넣어 Tier 2 를 강제하고, 띄운 프로세스의
+`/proc/<pid>/cgroup` 을 읽어 `app-graphical.slice/….scope` 가 실제로 생겼는지
+확인한다 — "호출했다"가 아니라 "효과가 있었다"를 본다. PATH 를 통제하지
+않으면 uwsm 없는 머신에서 Tier 1 이 발동해도 "대상이 실행됐다"만 보고 통과해
+버리므로, 실제 `uwsm-app` 이 없으면 **skip** 한다(Tier 1 을 조용히 검증하지
+않는다). uwsm 없는 머신이 원래 타깃이므로, 그 머신에서 이 테스트가 skip 되는
+것은 정상이다 — `bin/test-packages` 허용 목록에 그 skip 메시지가 등록돼 있다.

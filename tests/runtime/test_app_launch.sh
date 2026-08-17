@@ -35,7 +35,11 @@ EOF
 chmod +x "$COO_TEST_SANDBOX/r06.probe.sh"
 
 out=$("$SHIM" -- "$COO_TEST_SANDBOX/r06.probe.sh"); code=$?
-assert_eq "$code" "0" "shim -- cmd 가 위임한다"
+# 위임인지 fallback 인지는 호스트 PATH 에 실제 uwsm-app 유무로 갈린다(위 info
+# 메시지). 여기서는 "대상이 실행됐다"만 단언한다 — "위임한다"라고 쓰면 uwsm
+# 없는 머신에서 Tier 1 이 발동해도 통과하는 false-green 이 된다. 위임의 효과
+# (스코프 격리)는 test_uwsm_scope.sh 가 PATH 를 통제해 실측한다.
+assert_eq "$code" "0" "shim -- cmd 가 대상을 실행한다"
 assert_eq "$(cat "$marker")" "launched" "shim 이 대상 명령을 실행했다"
 rm -f "$marker"
 
