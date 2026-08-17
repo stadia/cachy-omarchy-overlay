@@ -91,8 +91,10 @@ bin/rollback                 # 이전 핀으로 복귀
 - **v0.2 (Milestone 8)** — `omarchy.bar` 채택. 완료(`v0.2.0`). 업스트림 바를
   켠 채로 출고한다. Waybar를 대체하지는 않는다 — 둘을 함께 띄우면 겹치지 않고
   쌓이며(세로 예약 `36 → 62px`), 우리는 Waybar를 중지·제거하지 않는다.
-- **v0.3 (Milestone 9)** — 업스트림 테마 런타임 채택. 진행 중
-  (`docs/superpowers/plans/2026-08-17-m9-theme-runtime-design.md`).
+- **v0.3 (Milestone 9)** — 업스트림 테마 런타임 채택. 완료(`v0.3.0`).
+  `themes/`+`default/themed/`+테마 helper 를 같은 핀에서 스테이징하고,
+  `cachy-omarchy-theme-set` 래퍼로 업스트림 `omarchy-theme-set` 을 무패치
+  실행한다. 실측: `docs/RUNTIME_STARTUP.md` §18.6.
 
 ## 라이선스
 
