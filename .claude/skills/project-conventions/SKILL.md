@@ -63,6 +63,13 @@ user-invocable: false
   주입까지 실행한다.
 - 라이브 테스트는 `hyprctl layers`로 우리 표면을 실측 + shell.log QML 에러 grep. 불린 IPC만으로
   "렌더됨"을 주장하지 말 것(M1 Task 6 교훈).
+- **패키징에 닿는 변경(`overlay/**`, `packages/**/stage-*.sh`, `overlay/defaults/**`) 뒤에는
+  `./tests/test.sh` 전에 반드시 `bin/build-packages`를 먼저 돌린다.** 스테이징 단언은 아티팩트가
+  없으면 `note: 아티팩트 없음 — 스테이징 검증 생략`만 찍고 **통과한다.** 실패 모드가 "빨개짐"이
+  아니라 "틀린 것을 통과시킴"이라 눈치채기 어렵다 — 그 note가 보이면 그 실행은 완전한 green이
+  아니다. `build/`는 릴리스마다 아티팩트를 누적하므로, 거기서 아티팩트를 고르는 코드는 mtime
+  최신을 쓰거나 모호성을 명시적으로 거부해야 한다(M8에서 `test_update_pipeline`이 낡은 패키지를
+  검증하다 실행마다 다른 단언이 깨졌다).
 
 ## 환경 (재측정 금지, 이미 확정)
 - CachyOS, Hyprland 0.56.2(사용자 설정 = `hyprland.lua`만), Quickshell 0.3.0(`/usr/bin/qs`).
