@@ -24,7 +24,7 @@
 
 | command | called from | purpose | class | action |
 | --- | --- | --- | --- | --- |
-| `uwsm-app -- gtk-launch` | `AppLibrary.qml` | 앱 실행 | ADAPTED | wrapper — uwsm 없으면 `gtk-launch` |
+| `uwsm-app -- gtk-launch` | `AppLibrary.qml` | 앱 실행 | ADAPTED | wrapper — 실제 `uwsm-app` 이 있으면 위임, 없으면 `gtk-launch` |
 | `omarchy-remove-launcher-entry` | `AppLibrary.remove` | 숨김 항목 | OPTIONAL / ADAPTED | copy into compat if hide-from-menu를 살릴 때 |
 | 메뉴 `action` 문자열 전반 | `omarchy-menu.jsonc` | 테마/락/캡처/네트워크/업데이트 등 | 대부분 DISABLED | disable — 항목은 JSONC에 남아도 실행 시 실패. v0.1은 앱 목록 + 안전 항목만 남기거나 `when`으로 숨김 |
 

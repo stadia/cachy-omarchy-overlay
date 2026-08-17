@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # R06: dummy desktop is launched through AppLibrary (uwsm-app -- gtk-launch).
-# Shim is required because this host has no uwsm; PATH is shell-process only.
+# Shim delegates to a real uwsm-app when one is on PATH, else falls back to
+# exec'ing the target directly (see test_uwsm_app_shim.sh for both paths in
+# isolation). PATH is shell-process only.
 set -uo pipefail
 REPO_ROOT="${REPO_ROOT:?}"
 source "$REPO_ROOT/tests/lib/assert.sh"
@@ -18,7 +20,11 @@ src=$(cat "$SHIM")
 assert_contains "$src" 'exec "$@"' "shim 은 나머지를 exec 한다 (REIMPLEMENT 아님)"
 
 host=$(command -v uwsm-app 2>/dev/null || true)
-assert_eq "$host" "" "호스트 PATH 에 uwsm-app 없음 (shim 이 필요한 이유)"
+if [[ -n $host ]]; then
+  echo "info: 호스트에 실제 uwsm-app 있음 ($host) — 아래 exec 는 shim 의 위임 경로를 탄다"
+else
+  echo "info: 호스트에 uwsm-app 없음 — 아래 exec 는 shim 의 fallback 경로를 탄다"
+fi
 
 marker=$COO_TEST_SANDBOX/r06.marker
 : >"$COO_TEST_SANDBOX/r06.probe.sh"

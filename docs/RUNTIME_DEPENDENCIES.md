@@ -26,7 +26,7 @@
 | `gum` | 다수 헬퍼 TUI | CachyOS `gum` | OPTIONAL | installed | yes for menu open | 없음 | NONE — **M4 실측: 키바인딩 경로 미사용** — `omarchy-menu-keybindings` / `omarchy-menu-select` / `omarchy-cmd-present` 에 `gum` 0 매치(grep). 선택 UI 는 gum 이 아니라 `summon omarchy.menu` select mode. **M2 실측: 기동 경로 미사용** 유지 |
 | `xkbcli` | `omarchy-menu-keybindings` `parse_keycodes` — `xkbcli compile-keymap` | CachyOS `libxkbcommon` | OPTIONAL | installed | no(목록 품질 저하) | 하드코딩 code: 폴백 테이블 | NONE — **M4 실측**: 없으면 `code:NNN` bind 가 심볼로 안 풀릴 뿐 스크립트는 동작 |
 | `lua` | `omarchy-menu-keybindings` Lua bind 캐시 (`hyprland.lua` 소스 파서) | CachyOS `lua` | OPTIONAL | 5.5.1-1 | no(목록 품질 저하) | `omarchy-cmd-present lua` 가드가 캐시를 끈다 | NONE — **M4 실측**: `lua` 가 없어도 스크립트 자체는 동작(Lua bind 메타만 빈 캐시) |
-| `uwsm` / `uwsm-app` | `AppLibrary.launch`: `uwsm-app -- gtk-launch <id>.desktop` | 공식 depends | OPTIONAL | **미설치(실측)** | 가능 | `gtk-launch` | WRAPPER — **M3 실측**: `overlay/compat/bin/uwsm-app` 이 `--` 뒤 나머지를 `exec`. 셸 프로세스 PATH 에만 붙음(§45) |
+| `uwsm` / `uwsm-app` | `AppLibrary.launch`: `uwsm-app -- gtk-launch <id>.desktop` | 공식 depends | OPTIONAL | 설치 여부에 따라 동작이 갈림 | 가능 | `gtk-launch` | WRAPPER — `overlay/compat/bin/uwsm-app` 이 실제 `uwsm-app` 을 PATH 에서 찾아(자기 자신 제외) 있으면 원래 인자(`--` 포함) 그대로 위임하고, 없으면 `--` 뒤 나머지를 직접 `exec`. 셸 프로세스 PATH 에만 붙음(§45) |
 | `inotifywait` / `inotify-tools` | `services/PluginRegistry.qml:638` `localPluginWatcher` 가 `~/.config/omarchy/plugins` 감시 | CachyOS `inotify-tools` | **REQUIRED(정상 기동) / OPTIONAL(기능)** | **미설치(실측)** | no(로그 정상화 시) | 없음 — 없으면 1초마다 WARN 반복 | NONE — **M2 실측으로 신규 추가**. `PKGBUILD depends` 누락. 기능은 정상이나 로그 스팸 → `depends` 에 `inotify-tools` 추가 권장 |
 | `gtk-launch` | 앱 실행 | `glib2` | REQUIRED for app launch | yes | no | `gio launch` | NONE or WRAPPER |
 | `systemd --user` | 우리 유닛 계획 | systemd | REQUIRED for M2 | yes | no | 수동 기동 | WRAPPER |
@@ -67,7 +67,7 @@ qs ipc -n -p "$OMARCHY_PATH/shell" call -- shell toggle omarchy.menu '{"menu":"r
 
 ## 앱 실행
 
-메뉴 Apps는 `DesktopEntries` + `uwsm-app -- gtk-launch`. 전체 Omarchy 테마/설치 명령 없이 일반 `.desktop` 실행이 가능하다. `uwsm`이 없으면 래퍼가 `gtk-launch`만 부르면 된다 (`WRAPPER`, `REIMPLEMENT` 아님).
+메뉴 Apps는 `DesktopEntries` + `uwsm-app -- gtk-launch`. 전체 Omarchy 테마/설치 명령 없이 일반 `.desktop` 실행이 가능하다. `uwsm`이 설치돼 있으면 shim이 실제 `uwsm-app`에 위임해 앱을 자체 systemd scope로 격리하고, 없으면 `gtk-launch`만 직접 부른다 (`WRAPPER`, `REIMPLEMENT` 아님 — 두 경우 모두).
 
 ---
 
@@ -85,5 +85,9 @@ qs ipc -n -p "$OMARCHY_PATH/shell" call -- shell toggle omarchy.menu '{"menu":"r
   1초마다 재시작하며 WARN 을 반복. 기능은 정상(37개 플러그인 등록)이나 정상 기동(로그 정숙)을
   위해 `REQUIRED`. **`PKGBUILD depends=('quickshell' 'hyprland')` 에 `inotify-tools` 추가 권장**
   (M7 신뢰성 마일스톤 전, 또는 M3 전). 추론 아닌 실측.
-- **`uwsm` 미설치 확정** — `pacman -Q uwsm` 없음. M3 는 `overlay/compat/bin/uwsm-app` WRAPPER 로 `gtk-launch` 위임 (R06 마커 실측).
+- **`uwsm-app` shim 은 설치 여부에 조건부로 반응한다** — `overlay/compat/bin/uwsm-app` 이 PATH 에서
+  자기 자신을 제외한 실제 `uwsm-app` 을 찾아, 있으면 원래 인자(`--` 포함) 그대로 위임하고(스코프
+  격리를 실제 도구에 넘김), 없으면 `--` 뒤 나머지를 직접 `exec`(M3 R06 마커 실측). 이 호스트는 이제
+  `uwsm` 이 설치돼 있어(`pacman -Q uwsm`) 위임 경로가 실사용된다 — "미설치" 로 단정하던 이전 기록은
+  더 이상 사실이 아니므로 여기서 정정한다.
 - **`omarchy.osd` 기동 불필요 확정** — 비활성 상태로 기동 정상. 상세는 `PLUGIN_AUDIT.md`.
