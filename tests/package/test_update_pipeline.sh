@@ -77,12 +77,20 @@ set -euo pipefail
 printf '%s\n' "$(basename "$PWD")" >>"$COO_TOOL_LOG"
 [[ ${COO_FAKE_BUILD_FAIL:-0} != 1 ]] || exit 7
 mkdir -p "$PKGDEST"
+# build/ legitimately accumulates artifacts across releases, so a plain
+# `find -print -quit` picks whichever one the directory happens to list first
+# and the candidate suite silently validates a stale package. Take the newest
+# by mtime instead; that is the one the working tree just produced.
+newest_artifact() {
+  find "$1" -maxdepth 1 -type f -name "$2" -printf '%T@ %p\n' \
+    | sort -rn | head -1 | cut -d' ' -f2-
+}
 if [[ $PWD == *cachy-omarchy-shell ]]; then
   ver=$(grep -m1 '^pkgver=' PKGBUILD | cut -d= -f2 | tr -d "'\"")
   rel=$(grep -m1 '^pkgrel=' PKGBUILD | cut -d= -f2 | tr -d "'\"")
   target="$PKGDEST/cachy-omarchy-shell-${ver}-${rel}-any.pkg.tar.zst"
   if [[ -n ${COO_FAKE_ARTIFACT_SOURCE:-} ]]; then
-    source_archive=$(find "$COO_FAKE_ARTIFACT_SOURCE" -maxdepth 1 -type f -name 'cachy-omarchy-shell-*.pkg.tar.zst' -print -quit)
+    source_archive=$(newest_artifact "$COO_FAKE_ARTIFACT_SOURCE" 'cachy-omarchy-shell-*.pkg.tar.zst')
     cp "$source_archive" "$target"
   else
     : >"$target"
@@ -92,7 +100,7 @@ else
   rel=$(grep -m1 '^pkgrel=' PKGBUILD | cut -d= -f2 | tr -d "'\"")
   target="$PKGDEST/cachy-omarchy-overlay-${ver}-${rel}-any.pkg.tar.zst"
   if [[ -n ${COO_FAKE_ARTIFACT_SOURCE:-} ]]; then
-    source_archive=$(find "$COO_FAKE_ARTIFACT_SOURCE" -maxdepth 1 -type f -name 'cachy-omarchy-overlay-*.pkg.tar.zst' -print -quit)
+    source_archive=$(newest_artifact "$COO_FAKE_ARTIFACT_SOURCE" 'cachy-omarchy-overlay-*.pkg.tar.zst')
     cp "$source_archive" "$target"
   else
     : >"$target"
