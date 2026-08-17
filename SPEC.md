@@ -2124,27 +2124,34 @@ This is the v0.1 release candidate.
 
 All must be true:
 
-- [ ] Runs on CachyOS.
-- [ ] Omarchy OS is not installed.
-- [ ] Official `omarchy` package is not required.
-- [ ] Official `omarchy-settings` package is not required.
-- [ ] Quickshell is used.
-- [ ] Upstream Quattro shell source is reused.
-- [ ] Upstream source is pinned to a commit.
-- [ ] `cachy-omarchy-shell` builds successfully.
-- [ ] Package owns no forbidden system paths.
-- [ ] Long-running shell starts as user.
-- [ ] IPC works.
-- [ ] `SUPER + SPACE` opens Quattro launcher.
-- [ ] Normal applications can launch.
-- [ ] `SUPER + K` opens keybinding UI.
-- [ ] Existing Hyprland config is preserved.
-- [ ] Existing Waybar is preserved.
-- [ ] Existing notification daemon is preserved.
-- [ ] Existing lock setup is preserved.
-- [ ] Rebuild against a newer upstream release is automated.
-- [ ] Failed updates do not install.
-- [ ] Previous working package can be rolled back.
+- [x] Runs on CachyOS.
+- [x] Omarchy OS is not installed.
+- [x] Official `omarchy` package is not required.
+- [x] Official `omarchy-settings` package is not required.
+- [x] Quickshell is used.
+- [x] Upstream Quattro shell source is reused.
+- [x] Upstream source is pinned to a commit.
+- [x] `cachy-omarchy-shell` builds successfully.
+- [x] Package owns no forbidden system paths.
+- [x] Long-running shell starts as user.
+- [x] IPC works.
+- [x] `SUPER + SPACE` opens Quattro launcher.
+- [x] Normal applications can launch.
+- [x] `SUPER + K` opens keybinding UI.
+- [x] Existing Hyprland config is preserved.
+- [ ] Existing Waybar is preserved. *(bar 억제는 측정됨 §14.4/§16.4; Waybar 자체 공존은 이 호스트가 mako 를 써 미검증)*
+- [x] Existing notification daemon is preserved.
+- [ ] Existing lock setup is preserved. *(미검증 — hyprlock 등 live lock 설정과 상호작용 실측 안 함)*
+- [x] Rebuild against a newer upstream release is automated.
+- [x] Failed updates do not install.
+- [x] Previous working package can be rolled back.
+
+Evidence ledger: `docs/RC_GAP_INVENTORY.md` (측정됨 / 미검증 / 추론됨 구분). 라이브
+실측 기록은 `docs/RUNTIME_STARTUP.md` §12–§16. 19/21 측정됨; 2건(Waybar 공존, lock
+공존)은 호스트 환경 제약으로 미검증 — 패키지 설계는 보존하지만 라이브 입증은 안 됨.
+0.1.2 release (cachy-omarchy-overlay 0.1.2-1) 시점 기준. R07 자동 복구는
+systemd 유닛 제거(4c5731b)로 더 이상 shipped feature 가 아님(§16.6) — 이는 §61 의
+명시 항목이 아님.
 
 ---
 
