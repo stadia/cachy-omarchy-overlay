@@ -4,7 +4,7 @@ src=${1:?overlay dir}
 dest=${2:?pkgdir}
 
 install -d "$dest/usr/bin"
-for b in shell launcher keybindings bindings init doctor; do
+for b in shell launcher keybindings bindings init doctor theme-set; do
   install -D -m755 "$src/bin/cachy-omarchy-$b" "$dest/usr/bin/cachy-omarchy-$b"
 done
 

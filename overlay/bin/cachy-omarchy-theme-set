@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# 업스트림 omarchy-theme-set 을 CachyOS 패키지 트리에서 실행하는 얇은 래퍼
+# (SPEC 44, M9 설계 문서 D6). 테마 로직을 재구현하지 않는다 — OMARCHY_PATH 와
+# PATH 만 세우고 업스트림 스크립트를 exec 한다.
+set -uo pipefail
+
+PREFIX_ROOT=${COO_PREFIX_ROOT:-/usr/share/cachy-omarchy}
+OMARCHY_PATH=${COO_OMARCHY_PATH:-$PREFIX_ROOT/upstream}
+COMPAT_BIN=${COO_COMPAT_BIN:-/usr/lib/cachy-omarchy/compat/bin}
+export OMARCHY_PATH
+
+TARGET=$OMARCHY_PATH/bin/omarchy-theme-set
+[[ -x $TARGET ]] || {
+  printf 'error: 업스트림 theme-set 을 찾을 수 없다: %s\n' "$TARGET" >&2
+  exit 1
+}
+
+# theme-set 의 post 훅과 배경 체인이 다른 staged helper (omarchy-theme-color,
+# omarchy-notification-send 등)를 bare name 으로 부른다. compat shim 은
+# omarchy-shell IPC 를 위해 앞에 둔다.
+[[ -d $COMPAT_BIN ]] && PATH="$COMPAT_BIN:$PATH"
+PATH="$OMARCHY_PATH/bin:$PATH"
+export PATH
+
+exec "$TARGET" "$@"
