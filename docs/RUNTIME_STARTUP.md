@@ -946,3 +946,74 @@ M5 Task 5 가 샌드박스에서 관측했던 동작이 실제 설치본에서 �
   (10초 내 5회)을 초과하면 유닛이 failed 로 고정되는데, 그 경계는 관측하지 않았다.
 - 서비스는 검증 후 `stop` 했고 `disabled` 상태로 남겼다. `~/.config/systemd/user/`
   에 `.wants` 심볼릭이 생기지 않았음을 확인했다.
+
+---
+
+## 15. uwsm 도입과 앱 스코프 격리 (2026-08-17)
+
+`graphical-session.target` 이 inactive 인 원인을 진단하다 `uwsm` 을 설치하게 됐고,
+그 결과 compat shim 이 진짜 도구를 가리는 문제가 드러나 함께 수정했다.
+
+### 15.1 `graphical-session.target` 이 inactive 인 이유 — 진단됨
+
+이 호스트는 GDM 에서 `/usr/share/wayland-sessions/hyprland.desktop`
+(`Exec=/usr/bin/start-hyprland`) 으로 로그인한다. `start-hyprland` 는 `hyprland`
+패키지가 제공하는 **ELF 바이너리**이며 `strings` 에 `systemd`·`graphical-session`·
+`import-environment` 가 하나도 없다 — 컴포지터만 띄우고 systemd 세션 타깃을
+건드리지 않는다.
+
+`systemctl --user list-dependencies graphical-session.target --reverse` 의 결과는
+**`gnome-session.target` 하나뿐**이다. Hyprland 쪽에서 이 타깃을 원하는 유닛이 없고,
+따라서 유닛의 `WantedBy=graphical-session.target` 은 발동할 계기가 없다.
+
+환경 변수 자체는 정상이다 — systemd 사용자 환경에 `WAYLAND_DISPLAY=wayland-1`,
+`XDG_CURRENT_DESKTOP=Hyprland` 가 있어 `ConditionEnvironment` 는 충족된다.
+**문제는 조건이 아니라 트리거다.**
+
+GDM 에는 `Exec=uwsm start -e -D Hyprland hyprland.desktop` 세션 엔트리도 있으나
+`uwsm` 미설치로 사용할 수 없었다. `uwsm` 은 이 타깃을 올리는 것이 존재 이유다.
+
+### 15.2 compat shim 이 진짜 `uwsm-app` 을 가리던 문제 — 수정됨
+
+`uwsm 0.26.6-1` 이 설치되자 `/usr/bin/uwsm-app` 이 생겼다. 그런데 우리 compat
+디렉터리가 셸 프로세스 PATH 의 **첫 항목**이므로(§13.3), 구 shim 이 계속 이기고
+`exec "$@"` 로 스코프 배치를 버렸다. **uwsm 을 설치하고도 그 이점을 못 받는 상태.**
+
+수정(`24ff123`)은 shim 을 투명하게 만들었다 — 자기 위치를 제외하고 다음
+`uwsm-app` 을 해석해 인자를 그대로(선행 `--` 포함) 넘기고, 없으면 기존 폴백을
+유지한다. 패키징 내용 변경이므로 오버레이를 `0.1.1-1` 로 릴리스했다(`6ae2fe6`).
+
+### 15.3 앱 스코프 격리 — 측정됨
+
+사용자가 `SUPER+SPACE` 런처로 계산기를 실행한 뒤 cgroup 을 읽었다:
+
+```
+계산기: app.slice/app-graphical.slice/app-Hyprland-gtk\x2dlaunch-f26d135d.scope
+셸    : app.slice/cachy-omarchy-shell.service
+```
+
+앱이 **`app-graphical.slice` 아래 자기 스코프**에 들어갔고 셸 서비스 밖이다.
+스코프 이름 `app-Hyprland-gtk\x2dlaunch-…` 는 진짜 `uwsm-app` 이 만든 것으로,
+shim 이 위임했다는 직접 증거다. 구 shim 이었다면 `exec` 만 해서 계산기가
+`cachy-omarchy-shell.service` 안에 남았을 것이다.
+
+업스트림 `shell/services/AppLibrary.qml:81` 의 의도가 실현됐다 —
+"apps do not inherit wayland-wm@.service".
+
+**§14.2 의 R07 과 짝을 이룬다.** `Restart=on-failure` 복구가 2초 만에 도는 것을
+확인했는데, 앱이 셸 서비스 안에 갇혀 있었다면 그 복구가 사용자 앱을 함께 죽인다.
+스코프 격리가 그것을 막는다. 두 관측은 따로 보면 절반만 의미가 있다.
+
+### 15.4 측정 방법에 관한 주의
+
+첫 시도에서 컨트롤러가 터미널에서 `uwsm-app -- gtk-launch …` 를 직접 실행해
+검증하려 했으나 **무효였다** — 그 경우 앱이 터미널의 스코프
+(`app-ghostty-surface-transient-…`)를 상속하므로 셸과 무관하다. 이 성질은
+**셸이 앱을 띄울 때만** 관측된다. 호출 맥락이 측정의 일부다.
+
+### 15.5 아직 하지 않은 것
+
+`uwsm` 은 설치했으나 **uwsm 세션으로 로그인하지는 않았다.** 따라서
+`graphical-session.target` 은 여전히 inactive 이고 자동 기동은 미검증이다.
+전환하려면 GDM 에서 uwsm 계열 세션을 선택해 재로그인해야 하며, 기존
+`hyprland.desktop` 엔트리가 남아 있어 되돌릴 수 있다.
