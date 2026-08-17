@@ -214,14 +214,12 @@ esac
    에 없고 `RUNTIME_DEPENDENCIES.md` 에도 없었다 — M1 의존성 감사(§28)의 누락.
    → `RUNTIME_DEPENDENCIES.md` 갱신 + `inotify-tools` 를 `depends` 에 추가할지 결정 필요.
 
-3. **`graphical-session.target` 비활성** — `overlay/systemd/cachy-omarchy-shell.service`
-   는 `WantedBy=graphical-session.target` + `ConditionEnvironment=WAYLAND_DISPLAY`
-   (업스트림 패턴, 실측 일치). 그러나 이 호스트엔 `uwsm` 이 없어
-   `graphical-session.target` 이 `inactive (dead)` 다. 현재 Wayland 세션은 살아
-   있음(`wayland-1`). **결과: M5 에서 유닛이 자동 시작하지 않는다.** M2 는 유닛을 쓰지
-   않고 래퍼를 직접 부르므로 영향 없으나, §17 "CachyOS 에서 target 순서 검증" 은
-   미충족. 해결: `graphical-session.target` 활성화 경로 문서화 / Hyprland `exec-once`
-   로 서비스 시작 / 타겟 재검토.
+3. **셸 자동 기동 누락** — 셸은 Hyprland autostart(`overlay/hypr/bindings.lua`
+   의 `hl.on("hyprland.start", …)`)로 기동한다. 업그레이드로 autostart 줄이
+   추가됐더라도 live `~/.config/cachy-omarchy/hypr/bindings.lua` 는 `--force`
+   없이 갱신되지 않는다. 해결: `cachy-omarchy-bindings --force` 로 정본 새로고침
+   후 재로그인(또는 수동 `cachy-omarchy-shell --run`). `hyprctl reload` 만으로는
+   `hyprland.start` 가 재발화하지 않으므로 셸이 뜨지 않는 게 정상이다.
 
 4. **사용자 `~/.config/omarchy/shell.json` 오버라이드** — §2. 우리 기본값이 통째로
    무시될 수 있음. 감지·경고는 M7 doctor 후보.
@@ -347,7 +345,7 @@ overlay 패키지, `cachy-omarchy-init`, Waybar 처리와 실제 설치 통합�
 | 5 | `usr/bin/cachy-omarchy-shell` |
 | 6 | `usr/lib/cachy-omarchy/compat/bin/omarchy-shell` |
 | 7 | `usr/lib/cachy-omarchy/compat/bin/uwsm-app` |
-| 8 | `usr/lib/systemd/user/cachy-omarchy-shell.service` |
+| 8 | usr/share/cachy-omarchy/hypr/bindings.lua (autostart) |
 | 9 | `usr/share/cachy-omarchy/defaults/shell.json` |
 | 10 | `usr/share/cachy-omarchy/hypr/bindings.conf` |
 | 11 | `usr/share/cachy-omarchy/hypr/bindings.lua` |
@@ -576,6 +574,9 @@ retention, U10 valid/corrupt rollback을 검증한다. 실패 경로는 모두 i
 참조하므로 clean chroot는 여전히 깨져 있으며 M7에서 해결한다. 또한 이 호스트의
 `graphical-session.target`은 inactive여서 service의 자동 기동은 미검증이다.
 `WantedBy=graphical-session.target`은 의도이지 관측된 자동 시작이 아니다.
+
+- autostart 전환 마이그레이션: 기존 설치는 `cachy-omarchy-bindings --force` 로
+  live bindings 를 새로고침해야 자동 기동을 얻는다.
 
 
 ## 11. M7 RC 증거 — 실측 경계와 남은 승인 작업
@@ -867,6 +868,8 @@ applications/icons/*.png` 가 반복된다. 업스트림 셸 트리에 `omakub` 
 ---
 
 ## 14. systemd user service 검증 (2026-08-17)
+
+> **참고:** 이 측정은 구 systemd 유닛 모델 기반이다; 현재 기동 모델은 §16/§17(Hyprland autostart)을 본다.
 
 §13 의 포그라운드 세션을 종료한 뒤, 설치된 유닛으로 서비스를 기동해 R07 을 검증했다.
 **`enable` 은 하지 않았다** — `start` 만으로 R07 이 성립하고, 이 호스트에서
