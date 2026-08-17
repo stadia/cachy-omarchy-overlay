@@ -11,7 +11,7 @@ done
 # compat shim 은 통제된 경로에만 둔다. /usr/bin 에 두면 사용자의 일반 PATH 를
 # 오염시키고 SPEC 44 를 위반한다. 셸 프로세스만 이 디렉터리를 PATH 에 붙인다.
 install -d "$dest/usr/lib/cachy-omarchy/compat/bin"
-for c in omarchy-shell uwsm-app; do
+for c in omarchy-shell uwsm-app omarchy-update-available; do
   install -D -m755 "$src/compat/bin/$c" "$dest/usr/lib/cachy-omarchy/compat/bin/$c"
 done
 
