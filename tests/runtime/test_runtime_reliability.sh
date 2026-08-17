@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# M7 R01-R10 reliability evidence.  Package files are tested from the two
+# M7 R01-R10 reliability evidence. Package files are tested from the two
 # extracted archives; the manual wrapper-restart smoke is deliberately limited
-# to a sandbox HOME. It is not a systemd Restart=on-failure service test.
-# It never enables/starts a user unit or changes a live user configuration.
+# to a sandbox HOME. It exercises `cachy-omarchy-shell --restart`, not a systemd
+# unit (the shell is launched by Hyprland autostart; R07 auto-restart is not
+# provided — recovery is manual `--restart`).
 set -uo pipefail
 REPO_ROOT="${REPO_ROOT:?}"
 source "$REPO_ROOT/tests/lib/assert.sh"
@@ -59,24 +60,21 @@ assert_eq "$(grep -Eic '^(etc/.*(lock|hyprlock)|usr/lib/systemd/system/.*(lock|h
   "R10 no lock replacement /etc or system-unit path is owned"
 printf '%s\n' '      FINDING: R09/R10 only audit package ownership; live dunst/mako/hyprlock preservation is UNVERIFIED.'
 
-# This is a read-only observation.  WantedBy is unit install intent, not an
-# observed start: this test never calls enable, start, daemon-reload, or reload.
+# Auto-start intent is now declared in the autostart bindings, not a systemd
+# unit. The unit is gone from the package. This test never enables/starts a
+# unit or changes a live user configuration.
+bindings="$root/usr/share/cachy-omarchy/hypr/bindings.lua"
+assert_file_exists "$bindings" "autostart bindings are packaged"
+assert_contains "$(cat "$bindings")" "hyprland.start" "autostart trigger is declared"
+assert_contains "$(cat "$bindings")" "cachy-omarchy-shell --run" "autostart launches the wrapper"
 unit="$root/usr/lib/systemd/user/cachy-omarchy-shell.service"
-assert_file_exists "$unit" "auto-start unit is packaged as a user unit"
-assert_contains "$(cat "$unit")" "WantedBy=graphical-session.target" \
-  "auto-start intent is declared"
-if command -v systemctl >/dev/null 2>&1; then
-  target_state=$(systemctl --user is-active graphical-session.target 2>&1); target_code=$?
-  target_show=$(systemctl --user show graphical-session.target \
-    --property=ActiveState --property=SubState --no-page 2>&1); show_code=$?
-  printf '      FINDING: graphical-session.target read-only state (is-active exit=%s): %s\n' \
-    "$target_code" "$target_state"
-  printf '      FINDING: graphical-session.target read-only show (exit=%s): %s\n' \
-    "$show_code" "${target_show//$'\n'/; }"
+if [[ ! -e $unit ]]; then
+  printf 'ok:   systemd unit is not packaged\n'
 else
-  printf '%s\n' '      FINDING: systemctl unavailable; automatic start is UNVERIFIED.'
+  printf 'FAIL: systemd unit still packaged: %s\n' "$unit" >&2
+  ASSERT_FAILURES=$((ASSERT_FAILURES + 1))
 fi
-printf '%s\n' '      FINDING: no target activation was requested; automatic start is UNVERIFIED.'
+printf '%s\n' '      FINDING: automatic start is asserted via packaged autostart bindings, not observed live here.'
 
 # This is a manual extracted-tree wrapper-restart smoke when a Wayland runtime
 # is available. It does not exercise systemd Restart=on-failure: no user unit
@@ -85,12 +83,12 @@ if ! coo_live_runtime_usable; then
   # This is deliberately a note, not a skip: the package-ownership R08-R10
   # assertions above did run.  M6 treats `skip:` as required-test failure;
   # the unavailable live recovery remains explicit evidence, not false green.
-  printf '%s\n' 'note: manual wrapper-restart smoke UNVERIFIED (needs a working systemd-cat/journald, quickshell, qs, and a live WAYLAND_DISPLAY socket); R07 systemd service recovery remains UNVERIFIED'
+  printf '%s\n' 'note: manual --restart smoke UNVERIFIED (needs working systemd-cat/journald, quickshell, qs, and a live WAYLAND_DISPLAY socket)'
   exit "$ASSERT_FAILURES"
 fi
 
 export COO_PREFIX_ROOT="$root/usr/share/cachy-omarchy"
-export COO_OMARCHY_PATH="$COO_PREFIX_ROOT/upstream"
+export COO_OMARCHY_PATH="$root/usr/share/cachy-omarchy/upstream"
 export COO_COMPAT_BIN="$root/usr/lib/cachy-omarchy/compat/bin"
 export COO_IPC_TIMEOUT=1s
 mkdir -p "$HOME/.local/state/omarchy/toggles"
@@ -100,11 +98,14 @@ shell_pid=""
 stop_shell() {
   local pid=${shell_pid:-} n=0
   shell_pid=""
-  [[ -n $pid ]] || return 0
-  kill -TERM "$pid" 2>/dev/null || true
+  [[ -n $pid ]] && kill -TERM "$pid" 2>/dev/null || true
   while kill -0 "$pid" 2>/dev/null && (( n < 20 )); do sleep 0.1; n=$((n + 1)); done
   kill -KILL "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
+  # --restart 가 detached 로 띄운 인스턴스도 정리(테스트 전용 경로로 정밀 매칭).
+  local pat="quickshell -n -p $COO_OMARCHY_PATH/shell" rpids
+  rpids=$(pgrep -f "$pat" 2>/dev/null || true)
+  [[ -n $rpids ]] && kill -KILL $rpids 2>/dev/null || true
 }
 start_shell() {
   "$W" --run >/dev/null 2>&1 &
@@ -127,11 +128,24 @@ start_shell
 first_reply=$(wait_ping 2>/dev/null || true)
 assert_eq "$first_reply" "ok" "manual wrapper first start responds to IPC"
 if [[ $first_reply == ok ]]; then
-  # This is our just-created wrapper PID, never a broad pkill/killall match.
   stop_shell
   start_shell
   recovered_reply=$(wait_ping 2>/dev/null || true)
   assert_eq "$recovered_reply" "ok" "manual wrapper restart after owned PID kill recovers IPC"
+  # --restart: detached kill + 재기동. 추적 PID 는 죽고, 새 인스턴스가 IPC 응답.
+  shell_pid_prev=$shell_pid
+  out=$("$W" --restart 2>&1); rc=$?
+  assert_eq "$rc" "0" "--restart exits 0 (detached relaunch)"
+  sleep 0.3
+  assert_eq "$(kill -0 "$shell_pid_prev" 2>/dev/null; echo $?)" "1" "--restart killed the old instance"
+  restart_reply=$(wait_ping 2>/dev/null || true)
+  assert_eq "$restart_reply" "ok" "--restart relaunches a shell that answers IPC"
+  # 멱등: 이미 떠 있으면 --run 은 no-op(exit 0)하고 새 인스턴스를 늘리지 않는다.
+  before_n=$(pgrep -f "quickshell -n -p $COO_OMARCHY_PATH/shell" 2>/dev/null | wc -l | tr -d ' ')
+  out=$("$W" --run 2>&1); rc=$?
+  assert_eq "$rc" "0" "--run while running is no-op exit 0"
+  after_n=$(pgrep -f "quickshell -n -p $COO_OMARCHY_PATH/shell" 2>/dev/null | wc -l | tr -d ' ')
+  assert_eq "$after_n" "$before_n" "--run no-op does not add an instance"
 fi
 
 exit "$ASSERT_FAILURES"
