@@ -20,13 +20,18 @@ assert_file_exists "$root/version" "version packaged"
 assert_file_exists "$root/config/omarchy/shell.json" "upstream shell.json packaged"
 assert_file_exists "$stage/usr/share/licenses/cachy-omarchy-shell/LICENSE" "MIT license"
 
-# Must not stage excluded trees
-if [[ -e $root/install || -e $root/migrations || -e $root/themes ]]; then
+# Must not stage excluded trees. themes/ 는 M9 부터 스테이징 대상이다 —
+# colors.toml 과 default/themed/*.tpl 이 같이 진화하는 한 쌍이라 셸과 같은
+# 핀 커밋에서 함께 간다 (M9 설계 문서). 테마 스테이징의 정합성은
+# tests/package/test_staged_themes.sh 가 단언한다.
+if [[ -e $root/install || -e $root/migrations ]]; then
   printf 'FAIL: excluded upstream trees were staged\n'
   ASSERT_FAILURES=$((ASSERT_FAILURES + 1))
 else
-  printf 'ok:   excluded install/migrations/themes\n'
+  printf 'ok:   excluded install/migrations\n'
 fi
+assert_file_exists "$root/themes/tokyo-night/colors.toml" "themes staged (M9)"
+assert_file_exists "$root/default/themed/shell.toml.tpl" "themed templates staged (M9)"
 
 id=$(grep -E '"id"' "$root/shell/plugins/menu/manifest.json" | head -1)
 assert_contains "$id" "omarchy.menu" "menu plugin id"

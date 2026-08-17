@@ -9,6 +9,13 @@ cp -a "$src/shell" "$dest/usr/share/cachy-omarchy/upstream/"
 install -D -m644 "$src/version" "$dest/usr/share/cachy-omarchy/upstream/version"
 install -D -m644 "$src/default/omarchy/omarchy-menu.jsonc" \
   "$dest/usr/share/cachy-omarchy/upstream/default/omarchy/omarchy-menu.jsonc"
+# 테마 런타임 (M9): colors.toml 과 default/themed/*.tpl 은 같이 진화하는 한
+# 쌍이므로 셸과 같은 핀 커밋에서 함께 스테이징한다. omarchy-theme-set 은
+# $OMARCHY_PATH/themes 와 $OMARCHY_PATH/default/themed 를 참조한다.
+# upstream/default/ 는 바로 위 omarchy-menu.jsonc install -D 가 만든다 —
+# 이 블록은 그 뒤에 있어야 한다.
+cp -a "$src/themes" "$dest/usr/share/cachy-omarchy/upstream/"
+cp -a "$src/default/themed" "$dest/usr/share/cachy-omarchy/upstream/default/"
 # 바·패널 위젯이 bare name 으로 부르는 업스트림 helper 를 verbatim 으로
 # 스테이징한다 (셸 래퍼가 $OMARCHY_PATH/bin 을 셸 프로세스 PATH 에 붙인다).
 # 목록은 위젯 실측에서 나왔다 — M8 평가 문서 "helper 처리 방침" Tier A·B.
