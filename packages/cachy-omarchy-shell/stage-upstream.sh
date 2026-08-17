@@ -35,6 +35,14 @@ cp -a "$src/default/themed" "$dest/usr/share/cachy-omarchy/upstream/default/"
 # omarchy-toggle-enabled 는 theme-set-vscode 의 skip 토글 게이트 — 사용자
 # 상태의 존재만 읽는 1행 테스트라 shim 없이 원본을 둔다 (M9 라이브 실측에서
 # 누락 확인, RUNTIME_STARTUP §18.6).
+# 유틸리티 플러그인 체인 (M10, 설계 문서 §3 Tier A): clipboard/emojis/OSD
+# 오버레이는 이미 기본 로드되고 QML 이 $OMARCHY_PATH/bin 의 helper 를 부른다.
+# clipboard-open 의 launch-browser/editor/tui/hyprland-focus-app 은 전이
+# closure 다. brightness-keyboard-mute 는 이름과 달리 mic-mute LED no-op
+# 가드 helper — audio-input-mute 가 무조건 부르므로 빼면 command not found 가
+# 샌다 (D7). audio-output-switch/audio-tuning, brightness-display 체인은
+# M10 Tier C — pipewire/wireplumber 사용자 설정·서비스 정책과 하드웨어
+# 정책을 끌고 오므로 넣지 않는다.
 for helper in \
   omarchy-menu-select \
   omarchy-cmd-present \
@@ -76,7 +84,21 @@ for helper in \
   omarchy-theme-set-claude \
   omarchy-theme-set-vscode \
   omarchy-theme-set-obsidian \
-  omarchy-toggle-enabled ; do
+  omarchy-toggle-enabled \
+  omarchy-menu-clipboard \
+  omarchy-clipboard-open \
+  omarchy-clipboard-paste-text \
+  omarchy-clipboard-paste-file \
+  omarchy-launch-browser \
+  omarchy-launch-editor \
+  omarchy-launch-tui \
+  omarchy-hyprland-focus-app \
+  omarchy-menu-emoji \
+  omarchy-menu-emoji-insert \
+  omarchy-osd \
+  omarchy-audio-output-volume \
+  omarchy-audio-input-mute \
+  omarchy-brightness-keyboard-mute ; do
   install -D -m755 "$src/bin/$helper" \
     "$dest/usr/share/cachy-omarchy/upstream/bin/$helper"
 done

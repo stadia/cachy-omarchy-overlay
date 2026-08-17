@@ -10,10 +10,15 @@ license=('MIT')
 #   썸네일 부재가 조용하다). procps-ng: pgrep/pkill (restart-btop/helix,
 #   theme-set-foot, cachy-omarchy-shell --run 중복 기동 검사). psmisc: killall
 #   (restart-terminal 의 kitty/ghostty, restart-opencode). (M9, 설계 문서 D8)
-depends=('quickshell' 'hyprland' 'inotify-tools' 'libvips' 'procps-ng' 'psmisc')
+# jq (M10 승격): clipboard history/read/write, reminders timer JSON, OSD payload —
+#   더 이상 theme-hook 전용이 아니다. wl-clipboard: clipboard watcher(wl-paste)
+#   ·copy(wl-copy). wtype: emoji/clipboard 선택 paste. wireplumber: wpctl
+#   (mic mute). pipewire-pulse: pactl (output volume). xdg-utils:
+#   xdg-settings/xdg-mime/xdg-terminal-exec (clipboard-open 의 launch closure).
+depends=('quickshell' 'hyprland' 'inotify-tools' 'libvips' 'procps-ng' 'psmisc'
+         'jq' 'wl-clipboard' 'wtype' 'wireplumber' 'pipewire-pulse' 'xdg-utils')
 makedepends=('git')
 optdepends=(
-  'jq: theme hooks for vscode/pi/claude/obsidian (omarchy-theme-set-*)'
   'tmux: omarchy-theme-set-tmux hook'
   'foot: omarchy-theme-set-foot hook (OSC reload)'
 )

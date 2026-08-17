@@ -32,7 +32,8 @@ if [[ $ASSERT_FAILURES -eq 0 ]]; then
 fi
 
 pkgbuild=$REPO_ROOT/packages/cachy-omarchy-shell/PKGBUILD
-deps=$(grep -E '^depends=' "$pkgbuild")
+# depends= 배열은 여러 줄일 수 있다 — 괄호가 닫힐 때까지 읽는다.
+deps=$(sed -n '/^depends=(/,/)/p' "$pkgbuild")
 for bad in omarchy-settings limine snapper sddm plymouth omarchy-keyring perl; do
   if [[ $deps == *"$bad"* ]]; then
     printf 'FAIL: forbidden dependency %s in %s\n' "$bad" "$deps"
@@ -45,6 +46,25 @@ assert_contains "$deps" "inotify-tools" "depends inotify-tools (§28 실측)"
 assert_contains "$deps" "libvips" "depends libvips (menu-images 썸네일, M9)"
 assert_contains "$deps" "procps-ng" "depends procps-ng (pgrep/pkill, M9)"
 assert_contains "$deps" "psmisc" "depends psmisc (killall, M9)"
+assert_contains "$deps" "jq" "depends jq (M10 승격: clipboard/reminders/OSD)"
+assert_contains "$deps" "wl-clipboard" "depends wl-clipboard (M10 clipboard watcher)"
+assert_contains "$deps" "wtype" "depends wtype (M10 emoji/clipboard paste)"
+assert_contains "$deps" "wireplumber" "depends wireplumber (M10 wpctl mic mute)"
+assert_contains "$deps" "pipewire-pulse" "depends pipewire-pulse (M10 pactl volume)"
+assert_contains "$deps" "xdg-utils" "depends xdg-utils (M10 clipboard-open launch closure)"
+
+# M10: jq 는 hard depends 로 승격됐으므로 optdepends 에 남아 있으면 안 된다.
+optdeps=$(grep -A10 -E '^optdepends=' "$pkgbuild")
+if [[ $optdeps == *"'jq:"* ]]; then
+  printf 'FAIL: jq 가 optdepends 에 잔존 (M10 에서 hard depends 로 승격)\n'
+  ASSERT_FAILURES=$((ASSERT_FAILURES + 1))
+fi
+for bad in tensaku brightnessctl; do
+  if [[ $deps == *"$bad"* ]]; then
+    printf 'FAIL: M10 범위 밖 dependency %s in depends\n' "$bad"
+    ASSERT_FAILURES=$((ASSERT_FAILURES + 1))
+  fi
+done
 printf 'ok:   P02-P04 unsafe deps absent (if no FAIL above)\n'
 
 [[ $ASSERT_FAILURES -eq 0 ]]
