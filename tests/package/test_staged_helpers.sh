@@ -31,6 +31,16 @@ for h in omarchy-audio-output-sink omarchy-monitor-state ; do
   assert_eq "$x" "0" "verbatim: $h 는 업스트림과 바이트 동일"
 done
 
+# Tier B — 기능 단위 묶음. reminders 는 omarchy-shell(우리 compat shim)과
+# systemd 유저 타이머만 쓰고, agents 수집기는 해당 CLI 가 없으면 조용히 빈다.
+for h in omarchy-reminder omarchy-notification-send \
+         omarchy-agent-usage-update omarchy-agent-usage-claude \
+         omarchy-agent-usage-codex omarchy-agent-usage-fireworks ; do
+  assert_file_exists "$bin/$h" "Tier B 스테이징: $h"
+  [[ -x $bin/$h ]] && x=0 || x=1
+  assert_eq "$x" "0" "실행 가능: $h"
+done
+
 # Tier D — 밝기 체인은 넣지 않는다 (brightnessctl/ddcutil 미설치, 꼬리가 길다).
 # omarchy-monitor-state 가 가드하므로 밝기 행만 빈다.
 for h in omarchy-brightness-display omarchy-brightness-display-ddc \

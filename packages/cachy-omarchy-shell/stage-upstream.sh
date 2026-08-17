@@ -11,8 +11,12 @@ install -D -m644 "$src/default/omarchy/omarchy-menu.jsonc" \
   "$dest/usr/share/cachy-omarchy/upstream/default/omarchy/omarchy-menu.jsonc"
 # 바·패널 위젯이 bare name 으로 부르는 업스트림 helper 를 verbatim 으로
 # 스테이징한다 (셸 래퍼가 $OMARCHY_PATH/bin 을 셸 프로세스 PATH 에 붙인다).
-# 목록은 위젯 실측에서 나왔다 — M8 평가 문서 "helper 처리 방침" Tier A.
+# 목록은 위젯 실측에서 나왔다 — M8 평가 문서 "helper 처리 방침" Tier A·B.
 # 앞의 두 개는 M4 키바인딩 UI (cachy-omarchy-keybindings) 도 쓴다.
+# reminder/agent-usage 묶음(Tier B)은 기능 단위로 함께 있어야 성립한다:
+# omarchy-reminder 는 omarchy-notification-send 를 부르고, agents 패널은
+# omarchy-agent-usage-update 가 CLI 별 수집기를 부른다. 수집기는 해당 CLI 가
+# 없으면 조용히 빈다.
 # 밝기 체인(omarchy-brightness-display*, omarchy-hw-display)은 의존 명령이
 # CachyOS 에 없어 넣지 않는다 — omarchy-monitor-state 가 가드한다.
 # omarchy-menu-keybindings 도 넣지 않는다: 데이터 수집을 CachyOS 에 맞춘
@@ -25,7 +29,13 @@ for helper in \
   omarchy-network-status \
   omarchy-network-band \
   omarchy-monitor-state \
-  omarchy-hyprland-monitor-scaling ; do
+  omarchy-hyprland-monitor-scaling \
+  omarchy-reminder \
+  omarchy-notification-send \
+  omarchy-agent-usage-update \
+  omarchy-agent-usage-claude \
+  omarchy-agent-usage-codex \
+  omarchy-agent-usage-fireworks ; do
   install -D -m755 "$src/bin/$helper" \
     "$dest/usr/share/cachy-omarchy/upstream/bin/$helper"
 done
