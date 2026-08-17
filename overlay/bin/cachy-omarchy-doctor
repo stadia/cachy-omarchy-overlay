@@ -304,11 +304,30 @@ if [[ -s $OMARCHY_STATE_DIR/current/theme.name && -f $HYPR_DIR/hyprland.conf ]] 
     warn "theme hyprland.lua not sourced — run: cachy-omarchy-bindings --force"
   fi
 fi
-# jq 는 Tier B 훅(vscode/pi/claude/obsidian)용 optdepends — 없어도 FAIL 아님.
+# M10: jq 는 hard depends 로 승격됐다 (clipboard history, reminders timer JSON,
+# OSD payload). pacman 이 강제하지만 깨진 설치는 여기서 드러나야 한다.
 if command -v jq >/dev/null 2>&1; then
-  pass "jq (vscode/pi/claude/obsidian 테마 훅)"
+  pass "jq (clipboard/reminders/OSD, 테마 훅)"
 else
-  warn "jq missing — vscode/pi/claude/obsidian 테마 훅은 건너뛴다 (pacman -S jq)"
+  warn "jq missing — clipboard history·reminders·OSD·테마 훅이 동작하지 않는다 (pacman -S jq)"
+fi
+
+# M10: clipboard history 존재 공개 (§66 — 사용자가 모를 수 있는 로컬 상태를
+# 알리되 지우는 것은 사용자 몫). upstream Clipboard.qml:20 은 XDG_STATE_HOME 이
+# 아니라 항상 $HOME/.local/state/omarchy 를 쓰므로 doctor 도 그대로 읽는다.
+# 경로와 항목 수만 보고한다 — 항목 내용은 출력도 수정도 하지 않는다.
+clip_history="$HOME/.local/state/omarchy/clipboard-history.json"
+if [[ -e $clip_history ]]; then
+  if ! command -v jq >/dev/null 2>&1; then
+    warn "clipboard history present but not measurable (jq missing)"
+  elif clip_count=$(jq -r 'if type == "array" then length else empty end' "$clip_history" 2>/dev/null) \
+    && [[ -n $clip_count ]]; then
+    pass "clipboard history: $clip_count entries ($clip_history)"
+  else
+    warn "clipboard history unreadable: $clip_history (수정하지 않음 — 필요하면 직접 삭제)"
+  fi
+else
+  warn "clipboard history absent ($clip_history)"
 fi
 
 exit "$failures"

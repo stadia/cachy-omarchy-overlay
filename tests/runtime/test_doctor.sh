@@ -99,7 +99,7 @@ out=$(run_doctor); code=$?
 assert_contains "$out" "PASS: theme hyprland.lua sourced" "source 줄 있으면 PASS"
 mv "$hypr/hyprland.conf.bak" "$hypr/hyprland.conf"
 
-# jq 는 Tier B 훅(vscode/pi/claude/obsidian)용 optdepends — 없어도 FAIL 아님.
+# jq 는 M10 에서 hard depends — 없어도 FAIL 은 아니지만 WARN 으로 드러난다.
 printf '#!/usr/bin/env bash\nexit 0\n' > "$fake_bin/jq"
 chmod +x "$fake_bin/jq"
 out=$(run_doctor); code=$?
@@ -107,10 +107,30 @@ assert_contains "$out" "PASS: jq" "jq 존재는 PASS"
 rm -f "$fake_bin/jq"
 if ! command -v jq >/dev/null 2>&1; then
   out=$(run_doctor); code=$?
-  assert_contains "$out" "WARN: jq missing" "jq 부재는 WARN (optdepends)"
+  assert_contains "$out" "WARN: jq missing" "jq 부재는 WARN (hard depends — 깨진 설치 신호)"
 else
   echo "note: 호스트에 jq 있음 — 부재 분기는 미측정"
 fi
+
+# M10: clipboard history 는 upstream 의 HOME 고정 경로(Clipboard.qml:20)에서만
+# 읽는다. 경로·항목 수만 보고하고 내용은 출력하지 않으며 절대 수정하지 않는다.
+clip_history="$COO_TEST_SANDBOX/.local/state/omarchy/clipboard-history.json"
+out=$(run_doctor); code=$?
+assert_contains "$out" "WARN: clipboard history absent" "history 부재는 명시적 WARN (실패 아님)"
+
+mkdir -p "$(dirname "$clip_history")"
+printf '[{"type":"text","text":"alpha"},{"type":"text","text":"beta"}]\n' >"$clip_history"
+hist_before=$(sha256sum "$clip_history" | awk '{print $1}')
+out=$(run_doctor); code=$?
+assert_contains "$out" "PASS: clipboard history: 2 entries" "유효 history 는 항목 수만 보고"
+assert_eq "$(sha256sum "$clip_history" | awk '{print $1}')" "$hist_before" "doctor 는 history 를 수정하지 않는다"
+if grep -q 'alpha\|beta' <<<"$out"; then x=1; else x=0; fi
+assert_eq "$x" "0" "doctor 는 history 내용을 출력하지 않는다"
+
+printf 'not json\n' >"$clip_history"
+out=$(run_doctor); code=$?
+assert_contains "$out" "WARN: clipboard history unreadable" "깨진 history 는 WARN (수리 시도 없음)"
+rm -f "$clip_history"
 
 out=$(COO_FAKE_PROCESS=1 COO_TEST_WAYLAND_DISPLAY=fixture-wayland run_doctor); code=$?
 assert_eq "$code" 0 "live IPC ping success passes"
