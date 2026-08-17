@@ -494,8 +494,6 @@ Expected content:
 /usr/bin/cachy-omarchy-launcher
 /usr/bin/cachy-omarchy-keybindings
 
-/usr/lib/systemd/user/cachy-omarchy-shell.service
-
 /usr/share/cachy-omarchy/defaults/
 ```
 
@@ -730,9 +728,6 @@ cachy-omarchy-overlay/
 │   │   ├── cachy-omarchy-keybindings
 │   │   └── cachy-omarchy-doctor
 │   │
-│   ├── systemd/
-│   │   └── cachy-omarchy-shell.service
-│   │
 │   ├── defaults/
 │   └── hypr/
 │
@@ -871,11 +866,11 @@ The shell is expected to be long-lived.
 Preferred lifecycle:
 
 ```text
-Hyprland session starts
+Hyprland session starts (hyprland.start event fires once)
         ↓
-systemd --user starts cachy-omarchy-shell.service
+cachy-omarchy-shell --run  (launched via overlay/hypr/bindings.lua)
         ↓
-Quickshell loads upstream shell tree
+Quickshell loads upstream shell tree (inherits Hyprland WAYLAND_DISPLAY)
         ↓
 launcher hotkeys send IPC
 ```
@@ -884,37 +879,27 @@ Benefits:
 
 - fast launcher;
 - warm app index;
-- same lifecycle model as upstream;
-- fewer startup races.
+- matches upstream omarchy's launch model (shell/README.md 193–198);
+- no startup race: the compositor environment is already correct when the
+  shell launches, so the socket-wait workaround is unnecessary.
 
 ---
 
 # 17. User Service
 
-Preferred unit:
+The shell is launched by Hyprland autostart, not a systemd user unit:
 
 ```text
-/usr/lib/systemd/user/cachy-omarchy-shell.service
+/usr/share/cachy-omarchy/hypr/bindings.lua   (autostart: hl.on("hyprland.start", …))
+/usr/bin/cachy-omarchy-shell --run           (wrapper: idempotent guard, QT wayland pin,
+                                             QS_DISABLE_FILE_WATCHER=1, systemd-cat logging)
 ```
 
-Conceptual:
-
-```ini
-[Unit]
-Description=Cachy Omarchy Quattro Shell
-PartOf=graphical-session.target
-After=graphical-session.target
-
-[Service]
-ExecStart=/usr/bin/cachy-omarchy-shell --run
-Restart=on-failure
-RestartSec=1
-
-[Install]
-WantedBy=default.target
-```
-
-Exact target ordering must be validated on CachyOS.
+`--run` is foreground (Hyprland `exec` forks it). `--restart` kills the running
+instance (precise `quickshell -n -p <path>` match) and relaunches detached.
+There is no `Restart=on-failure` (R07 auto-recovery is not provided; recovery is
+manual `--restart`). Migration from the former systemd unit requires
+`cachy-omarchy-bindings --force` to refresh the live bindings copy.
 
 The service must not:
 
