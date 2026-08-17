@@ -33,7 +33,8 @@ done
 for h in omarchy-theme-set-foot omarchy-theme-set-tmux \
          omarchy-theme-set-gnome omarchy-theme-set-pi \
          omarchy-theme-set-claude omarchy-theme-set-vscode \
-         omarchy-theme-set-obsidian ; do
+         omarchy-theme-set-obsidian \
+         omarchy-toggle-enabled ; do
   assert_file_exists "$bin/$h" "Tier B 스테이징: $h"
 done
 

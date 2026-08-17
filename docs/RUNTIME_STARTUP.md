@@ -1483,3 +1483,45 @@ theme-set 경로에서 불필요(감사 실측 — 설계 문서).
   죽은 항목으로 둔다 (D3).
 - 헤드리스 모드는 post 훅 전체를 건너뛴다 — 샌드박스 테스트는 훅을 검증하지
   않는다. 훅 체인의 유일한 검증은 라이브 비헤드리스 실측(§18.6 예정)이다.
+
+### 18.6 라이브 실측 — R06/R07 (2026-08-17)
+
+격리 트리(빌드 아티팩트 추출본)의 셸을 라이브 세션에 띄우고 비헤드리스로
+테마를 적용·전환했다. 헤드리스는 post 훅 전체를 건너뛰므로(설계 문서 R03)
+이 구간이 훅 체인과 no-op shim 의 유일한 실측이다. 절차:
+
+```bash
+coo_extract_pkg "$tmp"; coo_extract_overlay "$ovl"
+env HOME=$H COO_OMARCHY_PATH=$tmp/.../upstream \
+    COO_COMPAT_BIN=$ovl/.../compat/bin \
+    $ovl/usr/bin/cachy-omarchy-shell --run > $H/shell.log 2>&1 &
+env HOME=$H COO_OMARCHY_PATH=... COO_COMPAT_BIN=... \
+    $ovl/usr/bin/cachy-omarchy-theme-set "Tokyo Night" 2>$H/t1.err
+env HOME=$H ... theme-set "Nord" 2>$H/t2.err
+```
+
+결과 (최종 빌드 기준):
+
+| 항목 | 기대 | 실측 |
+| --- | --- | --- |
+| theme-set exit | 0 | 0 (두 번 모두) |
+| `theme.name` | 전환을 따라감 | `tokyo-night` → `nord` |
+| stderr "command not found" | 0 | **0** (두 번 모두, stderr 0바이트) |
+| `shell.log` QML error/exception | 0 | 0 |
+| `hyprctl layers` 의 `omarchy-bar` | 유지 | 유지 (격리 바 1 + 기존 바 1 = 2, kill 후 1 복귀) |
+| 팔레트 일치 | colors.toml == shell.toml | `background #2e3440` 양쪽 일치 (Nord) |
+| background symlink | headless 아니어도 설정 | `→ theme/backgrounds/0-black-moon.jpg` |
+
+**실측 중 발견·수정 1건**: 첫 빌드에서 stderr 에
+`omarchy-theme-set-vscode: omarchy-toggle-enabled: 명령을 찾을 수 없음` 4줄이
+샜다 — Tier B 감사가 놓친 진짜 런타임 의존(vscode 훅의 skip 토글 게이트).
+`omarchy-toggle-enabled` 는 `~/.local/state/omarchy/toggles/<name>` 의 존재만
+검사하는 읽기 전용 1행 스크립트라 shim 이 아니라 원본을 Tier B 에 추가했다
+(no-op shim 은 exit 코드로 의미를 뒤집는다 — `! 토글 &&` 체인이라 exit 0
+shim 은 테마 적용 자체를 꺼버린다). 수정 후 재실측이 위 표다. 같은 방법으로
+스테이징된 40개 helper 의 `omarchy-*` 참조를 전수 대조했고 나머지는 전부
+문자열 리터럴·echo 안내·알림 hint 이름이었다.
+
+shell.log 에 applyTheme 관련 로그는 없다 — Color.qml 은 `colors.toml` 을
+watch 하므로 파일 교체 자체가 전파 경로다(IPC 로그가 없는 게 정상).
+메뉴 `Style > Theme` 의 라이브 확인은 별도 후보로 남긴다.

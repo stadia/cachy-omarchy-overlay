@@ -32,6 +32,9 @@ cp -a "$src/default/themed" "$dest/usr/share/cachy-omarchy/upstream/default/"
 # 테마 체인 (M9): omarchy-theme-set 의 critical path + 배경 묶음 + 메뉴 UI
 # 프론트(omarchy-menu-images). yq 는 핀 커밋에서 불필요 (감사 실측).
 # browser/keyboard/install/update/remove 는 제외 — M9 설계 문서 D3·Tier C.
+# omarchy-toggle-enabled 는 theme-set-vscode 의 skip 토글 게이트 — 사용자
+# 상태의 존재만 읽는 1행 테스트라 shim 없이 원본을 둔다 (M9 라이브 실측에서
+# 누락 확인, RUNTIME_STARTUP §18.6).
 for helper in \
   omarchy-menu-select \
   omarchy-cmd-present \
@@ -72,7 +75,8 @@ for helper in \
   omarchy-theme-set-pi \
   omarchy-theme-set-claude \
   omarchy-theme-set-vscode \
-  omarchy-theme-set-obsidian ; do
+  omarchy-theme-set-obsidian \
+  omarchy-toggle-enabled ; do
   install -D -m755 "$src/bin/$helper" \
     "$dest/usr/share/cachy-omarchy/upstream/bin/$helper"
 done
