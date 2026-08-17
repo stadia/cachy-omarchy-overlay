@@ -63,8 +63,8 @@ assert_eq "$leaked" "0" \
 
 # ---------------------------------------------------------------------------
 # B) 실제 uwsm-app 이 전혀 없으면 -> 오늘까지의 fallback (`--` 벗기고 exec).
-#    같은 자리에 shim 이 스스로 다시 걸려도(자기 자신을 발견해도) 재귀하지
-#    않고 fallback 으로 빠지는지도 이 경로가 증명한다.
+#    이 PATH 에는 shim 자신이 없으므로 자기 재귀 가드는 여기서 발동하지 않는다
+#    — 가드 자체의 검증은 아래 C 절이 담당한다.
 # ---------------------------------------------------------------------------
 narrow_dir="$WORK/narrow-bin"
 mkdir -p "$narrow_dir"
@@ -84,5 +84,35 @@ assert_file_exists "$target_marker" "fallback: -- 벗기고 target 을 직접 ex
 # 대해 돌리면 실패한다 (real uwsm-app 이 없으므로 exec 대상이 없어 nonzero
 # 로 죽거나, 자기 자신을 "실제 구현"으로 오인해 무한 재귀한다 — 5초
 # timeout 이 그 경우를 exit 124 로 잡아낸다).
+
+# ---------------------------------------------------------------------------
+# C) 자기 재귀 가드: PATH 에 shim 을 가리키는 심볼릭 링크가 `uwsm-app` 으로
+#    있으면 그 후보는 건너뛰어야 한다. shim 코멘트대로 비교는 경로 문자열이
+#    아니라 `readlink -f` 로 정규화한 실제 경로로 이뤄지므로, 심볼릭 링크로
+#    배포돼도 자기 자신으로 인식된다. 이 가드 줄(`[[ $resolved == "$self" ]]`)
+#    을 떼어낸 구현은 아래 두 시나리오에서 자기 자신을 exec 하며 무한 재귀에
+#    빠져 timeout(exit 124)이 난다 — 즉 이 절은 가드의 존재 자체를 증명한다.
+# ---------------------------------------------------------------------------
+shimlink_dir="$WORK/shimlink-bin"
+mkdir -p "$shimlink_dir"
+ln -sf "$SHIM" "$shimlink_dir/uwsm-app"
+
+# C-1) 자기 링크 뒤에 실제 uwsm-app 이 있으면 -> 링크를 건너뛰고 위임한다.
+rm -f "$real_marker" "$target_marker"
+out=$(PATH="$shimlink_dir:$real_dir:$BASE_PATH" timeout 5 "$SHIM" -- "$target" 2>&1)
+code=$?
+assert_eq "$code" "0" "자기 링크 건너뜀: shim exit 0 (무한 재귀면 timeout 124)"
+assert_file_exists "$real_marker" "자기 링크 건너뜀: real uwsm-app 에 도달했다"
+assert_eq "$(cat "$real_marker" 2>/dev/null)" "-- $target" \
+  "자기 링크 건너뜀: -- 가 원형 그대로 real uwsm-app 에 전달됐다"
+[[ -f $target_marker ]] && leaked=1 || leaked=0
+assert_eq "$leaked" "0" "자기 링크 건너뜀: shim 이 target 을 직접 exec 하면 안 된다"
+
+# C-2) PATH 에 자기 링크뿐이면 -> 건너뛴 뒤 fallback 으로 빠진다.
+rm -f "$fallback_marker" "$target_marker"
+out=$(PATH="$shimlink_dir:$narrow_dir" timeout 5 "$SHIM" -- "$target" 2>&1)
+code=$?
+assert_eq "$code" "0" "자기 링크뿐: fallback 으로 빠져 exit 0 (무한 재귀 없음)"
+assert_file_exists "$target_marker" "자기 링크뿐: -- 벗기고 target 을 직접 exec 했다"
 
 exit "$ASSERT_FAILURES"
