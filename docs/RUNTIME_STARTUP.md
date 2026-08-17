@@ -220,6 +220,12 @@ esac
    없이 갱신되지 않는다. 해결: `cachy-omarchy-bindings --force` 로 정본 새로고침
    후 재로그인(또는 수동 `cachy-omarchy-shell --run`). `hyprctl reload` 만으로는
    `hyprland.start` 가 재발화하지 않으므로 셸이 뜨지 않는 게 정상이다.
+   참고: `hyprland.start` 트리거의 1회 발화 자체는 아직 실측되지 않았다 —
+   첫 재로그인 시 확인(프로젝트 관행 "문서 < 실측"). 정적 테스트는 이벤트 이름이
+   bindings 파일에 존재함만 검증하며, 실제 발화를 증명하지 않는다. 또, 과거에
+   구 유닛을 수동으로 `enable` 했던 사용자는 `systemctl --user disable
+   cachy-omarchy-shell.service` 로 잔여 `wants/` 심볼릭 링크를 정리해야 한다
+   (pacman 은 유닛 파일은 지우지만 symlink 는 남길 수 있다).
 
 4. **사용자 `~/.config/omarchy/shell.json` 오버라이드** — §2. 우리 기본값이 통째로
    무시될 수 있음. 감지·경고는 M7 doctor 후보.
