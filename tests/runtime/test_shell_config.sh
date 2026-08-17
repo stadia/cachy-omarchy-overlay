@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# 패키지에 스테이징된 기본 shell.json 이 사용자 데스크톱과 충돌하는
-# 플러그인을 끄는지 검증한다. SPEC 4.3 / 17.
+# 패키지 정본 shell.json 이 업스트림 기본값 그대로인지 검증한다.
+# M8 원칙 0: upstream 기본값이 기본, 억제는 실측 충돌이 있을 때만 예외.
 set -uo pipefail
 REPO_ROOT="${REPO_ROOT:?}"
 source "$REPO_ROOT/tests/lib/assert.sh"
@@ -14,28 +14,39 @@ command -v jq >/dev/null || { echo "skip: jq 없음"; exit 0; }
 
 assert_eq "$(jq -r '.version' "$SRC")" "1" "version: 1 (없으면 셸이 무시한다)"
 
-for w in left center right; do
-  assert_eq "$(jq -r ".bar.layout.$w | length" "$SRC")" "0" "bar.layout.$w 비어 있음"
-done
+# 억제 해제: 빈 layout 도 disabledPlugins 도 없다.
+total=$(jq -r '[.bar.layout.left, .bar.layout.center, .bar.layout.right]
+               | map(length) | add' "$SRC")
+assert_eq "$total" "14" "업스트림 기본 layout 14개 위젯"
+assert_eq "$(jq -r 'has("disabledPlugins")' "$SRC")" "false" \
+  "disabledPlugins 키 없음 (11개 전부 해제)"
+assert_eq "$(jq -r '.bar.layout.left[0].id' "$SRC")" "omarchy.menu" \
+  "left 첫 위젯은 omarchy.menu"
 
-# 사용자 데스크톱과 겹치는 플러그인은 반드시 꺼져 있어야 한다.
-for p in omarchy.bar omarchy.notifications omarchy.lock omarchy.osd \
-         omarchy.idle omarchy.polkit omarchy.background; do
-  has=$(jq -r --arg p "$p" '.disabledPlugins | index($p) != null' "$SRC")
-  assert_eq "$has" "true" "$p 비활성"
-done
+# upstream fidelity: 정본은 핀 커밋의 업스트림 파일과 내용이 같아야 한다.
+UPSTREAM_GIT=${COO_OMARCHY_GIT:-$REPO_ROOT/build/omarchy}
+PINNED=$(grep -oP "^_commit='\K[0-9a-f]+" \
+  "$REPO_ROOT/packages/cachy-omarchy-shell/PKGBUILD")
+if [[ -d $UPSTREAM_GIT/.git ]]; then
+  upstream_json=$(git -C "$UPSTREAM_GIT" show \
+    "$PINNED:config/omarchy/shell.json" 2>/dev/null)
+  if [[ -n $upstream_json ]]; then
+    assert_eq "$(jq -S . <<<"$upstream_json")" "$(jq -S . "$SRC")" \
+      "정본 == 핀 커밋 업스트림 기본값 (드리프트 없음)"
+  else
+    echo "note: 핀 커밋에서 shell.json 을 읽지 못함 — 드리프트 검증 생략"
+  fi
+else
+  echo "note: build/omarchy 클론 없음 — 드리프트 검증 생략"
+fi
 
-# 메뉴는 절대 꺼지면 안 된다 — M3 의 런처가 이것이다.
-has=$(jq -r '.disabledPlugins | index("omarchy.menu") != null' "$SRC")
-assert_eq "$has" "false" "omarchy.menu 는 활성 유지"
-
-# 패키지에 실제로 우리 파일이 들어갔는지 (업스트림 것이 아니라)
+# 패키지에 실제로 그 내용이 들어갔는지
 if artifact=$(coo_pkg_artifact); then
   dest="$COO_TEST_SANDBOX/pkg"
   coo_extract_pkg "$dest"
   staged="$(coo_upstream_root "$dest")/config/omarchy/shell.json"
   assert_file_exists "$staged" "스테이징된 shell.json"
-  assert_eq "$(jq -S . "$staged")" "$(jq -S . "$SRC")" "스테이징된 파일 == 우리 정본"
+  assert_eq "$(jq -S . "$staged")" "$(jq -S . "$SRC")" "스테이징된 파일 == 정본"
 else
   echo "note: 아티팩트 없음 — 스테이징 검증 생략"
 fi
