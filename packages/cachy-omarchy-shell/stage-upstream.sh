@@ -29,6 +29,9 @@ cp -a "$src/default/themed" "$dest/usr/share/cachy-omarchy/upstream/default/"
 # omarchy-menu-keybindings 도 넣지 않는다: 데이터 수집을 CachyOS 에 맞춘
 # 우리 적응 카피가 overlay/bin 에 있다. 나머지 업스트림 bin/ 은 전체 OS
 # 가정이라 여전히 넣지 않는다 (docs/COMMAND_AUDIT.md).
+# 테마 체인 (M9): omarchy-theme-set 의 critical path + 배경 묶음 + 메뉴 UI
+# 프론트(omarchy-menu-images). yq 는 핀 커밋에서 불필요 (감사 실측).
+# browser/keyboard/install/update/remove 는 제외 — M9 설계 문서 D3·Tier C.
 for helper in \
   omarchy-menu-select \
   omarchy-cmd-present \
@@ -42,7 +45,27 @@ for helper in \
   omarchy-agent-usage-update \
   omarchy-agent-usage-claude \
   omarchy-agent-usage-codex \
-  omarchy-agent-usage-fireworks ; do
+  omarchy-agent-usage-fireworks \
+  omarchy-theme-set \
+  omarchy-theme-set-templates \
+  omarchy-theme-color \
+  omarchy-theme-list \
+  omarchy-theme-current \
+  omarchy-theme-osc \
+  omarchy-theme-colors-from-alacritty \
+  omarchy-hook \
+  omarchy-restart-terminal \
+  omarchy-restart-hyprctl \
+  omarchy-restart-btop \
+  omarchy-restart-opencode \
+  omarchy-restart-helix \
+  omarchy-menu-images \
+  omarchy-theme-switcher \
+  omarchy-theme-bg-set \
+  omarchy-theme-bg-next \
+  omarchy-theme-bg-current \
+  omarchy-theme-bg-switcher \
+  omarchy-theme-bg-cache ; do
   install -D -m755 "$src/bin/$helper" \
     "$dest/usr/share/cachy-omarchy/upstream/bin/$helper"
 done

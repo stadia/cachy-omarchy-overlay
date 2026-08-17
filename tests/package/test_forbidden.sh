@@ -42,6 +42,9 @@ done
 assert_contains "$deps" "quickshell" "depends quickshell"
 assert_contains "$deps" "hyprland" "depends hyprland"
 assert_contains "$deps" "inotify-tools" "depends inotify-tools (§28 실측)"
+assert_contains "$deps" "libvips" "depends libvips (menu-images 썸네일, M9)"
+assert_contains "$deps" "procps-ng" "depends procps-ng (pgrep/pkill, M9)"
+assert_contains "$deps" "psmisc" "depends psmisc (killall, M9)"
 printf 'ok:   P02-P04 unsafe deps absent (if no FAIL above)\n'
 
 [[ $ASSERT_FAILURES -eq 0 ]]

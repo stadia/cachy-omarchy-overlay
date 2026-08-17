@@ -6,7 +6,11 @@ pkgdesc='Pinned Omarchy Quattro shell runtime for CachyOS (no omarchy-settings)'
 arch=('any')
 url='https://github.com/basecamp/omarchy'
 license=('MIT')
-depends=('quickshell' 'hyprland' 'inotify-tools')
+# libvips: omarchy-menu-images vipsthumbnail (theme/bg picker 미리보기 — 없으면
+#   썸네일 부재가 조용하다). procps-ng: pgrep/pkill (restart-btop/helix,
+#   theme-set-foot, cachy-omarchy-shell --run 중복 기동 검사). psmisc: killall
+#   (restart-terminal 의 kitty/ghostty, restart-opencode). (M9, 설계 문서 D8)
+depends=('quickshell' 'hyprland' 'inotify-tools' 'libvips' 'procps-ng' 'psmisc')
 makedepends=('git')
 _commit='f0020448ca87329199de7cb12f2015ebc4a3e5e7'
 

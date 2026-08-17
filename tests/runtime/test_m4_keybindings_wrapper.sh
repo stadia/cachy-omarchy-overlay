@@ -34,7 +34,10 @@ assert_contains "$src" "printf 'v12" "적응 캐시 스키마는 v12 이다"
 [[ $src == *"printf 'v11"* ]] && v=1 || v=0
 assert_eq "$v" "0" "upstream v11 캐시는 재사용하지 않는다"
 
-# --- 스테이징: 업스트림 bin 헬퍼 두 개만 -----------------------------------
+# --- 스테이징: 이 뷰어가 쓰는 업스트림 bin 헬퍼 ------------------------------
+# (M9 갱신: omarchy-theme-set 체인은 M9 부터 스테이징 대상이다. "나머지 전부
+# 제외" 단언은 유효하지 않으므로, 여전히 제외인 것 — omarchy-menu-keybindings
+# (우리 적응 카피로 대체) 과 Tier C 네트워크 설치 helper — 만 잰다.)
 usrc=${COO_OMARCHY_GIT:-$REPO_ROOT/build/omarchy}
 stage="$COO_TEST_SANDBOX/stage"
 bash "$STAGE" "$usrc" "$stage" "$REPO_ROOT/overlay/defaults"
@@ -43,8 +46,8 @@ assert_file_exists "$root/bin/omarchy-menu-select" "스테이징: omarchy-menu-s
 assert_file_exists "$root/bin/omarchy-cmd-present" "스테이징: omarchy-cmd-present"
 [[ -e $root/bin/omarchy-menu-keybindings ]] && s=1 || s=0
 assert_eq "$s" "0" "스테이징: 업스트림 omarchy-menu-keybindings 는 넣지 않는다"
-[[ -e $root/bin/omarchy-theme-set ]] && s=1 || s=0
-assert_eq "$s" "0" "스테이징: 나머지 업스트림 bin 은 넣지 않는다"
+[[ -e $root/bin/omarchy-theme-install ]] && s=1 || s=0
+assert_eq "$s" "0" "스테이징: Tier C (네트워크 설치) 는 넣지 않는다"
 
 # A fake shell makes pre-flight and compat tests independent from real qs.
 fake_shell="$COO_TEST_SANDBOX/fake-cachy-omarchy-shell"
