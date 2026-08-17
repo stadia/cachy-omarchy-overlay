@@ -88,6 +88,8 @@ cmd_restart() {
   require_tree
   # 정밀 매칭: qs ipc 프로세스(qs ipc -n -p <경로> call)는 cmdline 에
   # "quickshell -n -p <경로>" 가 없으므로 false positive 안 남(#5).
+  # 이 패턴은 systemd-cat 부모(systemd-cat -t cachy-omarchy-shell -- quickshell -n -p <경로>)
+  # 도 의도적으로 같이 잡아 --restart 가 부모·자식 모두를 죽이게 한다(버그 아님).
   local pat="quickshell -n -p $OMARCHY_PATH/shell"
   local pids n=0
   pids=$(pgrep -f "$pat" 2>/dev/null || true)
@@ -99,6 +101,12 @@ cmd_restart() {
     pids=$(pgrep -f "$pat" 2>/dev/null || true)
     [[ -n $pids ]] && kill -KILL $pids 2>/dev/null || true
   fi
+  # KILL/TERM 후 pgrep 에서 완전히 사라질 때까지 잠깐 대기 — cmd_run 멱등 가드가
+  # 죽어가는 프로세스를 보고 no-op 하는 reap race 방지.
+  n=0
+  while pgrep -f "$pat" >/dev/null 2>&1 && (( n < 10 )); do
+    sleep 0.05; n=$((n + 1))
+  done
   # cmd_run 을 재사용(자체 멱등 가드·Qt 핀·file-watcher off·systemd-cat 로깅).
   # detached 로 띄워 명령이 반환하게 한다.
   setsid "$0" --run </dev/null >/dev/null 2>&1 &
