@@ -38,28 +38,20 @@ require_tree() {
 
 cmd_run() {
   require_tree
+  # 수동 --run 이중 기동 방지(autostart 는 hyprland.start 1회라 무관하지만 수동
+  # 실행 보호). 정밀 매칭: 실제 quickshell 실행 cmdline 을 잡고, qs ipc 프로세스
+  # (qs ipc -n -p <경로> call)는 false positive 안 남(#5).
+  if pgrep -f "quickshell -n -p $OMARCHY_PATH/shell" >/dev/null 2>&1; then
+    exit 0
+  fi
   # compat shim 은 셸 프로세스에만 보이게 한다. 사용자의 일반 PATH 를
   # 오염시키지 않는다 (SPEC 44, 45).
   [[ -d $COMPAT_BIN ]] && export PATH="$COMPAT_BIN:$PATH"
 
-  # uwsm/graphical-session.target 이 컴포저터가 WAYLAND_DISPLAY 를 systemd 유저
-  # 매니저에 올리기 전 — 또는 이전 세션의 낡은 값으로 — 우리를 띄울 수 있다.
-  # 그 상태로 quickshell(Qt)을 시작하면 wayland 소켓에 연결하지 못하고 xcb 로
-  # 폴백해 크래시한다(시작 84ms 만에 start-limit). 권위 있는(post-propagation)
-  # 값이 살아 있는 소켓을 가리킬 때까지 기다린 뒤 Qt 를 wayland 에 고정한다.
-  local wd wd_man cand
-  wd=
-  for _ in $(seq 1 80); do
-    wd_man=$(systemctl --user show-environment 2>/dev/null \
-      | sed -n 's/^WAYLAND_DISPLAY=//p' | head -1)
-    for cand in "$wd_man" "${WAYLAND_DISPLAY:-}"; do
-      [[ -n $cand && -S $XDG_RUNTIME_DIR/$cand ]] && { wd=$cand; break 2; }
-    done
-    sleep 0.25
-  done
-  [[ -n $wd && -S $XDG_RUNTIME_DIR/$wd ]] \
-    || fail "Wayland 세션 소켓을 기다릴 수 없다 (WAYLAND_DISPLAY 미전파 또는 낡은 값)"
-  export WAYLAND_DISPLAY=$wd QT_QPA_PLATFORM=wayland
+  # Qt 를 wayland 에 고정(방어적 — xcb 폴백 차단). Hyprland autostart(hyprland.start)
+  # 로 기동하면 WAYLAND_DISPLAY 가 컴포저터 env 로 항상 정상이라 socket-wait 는
+  # 불필요해 제거됐다. 세션 터미널 전제(SPEC §16).
+  export QT_QPA_PLATFORM=wayland
 
   # 파일 워처를 끄는 것은 필수다. pacman 이 $OMARCHY_PATH/shell 을 다시 쓰는
   # 도중 리로드가 걸리면 반쯤 쓰인 트리를 읽고, 실패한 리로드가 두 번째 엔진
