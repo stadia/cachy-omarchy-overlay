@@ -115,6 +115,23 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-shell osd ...` | AppLibrary 런치 OSD | OPTIONAL | osd 플러그인 정책에 따름 |
 | `omarchy-osd` | osd 패널 | M10: stage | `omarchy-shell -q osd show <jq payload>` 얇은 프런트. volume/mic-mute helper 와 함께 채택, display brightness 체인은 제외 (M10 D6) |
 
+### M10 스테이징 목록 (verbatim, `$OMARCHY_PATH/bin`)
+
+`packages/cachy-omarchy-shell/stage-upstream.sh` 와 1:1 대응 — 회귀는
+`tests/package/test_staged_plugin_helpers.sh` + `test_makepkg.sh` 가 단언한다.
+
+| helper | plugin | class | note |
+| --- | --- | --- | --- |
+| `omarchy-menu-clipboard` | clipboard | SAFE | `shell toggle omarchy.clipboard` 얇은 프런트 |
+| `omarchy-clipboard-paste-text` / `-paste-file` | clipboard | SAFE | 선택 시에만 `wl-copy`/`wtype` (D4). `wtype || true` 는 선언된 upstream 예외 (P08 범위 밖) |
+| `omarchy-clipboard-open` | clipboard | SAFE | URL→launch-browser, text→launch-editor, image→`tensaku-edit`(미설치 시 명시적 127) |
+| `omarchy-launch-browser` / `-editor` / `-tui` / `omarchy-hyprland-focus-app` | clipboard 전이 closure | SAFE | xdg-utils(hard depends) + uwsm-app compat 사용 |
+| `omarchy-menu-emoji` / `-emoji-insert` | emojis | SAFE | 선택 시 copy+type 1회, 취소 무부작용 |
+| `omarchy-osd` | osd | SAFE | 직접 IPC 프런트. shell 실패는 non-zero 전파 |
+| `omarchy-audio-output-volume` / `-input-mute` | osd audio bridge | SAFE | pactl(pipewire-pulse)/wpctl(wireplumber). debounce 파일은 runtime dir |
+| `omarchy-brightness-keyboard-mute` | input-mute closure | SAFE | mic-mute LED 가드. LED/brightnessctl 부재 시 no-op |
+| (제외) `omarchy-audio-output-switch` / `-tuning`, `omarchy-brightness-display*`, `omarchy-hw-display`, `omarchy-system-*` | — | DISABLED | M10 Tier C — pipewire/wireplumber 사용자 설정·서비스 정책, 하드웨어 밝기, power 정책 |
+
 ---
 
 ## 정책

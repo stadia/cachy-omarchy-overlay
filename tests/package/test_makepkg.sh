@@ -21,6 +21,21 @@ if [[ -f $shell_artifact ]]; then
   list=$(bsdtar -tf "$shell_artifact")
   assert_contains "$list" "usr/share/cachy-omarchy/upstream/shell/shell.qml" "shell artifact has shell.qml"
   assert_contains "$list" "usr/share/cachy-omarchy/upstream/shell/plugins/menu/manifest.json" "shell artifact has menu plugin"
+  # M10: 스테이징 스크립트 단언만으로는 부족하다 — 실제 아티팩트에도 들어갔는지 단언한다.
+  for h in omarchy-menu-clipboard omarchy-clipboard-open omarchy-clipboard-paste-text \
+           omarchy-clipboard-paste-file omarchy-launch-browser omarchy-launch-editor \
+           omarchy-launch-tui omarchy-hyprland-focus-app omarchy-menu-emoji \
+           omarchy-menu-emoji-insert omarchy-osd omarchy-audio-output-volume \
+           omarchy-audio-input-mute omarchy-brightness-keyboard-mute; do
+    assert_contains "$list" "usr/share/cachy-omarchy/upstream/bin/$h" "shell artifact has M10 helper: $h"
+  done
+  for h in omarchy-audio-output-switch omarchy-audio-tuning omarchy-brightness-display; do
+    if [[ $list == *"upstream/bin/$h"* ]]; then
+      printf 'FAIL: M10 Tier C helper leaked into artifact: %s\n' "$h"
+      ASSERT_FAILURES=$((ASSERT_FAILURES + 1))
+    fi
+  done
+  printf 'ok:   M10 Tier C helpers absent from artifact (if no FAIL above)\n'
 fi
 if [[ -f $overlay_artifact ]]; then
   list=$(bsdtar -tf "$overlay_artifact")

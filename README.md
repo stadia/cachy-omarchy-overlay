@@ -17,8 +17,8 @@ SUPER + K      →  Omarchy 스타일 키바인딩 뷰어
 
 | 패키지 | 버전 | 역할 |
 |---|---|---|
-| `cachy-omarchy-shell` | 4.0.0-2 | 핀된 Omarchy Quattro 셸 런타임 (Quickshell 트리, `omarchy-settings` 제외) |
-| `cachy-omarchy-overlay` | 0.1.1-1 | CachyOS 통합 계층 (래퍼 명령, Hyprland 바인딩, 기본값) |
+| `cachy-omarchy-shell` | 4.0.0-4 | 핀된 Omarchy Quattro 셸 런타임 (Quickshell 트리, `omarchy-settings` 제외) |
+| `cachy-omarchy-overlay` | 0.3.0-1 | CachyOS 통합 계층 (래퍼 명령, Hyprland 바인딩, 기본값) |
 
 업스트림 핀은 `upstream.lock`이 관리한다 (현재 `basecamp/omarchy @ v4.0.0`,
 `f0020448`).
@@ -65,9 +65,11 @@ helper 와 런타임 의존성(`jq`, `wl-clipboard`, `wtype`, `wireplumber`,
 - **Reminders** — `omarchy-reminder -i`/메뉴에서 설정. user systemd 타이머
   (`omarchy-reminder-*.timer`)와 `${XDG_RUNTIME_DIR:-/tmp}/omarchy-reminders/`
   메타데이터만 사용한다 — system 유닛·`/etc`·root 없음.
-- **OSD** — `omarchy-osd` 직접 호출과 볼륨/마이크 뮤트 helper 가 upstream
-  `omarchy.osd` 패널을 띄운다. XF86 미디어 키 바인딩은 주입하지 않는다 —
-  도달 경로는 명시적 CLI/메뉴뿐이다 (화면 밝기 체인은 범위 밖).
+- **OSD** — 볼륨/마이크 뮤트 helper 와 `omarchy-osd` 가 upstream `omarchy.osd`
+  패널을 띄운다. 이 helper 들은 `$OMARCHY_PATH/bin` 아래 스테이징되며 일반
+  사용자 PATH 에는 없다 — 직접 호출하려면 셸 환경의 PATH(셸이 붙이는 경로)나
+  절대 경로가 필요하다. XF86 미디어 키 바인딩은 주입하지 않는다 — 도달 경로는
+  명시적 CLI/메뉴뿐이다 (화면 밝기 체인은 범위 밖).
 
 ## 기동 모델
 

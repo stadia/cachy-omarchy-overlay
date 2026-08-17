@@ -130,7 +130,17 @@ assert_eq "$x" "0" "doctor 는 history 내용을 출력하지 않는다"
 printf 'not json\n' >"$clip_history"
 out=$(run_doctor); code=$?
 assert_contains "$out" "WARN: clipboard history unreadable" "깨진 history 는 WARN (수리 시도 없음)"
-rm -f "$clip_history"
+
+# M10 회귀: XDG_STATE_HOME 을 HOME 과 의도적으로 다르게 둬도 doctor 는 upstream
+# Clipboard.qml:20 의 HOME 고정 경로를 읽어야 한다 — XDG 경로로 우회하면 안 된다.
+xdg_elsewhere=$COO_TEST_SANDBOX/xdg-elsewhere
+mkdir -p "$xdg_elsewhere/omarchy"
+printf '[{"type":"text","text":"gamma"}]\n' >"$clip_history"
+printf '[]\n' >"$xdg_elsewhere/omarchy/clipboard-history.json"
+out=$(XDG_STATE_HOME="$xdg_elsewhere" run_doctor); code=$?
+assert_contains "$out" "PASS: clipboard history: 1 entries" "XDG_STATE_HOME 분기: HOME 고정 경로를 읽는다"
+assert_contains "$out" "$clip_history" "XDG_STATE_HOME 분기: 보고 경로가 HOME 기반"
+rm -f "$clip_history" "$xdg_elsewhere/omarchy/clipboard-history.json"
 
 out=$(COO_FAKE_PROCESS=1 COO_TEST_WAYLAND_DISPLAY=fixture-wayland run_doctor); code=$?
 assert_eq "$code" 0 "live IPC ping success passes"

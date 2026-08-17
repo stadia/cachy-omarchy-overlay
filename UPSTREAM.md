@@ -55,19 +55,23 @@
 
 ### `cachy-omarchy-overlay` (`packages/cachy-omarchy-overlay/stage-overlay.sh`)
 
-업스트림 소스가 아니라 이 레포에서 새로 작성한 CachyOS 통합 레이어. 실측 소유 경로
-11개(`docs/RUNTIME_STARTUP.md` §9.1)는 다음 다섯 범주다:
+업스트림 소스가 아니라 이 레포에서 새로 작성한 CachyOS 통합 레이어. 현재 아티팩트의
+소유 파일 15개(2026-08-17 `bsdtar -tf` 실측)는 다음 네 범주다:
 
-- `usr/bin/cachy-omarchy-{shell,launcher,keybindings,bindings,init}` — 공개 명령 5개.
-- `usr/lib/cachy-omarchy/compat/bin/{omarchy-shell,uwsm-app}` — compat shim. `/usr/bin`
-  에는 절대 설치하지 않는다(§44).
-- `usr/lib/systemd/user/cachy-omarchy-shell.service` — 유저 유닛. system 유닛은 소유하지
-  않는다.
+- `usr/bin/cachy-omarchy-{shell,launcher,keybindings,bindings,init,doctor,theme-set}`
+  — 공개 명령 7개.
+- `usr/lib/cachy-omarchy/compat/bin/{omarchy-shell,uwsm-app,omarchy-update-available,
+  omarchy-theme-set-browser,omarchy-theme-set-keyboard}` — compat shim 5개.
+  `/usr/bin` 에는 절대 설치하지 않는다(§44).
 - `usr/share/cachy-omarchy/defaults/shell.json` — `cachy-omarchy-init` 가 최초 실행 시
   사용자 설정으로 복사하는 정본. `cachy-omarchy-shell` 패키지의 스테이징된 기본값과
   내용이 동일하다(`test_installed_tree.sh` 가 `jq -S` 로 비교).
 - `usr/share/cachy-omarchy/hypr/{bindings.conf,bindings.lua}` — `cachy-omarchy-bindings`
   가 사용자 `~/.config/cachy-omarchy/hypr/` 로 복사하는 소스.
+
+systemd 유저 유닛은 기동 전환(§"Milestone 8 — Shell Autostart", RUNTIME_STARTUP §16)
+으로 제거됐다 — 더 이상 소유하지 않는다. 과거 11개 시점의 실측은
+`docs/RUNTIME_STARTUP.md` §9.1 의 역사 기록이다.
 
 `cachy-omarchy-init` 는 post-install 훅이 아니라 사용자가 직접 실행하는 유저 레벨
 헬퍼다(SPEC §38) — 상세 계약은 `docs/RUNTIME_STARTUP.md` §9.2.
