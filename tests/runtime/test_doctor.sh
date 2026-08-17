@@ -76,6 +76,42 @@ assert_contains "$out" "WARN: IPC ping not measurable" "absent process leaves IP
 assert_contains "$(cat "$pacman_log")" "omarchy" "doctor queries official omarchy package"
 assert_contains "$(cat "$pacman_log")" "omarchy-settings" "doctor queries official omarchy-settings package"
 
+# M9: 테마 런타임 점검. 부재는 §66 상 실패가 아니라 WARN, 존재는 PASS.
+# (run_doctor 는 COO_OMARCHY_STATE_DIR 를 안 세우므로 기본값
+#  $XDG_STATE_HOME/omarchy = 샌드박스 경로를 탄다.)
+omarchy_state=$COO_TEST_SANDBOX/.local/state/omarchy
+assert_contains "$out" "WARN: no theme set" "테마 부재는 명시적 WARN (실패 아님)"
+
+mkdir -p "$omarchy_state/current"
+printf 'tokyo-night\n' > "$omarchy_state/current/theme.name"
+out=$(run_doctor); code=$?
+assert_contains "$out" "PASS: theme: tokyo-night" "테마 존재는 PASS"
+
+# 구형 conf 주입: 테마가 있는데 관리 블록에 theme source 줄이 없으면 WARN.
+cp "$hypr/hyprland.conf" "$hypr/hyprland.conf.bak"
+printf '# >>> cachy-omarchy >>>\nsource = %s/bindings.conf\n# <<< cachy-omarchy <<<\n' \
+  "$config/hypr" >> "$hypr/hyprland.conf"
+out=$(run_doctor); code=$?
+assert_contains "$out" "WARN: theme hyprland.lua not sourced" "구형 주입은 명시적 WARN"
+printf 'source = %s/.local/state/omarchy/current/theme/hyprland.lua\n' "$COO_TEST_SANDBOX" \
+  >> "$hypr/hyprland.conf"
+out=$(run_doctor); code=$?
+assert_contains "$out" "PASS: theme hyprland.lua sourced" "source 줄 있으면 PASS"
+mv "$hypr/hyprland.conf.bak" "$hypr/hyprland.conf"
+
+# jq 는 Tier B 훅(vscode/pi/claude/obsidian)용 optdepends — 없어도 FAIL 아님.
+printf '#!/usr/bin/env bash\nexit 0\n' > "$fake_bin/jq"
+chmod +x "$fake_bin/jq"
+out=$(run_doctor); code=$?
+assert_contains "$out" "PASS: jq" "jq 존재는 PASS"
+rm -f "$fake_bin/jq"
+if ! command -v jq >/dev/null 2>&1; then
+  out=$(run_doctor); code=$?
+  assert_contains "$out" "WARN: jq missing" "jq 부재는 WARN (optdepends)"
+else
+  echo "note: 호스트에 jq 있음 — 부재 분기는 미측정"
+fi
+
 out=$(COO_FAKE_PROCESS=1 COO_TEST_WAYLAND_DISPLAY=fixture-wayland run_doctor); code=$?
 assert_eq "$code" 0 "live IPC ping success passes"
 assert_contains "$out" "PASS: IPC ping" "doctor performs bounded read-only IPC ping"
