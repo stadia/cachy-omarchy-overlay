@@ -36,6 +36,14 @@
   스테이징. Tier C(네트워크 설치·/etc 쓰기·하드웨어 전용)는 제외하고, 그중
   `omarchy-theme-set-browser`·`-keyboard` 는 오버레이의 no-op compat shim 이
   대신 메운다(SPEC "Milestone 9 — Theme Runtime").
+- 유틸리티 플러그인 helper (M10) — clipboard(`omarchy-menu-clipboard`,
+  `omarchy-clipboard-{open,paste-text,paste-file}` + launch browser/editor/tui/
+  focus-app 전이 closure), emojis(`omarchy-menu-emoji{,-insert}`),
+  OSD(`omarchy-osd` + `omarchy-audio-output-volume`/`omarchy-audio-input-mute` +
+  mic-LED 가드 `omarchy-brightness-keyboard-mute`). `omarchy-audio-output-switch`/
+  `omarchy-audio-tuning`(pipewire·wireplumber 사용자 설정/서비스 정책)과 display
+  brightness 체인은 Tier C — 넣지 않는다 (SPEC "Milestone 10 — Utility Plugin
+  Runtime", 설계 문서 §3).
 - `version` (핀 표시·doctor)
 - `default/omarchy/omarchy-menu.jsonc` (메뉴 정의)
 - `config/omarchy/shell.json` — **업스트림 것이 아니라 우리 기본값**(`overlay/defaults/shell.json`).
@@ -72,7 +80,10 @@
 - 공식 `bin/` 전체의 `/usr/bin` 설치
 - 테마 Tier C helper(`omarchy-theme-install/update/remove`, plymouth/browser/
   keyboard 훅)의 스테이징 — M9 부터 나머지 테마 워크플로는 채택했다
-- 락/OSD/알림의 기본 활성
+- M10 Tier C helper(`omarchy-audio-output-switch`, `omarchy-audio-tuning`,
+  `omarchy-brightness-display*`, `omarchy-hw-display`, power/system helper)의
+  스테이징과 XF86 media 키의 자동 주입
+- 락/알림의 기본 활성 (OSD 패널은 M10 에서 채택 — direct CLI/audio helper 경로만)
 
 ## Minimum safe subset
 

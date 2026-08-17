@@ -113,6 +113,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-battery-low` / `omarchy-powerprofiles-set` | battery | DISABLED | disable plugin |
 | `omarchy-notification-send` | 여러 패널 | DISABLED until notifications ENABLE | disable |
 | `omarchy-shell osd ...` | AppLibrary 런치 OSD | OPTIONAL | osd 플러그인 정책에 따름 |
+| `omarchy-osd` | osd 패널 | M10: stage | `omarchy-shell -q osd show <jq payload>` 얇은 프런트. volume/mic-mute helper 와 함께 채택, display brightness 체인은 제외 (M10 D6) |
 
 ---
 
@@ -220,7 +221,7 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-launch-screensaver` | DISABLED | disable | 공식 런처/웹앱/플로팅 터미널 |
 | `omarchy-launch-webapp` | DISABLED | disable | 공식 런처/웹앱/플로팅 터미널 |
 | `omarchy-menu` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-menu-emoji` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-menu-emoji` | SAFE | package | M10: verbatim stage (`shell toggle omarchy.emojis`) + `omarchy-menu-emoji-insert` closure. wtype/wl-copy 는 hard depends |
 | `omarchy-menu-herdr-keybindings` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-menu-keybindings` | ADAPTED | wrapper | M4 SUPER+K → `cachy-omarchy-keybindings`. compat 에 같은 이름의 shim 을 두지 않으므로 메뉴 행 실행은 여전히 실패(범위는 SUPER+K 만) |
 | `omarchy-menu-plugin` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
@@ -243,7 +244,7 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-refresh-plymouth` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-refresh-shell` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-refresh-tmux` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-reminder` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-reminder` | SAFE | package | M8 부터 stage. user systemd timer + `${XDG_RUNTIME_DIR:-/tmp}/omarchy-reminders` metadata 만 사용 (M10 계약 고정) |
 | `omarchy-remove-browser` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
 | `omarchy-remove-dev-env` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
 | `omarchy-remove-gaming-battlenet` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |

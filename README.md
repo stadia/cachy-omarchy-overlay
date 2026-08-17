@@ -46,6 +46,29 @@ cachy-omarchy-theme-set "Nord"     # 전환 — 셸 재시작 없이 바·메뉴
 `~/.local/state/omarchy/current/theme/` 에 있고, 사용자 오버레이
 (`~/.config/omarchy/themes/<name>/`)가 패키지 테마 위에 합쳐진다.
 
+## 유틸리티 플러그인 (M10)
+
+업스트림 first-party 플러그인 다섯 개 — clipboard·emojis·image-picker·
+reminders·OSD — 는 업스트림 규칙상 기본 로드된다. M10 은 그 QML 이 부르는
+helper 와 런타임 의존성(`jq`, `wl-clipboard`, `wtype`, `wireplumber`,
+`pipewire-pulse`, `xdg-utils`)을 패키지가 닫는다.
+
+- **Clipboard** — 메뉴의 clipboard 항목 또는 `omarchy.clipboard` 토글. 히스토리는
+  업스트림과 같은 `~/.local/state/omarchy/clipboard-history.json` (최대 300개,
+  로컬 전용)에 기록되며, 민감한 selection(비밀번호 관리자 hint 등)은 저장하지
+  않는다. `cachy-omarchy-doctor` 가 경로와 항목 수를 읽기 전용으로 보고한다.
+  지우는 것은 사용자의 명시 동작뿐이다.
+- **Emojis** — 메뉴의 Emoji 항목. 선택한 emoji 를 clipboard 에 넣고 focused 앱에
+  한 번 붙여넣는다. 취소는 아무 side effect 도 없다.
+- **Image picker** — 테마/배경 선택 등에 쓰이는 업스트림 image-grid (M9 의
+  `omarchy-menu-images` 경로 그대로).
+- **Reminders** — `omarchy-reminder -i`/메뉴에서 설정. user systemd 타이머
+  (`omarchy-reminder-*.timer`)와 `${XDG_RUNTIME_DIR:-/tmp}/omarchy-reminders/`
+  메타데이터만 사용한다 — system 유닛·`/etc`·root 없음.
+- **OSD** — `omarchy-osd` 직접 호출과 볼륨/마이크 뮤트 helper 가 upstream
+  `omarchy.osd` 패널을 띄운다. XF86 미디어 키 바인딩은 주입하지 않는다 —
+  도달 경로는 명시적 CLI/메뉴뿐이다 (화면 밝기 체인은 범위 밖).
+
 ## 기동 모델
 
 셸은 systemd 유닛이 아니라 **Hyprland autostart**로 뜬다 — 업스트림 omarchy와 같은
@@ -95,6 +118,9 @@ bin/rollback                 # 이전 핀으로 복귀
   `themes/`+`default/themed/`+테마 helper 를 같은 핀에서 스테이징하고,
   `cachy-omarchy-theme-set` 래퍼로 업스트림 `omarchy-theme-set` 을 무패치
   실행한다. 실측: `docs/RUNTIME_STARTUP.md` §18.6.
+- **v0.4 (Milestone 10)** — 유틸리티 플러그인(clipboard·emojis·image-picker·
+  reminders·OSD) helper/의존성 채택. 진행 중. 설계·플랜:
+  `docs/superpowers/plans/2026-08-17-m10-utility-plugins-design.md`.
 
 ## 라이선스
 

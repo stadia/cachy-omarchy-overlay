@@ -2231,6 +2231,46 @@ load in `bindings.lua`; conditional `source =` line in the conf snippet).
 
 ---
 
+# Milestone 10 — Utility Plugin Runtime
+
+*(번호 없는 절 — M8·M9 와 같은 방식.)*
+
+Close the helper and dependency contract for the five first-party utility
+plugins that upstream default-enables (`omarchy.clipboard`, `omarchy.emojis`,
+`omarchy.image-picker`, `omarchy.reminders`, `omarchy.osd`). The decision
+record is `docs/superpowers/plans/2026-08-17-m10-utility-plugins-design.md`
+(D1–D7, P01–P10); in short:
+
+- These plugins are already loaded — `plugins: []` plus absent
+  `disabledPlugins` means first-party non-bar plugins default-enable
+  (upstream rule). M10 stages no plugin toggle and patches no QML; it stages
+  the verbatim helper closures the QML already calls.
+- Clipboard history is upstream local state only:
+  `$HOME/.local/state/omarchy/clipboard-history.json` (HOME-fixed, not
+  XDG_STATE_HOME — Clipboard.qml:20) plus hashed image files, capped at 300
+  entries, with sensitive selections never persisted. `cachy-omarchy-doctor`
+  discloses path and entry count read-only; clearing remains the user's
+  explicit action (§66).
+- Typing/paste (`wtype`) happens only after an explicit overlay selection.
+  The upstream paste helpers swallow `wtype` failures (`|| true`); under D1
+  that is a declared exception — P08 governs missing dependencies and helper
+  closures (`command not found`), not this upstream behavior.
+- Reminders use `systemd-run --user` timers named `omarchy-reminder-*` with
+  metadata in `${XDG_RUNTIME_DIR:-/tmp}/omarchy-reminders/` — runtime dir,
+  not state dir, and verbatim so it stays that way. No system units, /etc,
+  or root.
+- OSD adoption is the direct `omarchy-osd` IPC plus the volume/mic-mute
+  audio bridge (`pactl`/`wpctl`). `omarchy-audio-output-switch` is excluded
+  because `omarchy-audio-tuning` writes pipewire/wireplumber user config and
+  manages user services. The display-brightness chain stays out; the
+  mic-mute LED helper (`omarchy-brightness-keyboard-mute`) is a guarded
+  no-op without `/sys/class/leds/platform::micmute` and ships verbatim.
+  No XF86 media key is injected into the managed bindings — audio helpers
+  are reachable only via explicit CLI/menu paths until a future milestone
+  audits real user binds and gets approval.
+
+---
+
 # 61. v0.1 Acceptance Criteria
 
 All must be true:

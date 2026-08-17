@@ -1525,3 +1525,46 @@ shim 은 테마 적용 자체를 꺼버린다). 수정 후 재실측이 위 표�
 shell.log 에 applyTheme 관련 로그는 없다 — Color.qml 은 `colors.toml` 을
 watch 하므로 파일 교체 자체가 전파 경로다(IPC 로그가 없는 게 정상).
 메뉴 `Style > Theme` 의 라이브 확인은 별도 후보로 남긴다.
+
+---
+
+## 19. M10 — 유틸리티 플러그인 채택 (2026-08-17)
+
+### 19.1 범위와 단위 증거
+
+대상: `omarchy.clipboard`, `omarchy.emojis`, `omarchy.image-picker`,
+`omarchy.reminders`, `omarchy.osd` — 전부 first-party·`keepLoaded: true`·
+`disabledPlugins` 미등재라 **이미 기본 로드**다. M10 의 변경은 QML 이나
+`shell.json` 이 아니라 helper closure 14개의 verbatim stage + 런타임 의존성
+승격(`jq`, `wl-clipboard`, `wtype`, `wireplumber`, `pipewire-pulse`,
+`xdg-utils`)이다. 상세는 M10 설계 문서(D1–D7)와 플랜.
+
+단위 증거 (전부 sandbox HOME + fake 명령, 실 세션 무접촉):
+
+- `tests/package/test_staged_plugin_helpers.sh` — 14개 stage·executable·
+  바이트 동일, Tier C(switch/tuning/brightness-display/power) 미스테이징,
+  P01 회귀(`disabledPlugins` 부재·`plugins: []`·다섯 manifest `keepLoaded`).
+- `tests/runtime/test_clipboard_helpers.sh` — capture text/image JSON, 민감
+  selection·KDE password hint 미저장(D3), copy-only vs typed paste side
+  effect(D4), malformed index non-zero, clipboard-open 의 browser/editor/
+  tensaku-edit 라우팅.
+- `tests/runtime/test_emoji_helpers.sh` — 선택 시 copy+type 정확히 1회,
+  취소 시 side effect 0.
+- `tests/runtime/test_reminder_helper.sh` — create→`show --json`→clear 가
+  `omarchy-reminder-*` user timer 와 `${XDG_RUNTIME_DIR:-/tmp}/omarchy-reminders/`
+  metadata 만 만진다 (omarchy-reminder:185 — state dir 가 아니라 runtime dir).
+- `tests/runtime/test_osd_helpers.sh` — `omarchy-osd` payload·shell 실패
+  전파, volume(pactl)·input-mute(wpctl) 경로, `brightness-keyboard-mute`
+  mic-LED no-op 가드.
+- `tests/runtime/test_bindings.sh` — 관리 바인딩 소스에 XF86/audio/brightness
+  키가 없음(D6). audio helper 의 도달 경로는 CLI/메뉴뿐이다.
+- `tests/runtime/test_doctor.sh` — clipboard history 경로·항목 수 읽기 전용
+  보고(내용 미출력·미수정), 경로는 Clipboard.qml:20 의 HOME 고정 경로.
+
+### 19.2 라이브 실측 (예약)
+
+TODO(M10 Task 7): 사용자 고지 후 진행. clipboard capture/clear, emoji
+격리 타깃 type, image-picker summon/cancel, reminder user timer
+create/list/clear, `omarchy-osd` direct + audio helper 의 패널 표시·자동
+숨김·QML error 0 을 기록한다. XF86 키 주입·display brightness 변경은
+범위 밖 — 그 증거는 여기에 섞지 않는다.
