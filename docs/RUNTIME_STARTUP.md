@@ -1267,12 +1267,9 @@ $ journalctl --user -u mako.service --since today | grep -c Started
   `.INSTALL` 스크립트 자체가 없고(`test_runtime_reliability` 의 R08 이 고정),
   설치는 파일만 놓는다 — 설치 시점에 D-Bus 는 관여하지 않는다.
 
-> **미검증**: 0.2.0 이 설치된 상태로 세션을 새로 시작했을 때 셸이 실제로 이름을
-> 먼저 잡는지는 **아직 측정하지 않았다.** 로그아웃/로그인이 필요하다. 위 세 줄은
-> unit 설정과 활성화 기록에서 나온 결론이고, "셸이 이긴다" 는 아직 관측이 아니다.
-> 다음 세션에서 확인할 명령: `busctl --user call … GetNameOwner s
-> org.freedesktop.Notifications` 의 주인이 quickshell PID 인지, 그리고
-> `systemctl --user is-active mako.service` 가 `inactive` 인지.
+> **✅ 검증됨 (2026-08-17 14:20 재로그인).** 위 세 줄은 원래 unit 설정과 활성화
+> 기록에서 끌어낸 추론이었으나, 0.2.0 이 설치된 상태로 세션을 새로 시작해 직접
+> 측정했다 — 셸이 이름을 먼저 잡았고 mako 는 활성화되지 않았다. 출력은 §17.7.
 
 ### 17.5 정리 — 잔여물 없음
 
@@ -1341,35 +1338,75 @@ level 2: waybar      xywh 0 26 3072 36 pid 4180851
 > **세로 공간을 두 번 먹는 것이 사용자가 원한 결과가 아닐 가능성이 높기 때문**
 > 이다 — 그건 감지해서 알릴 일이지 우리가 결정할 일이 아니다 (§66).
 
-### 17.7 다음 세션에서 확인할 것 (미검증 인계)
+### 17.7 인계 항목 해소 — 셸이 알림 이름을 먼저 잡는다 (2026-08-17 14:20 재로그인)
 
-§17.4.1 의 "셸이 이름을 먼저 잡으면 mako 는 활성화되지 않는다" 는 **아직 관측이
-아니다.** 0.2.0 이 설치된 상태(2026-08-17 14:06)로 세션을 새로 시작하면 그대로
-측정된다. 로그인 직후, 알림이 하나라도 도착하기 전에:
+§17.4.1 의 "셸이 이름을 먼저 잡으면 mako 는 활성화되지 않는다" 를 **관측으로
+승격한다.** 0.2.0(overlay) + 4.0.0-3(shell) 이 설치된 상태로 로그아웃 후 새
+세션을 시작해, 알림이 도착하기 전에 잰 결과다. 셸 PID 는 22315, 기동 14:20:07.
 
-```bash
-# 1) 알림 이름의 주인이 우리 셸인가
-busctl --user call org.freedesktop.DBus /org/freedesktop/DBus \
-  org.freedesktop.DBus GetNameOwner s org.freedesktop.Notifications
-busctl --user call org.freedesktop.DBus /org/freedesktop/DBus \
-  org.freedesktop.DBus GetConnectionUnixProcessID s "<위에서 나온 :1.x>"
-# 기대: quickshell PID
+**1) 알림 이름의 주인은 우리 셸이다.**
 
-# 2) mako 가 아예 뜨지 않았는가
-systemctl --user is-active mako.service      # 기대: inactive
-journalctl --user -u mako.service -b         # 기대: 이번 부팅 기동 기록 없음
-
-# 3) 셸 로그에 알림 서버 등록 실패 WARN 이 없는가
-journalctl --user -t cachy-omarchy-shell -b | grep -i "notification"
-# 기대: "Could not register notification server" 없음
+```console
+$ busctl --user call … GetNameOwner s org.freedesktop.Notifications
+s ":1.2748"
+$ busctl --user call … GetConnectionUnixProcessID s ":1.2748"
+u 22315
+$ ps -p 22315 -o args=
+quickshell -n -p /usr/share/cachy-omarchy/upstream/shell
 ```
 
-세 개가 모두 기대대로면 §17.4.1 의 추론이 관측으로 승격되고, `omarchy.notifications`
-가 실제로 알림을 담당하게 된 것이다. 하나라도 어긋나면 그 출력을 §17.4.1 에
-반대 증거로 적는다.
+**2) mako 는 이 세션에서 한 번도 뜨지 않았다.**
 
-부수적으로 같이 볼 것:
+```console
+$ systemctl --user is-active mako.service     # exit 3
+inactive
+$ systemctl --user is-enabled mako.service
+disabled
+$ journalctl --user -u mako.service --since "2026-08-17 14:20:00"
+-- No entries --
+```
 
-- 바가 `y=0` 에 뜨는가 (사용자 실제 홈의 `bar-off` 토글은 2026-08-17 14:16 에
-  제거됐다). waybar 를 계속 쓴다면 §17.6 대로 둘이 쌓여 62px 를 예약한다.
-- `cachy-omarchy-doctor` 가 전부 PASS 인가 (로그아웃 직전 기준 WARN/FAIL 0건).
+부팅이 이어지고 있어 `-b` 는 이전 세션(마지막 기동 13:38:52)까지 포함한다 —
+그래서 셸 기동 시각으로 창을 잘랐다. **재로그인 이후 기동 기록은 0건이다.**
+
+**3) 셸 로그에 등록 실패 WARN 이 없다.**
+
+```console
+$ journalctl --user -t cachy-omarchy-shell --since "2026-08-17 14:20:00" \
+    | grep -iE "notif|warn|error"
+WARN: Could not load icon "input-keyboard-symbolic" …   # ×4, 아이콘 테마 문제
+WARN qt.svg.draw: The requested buffer size is too big, ignoring
+WARN qt.svg: <use> element m in wrong context!
+```
+
+`Could not register notification server` 가 없다 — §17.4 에서 나왔던 그 WARN 이
+사라졌다. 남은 WARN 은 전부 아이콘/SVG 렌더 잡음이고 알림과 무관하다.
+
+같은 로그에서 **`service plugin load failed for omarchy.notifications` 도 사라졌다.**
+0.2.0 이전(09:17) 로그에는 `plugins/notifications/Service.qml: No such file or
+directory` 가 찍혔지만, 현재 설치본에는 파일이 있다:
+
+```console
+$ ls /usr/share/cachy-omarchy/upstream/shell/plugins/notifications/
+NotificationLogic.js  Service.qml  components/  manifest.json
+```
+
+즉 `omarchy.notifications` 가 실제로 로드되어 알림을 담당하고 있다.
+
+**부수 확인 — 바와 doctor.**
+
+```console
+$ hyprctl layers
+Layer level 2 (top):
+  xywh: 0 0 3072 26, namespace: omarchy-bar, pid: 22315
+$ hyprctl monitors | grep reserved
+reserved: 0 26 0 0
+$ pgrep -a waybar
+(없음)
+```
+
+바는 `y=0` 에 뜨고 26px 만 예약한다. 이 세션에서는 waybar 가 실행되지 않아
+§17.6 의 62px 적층은 발생하지 않았다 — 적층은 waybar 를 함께 띄울 때의 이야기다.
+
+`cachy-omarchy-doctor` 는 24개 검사 **전부 PASS**, WARN/FAIL 0건이다
+(`bar-off toggle absent (bar shows by default)` 포함).

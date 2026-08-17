@@ -257,7 +257,9 @@ would mean patching quickshell itself, which is a dependency, not ours.
 What decides the outcome is order, not eviction. mako's unit is `disabled`
 with `Type=dbus`, so it exists only when a notification arrives while nobody
 owns the name — it started six separate times on the measurement day. A shell
-holding the name from session start means mako is never activated at all.
+holding the name from session start means mako is never activated at all;
+logging in with 0.2.0 installed measured exactly that (§17.7): the shell owns
+the name, mako never started, and the registration WARN is gone.
 Installing the package does none of this: install places files, and the
 overlay ships no `.INSTALL` script (R08 pins that).
 
@@ -1889,7 +1891,8 @@ Measured (RUNTIME_STARTUP §17.4): with mako already holding
 the queue, and backed off. R09 holds here for a stronger reason than restraint
 — the shell has no mechanism to take an owned name. Where the shell starts
 first, it simply owns the name and mako, whose unit is disabled and D-Bus
-activated, is never started; that is still ordering, not eviction.
+activated, is never started — measured on a fresh login in §17.7; that is
+still ordering, not eviction.
 
 ---
 
@@ -2195,7 +2198,7 @@ All must be true:
 - [x] `SUPER + K` opens keybinding UI.
 - [x] Existing Hyprland config is preserved.
 - [x] An installed Waybar is not removed or stopped by us. *(2026-08-17 실측 — waybar 0.15.0 설치·실행 상태에서 바를 켠 셸을 띄웠고 waybar 프로세스는 그대로였다. 두 바는 겹치지 않고 쌓인다(예약 36→62px). RUNTIME_STARTUP §17.6)*
-- [x] A running notification daemon is not stopped, masked or uninstalled by us. *(v0.2.0 개정 — 셸이 알림 플러그인을 켠 채로 뜬다. mako 가 이름을 쥐고 있으면 물러나고, 셸이 먼저 잡으면 mako 는 활성화되지 않는다 — 밀어내기가 아니라 순서. §17.4 실측)*
+- [x] A running notification daemon is not stopped, masked or uninstalled by us. *(v0.2.0 개정 — 셸이 알림 플러그인을 켠 채로 뜬다. mako 가 이름을 쥐고 있으면 물러나고, 셸이 먼저 잡으면 mako 는 활성화되지 않는다 — 밀어내기가 아니라 순서. §17.4 실측, 재로그인 실측 §17.7)*
 - [ ] An installed lock helper is not removed or stopped by us. *(미검증 — hyprlock 등 live lock 설정과 상호작용 실측 안 함)*
 - [x] Rebuild against a newer upstream release is automated.
 - [x] Failed updates do not install.
