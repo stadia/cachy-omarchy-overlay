@@ -228,9 +228,40 @@ SDDM
 system-wide PAM policy
 system-wide NSS configuration
 existing Waybar
-existing notification daemon
-existing lock screen
 ```
+
+Revised in v0.2.0 (M8). The desktop-surface entries — notification daemon and
+lock screen — left this list. Installing cachy-omarchy is a statement that you
+want what Omarchy provides, so its bar, notifications, OSD and lock come up on
+upstream defaults; suppression is now the opt-out, not the default. Waybar
+stays on the list, but not for the reason first written here: two bars were
+assumed to be unusable together, and measurement showed otherwise. They stack
+cleanly — layer-shell accumulates the exclusive zones, so the omarchy bar
+anchors directly below Waybar with no overlap, and the only cost is 62px of
+reserved height instead of 36 (RUNTIME_STARTUP §17.6). Waybar stays on the
+list because paying for two bars is unlikely to be what the user wanted, and
+that is something to detect and report rather than decide for them (§66).
+
+What replaced "must not modify" for the surfaces that left the list is not
+"may do anything". No package of ours owns a path under `/etc` or a system
+unit for a competing daemon, and no command of ours stops, masks, disables or
+uninstalls a running one.
+
+Measured on this host (RUNTIME_STARTUP §17.4): the shell does not displace a
+running notification daemon, and cannot. Replacing an owned D-Bus name needs
+the requester to send `REPLACE_EXISTING` and the incumbent to have taken the
+name with `ALLOW_REPLACEMENT`; the shell sends neither and does not even join
+the queue — it watches for the name to be released and retries. Changing that
+would mean patching quickshell itself, which is a dependency, not ours.
+
+What decides the outcome is order, not eviction. mako's unit is `disabled`
+with `Type=dbus`, so it exists only when a notification arrives while nobody
+owns the name — it started six separate times on the measurement day. A shell
+holding the name from session start means mako is never activated at all;
+logging in with 0.2.0 installed measured exactly that (§17.7): the shell owns
+the name, mako never started, and the registration WARN is gone.
+Installing the package does none of this: install places files, and the
+overlay ships no `.INSTALL` script (R08 pins that).
 
 ---
 
@@ -904,9 +935,14 @@ manual `--restart`). Migration from the former systemd unit requires
 The service must not:
 
 - start a second Hyprland;
-- replace Waybar;
-- start Omarchy lock screen unless explicitly enabled;
-- start unrelated upstream plugins automatically if they conflict.
+- stop, mask, disable or uninstall a running Waybar, notification daemon or
+  lock helper — detect and report, never evict (revised in v0.2.0; this host
+  has no Waybar installed, so coexistence remains unmeasured);
+- keep upstream plugins suppressed by default. Since v0.2.0 the staged
+  `shell.json` is the pinned upstream file verbatim, so bar, notifications,
+  OSD, idle and lock come up enabled. Suppression is added back only where a
+  live conflict has been measured, and the user opts out per surface
+  (`~/.local/state/omarchy/toggles/bar-off` for the bar).
 
 ---
 
@@ -930,14 +966,20 @@ omarchy.menu       ENABLE
 keybindings UI     ENABLE or ADAPT
 ```
 
-Examples of likely non-goals:
+This was written for v0.1, which shipped a `shell.json` with an empty
+`bar.layout` and eleven entries in `disabledPlugins`. v0.2.0 reversed that:
 
 ```text
-bar                DISABLE
-notifications      DISABLE
-lock               DISABLE
-OSD                DISABLE
+bar                UPSTREAM DEFAULT  (user opts out via the bar-off toggle)
+notifications      UPSTREAM DEFAULT  (wins the D-Bus name if it starts first;
+                                     yields if mako already holds it — §17.4)
+lock               UPSTREAM DEFAULT
+OSD                UPSTREAM DEFAULT
 ```
+
+The staged defaults file carries no `disabledPlugins` key at all, and
+`tests/runtime/test_shell_config.sh` diffs it against the pinned upstream
+commit so it cannot drift back silently.
 
 The dependency audit must determine whether disabled plugins can remain
 packaged but inactive.
@@ -1832,9 +1874,25 @@ R05 Escape closes launcher
 R06 application can be launched
 R07 restarting service recovers
 R08 absence of Waybar modification
-R09 absence of notification daemon replacement
-R10 absence of lock-screen replacement
+R09 no notification daemon is stopped, masked or uninstalled by us
+R10 no lock helper is stopped, masked or uninstalled by us
 ```
+
+R09 and R10 were reworded in v0.2.0. They used to read "absence of ...
+replacement", which the packaged defaults satisfied by disabling the upstream
+plugins outright. That suppression is gone: the shell now ships the
+notification and lock plugins enabled. What survives, and what these criteria
+measure, is that we never own a `/etc` path or system unit for a competing
+daemon and never stop one — `tests/runtime/test_runtime_reliability.sh` audits
+both directions.
+
+Measured (RUNTIME_STARTUP §17.4): with mako already holding
+`org.freedesktop.Notifications`, the shell could not register it, did not join
+the queue, and backed off. R09 holds here for a stronger reason than restraint
+— the shell has no mechanism to take an owned name. Where the shell starts
+first, it simply owns the name and mako, whose unit is disabled and D-Bus
+activated, is never started — measured on a fresh login in §17.7; that is
+still ordering, not eviction.
 
 ---
 
@@ -2139,16 +2197,17 @@ All must be true:
 - [x] Normal applications can launch.
 - [x] `SUPER + K` opens keybinding UI.
 - [x] Existing Hyprland config is preserved.
-- [ ] Existing Waybar is preserved. *(bar 억제는 측정됨 §14.4/§16.4; Waybar 자체 공존은 이 호스트가 mako 를 써 미검증)*
-- [x] Existing notification daemon is preserved.
-- [ ] Existing lock setup is preserved. *(미검증 — hyprlock 등 live lock 설정과 상호작용 실측 안 함)*
+- [x] An installed Waybar is not removed or stopped by us. *(2026-08-17 실측 — waybar 0.15.0 설치·실행 상태에서 바를 켠 셸을 띄웠고 waybar 프로세스는 그대로였다. 두 바는 겹치지 않고 쌓인다(예약 36→62px). RUNTIME_STARTUP §17.6)*
+- [x] A running notification daemon is not stopped, masked or uninstalled by us. *(v0.2.0 개정 — 셸이 알림 플러그인을 켠 채로 뜬다. mako 가 이름을 쥐고 있으면 물러나고, 셸이 먼저 잡으면 mako 는 활성화되지 않는다 — 밀어내기가 아니라 순서. §17.4 실측, 재로그인 실측 §17.7)*
+- [ ] An installed lock helper is not removed or stopped by us. *(미검증 — hyprlock 등 live lock 설정과 상호작용 실측 안 함)*
 - [x] Rebuild against a newer upstream release is automated.
 - [x] Failed updates do not install.
 - [x] Previous working package can be rolled back.
 
 Evidence ledger: `docs/RC_GAP_INVENTORY.md` (측정됨 / 미검증 / 추론됨 구분). 라이브
-실측 기록은 `docs/RUNTIME_STARTUP.md` §12–§16. 19/21 측정됨; 2건(Waybar 공존, lock
-공존)은 호스트 환경 제약으로 미검증 — 패키지 설계는 보존하지만 라이브 입증은 안 됨.
+실측 기록은 `docs/RUNTIME_STARTUP.md` §12–§17. 20/21 측정됨; Waybar 공존은
+2026-08-17 waybar 설치 후 §17.6 에서 해소됐고, 남은 1건(lock 공존)은 hyprlock 과의
+라이브 상호작용을 아직 측정하지 않았다.
 0.1.2 release (cachy-omarchy-overlay 0.1.2-1) 시점 기준. R07 자동 복구는
 systemd 유닛 제거(4c5731b)로 더 이상 shipped feature 가 아님(§16.6) — 이는 §61 의
 명시 항목이 아님.
@@ -2267,6 +2326,23 @@ If uncertain:
 - do not overwrite;
 - leave previous package in place;
 - print actionable diagnostics.
+
+Adopting upstream defaults in v0.2.0 did not weaken this. Coming up on
+upstream defaults is a decision about what our own shell draws; it is not a
+licence to reach into somebody else's daemon. The rule for a competing
+surface is detect, report, and let the user decide:
+
+- no command of ours stops, masks, disables or uninstalls a running daemon —
+  not `init`, not `doctor`, not any install script;
+- user state is never deleted to change a default. A `bar-off` toggle written
+  by 0.1.x survives the upgrade; `doctor` prints the one-line `rm` and stops
+  there;
+- where a takeover looks inherent to the mechanism, measure it before writing
+  it down as fact. "Starting the shell reclaims mako's D-Bus name within a
+  second" did not survive measurement (RUNTIME_STARTUP §17.4) — the shell
+  cannot take an owned name at all. What it can do is hold the name first, so
+  the on-demand daemon is never activated. Either way it must stay reversible
+  by not starting the shell.
 
 ---
 

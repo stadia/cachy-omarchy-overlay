@@ -44,9 +44,16 @@ cmd_run() {
   if pgrep -f "quickshell -n -p $OMARCHY_PATH/shell" >/dev/null 2>&1; then
     exit 0
   fi
-  # compat shim 은 셸 프로세스에만 보이게 한다. 사용자의 일반 PATH 를
-  # 오염시키지 않는다 (SPEC 44, 45).
-  [[ -d $COMPAT_BIN ]] && export PATH="$COMPAT_BIN:$PATH"
+  # compat shim 과 업스트림 helper 는 셸 프로세스에만 보이게 한다. 사용자의
+  # 일반 PATH 를 오염시키지 않는다 (SPEC 44, 45).
+  #
+  # $OMARCHY_PATH/bin 이 필요한 이유: 위젯이 helper 를 bare name 으로 부른다
+  # (plugins/panels/network/Panel.qml 등). 스테이징만으로는 해결되지 않는다.
+  # compat 이 앞이라 우리가 적응시킨 shim 이 업스트림 동명 파일을 이긴다.
+  local shell_path=
+  [[ -d $COMPAT_BIN ]] && shell_path="$COMPAT_BIN:"
+  [[ -d $OMARCHY_PATH/bin ]] && shell_path="$shell_path$OMARCHY_PATH/bin:"
+  [[ -n $shell_path ]] && export PATH="$shell_path$PATH"
 
   # Qt 를 wayland 에 고정(방어적 — xcb 폴백 차단). Hyprland autostart(hyprland.start)
   # 로 기동하면 WAYLAND_DISPLAY 가 컴포저터 env 로 항상 정상이라 socket-wait 는

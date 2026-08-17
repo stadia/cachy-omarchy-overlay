@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# 업스트림 omarchy-update-available 의 CachyOS 적응판 (SPEC 44).
+#
+# 업스트림은 pacman 패키지 omarchy / omarchy-dev 와 $OMARCHY_PATH 의 git
+# upstream 을 본다. 우리 패키지는 cachy-omarchy-shell / cachy-omarchy-overlay 이고
+# $OMARCHY_PATH 는 pacman 이 배치한 읽기 전용 트리라 git 이 아니다. 그대로 두면
+# 위젯이 영구히 "최신"만 보게 되므로 조회 대상만 바꾼다.
+#
+# 계약 (plugins/bar/widgets/SystemUpdate.qml:41 — updateAvailable = exitCode === 0):
+#   업데이트 있음   -> 줄 단위 출력 + exit 0
+#   없음/조회 불가  -> 메시지 한 줄 + exit 1
+#
+# 조회 불가(checkupdates 부재, 동기화 실패)를 "업데이트 있음"으로 올리지
+# 않는다. 위젯에 거짓 양성 배지를 띄우는 것보다 조용히 최신으로 보이는 편이
+# 낫다 — 실제 업데이트 경로는 cachy-omarchy-update 이고 이 위젯은 알림일 뿐이다.
+set -uo pipefail
+
+packages=(cachy-omarchy-shell cachy-omarchy-overlay)
+updates=()
+
+if command -v checkupdates >/dev/null 2>&1; then
+  while IFS= read -r line; do
+    [[ -n $line ]] && updates+=("$line")
+  done < <(checkupdates --nocolor 2>/dev/null |
+    awk -v list="${packages[*]}" '
+      BEGIN { n = split(list, a, " "); for (i = 1; i <= n; i++) want[a[i]] = 1 }
+      want[$1] { print }')
+fi
+
+if (( ${#updates[@]} > 0 )); then
+  printf '%s\n' "${updates[@]}"
+  exit 0
+fi
+
+echo "cachy-omarchy is up to date"
+exit 1

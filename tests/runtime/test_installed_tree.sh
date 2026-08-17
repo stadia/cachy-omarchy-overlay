@@ -38,7 +38,8 @@ mkdir -p "$COO_HYPR_DIR"; : > "$COO_HYPR_DIR/hyprland.conf"
 out=$(PATH="$BIN:$PATH" "$BIN/cachy-omarchy-init" 2>&1); code=$?
 assert_eq "$code" "0" "설치 트리에서 init exit 0"
 assert_file_exists "$HOME/.config/cachy-omarchy/hypr/bindings.conf" "init 가 바인딩 배치"
-assert_file_exists "$HOME/.local/state/omarchy/toggles/bar-off" "init 가 bar-off 생성"
+[[ -e "$HOME/.local/state/omarchy/toggles/bar-off" ]] && made=1 || made=0
+assert_eq "$made" "0" "설치 트리의 init 도 bar-off 를 만들지 않는다"
 
 # 4) compat shim 은 /usr/bin 이 아니라 통제된 경로에 있다.
 [[ -x "$COO_COMPAT_BIN/omarchy-shell" ]] && ok=0 || ok=1

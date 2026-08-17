@@ -57,7 +57,7 @@ journalctl --user -t cachy-omarchy-shell
 규칙:
 
 - `version: 1` 을 가진 유효한 사용자 파일이 `userConfigPath` 에 있으면 **기본값을 통째로 대체**한다. (일부 키만 덮어쓰기 불가.)
-- 없으면 `defaultsPath` 를 읽는다. 우리 패키지는 이 자리에 **우리 기본값**(`overlay/defaults/shell.json`)을 설치한다 — `stage-upstream.sh` 가 업스트림 것이 아니라 우리 것을 넣는다.
+- 없으면 `defaultsPath` 를 읽는다. `stage-upstream.sh` 는 이 자리에 정본 `overlay/defaults/shell.json` 을 설치한다. **v0.2.0 부터 그 정본의 내용은 핀 커밋 업스트림 파일과 바이트 동일하다** — 우리 값을 넣기 위해서가 아니라, 리베이스로 업스트림 기본값이 바뀌면 `tests/runtime/test_shell_config.sh` 의 핀 커밋 대조가 잡게 하려고 우리 경로를 거친다.
 - 그것도 실패하면 `builtinShellConfig`.
 
 ### 알려진 한계 — 사용자 `~/.config/omarchy/shell.json` 오버라이드
@@ -75,9 +75,19 @@ journalctl --user -t cachy-omarchy-shell
 
 ---
 
-## 3. 비활성 플러그인
+## 3. 비활성 플러그인 — v0.2.0 에서 폐기됨 (M2 기록으로 보존)
 
-패키지에 실제로 스테이징되는 `disabledPlugins` (`overlay/defaults/shell.json`):
+> **🔄 개정 (v0.2.0, M8, 2026-08-17).** 이 절이 서술하는 비활성 집합은 **더 이상
+> 존재하지 않는다.** 정본 `overlay/defaults/shell.json` 은 핀 커밋 업스트림 파일
+> 그대로이며 `disabledPlugins` 키 자체가 없다. 바·알림·OSD·idle·락은 전부 켜진
+> 채로 뜬다. 억제는 라이브 충돌이 실측된 곳에만, 사용자 opt-out 으로 돌아온다
+> (바는 `bar-off` 토글). 근거와 결정은 M8 평가 문서, 개정된 SPEC §4.3·§17·§18·§61.
+>
+> 아래 본문은 **M2 시점의 실측 기록**으로 남긴다. 그 안의 기술적 발견 두 가지는
+> 지금도 참이고 여전히 중요하다: (a) `disabledPlugins` 로는 내장 바를 끌 수 없다,
+> (b) `bar-off` 는 표면을 없애는 게 아니라 `y=-26` 으로 주차시킨다.
+
+M2 당시 패키지에 스테이징되던 `disabledPlugins`:
 
 ```text
 omarchy.bar  omarchy.notifications  omarchy.lock  omarchy.osd
@@ -85,7 +95,7 @@ omarchy.idle  omarchy.battery  omarchy.nightlight  omarchy.media
 omarchy.polkit  omarchy.reminders  omarchy.background
 ```
 
-`omarchy.menu` 는 목록에 **없다** (M3 런처).
+`omarchy.menu` 는 목록에 **없었다** (M3 런처).
 
 ### 기동 시 실측 상태 (라이브 `listPlugins` IPC)
 
@@ -355,6 +365,18 @@ overlay 패키지, `cachy-omarchy-init`, Waybar 처리와 실제 설치 통합�
 | 9 | `usr/share/cachy-omarchy/defaults/shell.json` |
 | 10 | `usr/share/cachy-omarchy/hypr/bindings.conf` |
 | 11 | `usr/share/cachy-omarchy/hypr/bindings.lua` |
+| 12 | `usr/lib/cachy-omarchy/compat/bin/omarchy-update-available` (v0.2.0) |
+
+v0.2.0 부터 셸 패키지는 바 위젯이 bare name 으로 부르는 업스트림 helper 도 함께
+스테이징한다 (`usr/share/cachy-omarchy/upstream/bin/`): Tier A `omarchy-menu-select`
+`omarchy-cmd-present` `omarchy-audio-output-sink` `omarchy-network-status`
+`omarchy-network-band` `omarchy-monitor-state` `omarchy-hyprland-monitor-scaling`,
+Tier B `omarchy-reminder` `omarchy-notification-send` `omarchy-agent-usage-{update,claude,codex,fireworks}`.
+전부 업스트림과 바이트 동일하다(`tests/package/test_staged_helpers.sh` 가 확인).
+밝기 체인(`omarchy-brightness-display*`, `omarchy-hw-display`)은 의존 명령이 없어
+넣지 않는다. `cachy-omarchy-shell --run` 이 `$OMARCHY_PATH/bin` 을 **셸 프로세스
+PATH 에만** 붙인다 — compat shim 디렉터리가 그보다 앞이라 적응 카피가 동명
+업스트림 파일을 이긴다.
 
 `/etc`, `/boot`, `/efi`, system 유닛(`usr/lib/systemd/system/`)은 소유하지 않는다.
 compat shim(6, 7번)은 `/usr/lib/cachy-omarchy/compat/bin/` 에만 있고 `/usr/bin` 으로
@@ -370,7 +392,13 @@ post-install 훅이 아니라 **사용자가 직접 실행**하는 유저 레벨
   - `~/.config/cachy-omarchy/hypr/bindings.{conf,lua}` — `cachy-omarchy-bindings` 에
     위임해 설치하고, 사용자 Hyprland 설정에 관리 source 블록만 주입한다(본문은 건드리지
     않음).
-  - `~/.local/state/omarchy/toggles/bar-off` — 내장 바를 숨기는 빈 파일.
+- **만들지 않는 것 — `~/.local/state/omarchy/toggles/bar-off` (v0.2.0 개정).** 0.1.x
+  init 은 이 빈 파일을 만들어 내장 바를 숨겼다. v0.2.0 부터는 만들지 않는다 —
+  바는 기본으로 보인다. `toggles` 디렉터리조차 만들지 않는다(만들면 다음 실행이
+  "사용자 상태 존재"로 오독한다). 업그레이드한 사용자가 이미 가진 토글은 사용자
+  상태이므로 지우지 않고, init 은 "유지" 한 줄을, `cachy-omarchy-doctor` 는
+  `WARN` 과 함께 지울 `rm` 명령을 알린다. 바를 끄고 싶으면 사용자가 직접 만든다:
+  `: > ~/.local/state/omarchy/toggles/bar-off`.
 - **만들지 않는 것** — `~/.config/cachy-omarchy/shell.json`. 셸이 읽는 사용자 경로는
   `~/.config/omarchy/shell.json` 이지 이 경로가 아니므로, 여기에 파일을 만들면 사용자
   편집이 조용히 무시된다(dead file). 패키지 기본값은
@@ -1135,3 +1163,250 @@ INFO 항목들은 테스트 스위트가 만든 샌드박스 셸이지 라이브
 - 잠금화면 공존(§61 #18, hyprlock 미관측).
 - `COO_RUN_LIVE=1` 자동화 키 주입 테스트(R04/R05 자동화).
 - 셸 크래시 후 자동 재기동은 이 모델에 **존재하지 않는다**(위 16.6).
+
+---
+
+## 17. M8 — 업스트림 기본 바 라이브 실측 (2026-08-17)
+
+v0.2.0 의 억제 해제(원칙 0)를 빌드된 아티팩트로 실제 검증했다. `sudo` 없이,
+격리 트리 + 격리 HOME 으로 사용자 세션 위에 띄웠다.
+
+### 17.1 절차
+
+```bash
+tmp=$(mktemp -d); ovl=$(mktemp -d); H=$(mktemp -d)
+source lib/runtime.sh
+coo_extract_pkg "$tmp"; coo_extract_overlay "$ovl"
+UP="$tmp/usr/share/cachy-omarchy/upstream"
+env HOME="$H" COO_OMARCHY_PATH="$UP" \
+    COO_COMPAT_BIN="$ovl/usr/lib/cachy-omarchy/compat/bin" \
+    "$ovl/usr/bin/cachy-omarchy-shell" --run &
+```
+
+### 17.2 측정 — 바가 y=0 에 실제로 그려진다
+
+```console
+$ hyprctl -j layers | jq -r '...'
+level 0: omarchy-background xywh 0 0 3072 1728 pid 4073942   # 격리 인스턴스
+level 2: omarchy-bar        xywh 0 0 3072 26   pid 4073942   # 격리 인스턴스
+level 2: omarchy-bar        xywh 0 -26 3072 26 pid 3910280   # 기존 셸(bar-off)
+level 2: notifications      xywh 2752 26 320 63 pid 3949882  # mako
+```
+
+- **`omarchy-bar` 가 `y=0` 에 매핑됐다** — 패키지 기본값만으로 바가 뜬다. 패치 0건.
+- `omarchy-background` 가 level 0(모든 창 아래) 에 전체화면으로 깔린다.
+- 대조: 같은 화면의 기존 셸(pid 3910280)은 `bar-off` 때문에 `y=-26` 에 주차돼
+  있다. 같은 패키지, 다른 사용자 상태 — 토글이 바를 없애는 게 아니라 옮긴다는
+  §3 의 발견이 두 인스턴스로 나란히 재현됐다.
+
+### 17.3 측정 — helper 격차 0건
+
+```console
+$ grep -c 'binary could not be found' shell.journal
+0
+$ grep -iE 'error|exception' shell.journal
+(없음)
+```
+
+M8 평가 시점의 helper 미해결 7건이 **전부 닫혔다.** Tier A·B 13개 스테이징 +
+셸 프로세스 PATH 에 `$OMARCHY_PATH/bin` 연결 + compat shim 1개
+(`omarchy-update-available`) 로 해결했고, 업스트림 본문 패치는 0건이다.
+Tier D 밝기 helper 는 `omarchy-monitor-state` 내부 가드에 걸려 이 grep 에 잡히지
+않는다(잡히면 가드가 깨진 것).
+
+### 17.4 🔴 정정 — mako 는 인계되지 않는다
+
+기동 로그의 유일한 WARN 2줄:
+
+```console
+WARN quickshell.service.notifications: Could not register notification server at
+  org.freedesktop.Notifications, presumably because one is already registered.
+WARN quickshell.service.notifications: Registration will be attempted again if
+  the active service is unregistered.
+$ busctl --user status org.freedesktop.Notifications
+PID=3949882  Comm=mako
+```
+
+**M8 평가 문서의 "mako 인계는 D-Bus 이름 회수로 1초 내 성립" 은 이 조건에서
+재현되지 않았다.** 셸은 이미 주인이 있는 이름을 **뺏지 않는다.**
+
+추가 측정으로 밀어내기 가능 여부를 확인했다. 셸이 뜬 상태에서:
+
+```console
+$ busctl --user call … ListQueuedOwners s org.freedesktop.Notifications
+as 1 ":1.2615"        # mako 하나뿐 — 셸은 대기열에도 없다
+```
+
+즉 셸은 `DBUS_NAME_FLAG_REPLACE_EXISTING` 를 요청하지도, 대기열에 서지도 않고,
+`NameOwnerChanged` 를 지켜보다 재시도한다(WARN 문구 그대로). D-Bus 에서
+밀어내기가 성립하려면 **요청자가 REPLACE_EXISTING 을 보내고 동시에 현 소유자가
+ALLOW_REPLACEMENT 로 이름을 잡았어야** 하는데, 우리 쪽이 애초에 요청하지 않는다.
+바꾸려면 omarchy 가 아니라 **quickshell 본체**를 패치해야 한다 — 우리 패치 예산
+바깥이다.
+
+### 17.4.1 그래서 누가 이기는가 — 순서 문제이지 밀어내기 문제가 아니다
+
+```console
+$ systemctl --user show mako.service -p Type,UnitFileState
+Type=dbus
+UnitFileState=disabled
+$ journalctl --user -u mako.service --since today | grep -c Started
+6      # 10:19, 10:22, 10:30, 12:02, 13:13, 13:38 — 뜨고 내려가기를 반복
+```
+
+**mako 는 상주 데몬이 아니다.** unit 은 `disabled` 이고 `Type=dbus` 라, 이름의
+주인이 없는 상태에서 알림이 도착할 때 D-Bus 가 활성화시킨다. 오늘 하루에만 6번
+새로 떴다. 즉 mako 에게 영구적 선점권은 없다.
+
+따라서 실질적 규칙은 이렇다:
+
+- **셸이 이름을 먼저 잡으면 mako 는 활성화조차 되지 않는다.** 밀어낼 필요가 없다.
+- 반대로 이름의 주인이 이미 mako 면 셸은 물러난다. §17.2 의 측정이 바로 이
+  경우였다 — 격리 인스턴스가 **나중에** 떴기 때문이다.
+- 우리 코드는 어느 쪽에서도 mako 를 죽이거나 mask 하지 않는다. 패키지에
+  `.INSTALL` 스크립트 자체가 없고(`test_runtime_reliability` 의 R08 이 고정),
+  설치는 파일만 놓는다 — 설치 시점에 D-Bus 는 관여하지 않는다.
+
+> **✅ 검증됨 (2026-08-17 14:20 재로그인).** 위 세 줄은 원래 unit 설정과 활성화
+> 기록에서 끌어낸 추론이었으나, 0.2.0 이 설치된 상태로 세션을 새로 시작해 직접
+> 측정했다 — 셸이 이름을 먼저 잡았고 mako 는 활성화되지 않았다. 출력은 §17.7.
+
+### 17.5 정리 — 잔여물 없음
+
+```console
+$ kill 4073942 && sleep 2
+$ hyprctl -j layers | jq '[... | select(.pid == 4073942)] | length'
+0
+```
+
+우리 PID 의 표면이 하나도 남지 않았고, 사용자의 기존 셸(3910280)과 mako(3949882)
+는 그대로다. 되돌리기는 프로세스 종료 하나뿐이다.
+
+### 17.6 Waybar 공존 — §61 미검증 항목 해소 (2026-08-17, waybar 설치 후)
+
+M8 평가 시점에 waybar 는 이 호스트에 없었고, 그래서 §61 의 "Existing Waybar is
+preserved" 는 v0.1 부터 계속 미검증으로 남아 있었다. 사용자가 `waybar 0.15.0-2.1`
+을 설치해 처음으로 측정 가능해졌다.
+
+**baseline** (셸의 바는 `bar-off` 로 주차, waybar 미실행):
+
+```console
+$ hyprctl -j monitors | jq -c '.[] | {name, reserved}'
+{"name":"DP-1","reserved":[0,0,0,0]}
+```
+
+**waybar 단독:**
+
+```console
+level 2: waybar xywh 0 0 3072 36 pid 4180851
+{"name":"DP-1","reserved":[0,36,0,0]}
+```
+
+**waybar + omarchy.bar 동시** (격리 HOME 에 `bar-off` 없음 = 바가 보이는 기본 상태):
+
+```console
+level 2: waybar     xywh 0  0 3072 36 pid 4180851
+level 2: omarchy-bar xywh 0 36 3072 26 pid 4181106   # ← waybar 아래에 쌓인다
+level 0: omarchy-background xywh 0 0 3072 1728
+{"name":"DP-1","reserved":[0,62,0,0]}
+```
+
+**결과 — 겹치지 않는다.** layer-shell 앵커링이 exclusive zone 을 누적 적용해
+`omarchy-bar` 를 `y=36`, 즉 waybar **바로 아래**에 배치한다. 가림도 없고 z-order
+싸움도 없다. 비용은 화면 세로 `36 → 62px` 예약뿐이다.
+
+**쌓이는 순서는 고정이 아니다 — 먼저 매핑한 쪽이 위를 가진다.** 같은 날 사용자가
+실제 홈의 `bar-off` 토글을 지워 라이브 셸의 바가 켜졌을 때는 반대로 나왔다:
+
+```console
+level 2: omarchy-bar xywh 0  0 3072 26 pid 3910280   # 이번엔 셸이 위
+level 2: waybar      xywh 0 26 3072 36 pid 4180851
+```
+
+격리 실험에서는 waybar 가 먼저 떠 있었고, 이 경우엔 셸이 먼저였다. 어느 쪽이든
+결론은 같다 — 겹치지 않고 쌓이며, 총 예약은 62px 다. 위치를 고정하고 싶으면
+그건 사용자가 각 바의 앵커/레이어 설정으로 정할 일이지 우리가 강제할 것이 아니다.
+
+**waybar 는 살아남았다.** 우리 셸을 띄우는 동안에도 종료 후에도 pid 4180851 이
+그대로다. 우리 코드는 waybar 를 중지·mask·제거하지 않는다 (R08). 우리 셸을
+죽이자 예약은 `62 → 36` 으로 되돌아갔다 — 되돌리기는 프로세스 종료 하나.
+
+> **🔴 SPEC §4.3 문언 정정.** v0.2.0 개정에서 "바는 두 개가 나란히 있으면 단순
+> 중복이 아니라 사용 불가라서 Waybar 만 비수정 목록에 남긴다" 고 적었는데, 그
+> 근거는 **추론이었고 측정에서 틀렸다.** 두 바는 깔끔하게 쌓이며 결과는 정확히
+> "단순 중복" 이다. Waybar 를 목록에 남기는 이유는 사용 불가라서가 아니라,
+> **세로 공간을 두 번 먹는 것이 사용자가 원한 결과가 아닐 가능성이 높기 때문**
+> 이다 — 그건 감지해서 알릴 일이지 우리가 결정할 일이 아니다 (§66).
+
+### 17.7 인계 항목 해소 — 셸이 알림 이름을 먼저 잡는다 (2026-08-17 14:20 재로그인)
+
+§17.4.1 의 "셸이 이름을 먼저 잡으면 mako 는 활성화되지 않는다" 를 **관측으로
+승격한다.** 0.2.0(overlay) + 4.0.0-3(shell) 이 설치된 상태로 로그아웃 후 새
+세션을 시작해, 알림이 도착하기 전에 잰 결과다. 셸 PID 는 22315, 기동 14:20:07.
+
+**1) 알림 이름의 주인은 우리 셸이다.**
+
+```console
+$ busctl --user call … GetNameOwner s org.freedesktop.Notifications
+s ":1.2748"
+$ busctl --user call … GetConnectionUnixProcessID s ":1.2748"
+u 22315
+$ ps -p 22315 -o args=
+quickshell -n -p /usr/share/cachy-omarchy/upstream/shell
+```
+
+**2) mako 는 이 세션에서 한 번도 뜨지 않았다.**
+
+```console
+$ systemctl --user is-active mako.service     # exit 3
+inactive
+$ systemctl --user is-enabled mako.service
+disabled
+$ journalctl --user -u mako.service --since "2026-08-17 14:20:00"
+-- No entries --
+```
+
+부팅이 이어지고 있어 `-b` 는 이전 세션(마지막 기동 13:38:52)까지 포함한다 —
+그래서 셸 기동 시각으로 창을 잘랐다. **재로그인 이후 기동 기록은 0건이다.**
+
+**3) 셸 로그에 등록 실패 WARN 이 없다.**
+
+```console
+$ journalctl --user -t cachy-omarchy-shell --since "2026-08-17 14:20:00" \
+    | grep -iE "notif|warn|error"
+WARN: Could not load icon "input-keyboard-symbolic" …   # ×4, 아이콘 테마 문제
+WARN qt.svg.draw: The requested buffer size is too big, ignoring
+WARN qt.svg: <use> element m in wrong context!
+```
+
+`Could not register notification server` 가 없다 — §17.4 에서 나왔던 그 WARN 이
+사라졌다. 남은 WARN 은 전부 아이콘/SVG 렌더 잡음이고 알림과 무관하다.
+
+같은 로그에서 **`service plugin load failed for omarchy.notifications` 도 사라졌다.**
+0.2.0 이전(09:17) 로그에는 `plugins/notifications/Service.qml: No such file or
+directory` 가 찍혔지만, 현재 설치본에는 파일이 있다:
+
+```console
+$ ls /usr/share/cachy-omarchy/upstream/shell/plugins/notifications/
+NotificationLogic.js  Service.qml  components/  manifest.json
+```
+
+즉 `omarchy.notifications` 가 실제로 로드되어 알림을 담당하고 있다.
+
+**부수 확인 — 바와 doctor.**
+
+```console
+$ hyprctl layers
+Layer level 2 (top):
+  xywh: 0 0 3072 26, namespace: omarchy-bar, pid: 22315
+$ hyprctl monitors | grep reserved
+reserved: 0 26 0 0
+$ pgrep -a waybar
+(없음)
+```
+
+바는 `y=0` 에 뜨고 26px 만 예약한다. 이 세션에서는 waybar 가 실행되지 않아
+§17.6 의 62px 적층은 발생하지 않았다 — 적층은 waybar 를 함께 띄울 때의 이야기다.
+
+`cachy-omarchy-doctor` 는 24개 검사 **전부 PASS**, WARN/FAIL 0건이다
+(`bar-off toggle absent (bar shows by default)` 포함).

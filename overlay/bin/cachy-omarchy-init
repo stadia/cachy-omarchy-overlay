@@ -23,8 +23,10 @@ usage() {
 
 만드는 것:
   ~/.config/cachy-omarchy/hypr/bindings.{conf,lua}
-  ~/.local/state/omarchy/toggles/bar-off        Omarchy 내장 바 숨김
   사용자 Hyprland 설정에 관리 source 블록       (충돌 시 주입하지 않음)
+
+Omarchy 내장 바는 기본으로 보인다. 숨기려면 직접 토글을 만든다:
+  : > ~/.local/state/omarchy/toggles/bar-off
 
 주의: 셸 설정(~/.config/cachy-omarchy/shell.json)은 만들지 않는다.
 셸은 ~/.config/omarchy/shell.json 을 읽지 이 경로를 읽지 않으므로,
@@ -60,16 +62,14 @@ done
 #    으로 스테이징되며 init 없이도 셸이 적용한다. 기존 사용자가 이 dead file
 #    을 갖고 있다면 cachy-omarchy-doctor 가 WARN 으로 알린다.
 
-# 2) bar-off 토글. toggles 디렉터리가 아직 없을 때만 만든다. 디렉터리는 있는데
-#    파일이 없다면 사용자가 일부러 지운 것이고, 그것은 "바를 보겠다"는 의사다.
-if [[ -d $TOGGLES_DIR ]]; then
-  note "유지: $TOGGLES_DIR (사용자 상태 존재 — bar-off 를 되살리지 않는다)"
-else
-  act "생성: $TOGGLES_DIR/bar-off"
-  if ! (( DRY )); then
-    mkdir -p "$TOGGLES_DIR" || fail "토글 디렉터리를 만들 수 없다: $TOGGLES_DIR"
-    : > "$TOGGLES_DIR/bar-off"
-  fi
+# 2) bar 토글은 만들지 않는다. M8 원칙 0 — cachy-omarchy 를 설치한다는 것은
+#    omarchy 가 주는 것을 쓰겠다는 의사이므로 업스트림 기본값(바 표시)이
+#    기본이다. 바를 끄고 싶으면 사용자가 직접 토글을 만든다:
+#      : > ~/.local/state/omarchy/toggles/bar-off
+#    0.1.x init 이 만들어 둔 기존 bar-off 는 사용자 상태이므로 지우지 않는다
+#    (SPEC 6.6). cachy-omarchy-doctor 가 존재를 알리고 삭제 방법을 안내한다.
+if [[ -e $TOGGLES_DIR/bar-off ]]; then
+  note "유지: $TOGGLES_DIR/bar-off (0.1.x 가 만든 억제 토글 — 지우지 않는다. 바를 보려면 직접 삭제)"
 fi
 
 # 3) Hyprland 바인딩. 충돌 감지와 --force 정책을 재구현하지 않고 위임한다

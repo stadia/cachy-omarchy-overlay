@@ -10,6 +10,9 @@ HYPR_DIR=${COO_HYPR_DIR:-$HOME/.config/hypr}
 CONFIG_DIR=${COO_CONFIG_DIR:-$HOME/.config/cachy-omarchy}
 STATE_DIR=${COO_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/cachy-omarchy}
 USER_OMARCHY_CONFIG_DIR=${COO_OMARCHY_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/omarchy}
+# Upstream omarchy keeps its own state tree, separate from STATE_DIR above
+# (which is ours). The bar toggle lives in theirs.
+OMARCHY_STATE_DIR=${COO_OMARCHY_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/omarchy}
 INSTALL_ROOT=$(dirname "$(dirname "$PREFIX_ROOT")")
 BIN_DIR=$INSTALL_ROOT/bin
 OMARCHY_PATH=${COO_OMARCHY_PATH:-$PREFIX_ROOT/upstream}
@@ -272,6 +275,15 @@ if [[ -e $USER_OMARCHY_CONFIG_DIR/shell.json ]]; then
   warn "user shell override present: $USER_OMARCHY_CONFIG_DIR/shell.json"
 else
   pass "user shell override absent"
+fi
+# bar-off is the suppression toggle 0.1.x init used to create. 0.2.0 no longer
+# creates it, but anyone who upgraded still has one and still has a hidden bar.
+# Deleting it would be reaching into user state (SPEC 6.6), so only say what to
+# remove.
+if [[ -e $OMARCHY_STATE_DIR/toggles/bar-off ]]; then
+  warn "bar-off toggle present: the omarchy bar stays hidden; to show it run: rm $OMARCHY_STATE_DIR/toggles/bar-off"
+else
+  pass "bar-off toggle absent (bar shows by default)"
 fi
 
 exit "$failures"

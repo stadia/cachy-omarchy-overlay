@@ -32,7 +32,9 @@ assert_eq "$code" "0" "최초 실행 exit 0"
 # shell.json 은 만들지 않는다 — 셸이 읽는 경로가 아니므로 dead file 이다.
 [[ -e "$HOME/.config/cachy-omarchy/shell.json" ]] && made=1 || made=0
 assert_eq "$made" "0" "init 는 dead shell.json 을 만들지 않는다"
-assert_file_exists "$HOME/.local/state/omarchy/toggles/bar-off" "bar-off 토글 생성"
+# bar-off 도 만들지 않는다 — M8 원칙 0 에 따라 바는 기본으로 보인다.
+[[ -e "$HOME/.local/state/omarchy/toggles/bar-off" ]] && made=1 || made=0
+assert_eq "$made" "0" "init 는 bar-off 토글을 만들지 않는다"
 assert_file_exists "$HOME/.config/cachy-omarchy/hypr/bindings.conf" "바인딩 배치"
 
 # FINDING 1 회귀: 사용자가 고친 bindings.conf 를 재실행이 덮어쓰지 않는다.
@@ -53,7 +55,9 @@ after_force=$(cat "$BIND_CONF")
 [[ $after_force == *"USER_MARKER"* ]] && kept=1 || kept=0
 assert_eq "$kept" "0" "--force 는 bindings.conf 를 갱신해 사용자 마커가 사라진다"
 
-# 사용자가 지운 bar-off 를 되살리지 않는다 — 사용자 의사를 존중한다.
+# 사용자가 지운 bar-off 를 되살리지 않는다 — 사용자 의사를 존중한다. init 이
+# 애초에 만들지 않게 된 뒤에도 이 단언은 유지한다: "만들지 않는다" 를 되돌리는
+# 회귀와 "지워진 것을 되살린다" 는 회귀는 서로 다른 코드 경로다.
 rm -f "$HOME/.local/state/omarchy/toggles/bar-off"
 "$I" >/dev/null 2>&1
 [[ -e "$HOME/.local/state/omarchy/toggles/bar-off" ]] && back=1 || back=0

@@ -31,23 +31,19 @@ fi
 id=$(grep -E '"id"' "$root/shell/plugins/menu/manifest.json" | head -1)
 assert_contains "$id" "omarchy.menu" "menu plugin id"
 
-# Task 2: the staged shell.json must be OUR bar-free default, not upstream's
-# full bar layout — otherwise the shell draws a bar over the user's Waybar
-# and starts notifications/lock/idle services (SPEC 4.3 / 17).
+# 스테이징된 shell.json 은 업스트림 기본값 그대로여야 한다 — 억제 계층 1
+# (빈 bar.layout + disabledPlugins) 은 M8 원칙 0 에 따라 제거됐다. 내용 자체의
+# 드리프트는 tests/runtime/test_shell_config.sh 가 핀 커밋과 대조해서 잡는다.
 if command -v jq >/dev/null; then
   staged_shell_json=$root/config/omarchy/shell.json
   assert_eq "$(jq -r '.version' "$staged_shell_json")" "1" "staged shell.json version: 1"
-  for w in left center right; do
-    assert_eq "$(jq -r ".bar.layout.$w | length" "$staged_shell_json")" "0" \
-      "staged shell.json bar.layout.$w empty"
-  done
-  for p in omarchy.bar omarchy.notifications omarchy.lock omarchy.osd \
-           omarchy.idle omarchy.polkit omarchy.background; do
-    has=$(jq -r --arg p "$p" '.disabledPlugins | index($p) != null' "$staged_shell_json")
-    assert_eq "$has" "true" "staged shell.json disables $p"
-  done
-  has_menu=$(jq -r '.disabledPlugins | index("omarchy.menu") != null' "$staged_shell_json")
-  assert_eq "$has_menu" "false" "staged shell.json keeps omarchy.menu enabled"
+  total=$(jq -r '[.bar.layout.left, .bar.layout.center, .bar.layout.right]
+                 | map(length) | add' "$staged_shell_json")
+  assert_eq "$total" "14" "staged shell.json ships the upstream 14-widget layout"
+  assert_eq "$(jq -r 'has("disabledPlugins")' "$staged_shell_json")" "false" \
+    "staged shell.json disables no plugins"
+  assert_eq "$(jq -r '.bar.layout.left[0].id' "$staged_shell_json")" "omarchy.menu" \
+    "staged shell.json keeps omarchy.menu enabled"
 else
   echo "skip: jq missing — cannot inspect staged shell.json contents"
 fi

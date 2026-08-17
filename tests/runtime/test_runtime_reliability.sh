@@ -47,18 +47,20 @@ assert_eq "$(grep -Ec '^\.INSTALL$' <<<"$overlay_paths" || true)" "0" \
 assert_eq "$(find "$root" -path '*/etc/*' -o -path '*/usr/lib/systemd/system/*' | wc -l | tr -d ' ')" "0" \
   "R08 extracted tree has no /etc or system unit"
 
-# R09/R10: disabled plugins prevent this shell from providing the upstream
-# notification/lock components.  The package audit only proves no replacement
-# is owned; it cannot prove a real dunst/mako/hyprlock session is preserved.
-assert_eq "$(jq -r '.disabledPlugins | index("omarchy.notifications") != null' "$defaults")" "true" \
-  "R09 omarchy.notifications is disabled"
-assert_eq "$(jq -r '.disabledPlugins | index("omarchy.lock") != null' "$defaults")" "true" \
-  "R10 omarchy.lock is disabled"
+# R09/R10 were rewritten for M8.  This shell now ships the upstream
+# notification and lock plugins ENABLED — suppressing them was reversed
+# (M8 principle 0: upstream defaults are the default).  The invariant that
+# survives is narrower and is the one that actually protects the user: we
+# never own a system path for a competing daemon and we never stop one.
+# Handing mako's D-Bus name over is a measured, consented takeover, not a
+# package-level eviction.
+assert_eq "$(jq -r 'has("disabledPlugins")' "$defaults")" "false" \
+  "R09/R10 extracted defaults disable no plugin"
 assert_eq "$(grep -Eic '^(etc/.*(notification|dunst|mako)|usr/lib/systemd/system/.*(notification|dunst|mako))' <<<"$overlay_paths" || true)" "0" \
   "R09 no notification daemon /etc or system-unit path is owned"
 assert_eq "$(grep -Eic '^(etc/.*(lock|hyprlock)|usr/lib/systemd/system/.*(lock|hyprlock))' <<<"$overlay_paths" || true)" "0" \
   "R10 no lock replacement /etc or system-unit path is owned"
-printf '%s\n' '      FINDING: R09/R10 only audit package ownership; live dunst/mako/hyprlock preservation is UNVERIFIED.'
+printf '%s\n' '      FINDING: R09/R10 only audit package ownership; live mako/hyprlock takeover behaviour is verified by the M8 live task, not here.'
 
 # Auto-start intent is now declared in the autostart bindings, not a systemd
 # unit. The unit is gone from the package. This test never enables/starts a
