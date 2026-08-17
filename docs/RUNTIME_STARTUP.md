@@ -775,6 +775,14 @@ warning: 기존 설정이 SUPER+SPACE 를 이미 바인딩한다. 덮어쓰지 �
 - `graphical-session.target` 자동 기동(§9.4 — 타깃이 여전히 inactive).
 - `COO_RUN_LIVE=1` 키 주입.
 
+**이후 절의 실측으로 대체된 항목.** 이 파일의 관례대로 원문은 보존하고 대체 절을
+가리킨다. SUPER+SPACE/SUPER+K 라이브 동작과 라이브 Quickshell 프로세스·세션
+IPC 는 §13.1 에서, 알림 데몬(mako)과의 공존은 §13.2·§14.1 에서 측정됐다.
+자동 기동은 기동 모델이 Hyprland autostart 로 바뀌며(§16) `hyprland.start` 발화가
+부모=Hyprland 로 실측됐다(§16.1) — `graphical-session.target` pull-in 은 새
+모델의 전제가 아니게 됐다. 이 절 기준으로 **여전히 미검증으로 남는 것은
+Waybar·lock 화면 공존과 `COO_RUN_LIVE=1` 키 주입뿐**이다(§16.7).
+
 ---
 
 ## 13. 라이브 세션 승인 검증 (2026-08-17)
