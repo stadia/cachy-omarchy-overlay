@@ -65,7 +65,14 @@ for helper in \
   omarchy-theme-bg-next \
   omarchy-theme-bg-current \
   omarchy-theme-bg-switcher \
-  omarchy-theme-bg-cache ; do
+  omarchy-theme-bg-cache \
+  omarchy-theme-set-foot \
+  omarchy-theme-set-tmux \
+  omarchy-theme-set-gnome \
+  omarchy-theme-set-pi \
+  omarchy-theme-set-claude \
+  omarchy-theme-set-vscode \
+  omarchy-theme-set-obsidian ; do
   install -D -m755 "$src/bin/$helper" \
     "$dest/usr/share/cachy-omarchy/upstream/bin/$helper"
 done

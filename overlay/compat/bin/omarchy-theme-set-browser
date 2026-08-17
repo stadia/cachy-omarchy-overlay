@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# No-op shim (M9 D3, SPEC 44). 업스트림 훅은 /etc/<browser>/policies/managed 에
+# 쓰므로 스테이징하지 않는다. 하지만 omarchy-theme-set 의 post_theme_commands 가
+# 이 이름을 무조건 호출하고 스크립트에 set -e 가 없어, 부재 시 stderr 에만
+# "command not found" 가 새고 exit 는 0 이다 — 조용한 실패. shim 으로 메운다.
+# 주의: compat/bin 은 PATH 에서 $OMARCHY_PATH/bin 보다 앞이다. 실제 훅을
+# 스테이징하게 되면 이 shim 을 먼저 삭제할 것 (섀도잉).
+exit 0

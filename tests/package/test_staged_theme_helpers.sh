@@ -28,6 +28,15 @@ for h in omarchy-theme-set omarchy-theme-set-templates omarchy-theme-color \
   assert_eq "$x" "0" "실행 가능: $h"
 done
 
+# Tier B — post-theme 훅. 사용자 홈만 건드리고 대상 앱이 없으면 조용히 종료.
+# browser(/etc 정책 쓰기)와 keyboard(특정 하드웨어)만 제외한다 (설계 문서 D3).
+for h in omarchy-theme-set-foot omarchy-theme-set-tmux \
+         omarchy-theme-set-gnome omarchy-theme-set-pi \
+         omarchy-theme-set-claude omarchy-theme-set-vscode \
+         omarchy-theme-set-obsidian ; do
+  assert_file_exists "$bin/$h" "Tier B 스테이징: $h"
+done
+
 # Tier C — 넣지 않는다 (네트워크/전체 OS 가정/하드웨어 전용, 설계 문서 D3).
 # 이 단언은 $OMARCHY_PATH/bin (스테이징된 upstream bin) 에만 건다 — 트리
 # 전체를 대상으로 하면 Task 3 의 compat no-op shim 2개(browser/keyboard)에

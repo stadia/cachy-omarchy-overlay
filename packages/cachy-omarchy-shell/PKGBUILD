@@ -12,6 +12,11 @@ license=('MIT')
 #   (restart-terminal 의 kitty/ghostty, restart-opencode). (M9, 설계 문서 D8)
 depends=('quickshell' 'hyprland' 'inotify-tools' 'libvips' 'procps-ng' 'psmisc')
 makedepends=('git')
+optdepends=(
+  'jq: theme hooks for vscode/pi/claude/obsidian (omarchy-theme-set-*)'
+  'tmux: omarchy-theme-set-tmux hook'
+  'foot: omarchy-theme-set-foot hook (OSC reload)'
+)
 _commit='f0020448ca87329199de7cb12f2015ebc4a3e5e7'
 
 # bin/build-packages --clean creates these source archives only in a temporary

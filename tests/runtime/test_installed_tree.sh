@@ -41,11 +41,24 @@ assert_file_exists "$HOME/.config/cachy-omarchy/hypr/bindings.conf" "init 가 �
 [[ -e "$HOME/.local/state/omarchy/toggles/bar-off" ]] && made=1 || made=0
 assert_eq "$made" "0" "설치 트리의 init 도 bar-off 를 만들지 않는다"
 
-# 4) compat shim 은 /usr/bin 이 아니라 통제된 경로에 있다.
-[[ -x "$COO_COMPAT_BIN/omarchy-shell" ]] && ok=0 || ok=1
-assert_eq "$ok" "0" "compat omarchy-shell 이 통제 경로에 있다"
-[[ -e "$BIN/omarchy-shell" ]] && leak=1 || leak=0
-assert_eq "$leak" "0" "/usr/bin 으로 새지 않았다"
+# 4) compat shim 은 전부 통제 경로에 있고, 어느 것도 /usr/bin 으로 새지
+#    않는다. 이름을 하드코딩하지 않고 디렉터리를 순회한다 — shim 이 추가될
+#    때마다 단언이 자동으로 따라간다 (기존에는 omarchy-shell 하나만 검사해
+#    uwsm-app·omarchy-update-available 이 미검증이었다).
+for shim in "$COO_COMPAT_BIN"/*; do
+  [[ -e $shim ]] || continue   # 빈 글롭 가드 — 리터럴 * 로 도는 것 방지
+  name=$(basename "$shim")
+  [[ -x $shim ]] && ok=0 || ok=1
+  assert_eq "$ok" "0" "compat $name 이 통제 경로에서 실행 가능"
+  [[ -e $BIN/$name ]] && leak=1 || leak=0
+  assert_eq "$leak" "0" "/usr/bin 으로 새지 않았다: $name"
+done
+# no-op shim 2개는 내용도 단언한다 — 실수로 실제 훅이 compat 에 들어오면
+# (섀도잉, D3 주의) 여기서 잡힌다. shim 파일에는 주석이 있으므로 핵심 행만 본다.
+for s in omarchy-theme-set-browser omarchy-theme-set-keyboard; do
+  grep -q '^exit 0$' "$COO_COMPAT_BIN/$s" && ok=0 || ok=1
+  assert_eq "$ok" "0" "no-op shim 내용: $s"
+done
 
 # 5) 공식 omarchy 는 여전히 미설치.
 pacman -Q omarchy >/dev/null 2>&1 && inst=1 || inst=0
