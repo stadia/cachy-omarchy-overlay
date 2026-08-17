@@ -33,6 +33,16 @@ assert_contains "$lsrc" 'hl.bind("SUPER + K", hl.dsp.exec_cmd("cachy-omarchy-key
 [[ $lsrc == *'hl.bind("SUPER + K"'* ]] && klive=1 || klive=0
 assert_eq "$klive" "1" "lua 는 SUPER+K 를 활성화한다"
 
+# M10 D6: media/brightness 키는 관리 블록에 자동 주입하지 않는다. audio helper 의
+# 도달 경로는 명시 CLI/메뉴뿐이다 (P07).
+for src_text in "$csrc" "$lsrc"; do
+  if grep -qE 'XF86|omarchy-audio-output|omarchy-brightness' <<<"$src_text"; then
+    printf 'FAIL: M10 — 관리 바인딩 소스에 media/brightness 키 주입 금지\n'
+    ASSERT_FAILURES=$((ASSERT_FAILURES + 1))
+  fi
+done
+printf 'ok:   M10 media/brightness 키 미주입 (if no FAIL above)\n'
+
 hsrc=$(cat "$H")
 if grep -Eiq '^[[:space:]]*hyprctl[[:space:]]+reload' <<<"$hsrc"; then
   printf 'FAIL: 헬퍼가 hyprctl reload 를 호출한다\n'
