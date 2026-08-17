@@ -25,7 +25,7 @@ fi
 if [[ -f $overlay_artifact ]]; then
   list=$(bsdtar -tf "$overlay_artifact")
   assert_contains "$list" "usr/bin/cachy-omarchy-init" "overlay artifact has init"
-  assert_contains "$list" "usr/lib/systemd/user/cachy-omarchy-shell.service" "overlay artifact has user unit"
+  assert_contains "$list" "usr/share/cachy-omarchy/hypr/bindings.lua" "overlay artifact has autostart bindings"
 fi
 
 for artifact in "$shell_artifact" "$overlay_artifact"; do

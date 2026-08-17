@@ -20,7 +20,6 @@ for p in \
   usr/bin/cachy-omarchy-doctor \
   usr/lib/cachy-omarchy/compat/bin/omarchy-shell \
   usr/lib/cachy-omarchy/compat/bin/uwsm-app \
-  usr/lib/systemd/user/cachy-omarchy-shell.service \
   usr/share/cachy-omarchy/defaults/shell.json \
   usr/share/cachy-omarchy/hypr/bindings.conf \
   usr/share/cachy-omarchy/hypr/bindings.lua ; do

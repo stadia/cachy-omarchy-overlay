@@ -15,9 +15,6 @@ for c in omarchy-shell uwsm-app; do
   install -D -m755 "$src/compat/bin/$c" "$dest/usr/lib/cachy-omarchy/compat/bin/$c"
 done
 
-install -D -m644 "$src/systemd/cachy-omarchy-shell.service" \
-  "$dest/usr/lib/systemd/user/cachy-omarchy-shell.service"
-
 install -D -m644 "$src/defaults/shell.json" \
   "$dest/usr/share/cachy-omarchy/defaults/shell.json"
 
