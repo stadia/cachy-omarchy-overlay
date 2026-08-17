@@ -228,9 +228,21 @@ SDDM
 system-wide PAM policy
 system-wide NSS configuration
 existing Waybar
-existing notification daemon
-existing lock screen
 ```
+
+Revised in v0.2.0 (M8). The desktop-surface entries — notification daemon and
+lock screen — left this list. Installing cachy-omarchy is a statement that you
+want what Omarchy provides, so its bar, notifications, OSD and lock come up on
+upstream defaults; suppression is now the opt-out, not the default. Waybar
+stays on the list because a bar is the one surface where two of them side by
+side is unusable rather than merely redundant.
+
+What replaced "must not modify" for the surfaces that left the list is not
+"may do anything". No package of ours owns a path under `/etc` or a system
+unit for a competing daemon, and no command of ours stops, masks, disables or
+uninstalls a running one. Taking over is something the user consents to; a
+D-Bus name changing hands when the shell starts is the mechanism, and it is
+reversible by not starting the shell.
 
 ---
 
@@ -904,9 +916,14 @@ manual `--restart`). Migration from the former systemd unit requires
 The service must not:
 
 - start a second Hyprland;
-- replace Waybar;
-- start Omarchy lock screen unless explicitly enabled;
-- start unrelated upstream plugins automatically if they conflict.
+- stop, mask, disable or uninstall a running Waybar, notification daemon or
+  lock helper — detect and report, never evict (revised in v0.2.0; this host
+  has no Waybar installed, so coexistence remains unmeasured);
+- keep upstream plugins suppressed by default. Since v0.2.0 the staged
+  `shell.json` is the pinned upstream file verbatim, so bar, notifications,
+  OSD, idle and lock come up enabled. Suppression is added back only where a
+  live conflict has been measured, and the user opts out per surface
+  (`~/.local/state/omarchy/toggles/bar-off` for the bar).
 
 ---
 
@@ -930,14 +947,19 @@ omarchy.menu       ENABLE
 keybindings UI     ENABLE or ADAPT
 ```
 
-Examples of likely non-goals:
+This was written for v0.1, which shipped a `shell.json` with an empty
+`bar.layout` and eleven entries in `disabledPlugins`. v0.2.0 reversed that:
 
 ```text
-bar                DISABLE
-notifications      DISABLE
-lock               DISABLE
-OSD                DISABLE
+bar                UPSTREAM DEFAULT  (user opts out via the bar-off toggle)
+notifications      UPSTREAM DEFAULT  (takes over mako's D-Bus name; measured)
+lock               UPSTREAM DEFAULT
+OSD                UPSTREAM DEFAULT
 ```
+
+The staged defaults file carries no `disabledPlugins` key at all, and
+`tests/runtime/test_shell_config.sh` diffs it against the pinned upstream
+commit so it cannot drift back silently.
 
 The dependency audit must determine whether disabled plugins can remain
 packaged but inactive.
@@ -1832,9 +1854,17 @@ R05 Escape closes launcher
 R06 application can be launched
 R07 restarting service recovers
 R08 absence of Waybar modification
-R09 absence of notification daemon replacement
-R10 absence of lock-screen replacement
+R09 no notification daemon is stopped, masked or uninstalled by us
+R10 no lock helper is stopped, masked or uninstalled by us
 ```
+
+R09 and R10 were reworded in v0.2.0. They used to read "absence of ... 
+replacement", which the packaged defaults satisfied by disabling the upstream
+plugins outright. That suppression is gone: the shell now provides
+notifications and lock, and on this host it takes over mako's D-Bus name when
+it starts. What survives, and what these criteria measure, is that we never
+own a `/etc` path or system unit for a competing daemon and never stop one —
+`tests/runtime/test_runtime_reliability.sh` audits both directions.
 
 ---
 
@@ -2139,9 +2169,9 @@ All must be true:
 - [x] Normal applications can launch.
 - [x] `SUPER + K` opens keybinding UI.
 - [x] Existing Hyprland config is preserved.
-- [ ] Existing Waybar is preserved. *(bar 억제는 측정됨 §14.4/§16.4; Waybar 자체 공존은 이 호스트가 mako 를 써 미검증)*
-- [x] Existing notification daemon is preserved.
-- [ ] Existing lock setup is preserved. *(미검증 — hyprlock 등 live lock 설정과 상호작용 실측 안 함)*
+- [ ] An installed Waybar is not removed or stopped by us. *(이 호스트에 Waybar 가 설치돼 있지 않아 공존은 여전히 미검증)*
+- [x] A running notification daemon is not stopped, masked or uninstalled by us. *(v0.2.0 개정 — 셸이 알림을 제공하고 mako 의 D-Bus 이름을 인계받는다. 데몬을 죽이지는 않는다)*
+- [ ] An installed lock helper is not removed or stopped by us. *(미검증 — hyprlock 등 live lock 설정과 상호작용 실측 안 함)*
 - [x] Rebuild against a newer upstream release is automated.
 - [x] Failed updates do not install.
 - [x] Previous working package can be rolled back.
@@ -2267,6 +2297,20 @@ If uncertain:
 - do not overwrite;
 - leave previous package in place;
 - print actionable diagnostics.
+
+Adopting upstream defaults in v0.2.0 did not weaken this. Coming up on
+upstream defaults is a decision about what our own shell draws; it is not a
+licence to reach into somebody else's daemon. The rule for a competing
+surface is detect, report, and let the user decide:
+
+- no command of ours stops, masks, disables or uninstalls a running daemon —
+  not `init`, not `doctor`, not any install script;
+- user state is never deleted to change a default. A `bar-off` toggle written
+  by 0.1.x survives the upgrade; `doctor` prints the one-line `rm` and stops
+  there;
+- where a takeover is inherent to the mechanism — a D-Bus name changing hands
+  when the shell starts — it must be measured, written down, and reversible by
+  not starting the shell.
 
 ---
 

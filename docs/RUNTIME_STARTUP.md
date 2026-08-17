@@ -57,7 +57,7 @@ journalctl --user -t cachy-omarchy-shell
 규칙:
 
 - `version: 1` 을 가진 유효한 사용자 파일이 `userConfigPath` 에 있으면 **기본값을 통째로 대체**한다. (일부 키만 덮어쓰기 불가.)
-- 없으면 `defaultsPath` 를 읽는다. 우리 패키지는 이 자리에 **우리 기본값**(`overlay/defaults/shell.json`)을 설치한다 — `stage-upstream.sh` 가 업스트림 것이 아니라 우리 것을 넣는다.
+- 없으면 `defaultsPath` 를 읽는다. `stage-upstream.sh` 는 이 자리에 정본 `overlay/defaults/shell.json` 을 설치한다. **v0.2.0 부터 그 정본의 내용은 핀 커밋 업스트림 파일과 바이트 동일하다** — 우리 값을 넣기 위해서가 아니라, 리베이스로 업스트림 기본값이 바뀌면 `tests/runtime/test_shell_config.sh` 의 핀 커밋 대조가 잡게 하려고 우리 경로를 거친다.
 - 그것도 실패하면 `builtinShellConfig`.
 
 ### 알려진 한계 — 사용자 `~/.config/omarchy/shell.json` 오버라이드
@@ -75,9 +75,19 @@ journalctl --user -t cachy-omarchy-shell
 
 ---
 
-## 3. 비활성 플러그인
+## 3. 비활성 플러그인 — v0.2.0 에서 폐기됨 (M2 기록으로 보존)
 
-패키지에 실제로 스테이징되는 `disabledPlugins` (`overlay/defaults/shell.json`):
+> **🔄 개정 (v0.2.0, M8, 2026-08-17).** 이 절이 서술하는 비활성 집합은 **더 이상
+> 존재하지 않는다.** 정본 `overlay/defaults/shell.json` 은 핀 커밋 업스트림 파일
+> 그대로이며 `disabledPlugins` 키 자체가 없다. 바·알림·OSD·idle·락은 전부 켜진
+> 채로 뜬다. 억제는 라이브 충돌이 실측된 곳에만, 사용자 opt-out 으로 돌아온다
+> (바는 `bar-off` 토글). 근거와 결정은 M8 평가 문서, 개정된 SPEC §4.3·§17·§18·§61.
+>
+> 아래 본문은 **M2 시점의 실측 기록**으로 남긴다. 그 안의 기술적 발견 두 가지는
+> 지금도 참이고 여전히 중요하다: (a) `disabledPlugins` 로는 내장 바를 끌 수 없다,
+> (b) `bar-off` 는 표면을 없애는 게 아니라 `y=-26` 으로 주차시킨다.
+
+M2 당시 패키지에 스테이징되던 `disabledPlugins`:
 
 ```text
 omarchy.bar  omarchy.notifications  omarchy.lock  omarchy.osd
@@ -85,7 +95,7 @@ omarchy.idle  omarchy.battery  omarchy.nightlight  omarchy.media
 omarchy.polkit  omarchy.reminders  omarchy.background
 ```
 
-`omarchy.menu` 는 목록에 **없다** (M3 런처).
+`omarchy.menu` 는 목록에 **없었다** (M3 런처).
 
 ### 기동 시 실측 상태 (라이브 `listPlugins` IPC)
 
@@ -355,6 +365,18 @@ overlay 패키지, `cachy-omarchy-init`, Waybar 처리와 실제 설치 통합�
 | 9 | `usr/share/cachy-omarchy/defaults/shell.json` |
 | 10 | `usr/share/cachy-omarchy/hypr/bindings.conf` |
 | 11 | `usr/share/cachy-omarchy/hypr/bindings.lua` |
+| 12 | `usr/lib/cachy-omarchy/compat/bin/omarchy-update-available` (v0.2.0) |
+
+v0.2.0 부터 셸 패키지는 바 위젯이 bare name 으로 부르는 업스트림 helper 도 함께
+스테이징한다 (`usr/share/cachy-omarchy/upstream/bin/`): Tier A `omarchy-menu-select`
+`omarchy-cmd-present` `omarchy-audio-output-sink` `omarchy-network-status`
+`omarchy-network-band` `omarchy-monitor-state` `omarchy-hyprland-monitor-scaling`,
+Tier B `omarchy-reminder` `omarchy-notification-send` `omarchy-agent-usage-{update,claude,codex,fireworks}`.
+전부 업스트림과 바이트 동일하다(`tests/package/test_staged_helpers.sh` 가 확인).
+밝기 체인(`omarchy-brightness-display*`, `omarchy-hw-display`)은 의존 명령이 없어
+넣지 않는다. `cachy-omarchy-shell --run` 이 `$OMARCHY_PATH/bin` 을 **셸 프로세스
+PATH 에만** 붙인다 — compat shim 디렉터리가 그보다 앞이라 적응 카피가 동명
+업스트림 파일을 이긴다.
 
 `/etc`, `/boot`, `/efi`, system 유닛(`usr/lib/systemd/system/`)은 소유하지 않는다.
 compat shim(6, 7번)은 `/usr/lib/cachy-omarchy/compat/bin/` 에만 있고 `/usr/bin` 으로
@@ -370,7 +392,13 @@ post-install 훅이 아니라 **사용자가 직접 실행**하는 유저 레벨
   - `~/.config/cachy-omarchy/hypr/bindings.{conf,lua}` — `cachy-omarchy-bindings` 에
     위임해 설치하고, 사용자 Hyprland 설정에 관리 source 블록만 주입한다(본문은 건드리지
     않음).
-  - `~/.local/state/omarchy/toggles/bar-off` — 내장 바를 숨기는 빈 파일.
+- **만들지 않는 것 — `~/.local/state/omarchy/toggles/bar-off` (v0.2.0 개정).** 0.1.x
+  init 은 이 빈 파일을 만들어 내장 바를 숨겼다. v0.2.0 부터는 만들지 않는다 —
+  바는 기본으로 보인다. `toggles` 디렉터리조차 만들지 않는다(만들면 다음 실행이
+  "사용자 상태 존재"로 오독한다). 업그레이드한 사용자가 이미 가진 토글은 사용자
+  상태이므로 지우지 않고, init 은 "유지" 한 줄을, `cachy-omarchy-doctor` 는
+  `WARN` 과 함께 지울 `rm` 명령을 알린다. 바를 끄고 싶으면 사용자가 직접 만든다:
+  `: > ~/.local/state/omarchy/toggles/bar-off`.
 - **만들지 않는 것** — `~/.config/cachy-omarchy/shell.json`. 셸이 읽는 사용자 경로는
   `~/.config/omarchy/shell.json` 이지 이 경로가 아니므로, 여기에 파일을 만들면 사용자
   편집이 조용히 무시된다(dead file). 패키지 기본값은
