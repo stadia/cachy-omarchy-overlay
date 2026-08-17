@@ -29,6 +29,20 @@ shell_pkgrel_pin=5
 sed -i "s/^pkgrel=.*/pkgrel=${shell_pkgrel_pin}/" "$root/packages/cachy-omarchy-shell/PKGBUILD"
 shell_pkgrel_pin=$(grep -m1 '^pkgrel=' "$root/packages/cachy-omarchy-shell/PKGBUILD" | cut -d= -f2 | tr -d "'\"")
 
+# Same hermetic problem, one package over: the overlay's own pkgver evolves
+# independently of upstream/shell state (PKGBUILD's own comment: "업스트림
+# 버전과 독립적으로 진화한다") and gets bumped for its own patch releases at
+# any time -- exactly like the working tree carrying pkgver=0.1.1 while this
+# file was last written against 0.1.0. Pin it to a sentinel distinct from
+# every overlay pkgver the live tree has ever used, so a future assertion
+# that hardcodes the overlay's literal pkgver/artifact name fails on every
+# run -- not only when the live tree happens to still agree with it.
+overlay_pkgver_pin=0.9.9
+sed -i "s/^pkgver=.*/pkgver=${overlay_pkgver_pin}/" "$root/packages/cachy-omarchy-overlay/PKGBUILD"
+overlay_pkgver_pin=$(grep -m1 '^pkgver=' "$root/packages/cachy-omarchy-overlay/PKGBUILD" | cut -d= -f2 | tr -d "'\"")
+overlay_pkgrel_pin=$(grep -m1 '^pkgrel=' "$root/packages/cachy-omarchy-overlay/PKGBUILD" | cut -d= -f2 | tr -d "'\"")
+overlay_artifact_pin="cachy-omarchy-overlay-${overlay_pkgver_pin}-${overlay_pkgrel_pin}-any.pkg.tar.zst"
+
 cp -a "$REPO_ROOT/bin/check-upstream" "$REPO_ROOT/bin/build-packages" \
   "$REPO_ROOT/bin/validated-build.sh" "$REPO_ROOT/bin/test-packages" \
   "$REPO_ROOT/bin/install-packages" "$REPO_ROOT/bin/rollback" \
@@ -196,7 +210,7 @@ manifest=$COO_TEST_SANDBOX/state/validated-build.manifest
 assert_file_exists "$manifest" "validated manifest exists"
 manifest_src=$(cat "$manifest")
 assert_contains "$manifest_src" "OMARCHY_COMMIT=f0020448ca87329199de7cb12f2015ebc4a3e5e7" "manifest binds commit"
-assert_contains "$manifest_src" "cachy-omarchy-overlay-0.1.0-1-any.pkg.tar.zst" "manifest binds overlay artifact"
+assert_contains "$manifest_src" "$overlay_artifact_pin" "manifest binds overlay artifact"
 release=$(awk -F= '$1 == "RELEASE" { print $2 }' "$manifest")
 # Derived from the fixture's own (hermetically pinned) PKGBUILD, not a
 # hardcoded pkgrel -- see shell_pkgrel_pin above.
@@ -254,6 +268,10 @@ assert_file_exists "$trans_state/validated-builds/old/artifacts/cachy-omarchy-sh
 # Dynamic shell version comes from fixture lock/PKGBUILD, not hard-coded names.
 dyn=$COO_TEST_SANDBOX/dynamic-repo
 cp -a "$root" "$dyn"
+# Independence is a relation (before vs. after a shell-only bump), not a
+# literal -- capture the overlay's pkgver here, before anything touches this
+# checkout, so it can be compared against itself post-build below.
+dyn_overlay_ver_before=$(grep -m1 '^pkgver=' "$dyn/packages/cachy-omarchy-overlay/PKGBUILD" | cut -d= -f2 | tr -d "'\"")
 sed -i 's/OMARCHY_VERSION=4.0.0/OMARCHY_VERSION=4.0.1/; s/f0020448ca87329199de7cb12f2015ebc4a3e5e7/5555555555555555555555555555555555555555/' "$dyn/upstream.lock"
 sed -i "s/pkgver=4.0.0/pkgver=4.0.1/; s/_commit='[0-9a-f]*'/_commit='5555555555555555555555555555555555555555'/" "$dyn/packages/cachy-omarchy-shell/PKGBUILD"
 COO_TOOL_LOG="$log" COO_REPO_ROOT="$dyn" COO_BUILD_DIR="$COO_TEST_SANDBOX/dynamic-build" COO_STATE_DIR="$COO_TEST_SANDBOX/dynamic-state" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" "$dyn/bin/build-packages" >/dev/null
@@ -265,7 +283,14 @@ assert_contains "$dynamic_manifest" "OMARCHY_VERSION=4.0.1" "dynamic lock versio
 dyn_shell_ver=$(grep -m1 '^pkgver=' "$dyn/packages/cachy-omarchy-shell/PKGBUILD" | cut -d= -f2 | tr -d "'\"")
 dyn_shell_rel=$(grep -m1 '^pkgrel=' "$dyn/packages/cachy-omarchy-shell/PKGBUILD" | cut -d= -f2 | tr -d "'\"")
 assert_contains "$dynamic_manifest" "cachy-omarchy-shell-${dyn_shell_ver}-${dyn_shell_rel}-any.pkg.tar.zst" "dynamic shell artifact name is used"
-assert_contains "$dynamic_manifest" "cachy-omarchy-overlay-0.1.0-1-any.pkg.tar.zst" "overlay version remains independent"
+# "Independent" means a shell-only upstream bump leaves the overlay's own
+# pkgver exactly as it was before the bump -- a before/after comparison, not
+# a hardcoded literal. This fails if a shell bump ever does change it, and
+# passes at whatever overlay pkgver the fixture happens to carry.
+dyn_overlay_ver_after=$(grep -m1 '^pkgver=' "$dyn/packages/cachy-omarchy-overlay/PKGBUILD" | cut -d= -f2 | tr -d "'\"")
+assert_eq "$dyn_overlay_ver_after" "$dyn_overlay_ver_before" "overlay version remains independent"
+dyn_overlay_rel=$(grep -m1 '^pkgrel=' "$dyn/packages/cachy-omarchy-overlay/PKGBUILD" | cut -d= -f2 | tr -d "'\"")
+assert_contains "$dynamic_manifest" "cachy-omarchy-overlay-${dyn_overlay_ver_after}-${dyn_overlay_rel}-any.pkg.tar.zst" "dynamic overlay artifact name is used"
 
 # U08: testing requires a current manifest first, and any skip is a failure.
 missing_state=$COO_TEST_SANDBOX/missing-state
@@ -495,6 +520,13 @@ update_state=$COO_TEST_SANDBOX/update-state
 update_build=$COO_TEST_SANDBOX/update-build
 pac_update=$COO_TEST_SANDBOX/update-pacman.log
 : >"$pac_update"
+# "Independent" means this shell-only upstream update leaves the overlay's
+# own pkgver exactly as it was beforehand -- capture that here, immediately
+# before the call, and compare it to itself afterward. A literal like
+# "pkgver=0.1.0" would only ever test that the fixture happens to still
+# carry that value, and would fail on every legitimate overlay release even
+# though nothing about independence changed.
+overlay_pkgver_before_update=$(grep -m1 '^pkgver=' "$root/packages/cachy-omarchy-overlay/PKGBUILD")
 code=0
 out=$(WAYLAND_DISPLAY= COO_UPDATE_PIPELINE_NESTED=1 COO_REPO_ROOT="$root" COO_GIT_BIN="$fake/git" COO_STATE_DIR="$update_state" COO_BUILD_DIR="$update_build" COO_OMARCHY_GIT="$REPO_ROOT/build/omarchy" COO_TOOL_LOG="$log" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_FAKE_ARTIFACT_SOURCE="$REPO_ROOT/build" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$pac_update" "$root/bin/update-upstream" 2>&1) || code=$?
 assert_eq "$code" "0" "U02 update validates and publishes candidate"
@@ -508,7 +540,7 @@ assert_contains "$updated_lock" "OMARCHY_TAG=v4.0.1" "U02 lock tag updates"
 assert_contains "$updated_pkg" "pkgver=4.0.1" "U03 shell pkgver updates"
 assert_contains "$updated_pkg" "pkgrel=1" "U03 pkgrel resets to one"
 assert_contains "$updated_pkg" "_commit='2222222222222222222222222222222222222222'" "U02 shell commit updates"
-assert_eq "$(grep -m1 '^pkgver=' "$root/packages/cachy-omarchy-overlay/PKGBUILD")" "pkgver=0.1.0" "U02 overlay version is independent"
+assert_eq "$(grep -m1 '^pkgver=' "$root/packages/cachy-omarchy-overlay/PKGBUILD")" "$overlay_pkgver_before_update" "U02 overlay version is independent"
 assert_eq "$(wc -l <"$pac_update")" "0" "U02 update never invokes pacman"
 assert_contains "$out" "UPSTREAM.md requires human" "UPSTREAM.md deferred with explicit reason"
 
