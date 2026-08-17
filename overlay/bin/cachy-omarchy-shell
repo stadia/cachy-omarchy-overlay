@@ -41,6 +41,25 @@ cmd_run() {
   # 오염시키지 않는다 (SPEC 44, 45).
   [[ -d $COMPAT_BIN ]] && export PATH="$COMPAT_BIN:$PATH"
 
+  # uwsm/graphical-session.target 이 컴포저터가 WAYLAND_DISPLAY 를 systemd 유저
+  # 매니저에 올리기 전 — 또는 이전 세션의 낡은 값으로 — 우리를 띄울 수 있다.
+  # 그 상태로 quickshell(Qt)을 시작하면 wayland 소켓에 연결하지 못하고 xcb 로
+  # 폴백해 크래시한다(시작 84ms 만에 start-limit). 권위 있는(post-propagation)
+  # 값이 살아 있는 소켓을 가리킬 때까지 기다린 뒤 Qt 를 wayland 에 고정한다.
+  local wd wd_man cand
+  wd=
+  for _ in $(seq 1 80); do
+    wd_man=$(systemctl --user show-environment 2>/dev/null \
+      | sed -n 's/^WAYLAND_DISPLAY=//p' | head -1)
+    for cand in "$wd_man" "${WAYLAND_DISPLAY:-}"; do
+      [[ -n $cand && -S $XDG_RUNTIME_DIR/$cand ]] && { wd=$cand; break 2; }
+    done
+    sleep 0.25
+  done
+  [[ -n $wd && -S $XDG_RUNTIME_DIR/$wd ]] \
+    || fail "Wayland 세션 소켓을 기다릴 수 없다 (WAYLAND_DISPLAY 미전파 또는 낡은 값)"
+  export WAYLAND_DISPLAY=$wd QT_QPA_PLATFORM=wayland
+
   # 파일 워처를 끄는 것은 필수다. pacman 이 $OMARCHY_PATH/shell 을 다시 쓰는
   # 도중 리로드가 걸리면 반쯤 쓰인 트리를 읽고, 실패한 리로드가 두 번째 엔진
   # 세대를 남겨 다음 재시작의 IPC kill 을 크래시로 만든다.
