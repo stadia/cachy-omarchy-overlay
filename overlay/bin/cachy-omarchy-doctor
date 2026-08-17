@@ -12,7 +12,6 @@ STATE_DIR=${COO_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/cachy-omarchy}
 USER_OMARCHY_CONFIG_DIR=${COO_OMARCHY_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/omarchy}
 INSTALL_ROOT=$(dirname "$(dirname "$PREFIX_ROOT")")
 BIN_DIR=$INSTALL_ROOT/bin
-SERVICE_FILE=$INSTALL_ROOT/lib/systemd/user/cachy-omarchy-shell.service
 OMARCHY_PATH=${COO_OMARCHY_PATH:-$PREFIX_ROOT/upstream}
 SHA256_BIN=${COO_SHA256_BIN:-sha256sum}
 IPC_TIMEOUT_RAW=${COO_IPC_TIMEOUT-2s}
@@ -218,7 +217,6 @@ check_packages
 [[ -d $OMARCHY_PATH ]] && pass "OMARCHY_PATH compatibility root ($OMARCHY_PATH)" \
   || fail "OMARCHY_PATH compatibility root missing: $OMARCHY_PATH"
 check_file "shell.qml" "$OMARCHY_PATH/shell/shell.qml"
-check_file "shell service" "$SERVICE_FILE"
 check_file "omarchy.menu availability" "$OMARCHY_PATH/default/omarchy/omarchy-menu.jsonc"
 check_executable "shell wrapper" "$BIN_DIR/cachy-omarchy-shell"
 check_executable "launcher invocation" "$BIN_DIR/cachy-omarchy-launcher"
@@ -275,6 +273,5 @@ if [[ -e $USER_OMARCHY_CONFIG_DIR/shell.json ]]; then
 else
   pass "user shell override absent"
 fi
-warn "graphical-session auto-start unverified; unit intent is not observed startup"
 
 exit "$failures"

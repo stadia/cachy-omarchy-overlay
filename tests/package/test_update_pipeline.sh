@@ -160,7 +160,6 @@ mkdir -p "$doctor_prefix/upstream/shell" "$doctor_prefix/upstream/default/omarch
   "$doctor_compat" "$doctor_root/usr/bin" "$doctor_root/usr/lib/systemd/user" "$doctor_fake"
 printf '// fixture shell\n' >"$doctor_prefix/upstream/shell/shell.qml"
 printf '{}\n' >"$doctor_prefix/upstream/default/omarchy/omarchy-menu.jsonc"
-printf '[Unit]\n' >"$doctor_root/usr/lib/systemd/user/cachy-omarchy-shell.service"
 for command in cachy-omarchy-shell cachy-omarchy-launcher cachy-omarchy-bindings cachy-omarchy-keybindings; do
   printf '#!/usr/bin/env bash\nexit 0\n' >"$doctor_root/usr/bin/$command"
   chmod +x "$doctor_root/usr/bin/$command"
