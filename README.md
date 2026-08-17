@@ -17,8 +17,8 @@ SUPER + K      →  Omarchy 스타일 키바인딩 뷰어
 
 | 패키지 | 버전 | 역할 |
 |---|---|---|
-| `cachy-omarchy-shell` | 4.0.0-4 | 핀된 Omarchy Quattro 셸 런타임 (Quickshell 트리, `omarchy-settings` 제외) |
-| `cachy-omarchy-overlay` | 0.3.0-1 | CachyOS 통합 계층 (래퍼 명령, Hyprland 바인딩, 기본값) |
+| `cachy-omarchy-shell` | 4.0.0-5 | 핀된 Omarchy Quattro 셸 런타임 (Quickshell 트리, `omarchy-settings` 제외) |
+| `cachy-omarchy-overlay` | 0.4.0-1 | CachyOS 통합 계층 (래퍼 명령, Hyprland 바인딩, 기본값) |
 
 업스트림 핀은 `upstream.lock`이 관리한다 (현재 `basecamp/omarchy @ v4.0.0`,
 `f0020448`).
@@ -121,8 +121,8 @@ bin/rollback                 # 이전 핀으로 복귀
   `cachy-omarchy-theme-set` 래퍼로 업스트림 `omarchy-theme-set` 을 무패치
   실행한다. 실측: `docs/RUNTIME_STARTUP.md` §18.6.
 - **v0.4 (Milestone 10)** — 유틸리티 플러그인(clipboard·emojis·image-picker·
-  reminders·OSD) helper/의존성 채택. 진행 중. 설계·플랜:
-  `docs/superpowers/plans/2026-08-17-m10-utility-plugins-design.md`.
+  reminders·OSD) helper/의존성 채택. 완료(`v0.4.0`). 실측:
+  `docs/RUNTIME_STARTUP.md` §19.2.
 
 ## 라이선스
 
