@@ -11,3 +11,17 @@ hl.bind("SUPER + K", hl.dsp.exec_cmd("cachy-omarchy-keybindings"))
 hl.on("hyprland.start", function()
   hl.exec_cmd("cachy-omarchy-shell --run")
 end)
+
+-- Theme palette (M9 D5): 테마가 생성한 hyprland.lua(테두리 색/그라디언트)를
+-- 있을 때만 로드한다. 관리 블록의 pcall(dofile, bindings.lua) 안에서 한 번 더
+-- pcall 로 감싼다 — 테마 파일이 깨져도 사용자 설정 전체가 죽지 않는다.
+-- 테마 파일 부재(시드 전/사용자 삭제)는 정상 경로이므로 조용히 지나간다.
+do
+  local theme_hypr = os.getenv("HOME")
+    .. "/.local/state/omarchy/current/theme/hyprland.lua"
+  local f = io.open(theme_hypr, "r")
+  if f then
+    f:close()
+    pcall(dofile, theme_hypr)
+  end
+end
