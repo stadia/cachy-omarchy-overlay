@@ -242,12 +242,19 @@ What replaced "must not modify" for the surfaces that left the list is not
 unit for a competing daemon, and no command of ours stops, masks, disables or
 uninstalls a running one.
 
-Measured on this host (RUNTIME_STARTUP §17.4): the shell does not in fact
-displace a running notification daemon. `org.freedesktop.Notifications` is
-first-come, so with mako already holding the name the shell's notification
-service backs off and retries rather than taking it. The shell provides
-notifications only where nothing else claimed the name — which means the user
-stopping mako is what hands the surface over, not us.
+Measured on this host (RUNTIME_STARTUP §17.4): the shell does not displace a
+running notification daemon, and cannot. Replacing an owned D-Bus name needs
+the requester to send `REPLACE_EXISTING` and the incumbent to have taken the
+name with `ALLOW_REPLACEMENT`; the shell sends neither and does not even join
+the queue — it watches for the name to be released and retries. Changing that
+would mean patching quickshell itself, which is a dependency, not ours.
+
+What decides the outcome is order, not eviction. mako's unit is `disabled`
+with `Type=dbus`, so it exists only when a notification arrives while nobody
+owns the name — it started six separate times on the measurement day. A shell
+holding the name from session start means mako is never activated at all.
+Installing the package does none of this: install places files, and the
+overlay ships no `.INSTALL` script (R08 pins that).
 
 ---
 
@@ -957,8 +964,8 @@ This was written for v0.1, which shipped a `shell.json` with an empty
 
 ```text
 bar                UPSTREAM DEFAULT  (user opts out via the bar-off toggle)
-notifications      UPSTREAM DEFAULT  (yields to a daemon already holding the
-                                     D-Bus name; measured §17.4)
+notifications      UPSTREAM DEFAULT  (wins the D-Bus name if it starts first;
+                                     yields if mako already holds it — §17.4)
 lock               UPSTREAM DEFAULT
 OSD                UPSTREAM DEFAULT
 ```
@@ -1872,10 +1879,12 @@ measure, is that we never own a `/etc` path or system unit for a competing
 daemon and never stop one — `tests/runtime/test_runtime_reliability.sh` audits
 both directions.
 
-Measured (RUNTIME_STARTUP §17.4): with mako running, the shell could not
-register `org.freedesktop.Notifications` and backed off. R09 holds here for a
-stronger reason than restraint — the D-Bus name is first-come and there was
-nothing to take.
+Measured (RUNTIME_STARTUP §17.4): with mako already holding
+`org.freedesktop.Notifications`, the shell could not register it, did not join
+the queue, and backed off. R09 holds here for a stronger reason than restraint
+— the shell has no mechanism to take an owned name. Where the shell starts
+first, it simply owns the name and mako, whose unit is disabled and D-Bus
+activated, is never started; that is still ordering, not eviction.
 
 ---
 
@@ -2181,7 +2190,7 @@ All must be true:
 - [x] `SUPER + K` opens keybinding UI.
 - [x] Existing Hyprland config is preserved.
 - [ ] An installed Waybar is not removed or stopped by us. *(이 호스트에 Waybar 가 설치돼 있지 않아 공존은 여전히 미검증)*
-- [x] A running notification daemon is not stopped, masked or uninstalled by us. *(v0.2.0 개정 — 셸이 알림 플러그인을 켠 채로 뜨지만, mako 가 D-Bus 이름을 쥐고 있으면 물러난다. §17.4 실측)*
+- [x] A running notification daemon is not stopped, masked or uninstalled by us. *(v0.2.0 개정 — 셸이 알림 플러그인을 켠 채로 뜬다. mako 가 이름을 쥐고 있으면 물러나고, 셸이 먼저 잡으면 mako 는 활성화되지 않는다 — 밀어내기가 아니라 순서. §17.4 실측)*
 - [ ] An installed lock helper is not removed or stopped by us. *(미검증 — hyprlock 등 live lock 설정과 상호작용 실측 안 함)*
 - [x] Rebuild against a newer upstream release is automated.
 - [x] Failed updates do not install.
@@ -2320,10 +2329,11 @@ surface is detect, report, and let the user decide:
   by 0.1.x survives the upgrade; `doctor` prints the one-line `rm` and stops
   there;
 - where a takeover looks inherent to the mechanism, measure it before writing
-  it down as fact. The claim that starting the shell hands `mako`'s D-Bus name
-  over did not survive measurement (RUNTIME_STARTUP §17.4): the name is
-  first-come and the shell yields. Whatever the mechanism turns out to be, it
-  must be reversible by not starting the shell.
+  it down as fact. "Starting the shell reclaims mako's D-Bus name within a
+  second" did not survive measurement (RUNTIME_STARTUP §17.4) — the shell
+  cannot take an owned name at all. What it can do is hold the name first, so
+  the on-demand daemon is never activated. Either way it must stay reversible
+  by not starting the shell.
 
 ---
 

@@ -1228,17 +1228,51 @@ PID=3949882  Comm=mako
 ```
 
 **M8 평가 문서의 "mako 인계는 D-Bus 이름 회수로 1초 내 성립" 은 이 조건에서
-재현되지 않았다.** 실제 동작은 그 반대다: `org.freedesktop.Notifications` 를
-이미 누가 잡고 있으면 셸의 알림 서비스는 **이름을 뺏지 않고 물러나** 해제될
-때까지 재시도한다. mako 가 계속 알림을 처리한다.
+재현되지 않았다.** 셸은 이미 주인이 있는 이름을 **뺏지 않는다.**
 
-결과적으로 이것은 SPEC §66 의 "감지→보고→사용자 결정" 과 정확히 같은 모양이고,
-사용자에게 더 나은 동작이다. 다만 문언을 사실에 맞춰야 한다:
+추가 측정으로 밀어내기 가능 여부를 확인했다. 셸이 뜬 상태에서:
 
-- 셸이 알림을 제공하려면 사용자가 **먼저 mako 를 중지**해야 한다. 우리 코드가
-  mako 를 죽이지 않는다는 R09 는 여기서도 지켜진다 — 이번엔 자제해서가 아니라
-  D-Bus 선점 규칙 때문에 애초에 뺏을 수 없기 때문이다.
-- "인계" 는 mako 가 없는 호스트에서만 일어난다. 이 호스트에서는 mako 가 이겼다.
+```console
+$ busctl --user call … ListQueuedOwners s org.freedesktop.Notifications
+as 1 ":1.2615"        # mako 하나뿐 — 셸은 대기열에도 없다
+```
+
+즉 셸은 `DBUS_NAME_FLAG_REPLACE_EXISTING` 를 요청하지도, 대기열에 서지도 않고,
+`NameOwnerChanged` 를 지켜보다 재시도한다(WARN 문구 그대로). D-Bus 에서
+밀어내기가 성립하려면 **요청자가 REPLACE_EXISTING 을 보내고 동시에 현 소유자가
+ALLOW_REPLACEMENT 로 이름을 잡았어야** 하는데, 우리 쪽이 애초에 요청하지 않는다.
+바꾸려면 omarchy 가 아니라 **quickshell 본체**를 패치해야 한다 — 우리 패치 예산
+바깥이다.
+
+### 17.4.1 그래서 누가 이기는가 — 순서 문제이지 밀어내기 문제가 아니다
+
+```console
+$ systemctl --user show mako.service -p Type,UnitFileState
+Type=dbus
+UnitFileState=disabled
+$ journalctl --user -u mako.service --since today | grep -c Started
+6      # 10:19, 10:22, 10:30, 12:02, 13:13, 13:38 — 뜨고 내려가기를 반복
+```
+
+**mako 는 상주 데몬이 아니다.** unit 은 `disabled` 이고 `Type=dbus` 라, 이름의
+주인이 없는 상태에서 알림이 도착할 때 D-Bus 가 활성화시킨다. 오늘 하루에만 6번
+새로 떴다. 즉 mako 에게 영구적 선점권은 없다.
+
+따라서 실질적 규칙은 이렇다:
+
+- **셸이 이름을 먼저 잡으면 mako 는 활성화조차 되지 않는다.** 밀어낼 필요가 없다.
+- 반대로 이름의 주인이 이미 mako 면 셸은 물러난다. §17.2 의 측정이 바로 이
+  경우였다 — 격리 인스턴스가 **나중에** 떴기 때문이다.
+- 우리 코드는 어느 쪽에서도 mako 를 죽이거나 mask 하지 않는다. 패키지에
+  `.INSTALL` 스크립트 자체가 없고(`test_runtime_reliability` 의 R08 이 고정),
+  설치는 파일만 놓는다 — 설치 시점에 D-Bus 는 관여하지 않는다.
+
+> **미검증**: 0.2.0 이 설치된 상태로 세션을 새로 시작했을 때 셸이 실제로 이름을
+> 먼저 잡는지는 **아직 측정하지 않았다.** 로그아웃/로그인이 필요하다. 위 세 줄은
+> unit 설정과 활성화 기록에서 나온 결론이고, "셸이 이긴다" 는 아직 관측이 아니다.
+> 다음 세션에서 확인할 명령: `busctl --user call … GetNameOwner s
+> org.freedesktop.Notifications` 의 주인이 quickshell PID 인지, 그리고
+> `systemctl --user is-active mako.service` 가 `inactive` 인지.
 
 ### 17.5 정리 — 잔여물 없음
 
