@@ -1051,3 +1051,79 @@ Tier 1 은 통제된 PATH 테스트(`test_uwsm_app_shim.sh` path B,
 버리므로, 실제 `uwsm-app` 이 없으면 **skip** 한다(Tier 1 을 조용히 검증하지
 않는다). uwsm 없는 머신이 원래 타깃이므로, 그 머신에서 이 테스트가 skip 되는
 것은 정상이다 — `bin/test-packages` 허용 목록에 그 skip 메시지가 등록돼 있다.
+
+## 16. Hyprland autostart 기동 실측 (2026-08-17)
+
+이 절은 셸을 systemd user service 가 아니라 **Hyprland autostart** 로
+띄우는 모델(커밋 4c5731b `refactor: drop systemd shell unit, package Hyprland
+autostart instead`, b093c06 `feat: launch Quattro shell on hyprland.start
+autostart`)를 라이브로 잰 것이다. 6e0f6f5 가 `hyprland.start` 단발화 트리거를
+"live-unverified" 로 남겨둔 caveat 가 이번 재로그인으로 해소됐다.
+
+### 16.1 기동 출처 — autostart 가 맞다 (결정적 증거)
+
+재로그인 후 라이브 셸 프로세스:
+
+```
+PID 3724905  quickshell -n -p /usr/share/cachy-omarchy/upstream/shell
+  PPID 3724848  Hyprland --watchdog-fd 4
+```
+
+부모가 곧 `Hyprland` 자신이다. 즉 터미널에서 `cachy-omarchy-shell --run` 을
+수동으로 친 게 아니라, **Hyprland 가 `hyprland.start` 에서 `exec-once` 로
+`cachy-omarchy-shell --run` 을 실행한 결과**다. 이것이 autostart 기동의
+직접 증거다. `WAYLAND_DISPLAY=wayland-1` 소켓(11:59 생성) 시점과 일치한다.
+
+### 16.2 런타임 환경 (environ, 실설치 경로)
+
+`/proc/3724905/environ`:
+
+- `OMARCHY_PATH=/usr/share/cachy-omarchy/upstream` — 실 pacman 설치 경로(샌드박스 아님).
+- `PATH=/usr/lib/cachy-omarchy/compat/bin:…` — compat bin 이 셸 PATH 선행. §45 PATH 격리가 autostart 세션에서도 그대로 유지됨(§13.3 과 동일).
+- `QT_QPA_PLATFORM=wayland`, `QT_IM_MODULE=fcitx`, `XDG_RUNTIME_DIR=/run/user/1000`.
+- `COO_RUN_LIVE` 없음 — 깨끗한 자동 기동(테스트 강제 키 아님).
+
+### 16.3 QML 에러 0
+
+`journalctl --user -t cachy-omarchy-shell` 에서 PID 3724905 의 항목은 Qt
+wayland textinput `zwp_text_input_v3_leave` `WARN` (surface 0x0 leave —
+양성, §13 시절과 동종) 만 있고 **QML 에러가 없다.** `shell.qml` 이
+wayland-1 에 정상 로드됐다. (동일 저널에 보이는 `/tmp/coo-test-*` 경로의
+INFO 항목들은 테스트 스위트가 만든 샌드박스 셸이지 라이브 셸이 아니다.)
+
+### 16.4 런처와 바 — 동작 확인
+
+- `hyprctl binds` 에 `key: space` 활성. 사용자가 **SUPER+SPACE 로 원본 Quattro
+  런처를 열어 동작을 확인**했다(R04/R05, autostart 세션에서 재확정).
+- `hyprctl layers`: `omarchy-bar` 레이어 `xywh: 0 -26 3072 26, a:1, pid:
+  3724905` — `bar-off` 억제 상태로 `y=-26` 주차, `reserved=[0,0,0,0]`.
+  §14.4/7ec6fda 측정과 동일. (사용자가 §13 이후 `bar-off` 를 유지 중.)
+
+### 16.5 이 절이 검증하는 §61 항목
+
+- **"Long-running shell starts as user"** — 측정됨. 부모=Hyprland 가 autostart
+  기동을 증명한다. 이 항목의 systemd-service 해석(§14.1)은 이제 역사 기록.
+
+### 16.6 모델 전환의 비용 — R07 자동 복구는 더 안 붙는다 (솔직한 한계)
+
+**주의:** systemd user unit 을 제거(4c5731b)하면서 §14.2 의
+`Restart=on-failure` 자동 복구(R07)도 함께 사라졌다. 새 모델에서:
+
+- `hyprland.start` `exec-once` 는 로그인 한 번 발화한다. 셸이 그 후 죽으면
+  자동으로 다시 뜨지 않는다.
+- 수동 복구는 `cachy-omarchy-shell --restart`(1a3ac95, KILL 후 detached
+  relaunch; dd31b59 로 reap 대기 강화)로만 가능하다.
+- 즉 **R07 "restarting service recovers" 의 자동 복구 반은 더 이상
+  shipped feature 가 아니다.** §14.2/§14.3 측정은 제거된 기능의 기록이다.
+
+이는 §61 어느 항목의 명시적 요구사항도 아니지만(R07 자동 복구는 §60 M7
+신뢰성 작업에서 도입된 것이지 §61 이 아님), 릴리스 노트에 드러나야 할
+동작 변화다. 자동 기동(이전엔 `enable`+graphical-session.target pull-in
+이 inactive 로 미검증)을 autostart 로 달성한 대가으로서 받은 trade-off 다.
+
+### 16.7 여전히 미검증
+
+- R08 Waybar 라이브 공존(호스트는 mako).
+- 잠금화면 공존(§61 #18, hyprlock 미관측).
+- `COO_RUN_LIVE=1` 자동화 키 주입 테스트(R04/R05 자동화).
+- 셸 크래시 후 자동 재기동은 이 모델에 **존재하지 않는다**(위 16.6).

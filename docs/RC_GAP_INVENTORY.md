@@ -18,7 +18,7 @@
 | upstream commit pin | 측정됨 | `upstream.lock`과 shell PKGBUILD `_commit` 정적 검사 및 `tests/package/test_clean_build.sh`가 clean source HEAD 일치를 검사한다. |
 | shell package build 성공 | 측정됨 (real chroot) | 2026-08-17 `devtools 1:1.5.1-1` + `mkarchroot`로 만든 Arch chroot에서 `build-packages --clean`이 두 패키지를 빌드했고, 산출물 파일 목록·권한이 호스트 빌드본과 동일했다(§12.5). 단 `--nodeps`이므로 의존 선언의 충분성은 이 경로로 검증되지 않는다. |
 | forbidden system path 미소유 | 측정됨 | M6 archive audit 및 `tests/package/test_forbidden.sh`, `tests/runtime/test_runtime_reliability.sh`가 금지 경로를 검사한다. |
-| long-running shell user start | 측정됨 (user service) | 2026-08-17 `systemctl --user start` 로 설치된 유닛을 기동해 `MainPID` 가 곧 `quickshell` 임을 확인하고 IPC `ok` 를 받았다(§14.1). 자동 기동(`enable` + target pull-in)은 여전히 미검증이다(§14.4). |
+| long-running shell starts as user | 측정됨 (Hyprland autostart) | 2026-08-17 재로그인 후 라이브 셸(pid 3724905)의 부모가 곧 `Hyprland` — `hyprland.start` `exec-once` 로 autostart 기동된 직접 증거(§16.1). 이것이 신기본 기동 모델이다. **주의:** systemd user service 모델은 4c5731b 로 제거됐다. §14.1 의 `systemctl --user start` 기동 측정은 제거된 기능의 기록이며, 자동 기동(`enable` + graphical-session.target pull-in) 미검증 논의(아래 "Automatic start observation")는 새 모델에서 moot 다 — autostart 가 target 없이 기동하므로. |
 | IPC 동작 | 측정됨 (live session) | 라이브 셸에 `cachy-omarchy-shell --ipc shell ping` → `ok`, `listPlugins` 응답 확인(§13.1, §13.5). |
 | SUPER+SPACE launcher | 측정됨 | 사용자가 실제로 눌러 원본 Quattro 런처가 열렸고 `Escape` 로 닫혔다(§13.1). 관리 블록은 `--force` 로 주입됐으며 Hyprland 가 재로드해 바인딩 48→49, `SUPER+space` 중복 0(§13.4). |
 | 일반 앱 launch | 측정됨 | 라이브 런처에서 앱 실행에 성공했다. 이 호스트에 `uwsm` 이 없으므로 compat shim 이 실제로 사용된 증거다(§13.3). |
@@ -45,7 +45,7 @@
 | R04 launcher toggles | 측정됨 (수동) | 사용자가 `SUPER+SPACE` 로 런처를 열었다(§13.1). `COO_RUN_LIVE=1` 자동화 테스트는 여전히 미실행이다. |
 | R05 Escape closes launcher | 측정됨 (수동) | 사용자가 `Escape` 로 런처를 닫았다(§13.1). `wtype` 자동 주입은 여전히 미실행이다. |
 | R06 application launch | 측정됨 | 라이브 런처에서 앱이 실행됐다(§13.1). compat PATH 격리도 `/proc/<pid>/environ` 으로 실측했다(§13.3). |
-| R07 restarting service recovers | 측정됨 (systemd service) | 2026-08-17 `MainPID` 를 SIGKILL 하자 systemd 가 `Failed with result 'signal'` → `Scheduled restart job` → 2초 내 새 PID 로 복구했고 `NRestarts=1`, 복구 후 IPC `ok`. 정상 `stop` 은 재시작을 유발하지 않았다(§14.2, §14.3). |
+| R07 restarting service recovers | 측정됨 (systemd service, **제거됨**) | 2026-08-17 `MainPID` 를 SIGKILL 하자 systemd 가 `Failed with result 'signal'` → `Scheduled restart job` → 2초 내 새 PID 로 복구했고 `NRestarts=1`, 복구 후 IPC `ok`. 정상 `stop` 은 재시작을 유발하지 않았다(§14.2, §14.3). **주의:** systemd user unit 이 4c5731b 로 제거되면서 이 자동 복구 반은 더 이상 shipped feature 가 아니다(§16.6). 새 모델은 수동 `cachy-omarchy-shell --restart`(1a3ac95)만 제공하며, `hyprland.start` 는 단발화라 셸이 그 후 죽으면 자동 재기동이 없다. §61 의 명시 항목은 아니지만 릴리스에 드러나야 할 동작 변화. |
 | R08 absence of Waybar modification | 측정됨 (package ownership) | archive/extracted tree에 `/etc`, system unit, home/Waybar path, `.INSTALL`이 없음을 확인했다. 실제 사용자 Waybar 공존은 여전히 미검증이다. |
 | R09 absence of notification replacement | 측정됨 (package ownership) | `omarchy.notifications`는 disabledPlugins에 있고 notification `/etc`·system-unit path가 없다. **dunst/mako 등 live user daemon 보존은 미검증**이다. |
 | R10 absence of lock replacement | 측정됨 (package ownership) | `omarchy.lock`은 disabledPlugins에 있고 lock `/etc`·system-unit path가 없다. **hyprlock 등 live lock setup 보존은 미검증**이다. |
@@ -89,6 +89,12 @@ activate하여 service가 pull-in된 것을 관측하지 않았으므로 automat
 **미검증**이다. 마찬가지로 approved user-systemd test가 없으므로
 `Restart=on-failure`에 의한 R07 service recovery도 **미검증**이다; manual wrapper
 restart IPC 관측을 systemd supervision으로 해석하지 않는다.
+
+> **2026-08-17 갱신:** systemd user unit 이 4c5731b 로 제거되면서 이 절의
+> "automatic start 미검증" 논의는 **moot** 다. 셸은 더 이상 systemd target pull-in
+> 으로 기동하지 않는다. 새 기동 모델은 Hyprland autostart(`hyprland.start`
+> `exec-once`)이며, 이것은 부모=Hyprland 로 라이브 실측됐다(§16.1). 위
+> R07 자동 복구 행의 "제거됨" 주석도 같이 볼 것.
 
 ## M7 doctor와 연결
 
