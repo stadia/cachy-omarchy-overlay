@@ -7,6 +7,27 @@ REPO_ROOT="${REPO_ROOT:?}"
 source "$REPO_ROOT/tests/lib/assert.sh"
 source "$REPO_ROOT/lib/runtime.sh"
 
+# 노출 계층 검사: 전부 상대 심링크인가, 타깃이 기대한 계층만 향하는가,
+# dangling 은 없는가. 두 패키지가 같은 /usr/bin 네임스페이스를 나눠 쓰므로
+# 같은 검사를 계층 접두사만 바꿔 두 번 돌린다.
+assert_symlink_layer() {
+  local bin_dir=$1 want_prefix=$2 label=$3
+  local link target bad_kind=0 bad_layer=0 dangling=0
+  for link in "$bin_dir"/omarchy-*; do
+    [[ -e $link || -L $link ]] || continue
+    [[ -L $link ]] || { bad_kind=$((bad_kind + 1)); continue; }
+    target=$(readlink "$link")
+    case "$target" in
+      "$want_prefix"*) ;;
+      *) bad_layer=$((bad_layer + 1)) ;;
+    esac
+    [[ -e $link ]] || dangling=$((dangling + 1))
+  done
+  assert_eq "$bad_kind" "0" "$label: /usr/bin 항목이 전부 심링크다"
+  assert_eq "$bad_layer" "0" "$label: 타깃이 $want_prefix 만 향한다"
+  assert_eq "$dangling" "0" "$label: dangling 심링크 없음"
+}
+
 coo_pkg_artifact >/dev/null 2>&1 || { echo "skip: 셸 아티팩트 없음"; exit 0; }
 
 # --- shell 패키지: 스테이징 배열 ⇔ /usr/bin 심링크 -------------------------
@@ -23,20 +44,7 @@ actual=$(cd "$shell_dest/usr/bin" 2>/dev/null && ls omarchy-* 2>/dev/null | sort
 assert_eq "$actual" "$expected" "shell: /usr/bin 심링크 집합 = 스테이징 배열"
 
 # 모든 항목이 상대 심링크이며 업스트림 계층만 향하고, 타깃이 실재한다.
-bad_kind=0; bad_layer=0; dangling=0
-for link in "$shell_dest/usr/bin"/omarchy-*; do
-  [[ -e $link || -L $link ]] || continue
-  [[ -L $link ]] || { bad_kind=$((bad_kind + 1)); continue; }
-  target=$(readlink "$link")
-  case "$target" in
-    ../share/cachy-omarchy/upstream/bin/*) ;;
-    *) bad_layer=$((bad_layer + 1)) ;;
-  esac
-  [[ -e $link ]] || dangling=$((dangling + 1))
-done
-assert_eq "$bad_kind" "0" "shell: /usr/bin 항목이 전부 심링크다 (실체 복사 금지)"
-assert_eq "$bad_layer" "0" "shell: 타깃이 ../share/cachy-omarchy/upstream/bin/ 만 향한다"
-assert_eq "$dangling" "0" "shell: dangling 심링크 없음"
+assert_symlink_layer "$shell_dest/usr/bin" "../share/cachy-omarchy/upstream/bin/" "shell"
 
 # 패키지 메타데이터는 노출과 한 몸이다. uwsm 이 없으면 uwsm-app 이 없고,
 # conflicts 가 없으면 공식 omarchy 와 파일 충돌이 런타임에 터진다.
@@ -57,20 +65,7 @@ ovl_expected=$(cd "$REPO_ROOT/overlay/compat/bin" && ls omarchy-* | sort)
 ovl_actual=$(cd "$ovl_dest/usr/bin" 2>/dev/null && ls omarchy-* 2>/dev/null | sort)
 assert_eq "$ovl_actual" "$ovl_expected" "overlay: /usr/bin 심링크 집합 = compat omarchy-* 파일"
 
-ovl_bad_kind=0; ovl_bad_layer=0; ovl_dangling=0
-for link in "$ovl_dest/usr/bin"/omarchy-*; do
-  [[ -e $link || -L $link ]] || continue
-  [[ -L $link ]] || { ovl_bad_kind=$((ovl_bad_kind + 1)); continue; }
-  target=$(readlink "$link")
-  case "$target" in
-    ../lib/cachy-omarchy/compat/bin/*) ;;
-    *) ovl_bad_layer=$((ovl_bad_layer + 1)) ;;
-  esac
-  [[ -e $link ]] || ovl_dangling=$((ovl_dangling + 1))
-done
-assert_eq "$ovl_bad_kind" "0" "overlay: /usr/bin 항목이 전부 심링크다"
-assert_eq "$ovl_bad_layer" "0" "overlay: 타깃이 ../lib/cachy-omarchy/compat/bin/ 만 향한다"
-assert_eq "$ovl_dangling" "0" "overlay: dangling 심링크 없음"
+assert_symlink_layer "$ovl_dest/usr/bin" "../lib/cachy-omarchy/compat/bin/" "overlay"
 
 # 두 패키지가 같은 이름을 소유하면 pacman 이 충돌한다.
 overlap=$(comm -12 <(printf '%s\n' "$expected") <(printf '%s\n' "$ovl_expected"))
