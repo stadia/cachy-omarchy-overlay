@@ -39,7 +39,6 @@ fi
 
 PREFIX_ROOT=${COO_PREFIX_ROOT:-/usr/share/cachy-omarchy}
 OMARCHY_PATH=${COO_OMARCHY_PATH:-$PREFIX_ROOT/upstream}
-COMPAT_BIN=${COO_COMPAT_BIN:-/usr/lib/cachy-omarchy/compat/bin}
 
 fail() { printf 'error: %s\n' "$1" >&2; exit 1; }
 
@@ -56,7 +55,7 @@ SUPER+K 로 여는 키바인딩 검색 메뉴. 핀된 업스트림 omarchy-menu-
   --help        이 도움말
 
 인자 없이 실행하면 실행 중인 cachy-omarchy-shell 에 검색 메뉴를 연다.
-환경: COO_OMARCHY_PATH, COO_COMPAT_BIN, COO_SHELL_BIN (래퍼와 동일).
+환경: COO_OMARCHY_PATH, COO_SHELL_BIN (래퍼와 동일).
 USAGE
 }
 
@@ -690,14 +689,12 @@ esac
 [[ -f $OMARCHY_PATH/shell/shell.qml ]] \
   || fail "셸 트리를 찾을 수 없다: $OMARCHY_PATH/shell/shell.qml"
 
-# compat shim 과 스테이징된 업스트림 헬퍼는 이 프로세스와 그 자식에만 보인다.
-# 사용자의 일반 PATH 를 오염시키지 않는다 (SPEC 44, 45).
+# PATH 는 건드리지 않는다 (SPEC §45). omarchy-menu-select 등 업스트림 helper 는
+# /usr/bin/omarchy-* 심링크로 노출된다. OMARCHY_PATH 는 세션 환경이 공급하지만,
+# 이 명령은 세션 밖(TTY)에서도 --print 로 돌 수 있으므로 명시적으로 export 한다.
 export OMARCHY_PATH
 export COO_OMARCHY_PATH=$OMARCHY_PATH
 export COO_SHELL_BIN=$SHELL_BIN
-[[ -d $COMPAT_BIN ]] && PATH="$COMPAT_BIN:$PATH"
-PATH="$OMARCHY_PATH/bin:$PATH"
-export PATH
 
 if [[ $MODE == interactive ]]; then
   [[ -x $OMARCHY_PATH/bin/omarchy-menu-select ]] \

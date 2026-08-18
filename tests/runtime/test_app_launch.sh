@@ -19,9 +19,6 @@ printf 'launched\n' > '$marker'
 EOF
 chmod +x "$COO_TEST_SANDBOX/r06.probe.sh"
 
-wrap=$(cat "$W")
-assert_contains "$wrap" 'COMPAT_BIN' "래퍼가 compat PATH 를 셸 프로세스에만 붙인다"
-
 command -v jq >/dev/null || { exit "$ASSERT_FAILURES"; }
 command -v hyprctl >/dev/null || { exit "$ASSERT_FAILURES"; }
 command -v wtype >/dev/null || { echo "skip: wtype 없음 (R06 라이브)"; exit "$ASSERT_FAILURES"; }
@@ -56,7 +53,10 @@ EOF
 
 export COO_OMARCHY_PATH="$root"
 export OMARCHY_PATH="$root"
-export COO_COMPAT_BIN="$REPO_ROOT/overlay/compat/bin"
+# 실제 설치에서는 /usr/bin/omarchy-* 심링크가 helper 를 공급한다. 추출 트리에는
+# 그 심링크가 있지만 /usr/bin 에 설치되지 않았으므로, 호출자 PATH 로 같은
+# 가시성을 만든다 — 래퍼는 더 이상 PATH 를 조작하지 않는다 (SPEC §45).
+export PATH="$root/bin:$PATH"
 
 "$W" --run >/dev/null 2>&1 &
 shell_pid=$!
@@ -90,10 +90,7 @@ done
 assert_eq "$reply" "ok" "셸 ping (R06 전)"
 
 envp=$(tr '\0' '\n' <"/proc/$shell_pid/environ" 2>/dev/null || true)
-assert_contains "$envp" "$COO_COMPAT_BIN" "셸 PATH 에 compat shim 디렉터리가 있다"
-parent_path=$PATH
-[[ $parent_path == *"$COO_COMPAT_BIN"* ]] && p=1 || p=0
-assert_eq "$p" "0" "테스트 프로세스 PATH 는 compat 으로 오염되지 않는다"
+assert_contains "$envp" "$root/bin" "셸 프로세스가 호출자 PATH 를 그대로 물려받았다"
 
 menu_layers() {
   hyprctl -j layers 2>/dev/null | jq -c \

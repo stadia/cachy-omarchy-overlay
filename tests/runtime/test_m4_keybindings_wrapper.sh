@@ -63,7 +63,7 @@ chmod +x "$fake_shell"
 
 # --- 미기동 실패: COO_SHELL_BIN 주입으로 실제 qs 를 절대 부르지 않는다 ------
 : >"$fake_log"
-out=$(COO_OMARCHY_PATH="$root" COO_COMPAT_BIN="$REPO_ROOT/overlay/compat/bin" \
+out=$(COO_OMARCHY_PATH="$root" \
   COO_SHELL_BIN="$fake_shell" COO_FAKE_SHELL_LOG="$fake_log" \
   COO_FAKE_SHELL_MESSAGE='error: 셸이 실행 중이 아니다' "$K" 2>&1); code=$?
 assert_eq "$code" "1" "셸 미기동 → exit 1"
@@ -74,7 +74,7 @@ assert_eq "$(cat "$fake_log")" $'--ipc\nshell\nping' "COO_SHELL_BIN pre-flight �
 fake="$COO_TEST_SANDBOX/faketree"
 mkdir -p "$fake/shell"
 : >"$fake/shell/shell.qml"
-out=$(COO_OMARCHY_PATH="$fake" COO_COMPAT_BIN="$REPO_ROOT/overlay/compat/bin" \
+out=$(COO_OMARCHY_PATH="$fake" \
   COO_SHELL_BIN="$fake_shell" COO_FAKE_SHELL_LOG="$fake_log" "$K" 2>&1); code=$?
 assert_eq "$code" "1" "헬퍼 없는 트리 → exit 1"
 assert_contains "$out" "omarchy-menu-select" "오류가 무엇이 없는지 말해준다"
@@ -130,8 +130,12 @@ old_cache_name=$( {
 mkdir -p "$cachehome/omarchy"
 printf 'STALE V11 RECORD\texec\tstale-command\n' >"$cachehome/omarchy/keybindings-$old_cache_name.records"
 
-out=$(PATH="$stubbin:$PATH" XDG_CACHE_HOME="$cachehome" \
-  COO_OMARCHY_PATH="$root" COO_COMPAT_BIN="$REPO_ROOT/overlay/compat/bin" \
+# omarchy-cmd-present 를 bare name 으로 부른다(128행) — 실제 설치에서는
+# /usr/bin/omarchy-* 심링크가 공급하지만, 추출 트리에는 설치되지 않으므로
+# 호출자 PATH 에 $root/bin 을 넣어 같은 가시성을 만든다 (SPEC §45, 래퍼는
+# 더 이상 PATH 를 조작하지 않는다).
+out=$(PATH="$stubbin:$root/bin:$PATH" XDG_CACHE_HOME="$cachehome" \
+  COO_OMARCHY_PATH="$root" \
   "$K" --print 2>&1); code=$?
 assert_eq "$code" "0" "--print 는 셸 없이 목록을 만든다 (exit 0)"
 [[ -e $side_effect_marker ]] && side_effect=1 || side_effect=0

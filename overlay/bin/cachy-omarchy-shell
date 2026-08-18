@@ -8,7 +8,6 @@ set -uo pipefail
 
 PREFIX_ROOT=${COO_PREFIX_ROOT:-/usr/share/cachy-omarchy}
 OMARCHY_PATH=${COO_OMARCHY_PATH:-$PREFIX_ROOT/upstream}
-COMPAT_BIN=${COO_COMPAT_BIN:-/usr/lib/cachy-omarchy/compat/bin}
 export OMARCHY_PATH
 
 fail() { printf 'error: %s\n' "$1" >&2; exit 1; }
@@ -26,7 +25,6 @@ usage() {
 
 환경:
   COO_OMARCHY_PATH   업스트림 루트 override (기본: /usr/share/cachy-omarchy/upstream)
-  COO_COMPAT_BIN     compat shim 디렉터리 (셸 프로세스에만 PATH 앞에 붙는다)
   COO_IPC_TIMEOUT    IPC 호출당 타임아웃 (기본 2s)
 USAGE
 }
@@ -44,16 +42,8 @@ cmd_run() {
   if pgrep -f "quickshell -n -p $OMARCHY_PATH/shell" >/dev/null 2>&1; then
     exit 0
   fi
-  # compat shim 과 업스트림 helper 는 셸 프로세스에만 보이게 한다. 사용자의
-  # 일반 PATH 를 오염시키지 않는다 (SPEC 44, 45).
-  #
-  # $OMARCHY_PATH/bin 이 필요한 이유: 위젯이 helper 를 bare name 으로 부른다
-  # (plugins/panels/network/Panel.qml 등). 스테이징만으로는 해결되지 않는다.
-  # compat 이 앞이라 우리가 적응시킨 shim 이 업스트림 동명 파일을 이긴다.
-  local shell_path=
-  [[ -d $COMPAT_BIN ]] && shell_path="$COMPAT_BIN:"
-  [[ -d $OMARCHY_PATH/bin ]] && shell_path="$shell_path$OMARCHY_PATH/bin:"
-  [[ -n $shell_path ]] && export PATH="$shell_path$PATH"
+  # PATH 는 건드리지 않는다 (SPEC §45). 위젯이 bare name 으로 부르는 helper 는
+  # /usr/bin/omarchy-* 심링크로 노출되고, compat 적응 카피도 같은 방식이다.
 
   # Qt 를 wayland 에 고정(방어적 — xcb 폴백 차단). Hyprland autostart(hyprland.start)
   # 로 기동하면 WAYLAND_DISPLAY 가 컴포저터 env 로 항상 정상이라 socket-wait 는
