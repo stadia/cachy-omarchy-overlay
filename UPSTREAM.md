@@ -44,6 +44,11 @@
   `omarchy-audio-tuning`(pipewire·wireplumber 사용자 설정/서비스 정책)과 display
   brightness 체인은 Tier C — 넣지 않는다 (SPEC "Milestone 10 — Utility Plugin
   Runtime", 설계 문서 §3).
+- 메뉴 `style.bar` + 세션 lock/logout/reboot/shutdown (`omarchy-bar`,
+  `omarchy-system-lock`/`-logout`/`-reboot`/`-shutdown`) 과 전이
+  (`omarchy-shell-config`, `omarchy-plugin-catalog`,
+  `omarchy-hyprland-window-close-all`, `omarchy-state`). `omarchy-system-factory-reset`
+  은 Omarchy ISO `@factory` 전제라 넣지 않는다.
 - `version` (핀 표시·doctor)
 - `default/omarchy/omarchy-menu.jsonc` (메뉴 정의)
 - `config/omarchy/shell.json` — **업스트림 것이 아니라 우리 기본값**(`overlay/defaults/shell.json`).
@@ -96,23 +101,19 @@ systemd 유저 유닛은 기동 전환(§"Milestone 8 — Shell Autostart", RUNT
 - 테마 Tier C helper(`omarchy-theme-install/update/remove`, plymouth/browser/
   keyboard 훅)의 스테이징 — M9 부터 나머지 테마 워크플로는 채택했다
 - M10 Tier C helper(`omarchy-audio-output-switch`, `omarchy-audio-tuning`,
-  `omarchy-brightness-display*`, `omarchy-hw-display`, power/system helper)의
-  스테이징과 XF86 media 키의 자동 주입
+  `omarchy-brightness-display*`, `omarchy-hw-display`)의 스테이징과 XF86 media
+  키의 자동 주입
+- `omarchy-system-factory-reset` / `-finish` (Omarchy ISO `@factory` 전제)
 - 락/알림의 기본 활성 (OSD 패널은 M10 에서 채택 — direct CLI/audio helper 경로만)
 
 ## Minimum safe subset
 
 CachyOS에서 `omarchy.menu`를 쓰려면 공식 OS가 아니라 **핀된 런타임 트리 + Quickshell + `OMARCHY_PATH` + IPC 래퍼**면 된다. 공식 `omarchy` 패키지는 그 트리에 `omarchy-settings`·부트로더·SDDM을 묶으므로 설치하지 않는다.
 
-## Known limitations (M2·M3, 미해결)
+## Known limitations (미해결)
 
 상세와 실측 근거는 `docs/RUNTIME_STARTUP.md` §6.
 
-- **바 억제 미충족 (§4.3)** — `disabledPlugins` 로 내장 바를 못 끈다. 패키징 기본값만
-  쓰면 사용자 Waybar 위에 `omarchy-bar` 가 뜸. M5 `cachy-omarchy-init` 가 `bar-off`
-  토글을 사용자 상태로 생성하거나 패치 필요. §61 "Existing Waybar preserved" 미충족.
-- **`inotify-tools` 미감사 의존** — `PluginRegistry.qml:638` 이 `inotifywait` 호출.
-  미설치 시 1초마다 WARN 반복. `PKGBUILD depends` 누락(§28).
 - **셸 종료 시 `inotifywait` 자식이 남는다** — Quickshell 0.3.0 의 `Io.Process` 는
   종료할 때 자식을 정리하지 않는다(실측: quickshell 은 SIGTERM 에 ~250ms 만에
   정상 종료하고, 자식은 `systemd --user` 로 재부모화된 채 계속 산다). 끄는
@@ -123,12 +124,31 @@ CachyOS에서 `omarchy.menu`를 쓰려면 공식 OS가 아니라 **핀된 런타
   (`/proc/<pid>/fdinfo` 에 워치 0개, `wchan: do_select`). 셸을 재시작할 때마다
   하나씩 쌓인다. 테스트 하네스 쪽은 `tests/lib/sandbox.sh` 가 샌드박스 경로로
   스코프해 회수하지만, **실세션 재시작 누수는 미해결**이다.
-- **패키지 미설치 상태에서만 검증** — 실설치 경로(`/usr/share/cachy-omarchy/upstream`)는 M5.
-- **M3 런처** — 원본 `omarchy.menu` IPC. `uwsm-app` 은 uwsm 패키지의 실제 바이너리
-  (구 WRAPPER shim 은 삭제됨 — 위 "Components packaged" 참조). SUPER+K 는 M4.
 
-> 역사 기록(해소됨): M2·M3 시점에는 **`graphical-session.target` 비활성** —
-> `uwsm` 부재로 유닛 자동 시작 안 함(§17 미검증) — 도 제한이었다. 현재는 uwsm 이
-> `cachy-omarchy-shell` 의 hard depends 이고, systemd 유저 유닛 자체가 Hyprland
-> autostart 기동 전환(`docs/RUNTIME_STARTUP.md` §16)으로 제거됐으므로 현재
-> 계약의 미해결 제한이 아니다.
+### 역사 기록 (해소됨 — 이 목록에 있었으나 더 이상 제한이 아니다)
+
+> **`graphical-session.target` 비활성** (M2·M3) — `uwsm` 부재로 유닛 자동 시작 안 함
+> (§17 미검증). 현재는 uwsm 이 `cachy-omarchy-shell` 의 hard depends 이고, systemd
+> 유저 유닛 자체가 Hyprland autostart 기동 전환(`docs/RUNTIME_STARTUP.md` §16)으로
+> 제거됐다.
+>
+> **바 억제 미충족 (§4.3)** — 해결이 아니라 **요구사항 폐기**다. v0.2.0(M8) 원칙 0 으로
+> 내장 바를 켜서 배포하는 것이 의도된 동작이 됐다(`SPEC.md` "suppression is now the
+> opt-out, not the default"). `overlay/defaults/shell.json` 은 `disabledPlugins` 없이
+> 업스트림 바 레이아웃을 그대로 싣고, `cachy-omarchy-init` 는 `bar-off` 를 만들지 않으며
+> 기존 토글이 있으면 note 만 찍는다(`overlay/bin/cachy-omarchy-init`,
+> `tests/runtime/test_init_bar_default.sh`). 이 항목이 달고 있던 "§61 Existing Waybar
+> preserved 미충족" 은 2026-08-17 실측으로 뒤집혔다 — waybar 0.15.0 실행 상태에서 바를
+> 켠 셸을 띄웠고 waybar 프로세스는 그대로였다. 두 바는 겹치지 않고 쌓인다(예약 36→62px,
+> `docs/RUNTIME_STARTUP.md` §17.6). `SPEC.md` §61 해당 항목은 `[x]`.
+>
+> **`inotify-tools` 미감사 의존** — `PKGBUILD depends` 에 추가됐다
+> (`packages/cachy-omarchy-shell/PKGBUILD`). 호출부
+> (`PluginRegistry.qml:638`)는 그대로이나 미설치로 인한 WARN 반복은 발생하지 않는다.
+>
+> **패키지 미설치 상태에서만 검증** — 2026-08-17 실 시스템 `pacman -U` 설치로 해소.
+> 위 표의 "Last tested CachyOS environment" 와 `docs/RUNTIME_STARTUP.md` §12 참조.
+>
+> **M3 런처의 SUPER+K 미구현** — M4 에서 구현됐다. `SPEC.md` §61 "SUPER + K opens
+> keybinding UI" 는 `[x]`. 함께 적혀 있던 `uwsm-app` 소유권 서술은 제한이 아니라
+> 설명이고, 위 "Components packaged" 에 이미 기록돼 있다.

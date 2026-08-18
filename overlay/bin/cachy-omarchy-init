@@ -35,8 +35,8 @@ Omarchy 내장 바는 기본으로 보인다. 숨기려면 직접 토글을 만�
 /usr/share/cachy-omarchy/upstream/config/omarchy/shell.json 으로
 스테이징되며 init 없이도 적용된다.
 
-중요: 이 명령을 실행하지 않으면 Omarchy 내장 바가 화면 상단에 나타나
-26px 를 예약한다. 패키지 기본값만으로는 그 바를 끌 수 없다.
+참고: 내장 바는 화면 상단에 26px 를 예약한다. 이 명령의 실행 여부와는
+무관하며 — init 은 바를 켜지도 끄지도 않는다 — 위의 bar-off 토글로만 끈다.
 
 옵션:
   --dry-run  무엇을 할지 출력만 하고 아무것도 쓰지 않는다.
