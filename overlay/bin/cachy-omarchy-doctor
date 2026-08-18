@@ -291,7 +291,7 @@ fi
 if [[ -s $OMARCHY_STATE_DIR/current/theme.name ]]; then
   pass "theme: $(cat "$OMARCHY_STATE_DIR/current/theme.name")"
 else
-  warn "no theme set — cachy-omarchy-theme-set \"Tokyo Night\" 또는 셸 메뉴 Style > Theme"
+  warn "no theme set — omarchy-theme-set \"Tokyo Night\" 또는 셸 메뉴 Style > Theme"
 fi
 # conf 경로 사용자 중 테마는 있는데 관리 블록에 theme source 줄이 없는 구형
 # 주입(M9 이전에 주입한 블록)을 잡는다. 고치는 것은 사용자다:

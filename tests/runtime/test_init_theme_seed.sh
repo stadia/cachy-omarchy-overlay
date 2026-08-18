@@ -29,11 +29,12 @@ mkdir -p "$home/.config/cachy-omarchy/hypr" "$home/.config/hypr"
 printf '// stub\n' > "$home/.config/hypr/hyprland.lua"
 
 run_init() {
-  HOME="$home" COO_OMARCHY_PATH="$up" COO_PREFIX_ROOT="$dest/usr/share/cachy-omarchy" \
-  COO_CONFIG_DIR="$home/.config/cachy-omarchy" \
-  COO_STATE_DIR="$home/.local/state/omarchy" \
-  COO_HYPR_DIR="$home/.config/hypr" \
-  PATH="$stub:$PATH" "$@"
+  env -u OMARCHY_PATH \
+    HOME="$home" COO_PREFIX_ROOT="$dest/usr/share/cachy-omarchy" \
+    COO_CONFIG_DIR="$home/.config/cachy-omarchy" \
+    COO_STATE_DIR="$home/.local/state/omarchy" \
+    COO_HYPR_DIR="$home/.config/hypr" \
+    PATH="$stub:$up/bin:$PATH" "$@"
 }
 
 # 1) 부재 시 시드
@@ -71,5 +72,53 @@ printf '// stub\n' > "$home4/.config/hypr/hyprland.lua"
 home=$home4 run_init "$INIT" >/dev/null 2>&1
 assert_eq "$(cat "$home4/.local/state/omarchy/current/theme.name")" \
   "tokyo-night" "빈 theme.name 은 부재 취급 (upstream ! -s 시맨틱)"
+
+# 5) 명령 해석과 환경 주입 계약 (spec §7.1). 가짜 omarchy-theme-set 이 받은
+#    환경을 기록하게 해서 init 이 무엇을 넘기는지 직접 본다.
+home5=$COO_TEST_SANDBOX/inithome5
+mkdir -p "$home5/.config/cachy-omarchy/hypr" "$home5/.config/hypr"
+printf '// stub\n' > "$home5/.config/hypr/hyprland.lua"
+probe_bin=$COO_TEST_SANDBOX/probe-bin
+probe_log=$COO_TEST_SANDBOX/theme-set.env
+mkdir -p "$probe_bin"
+cat > "$probe_bin/omarchy-theme-set" <<PROBE
+#!/usr/bin/env bash
+{
+  printf 'OMARCHY_PATH=%s\n' "\${OMARCHY_PATH:-<unset>}"
+  printf 'HEADLESS=%s\n' "\${OMARCHY_THEME_HEADLESS:-<unset>}"
+  printf 'ARG=%s\n' "\$1"
+} > "$probe_log"
+mkdir -p "\$HOME/.local/state/omarchy/current"
+printf 'tokyo-night\n' > "\$HOME/.local/state/omarchy/current/theme.name"
+PROBE
+chmod +x "$probe_bin/omarchy-theme-set"
+
+env -u OMARCHY_PATH \
+  HOME="$home5" COO_PREFIX_ROOT="$dest/usr/share/cachy-omarchy" \
+  COO_CONFIG_DIR="$home5/.config/cachy-omarchy" \
+  COO_STATE_DIR="$home5/.local/state/omarchy" \
+  COO_HYPR_DIR="$home5/.config/hypr" \
+  PATH="$probe_bin:$stub:$PATH" "$INIT" >/dev/null 2>&1
+
+assert_contains "$(cat "$probe_log" 2>/dev/null)" \
+  "OMARCHY_PATH=$dest/usr/share/cachy-omarchy/upstream" \
+  "init 이 OMARCHY_PATH 를 명시적으로 주입한다"
+assert_contains "$(cat "$probe_log" 2>/dev/null)" "HEADLESS=1" \
+  "셸이 없으면 OMARCHY_THEME_HEADLESS=1 로 부른다"
+assert_contains "$(cat "$probe_log" 2>/dev/null)" "ARG=Tokyo Night" \
+  "시드 테마 이름을 그대로 넘긴다"
+
+# 6) 명령이 없으면 하드 실패가 아니라 note 를 남기고 계속한다.
+home6=$COO_TEST_SANDBOX/inithome6
+mkdir -p "$home6/.config/cachy-omarchy/hypr" "$home6/.config/hypr"
+printf '// stub\n' > "$home6/.config/hypr/hyprland.lua"
+out=$(env -u OMARCHY_PATH \
+  HOME="$home6" COO_PREFIX_ROOT="$dest/usr/share/cachy-omarchy" \
+  COO_CONFIG_DIR="$home6/.config/cachy-omarchy" \
+  COO_STATE_DIR="$home6/.local/state/omarchy" \
+  COO_HYPR_DIR="$home6/.config/hypr" \
+  PATH="$stub:/usr/bin:/bin" "$INIT" 2>&1); code=$?
+assert_eq "$code" "0" "omarchy-theme-set 부재는 하드 실패가 아니다"
+assert_contains "$out" "omarchy-theme-set" "부재를 note 로 알린다"
 
 exit "$ASSERT_FAILURES"
