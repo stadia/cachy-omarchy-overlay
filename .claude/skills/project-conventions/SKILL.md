@@ -25,15 +25,17 @@ user-invocable: false
 - `commit.gpgsign` 꺼져 있음 — 다시 켜지 말 것.
 
 ## 현재 아키텍처 (경로/명령)
-- 공개 명령 5개, 모두 `overlay/bin/`에 있고 설치되면 `/usr/bin/`으로 간다:
+- 공개 명령 6개, 모두 `overlay/bin/`에 있고 설치되면 `/usr/bin/`으로 간다:
   `cachy-omarchy-shell`, `cachy-omarchy-launcher`, `cachy-omarchy-keybindings`,
-  `cachy-omarchy-bindings`, `cachy-omarchy-init`.
+  `cachy-omarchy-bindings`, `cachy-omarchy-init`, `cachy-omarchy-doctor`.
 - 사용자 라이브 설정: `~/.config/cachy-omarchy/`(hypr/bindings.{conf,lua}). `shell.json` 은
   셸이 읽지 않는 dead file 이므로 init 가 만들지 않는다.
 - 패키지 정본/기본값: `/usr/share/cachy-omarchy/`(defaults/shell.json, hypr/bindings.{conf,lua}).
-- compat shim: `/usr/lib/cachy-omarchy/compat/bin/`(예: `omarchy-shell`, `uwsm-app`) — `/usr/bin`으로
-  새면 안 되고, 이는 `tests/runtime/test_installed_tree.sh`가 양방향으로 검사한다.
-- systemd 유저 유닛: `cachy-omarchy-shell.service`(`overlay/systemd/`에 정본).
+- compat 적응 카피: 실체는 `/usr/lib/cachy-omarchy/compat/bin/`(예: `omarchy-shell`,
+  `omarchy-update-available`)에만 두고, `/usr/bin`에는 실체를 가리키는 상대 심링크만 놓는다 —
+  `tests/runtime/test_installed_tree.sh`가 양방향으로 검사한다. `uwsm-app`은 shim이 아니라
+  uwsm 패키지(`cachy-omarchy-shell` hard depends) 소유다.
+- 셸 기동은 Hyprland `hyprland.start` autostart (`overlay/hypr/bindings.lua`). systemd 유저 유닛은 없다.
 - 두 패키지 산출물: `cachy-omarchy-shell-*.pkg.tar.zst`, `cachy-omarchy-overlay-*.pkg.tar.zst`
   (`build/`). `lib/runtime.sh`의 `coo_extract_pkg`/`coo_extract_overlay`가 이 아티팩트를 임시
   디렉터리에 추출해 "설치된 것처럼" 배치하는 헬퍼다 — 어느 쪽도 `sudo`/`pacman -U`를 쓰지 않는다.

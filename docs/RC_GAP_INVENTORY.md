@@ -21,7 +21,7 @@
 | long-running shell starts as user | 측정됨 (Hyprland autostart) | 2026-08-17 재로그인 후 라이브 셸(pid 3724905)의 부모가 곧 `Hyprland` — `hyprland.start` `exec-once` 로 autostart 기동된 직접 증거(§16.1). 이것이 신기본 기동 모델이다. **주의:** systemd user service 모델은 4c5731b 로 제거됐다. §14.1 의 `systemctl --user start` 기동 측정은 제거된 기능의 기록이며, 자동 기동(`enable` + graphical-session.target pull-in) 미검증 논의(아래 "Automatic start observation")는 새 모델에서 moot 다 — autostart 가 target 없이 기동하므로. |
 | IPC 동작 | 측정됨 (live session) | 라이브 셸에 `cachy-omarchy-shell --ipc shell ping` → `ok`, `listPlugins` 응답 확인(§13.1, §13.5). |
 | SUPER+SPACE launcher | 측정됨 | 사용자가 실제로 눌러 원본 Quattro 런처가 열렸고 `Escape` 로 닫혔다(§13.1). 관리 블록은 `--force` 로 주입됐으며 Hyprland 가 재로드해 바인딩 48→49, `SUPER+space` 중복 0(§13.4). |
-| 일반 앱 launch | 측정됨 | 라이브 런처에서 앱 실행에 성공했다. 이 호스트에 `uwsm` 이 없으므로 compat shim 이 실제로 사용된 증거다(§13.3). |
+| 일반 앱 launch | 측정됨 | 라이브 런처에서 앱 실행에 성공했다. 이 호스트에 `uwsm` 이 없으므로 compat shim 이 실제로 사용된 증거다(§13.3). **정정:** 그 뒤 `uwsm` 이 hard depends 가 되고 shim 은 삭제됐다 — 현재는 uwsm 패키지의 실제 `uwsm-app` 이 앱을 `app-graphical.slice` scope 로 격리한다(RUNTIME_STARTUP §4·§15). |
 | SUPER+K keybinding UI | 측정됨 | 사용자가 실제로 눌러 키바인딩 UI 가 열렸다(§13.1). 업스트림 select-mode 재사용이므로 별도 layer 를 남기지 않는다. |
 | 기존 Hyprland config 보존 | 측정됨 | 2026-08-17 설치된 `cachy-omarchy-init`을 사용자의 실제 `~/.config/hypr/hyprland.lua`에 대해 실행했다. `SUPER+SPACE` 충돌(walker, `:295`)을 감지해 주입을 거부했고 md5는 불변이었다(§12.3). |
 | 기존 Waybar 보존 | 측정됨 (bar 억제); 미검증 (Waybar 공존) | 2026-08-17 `bar-off` 가 있으면 `omarchy-bar` 가 `y=-26` 에 주차되고 `reserved=[0,0,0,0]` 임을 실제 설치본에서 확인했다(§14.4). 이 호스트는 Waybar 를 실행하지 않으므로 Waybar 자체와의 공존은 여전히 미검증이다. |

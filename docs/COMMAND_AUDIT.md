@@ -26,7 +26,7 @@
 
 | command | called from | purpose | class | action |
 | --- | --- | --- | --- | --- |
-| `uwsm-app -- gtk-launch` | `AppLibrary.qml` | 앱 실행 | ADAPTED | wrapper — 실제 `uwsm-app` 이 있으면 위임, 없으면 `gtk-launch` |
+| `uwsm-app -- gtk-launch` | `AppLibrary.qml` | 앱 실행 | SAFE | package — uwsm 패키지(`cachy-omarchy-shell` hard depends)의 실제 바이너리. compat shim 삭제됨 |
 | `omarchy-remove-launcher-entry` | `AppLibrary.remove` | 숨김 항목 | OPTIONAL / ADAPTED | copy into compat if hide-from-menu를 살릴 때 |
 | 메뉴 `action` 문자열 전반 | `omarchy-menu.jsonc` | 테마/락/캡처/네트워크/업데이트 등 | 대부분 DISABLED | disable — 항목은 JSONC에 남아도 실행 시 실패. v0.1은 앱 목록 + 안전 항목만 남기거나 `when`으로 숨김 |
 
@@ -127,7 +127,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-menu-clipboard` | clipboard | SAFE | `shell toggle omarchy.clipboard` 얇은 프런트 |
 | `omarchy-clipboard-paste-text` / `-paste-file` | clipboard | SAFE | 선택 시에만 `wl-copy`/`wtype` (D4). `wtype || true` 는 선언된 upstream 예외 (P08 범위 밖) |
 | `omarchy-clipboard-open` | clipboard | SAFE | URL→launch-browser, text→launch-editor, image→`tensaku-edit`(미설치 시 명시적 127) |
-| `omarchy-launch-browser` / `-editor` / `-tui` / `omarchy-hyprland-focus-app` | clipboard 전이 closure | SAFE | xdg-utils(hard depends) + uwsm-app compat 사용 |
+| `omarchy-launch-browser` / `-editor` / `-tui` / `omarchy-hyprland-focus-app` | clipboard 전이 closure | SAFE | xdg-utils(hard depends) + uwsm-app(uwsm 패키지) 사용 |
 | `omarchy-menu-emoji` / `-emoji-insert` | emojis | SAFE | 선택 시 copy+type 1회, 취소 무부작용 |
 | `omarchy-osd` | osd | SAFE | 직접 IPC 프런트. shell 실패는 non-zero 전파 |
 | `omarchy-audio-output-volume` / `-input-mute` | osd audio bridge | SAFE | pactl(pipewire-pulse)/wpctl(wireplumber). debounce 파일은 runtime dir |
@@ -164,7 +164,8 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
    더 숨길 수 있다. M3는 패치 수 0을 유지한다.
 
 표준 명령(`systemctl suspend|hibernate`, `hyprpicker`, `passwd`)은 SAFE이며
-`omarchy-*`가 아니라 이 표에 없다. `uwsm-app`은 Task 3 WRAPPER.
+`omarchy-*`가 아니라 이 표에 없다. `uwsm-app`은 uwsm 패키지 소유 실제
+바이너리다(구 Task 3 WRAPPER shim 은 삭제됨).
 
 <!-- MENU_AUDIT_BEGIN -->
 | command | class | action | note |

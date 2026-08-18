@@ -28,7 +28,7 @@
 | `limine`, `limine-mkinitcpio-hook`, `limine-snapper-sync`, `snapper` | UNSAFE | 부트로더/스냅샷. SPEC §5·§21. |
 | `hyprland` | REQUIRED | 컴포지터. CachyOS에 있음. |
 | `quickshell` | REQUIRED | 셸 런타임. CachyOS `0.3.0-2.1`. |
-| `uwsm` | OPTIONAL / ADAPT | 앱 실행이 `uwsm-app -- gtk-launch`를 씀. 셸 기동 자체에는 불필요. |
+| `uwsm` | REQUIRED (개정) | 앱 실행이 `uwsm-app -- gtk-launch`를 씀. **개정: `cachy-omarchy-shell` 의 hard depends 가 됐고 `/usr/bin/uwsm-app` 은 uwsm 패키지 소유다 — M1 시점의 OPTIONAL/ADAPT(compat shim) 판정은 폐기.** 셸 기동 자체에는 불필요. |
 | `sddm` | UNSAFE | 로그인 매니저 교체. |
 | `xdg-desktop-portal-hyprland` | OPTIONAL | 포털. 메뉴 기동에 필수 아님. |
 | `wireplumber`, `pipewire` | OPTIONAL | 오디오 플러그인용. |
@@ -151,6 +151,6 @@ gum: 0.17.0-1.1
 
 What is the minimum safe subset of Omarchy Quattro required to run `omarchy.menu` on CachyOS?
 
-**Answer:** The entire `shell/` tree from commit `f0020448…`, plus `default/omarchy/omarchy-menu.jsonc` (officially shipped by `omarchy-settings`, not by `omarchy`), a pinned `version` file, Quickshell, Hyprland, and wrappers that set `OMARCHY_PATH` and exec `quickshell -n -p "$OMARCHY_PATH/shell"` / `qs ipc … toggle omarchy.menu`. Do not install official `omarchy` or `omarchy-settings`. Disable bar/lock/notifications/idle via `disabledPlugins`. Launch apps through `gtk-launch` (adapt away `uwsm-app` if needed).
+**Answer:** The entire `shell/` tree from commit `f0020448…`, plus `default/omarchy/omarchy-menu.jsonc` (officially shipped by `omarchy-settings`, not by `omarchy`), a pinned `version` file, Quickshell, Hyprland, and wrappers that set `OMARCHY_PATH` and exec `quickshell -n -p "$OMARCHY_PATH/shell"` / `qs ipc … toggle omarchy.menu`. Do not install official `omarchy` or `omarchy-settings`. Disable bar/lock/notifications/idle via `disabledPlugins`. Launch apps through `gtk-launch`. **(개정: 이 절의 M1 판정 — 필요 시 `uwsm-app` 을 걷어내 적응한다 — 는 폐기다. uwsm 은 `cachy-omarchy-shell` 의 hard depends 가 됐고 `/usr/bin/uwsm-app` 은 uwsm 패키지 소유 실제 바이너리이므로 걷어내지 않는다. 위 표의 `uwsm` 행 참조.)**
 
 한국어: 공식 메타패키지가 아니라, 핀된 셸 트리와 메뉴 JSONC와 환경 변수 래퍼만 있으면 된다.

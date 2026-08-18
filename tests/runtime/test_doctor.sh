@@ -15,11 +15,20 @@ config=$COO_TEST_SANDBOX/config
 user_config=$COO_TEST_SANDBOX/user-omarchy
 state=$COO_TEST_SANDBOX/state
 fake_bin=$COO_TEST_SANDBOX/fake-bin
+# A caller may export doctor or former fixture controls. Keep the fixture
+# baseline hermetic; only the namespaced controls below enable special cases.
+unset COO_IPC_TIMEOUT COO_TEST_DOCTOR_SHA256_BIN \
+  COO_FAKE_PROCESS COO_FAKE_PING_FAIL COO_FAKE_OFFICIAL_PRESENT COO_TEST_WAYLAND_DISPLAY \
+  TEST_DOCTOR_PROCESS TEST_DOCTOR_PING_FAIL TEST_DOCTOR_OFFICIAL_PRESENT \
+  TEST_DOCTOR_WAYLAND_DISPLAY TEST_DOCTOR_UWSM_APP
 mkdir -p "$prefix/upstream/shell" "$prefix/upstream/default/omarchy" "$compat" \
   "$root/usr/bin" "$root/usr/lib/systemd/user" "$hypr" "$config" "$user_config" "$state" "$fake_bin"
 printf '// fixture shell\n' >"$prefix/upstream/shell/shell.qml"
 printf '{}\n' >"$prefix/upstream/default/omarchy/omarchy-menu.jsonc"
 printf '# no conflicting bindings\n' >"$hypr/hyprland.conf"
+os_release=$COO_TEST_SANDBOX/os-release
+printf 'ID=cachyos\n' >"$os_release"
+omarchy_state=$COO_TEST_SANDBOX/.local/state/omarchy
 for cmd in cachy-omarchy-launcher cachy-omarchy-bindings cachy-omarchy-keybindings; do
   printf '#!/usr/bin/env bash\nexit 0\n' >"$root/usr/bin/$cmd"
   chmod +x "$root/usr/bin/$cmd"
@@ -27,7 +36,7 @@ done
 cat >"$root/usr/bin/cachy-omarchy-shell" <<'EOF'
 #!/usr/bin/env bash
 if [[ ${1:-} == --ipc && ${2:-} == shell && ${3:-} == ping ]]; then
-  [[ ${COO_FAKE_PING_FAIL:-0} == 1 ]] && exit 1
+  [[ ${TEST_DOCTOR_PING_FAIL:-0} == 1 ]] && exit 1
   printf 'ok\n'
 fi
 exit 0
@@ -35,27 +44,52 @@ EOF
 chmod +x "$root/usr/bin/cachy-omarchy-shell"
 cat >"$fake_bin/pgrep" <<'EOF'
 #!/usr/bin/env bash
-[[ ${COO_FAKE_PROCESS:-0} == 1 ]]
+[[ ${TEST_DOCTOR_PROCESS:-0} == 1 ]]
 EOF
 cat >"$fake_bin/qs" <<'EOF'
 #!/usr/bin/env bash
 exit 0
 EOF
+# Test-local jq accepts exactly doctor's array-length query and the known
+# valid fixture arrays. All other input is unreadable, so malformed fixture
+# history follows doctor's warning path without an external interpreter.
+cat >"$fake_bin/jq" <<'EOF'
+#!/usr/bin/env bash
+query='if type == "array" then length else empty end'
+[[ $# -eq 3 && $1 == -r && $2 == "$query" && -r $3 ]] || exit 2
+payload=$(<"$3")
+case $payload in
+  '[]') printf '0\n' ;;
+  '[{"type":"text","text":"gamma"}]') printf '1\n' ;;
+  '[{"type":"text","text":"alpha"},{"type":"text","text":"beta"}]') printf '2\n' ;;
+  *) exit 1 ;;
+esac
+EOF
+chmod +x "$fake_bin/jq"
+grep -q 'python3' "$fake_bin/jq" && jq_uses_python=1 || jq_uses_python=0
+assert_eq "$jq_uses_python" "0" "fake jq has no undeclared Python dependency"
 cat >"$fake_bin/pacman" <<'EOF'
 #!/usr/bin/env bash
 case ${1:-} in
+  -Qqo)
+    printf '%s\n' "$1" >>"${COO_PACMAN_OWNER_LOG:?}"
+    [[ ${2:-} == "$TEST_DOCTOR_UWSM_APP" ]] || exit 1
+    printf 'uwsm\n'
+    ;;
+  -Qo)
+    # Verbose ownership prose is intentionally unavailable: doctor must use
+    # the quiet package-name query, not parse localized human output.
+    printf '%s\n' "$1" >>"${COO_PACMAN_OWNER_LOG:?}"
+    exit 1
+    ;;
   -Q)
     printf '%s\n' "${2:-}" >>"${COO_PACMAN_LOG:?}"
     case ${2:-} in
       omarchy|omarchy-settings)
-        [[ ${COO_FAKE_OFFICIAL_PRESENT:-} == "$2" ]] && { printf '%s 1.0-1\n' "$2"; exit 0; }
+        [[ ${TEST_DOCTOR_OFFICIAL_PRESENT:-} == "$2" ]] && { printf '%s 1.0-1\n' "$2"; exit 0; }
         ;;
     esac
     exit 1
-    ;;
-  -Qo)
-    [[ ${2:-} == "$COO_FAKE_UWSM_APP" ]] || exit 1
-    printf '%s is owned by uwsm 0.26.6-1\n' "$2"
     ;;
   *) exit 2 ;;
 esac
@@ -68,13 +102,24 @@ mkdir -p "$prefix/upstream/bin"
 printf '#!/usr/bin/env bash\nexit 0\n' >"$prefix/upstream/bin/omarchy-theme-set"
 chmod +x "$prefix/upstream/bin/omarchy-theme-set"
 ln -s ../share/cachy-omarchy/upstream/bin/omarchy-theme-set "$root/usr/bin/omarchy-theme-set"
+ln -s ../lib/cachy-omarchy/compat/bin/omarchy-shell "$root/usr/bin/omarchy-shell"
 
 pacman_log=$COO_TEST_SANDBOX/pacman.log
+owner_query_log=$COO_TEST_SANDBOX/pacman-owner-query.log
+: >"$owner_query_log"
+export COO_PACMAN_OWNER_LOG=$owner_query_log
 run_doctor() {
-  PATH="$fake_bin:/usr/bin:/bin" WAYLAND_DISPLAY="${COO_TEST_WAYLAND_DISPLAY:-}" \
-    OMARCHY_PATH="$prefix/upstream" COO_FAKE_UWSM_APP="$fake_bin/uwsm-app" \
+  PATH="$fake_bin:/usr/bin:/bin" WAYLAND_DISPLAY="${TEST_DOCTOR_WAYLAND_DISPLAY:-}" \
+    OMARCHY_PATH="$prefix/upstream" TEST_DOCTOR_UWSM_APP="$fake_bin/uwsm-app" \
     COO_PACMAN_LOG="$pacman_log" COO_PREFIX_ROOT="$prefix" COO_COMPAT_BIN="$compat" COO_HYPR_DIR="$hypr" \
-    COO_CONFIG_DIR="$config" COO_OMARCHY_CONFIG_DIR="$user_config" COO_STATE_DIR="$state" "$DOCTOR" 2>&1
+    COO_CONFIG_DIR="$config" COO_OMARCHY_CONFIG_DIR="$user_config" COO_STATE_DIR="$state" \
+    COO_OMARCHY_PATH="$prefix/upstream" COO_OS_RELEASE="$os_release" \
+    COO_OMARCHY_STATE_DIR="$omarchy_state" \
+    COO_SHA256_BIN="${COO_TEST_DOCTOR_SHA256_BIN:-sha256sum}" "$DOCTOR" 2>&1
+}
+
+run_doctor_with_sha() {
+  COO_TEST_DOCTOR_SHA256_BIN=$1 run_doctor
 }
 
 printf 'do not modify\n' >"$config/sentinel"
@@ -88,18 +133,64 @@ assert_contains "$out" "WARN: Quickshell process not observed" "baseline does no
 assert_contains "$out" "WARN: IPC ping not measurable" "absent process leaves IPC explicitly unmeasured"
 assert_contains "$(cat "$pacman_log")" "omarchy" "doctor queries official omarchy package"
 assert_contains "$(cat "$pacman_log")" "omarchy-settings" "doctor queries official omarchy-settings package"
+assert_eq "$(cat "$owner_query_log")" "-Qqo"   "healthy doctor queries uwsm-app ownership with pacman -Qqo"
+
+# Every doctor override except deliberately injected COO_IPC_TIMEOUT is pinned
+# by run_doctor. Hostile inherited values must not redirect this fixture.
+out_hostile=$(COO_PREFIX_ROOT=/hostile COO_COMPAT_BIN=/hostile COO_HYPR_DIR=/hostile \
+  COO_CONFIG_DIR=/hostile COO_STATE_DIR=/hostile COO_OMARCHY_CONFIG_DIR=/hostile \
+  COO_OMARCHY_PATH=/hostile COO_OS_RELEASE=/hostile COO_OMARCHY_STATE_DIR=/hostile \
+  COO_SHA256_BIN=missing-sha256 run_doctor); hostile_code=$?
+assert_eq "$hostile_code" "0" "hostile doctor overrides cannot corrupt fixture health"
+assert_contains "$out_hostile" "PASS: shell.qml ($prefix/upstream/shell/shell.qml)" \
+  "fixture keeps its own OMARCHY_PATH despite hostile override"
+
+# Legacy fake controls must not leak into an otherwise baseline doctor call.
+out_hostile_controls=$(COO_FAKE_PROCESS=1 COO_FAKE_PING_FAIL=1 \
+  COO_FAKE_OFFICIAL_PRESENT=omarchy COO_TEST_WAYLAND_DISPLAY=hostile-wayland run_doctor); hostile_controls_code=$?
+assert_eq "$hostile_controls_code" "0" "hostile inherited fake controls cannot corrupt baseline"
+assert_contains "$out_hostile_controls" "WARN: Quickshell process not observed" \
+  "hostile fake process control is ignored"
+assert_contains "$out_hostile_controls" "PASS: official package absent: omarchy" \
+  "hostile fake official-package control is ignored"
 
 # 세션 환경은 uwsm 이 공급한다. doctor 자체의 fallback 경로가 이 사실을 가리면
 # 잘못된 세션을 정상으로 오진하므로 상속값을 별도로 검사해야 한다.
 assert_contains "$out" "PASS: session OMARCHY_PATH" "세션 변수가 있으면 PASS"
 assert_contains "$out" "PASS: /usr/bin omarchy-* symlinks resolve" "심링크가 있으면 PASS"
-assert_contains "$out" "PASS: uwsm-app owned by uwsm package" "uwsm-app 소유권을 확인한다"
+assert_contains "$out" "PASS: exposed: omarchy-theme-set" "업스트림 핵심 명령 노출을 확인한다"
+assert_contains "$out" "PASS: exposed: omarchy-shell" "compat 핵심 명령 노출을 확인한다"
+assert_contains "$out" "PASS: uwsm-app owned by uwsm package" "quiet ownership query is locale-independent"
+
+ln -s ../share/cachy-omarchy/upstream/bin/omarchy-gone "$root/usr/bin/omarchy-gone"
+out_broken=$(run_doctor); broken_code=$?
+assert_contains "$out_broken" "FAIL: /usr/bin omarchy-* symlinks broken" "dangling 심링크는 FAIL"
+[[ $broken_code -ne 0 ]] && broken_nonzero=0 || broken_nonzero=1
+assert_eq "$broken_nonzero" "0" "dangling 심링크는 nonzero exit"
+rm -f "$root/usr/bin/omarchy-gone"
+
+empty_root=$COO_TEST_SANDBOX/empty-exposure
+empty_prefix=$empty_root/usr/share/cachy-omarchy
+mkdir -p "$empty_root/usr/bin" "$empty_prefix/upstream/shell" "$empty_prefix/upstream/default/omarchy"
+printf '// fixture shell\n' >"$empty_prefix/upstream/shell/shell.qml"
+printf '{}\n' >"$empty_prefix/upstream/default/omarchy/omarchy-menu.jsonc"
+out_empty=$(PATH="$fake_bin:/usr/bin:/bin" WAYLAND_DISPLAY="${TEST_DOCTOR_WAYLAND_DISPLAY:-}" \
+  OMARCHY_PATH="$empty_prefix/upstream" TEST_DOCTOR_UWSM_APP="$fake_bin/uwsm-app" \
+  COO_PACMAN_LOG="$pacman_log" COO_PREFIX_ROOT="$empty_prefix" COO_COMPAT_BIN="$compat" \
+  COO_HYPR_DIR="$hypr" COO_CONFIG_DIR="$config" COO_OMARCHY_CONFIG_DIR="$user_config" \
+  COO_STATE_DIR="$state" COO_OMARCHY_PATH="$empty_prefix/upstream" COO_OS_RELEASE="$os_release" \
+  COO_OMARCHY_STATE_DIR="$omarchy_state" COO_SHA256_BIN=sha256sum "$DOCTOR" 2>&1); empty_code=$?
+assert_contains "$out_empty" "FAIL: no omarchy-* commands exposed" "빈 노출은 FAIL"
+[[ $empty_code -ne 0 ]] && empty_nonzero=0 || empty_nonzero=1
+assert_eq "$empty_nonzero" "0" "빈 노출은 nonzero exit"
 
 out_nosession=$(PATH="$fake_bin:/usr/bin:/bin" \
-  WAYLAND_DISPLAY="${COO_TEST_WAYLAND_DISPLAY:-}" COO_FAKE_UWSM_APP="$fake_bin/uwsm-app" \
+  WAYLAND_DISPLAY="${TEST_DOCTOR_WAYLAND_DISPLAY:-}" TEST_DOCTOR_UWSM_APP="$fake_bin/uwsm-app" \
   COO_PACMAN_LOG="$pacman_log" COO_PREFIX_ROOT="$prefix" COO_COMPAT_BIN="$compat" \
   COO_HYPR_DIR="$hypr" COO_CONFIG_DIR="$config" \
   COO_OMARCHY_CONFIG_DIR="$user_config" COO_STATE_DIR="$state" \
+  COO_OMARCHY_PATH="$prefix/upstream" COO_OS_RELEASE="$os_release" \
+  COO_OMARCHY_STATE_DIR="$omarchy_state" COO_SHA256_BIN=sha256sum \
   env -u OMARCHY_PATH "$DOCTOR" 2>&1); nocode=$?
 assert_contains "$out_nosession" "FAIL: OMARCHY_PATH not in session environment" \
   "세션 변수가 없으면 FAIL"
@@ -109,9 +200,7 @@ assert_contains "$out_nosession" "Hyprland (uwsm-managed)" \
 assert_eq "$nz" "0" "세션 변수 부재는 nonzero exit"
 
 # M9: 테마 런타임 점검. 부재는 §66 상 실패가 아니라 WARN, 존재는 PASS.
-# (run_doctor 는 COO_OMARCHY_STATE_DIR 를 안 세우므로 기본값
-#  $XDG_STATE_HOME/omarchy = 샌드박스 경로를 탄다.)
-omarchy_state=$COO_TEST_SANDBOX/.local/state/omarchy
+# (run_doctor pins COO_OMARCHY_STATE_DIR to this sandbox path.)
 assert_contains "$out" "WARN: no theme set" "테마 부재는 명시적 WARN (실패 아님)"
 
 mkdir -p "$omarchy_state/current"
@@ -129,20 +218,14 @@ printf 'source = %s/.local/state/omarchy/current/theme/hyprland.lua\n' "$COO_TES
   >> "$hypr/hyprland.conf"
 out=$(run_doctor); code=$?
 assert_contains "$out" "PASS: theme hyprland.lua sourced" "source 줄 있으면 PASS"
+# A commented stale source is not active Hyprland configuration.
+sed -i 's|^source = \(.*current/theme/hyprland.lua\)|# source = \1|' "$hypr/hyprland.conf"
+out=$(run_doctor); code=$?
+assert_contains "$out" "WARN: theme hyprland.lua not sourced" "주석 source 줄은 PASS 가 아니다"
 mv "$hypr/hyprland.conf.bak" "$hypr/hyprland.conf"
 
-# jq 는 M10 에서 hard depends — 없어도 FAIL 은 아니지만 WARN 으로 드러난다.
-printf '#!/usr/bin/env bash\nexit 0\n' > "$fake_bin/jq"
-chmod +x "$fake_bin/jq"
 out=$(run_doctor); code=$?
-assert_contains "$out" "PASS: jq" "jq 존재는 PASS"
-rm -f "$fake_bin/jq"
-if ! command -v jq >/dev/null 2>&1; then
-  out=$(run_doctor); code=$?
-  assert_contains "$out" "WARN: jq missing" "jq 부재는 WARN (hard depends — 깨진 설치 신호)"
-else
-  echo "note: 호스트에 jq 있음 — 부재 분기는 미측정"
-fi
+assert_contains "$out" "PASS: jq" "test-local jq 존재는 PASS"
 
 # M10: clipboard history 는 upstream 의 HOME 고정 경로(Clipboard.qml:20)에서만
 # 읽는다. 경로·항목 수만 보고하고 내용은 출력하지 않으며 절대 수정하지 않는다.
@@ -174,13 +257,13 @@ assert_contains "$out" "PASS: clipboard history: 1 entries" "XDG_STATE_HOME 분�
 assert_contains "$out" "$clip_history" "XDG_STATE_HOME 분기: 보고 경로가 HOME 기반"
 rm -f "$clip_history" "$xdg_elsewhere/omarchy/clipboard-history.json"
 
-out=$(COO_FAKE_PROCESS=1 COO_TEST_WAYLAND_DISPLAY=fixture-wayland run_doctor); code=$?
+out=$(TEST_DOCTOR_PROCESS=1 TEST_DOCTOR_WAYLAND_DISPLAY=fixture-wayland run_doctor); code=$?
 assert_eq "$code" 0 "live IPC ping success passes"
 assert_contains "$out" "PASS: IPC ping" "doctor performs bounded read-only IPC ping"
-out=$(COO_FAKE_PROCESS=1 COO_TEST_WAYLAND_DISPLAY=fixture-wayland COO_FAKE_PING_FAIL=1 run_doctor); code=$?
+out=$(TEST_DOCTOR_PROCESS=1 TEST_DOCTOR_WAYLAND_DISPLAY=fixture-wayland TEST_DOCTOR_PING_FAIL=1 run_doctor); code=$?
 assert_eq "$code" 1 "live IPC ping failure fails"
 assert_contains "$out" "FAIL: IPC ping" "failed IPC ping is explicit"
-out=$(COO_FAKE_PROCESS=1 COO_TEST_WAYLAND_DISPLAY=fixture-wayland COO_IPC_TIMEOUT=0 run_doctor); code=$?
+out=$(TEST_DOCTOR_PROCESS=1 TEST_DOCTOR_WAYLAND_DISPLAY=fixture-wayland COO_IPC_TIMEOUT=0 run_doctor); code=$?
 assert_eq "$code" 1 "zero IPC timeout is rejected before ping"
 assert_contains "$out" "FAIL: IPC timeout" "zero IPC timeout is explicit"
 for invalid_timeout in '' -1 not-a-number 11; do
@@ -188,10 +271,10 @@ for invalid_timeout in '' -1 not-a-number 11; do
   assert_eq "$code" 1 "invalid IPC timeout is rejected: ${invalid_timeout:-empty}"
   assert_contains "$out" "FAIL: IPC timeout" "invalid timeout is explicit: ${invalid_timeout:-empty}"
 done
-out=$(COO_FAKE_OFFICIAL_PRESENT=omarchy run_doctor); code=$?
+out=$(TEST_DOCTOR_OFFICIAL_PRESENT=omarchy run_doctor); code=$?
 assert_eq "$code" 1 "official omarchy presence fails"
 assert_contains "$out" "FAIL: official package present: omarchy" "official omarchy presence is explicit"
-out=$(COO_FAKE_OFFICIAL_PRESENT=omarchy-settings run_doctor); code=$?
+out=$(TEST_DOCTOR_OFFICIAL_PRESENT=omarchy-settings run_doctor); code=$?
 assert_eq "$code" 1 "official omarchy-settings presence fails"
 assert_contains "$out" "FAIL: official package present: omarchy-settings" "official omarchy-settings presence is explicit"
 
@@ -261,7 +344,7 @@ out=$(run_doctor); code=$?
 assert_eq "$code" 1 "two valid-looking wrong package names fail"
 assert_contains "$out" "FAIL: artifact/manifest mismatch" "wrong package names are explicit"
 write_valid_manifest
-out=$(COO_SHA256_BIN=missing-sha256 run_doctor); code=$?
+out=$(run_doctor_with_sha missing-sha256); code=$?
 assert_eq "$code" 1 "manifest without checksum tool cannot pass"
 assert_contains "$out" "FAIL: artifact/manifest mismatch" "missing checksum tool is explicit"
 rm -rf "$state/$release" "$state/validated-build.manifest"

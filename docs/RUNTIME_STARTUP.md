@@ -15,8 +15,9 @@
 
 ```bash
 export OMARCHY_PATH=/usr/share/cachy-omarchy/upstream
-# compat shim 디렉터리가 존재할 때만 PATH 앞에 붙인다 (M3: uwsm-app, §4).
-[[ -d /usr/lib/cachy-omarchy/compat/bin ]] && export PATH="/usr/lib/cachy-omarchy/compat/bin:$PATH"
+export QT_QPA_PLATFORM=wayland
+# PATH 는 어느 레이어도 건드리지 않는다 (§45 개정). 위젯이 bare name 으로 부르는
+# helper 는 /usr/bin/omarchy-* 상대 심링크로 노출된다.
 
 exec env QS_DISABLE_FILE_WATCHER=1 QS_NO_RELOAD_POPUP=1 \
   systemd-cat -t cachy-omarchy-shell -- \
@@ -27,7 +28,8 @@ exec env QS_DISABLE_FILE_WATCHER=1 QS_NO_RELOAD_POPUP=1 \
 
 | 변수 | 값 | 이유 |
 | --- | --- | --- |
-| `OMARCHY_PATH` | `/usr/share/cachy-omarchy/upstream` | `shell/shell.qml:27` 가 `Quickshell.env("OMARCHY_PATH")` 로 자산을 찾는다. 래퍼/유닛이 설정하지 않으면 IPC·기동이 모두 실패한다. |
+| `OMARCHY_PATH` | `/usr/share/cachy-omarchy/upstream` | `shell/shell.qml:27` 가 `Quickshell.env("OMARCHY_PATH")` 로 자산을 찾는다. uwsm 세션 환경(`/usr/share/uwsm/env-hyprland.d/10-cachy-omarchy`)이 공급하고, 래퍼가 같은 값을 기본으로 설정한다. 어느 쪽도 없으면 IPC·기동이 모두 실패한다. |
+| `QT_QPA_PLATFORM` | `wayland` | xcb 폴백 차단(방어적). Hyprland autostart(`hyprland.start`)로 기동하면 `WAYLAND_DISPLAY` 가 컴포지터 env 로 항상 정상이라 별도 socket-wait 는 없다. |
 | `QS_DISABLE_FILE_WATCHER` | `1` | **필수.** pacman 이 `$OMARCHY_PATH/shell` 을 다시 쓰는 도중 Quickshell 파일 워처가 리로드를 걸면 반쯤 쓰인 트리를 읽고, 실패한 리로드가 두 번째 엔진 세대를 남겨 다음 재시작의 IPC kill 을 크래시로 만든다. 업스트림 `bin/omarchy-launch-shell` 이 같은 이유로 끈다. 우리는 pacman 배포이므로 그대로 해당. |
 | `QS_NO_RELOAD_POPUP` | `1` | 업스트림 기동 명령이 함께 끄는 팝업. 기동 경로에 영향은 없지만 업스트림 동작을 그대로 따른다(§55). |
 
@@ -163,11 +165,17 @@ Task 5 라이브 기동에서 **실제로 필요했던** `omarchy-*` compat shim
 로그/소스가 요구한 명령만이다(§44).
 
 **M3 앱 실행 경로**에서 `AppLibrary.launch` 가 `uwsm-app -- gtk-launch` 를 부른다.
-이 호스트에 `uwsm-app` 이 없어 `overlay/compat/bin/uwsm-app` WRAPPER 를 추가했다
-(`exec "$@"` 만, gtk-launch 재구현 아님). compat PATH 는 `cachy-omarchy-shell --run`
-이 셸 프로세스에만 붙인다(§45). 기동 자체는 이 shim 없이 통과한다.
+M3 당시에는 이 호스트에 `uwsm-app` 이 없어 `overlay/compat/bin/uwsm-app` WRAPPER 를
+추가했었으나(`exec "$@"` 만, gtk-launch 재구현 아님), **그 shim 은 삭제됐다.**
+현재 계약: uwsm-app 은 uwsm 패키지가 소유하는 실제 바이너리이고,
+`cachy-omarchy-shell` 이 `uwsm` 을 hard depends 로 끌어온다 — 우리 두 패키지
+어느 쪽도 `uwsm-app` 을 소유하지 않는다. shim 을 뺀 이유는, uwsm 이 필수 의존이
+된 이상 shim 은 실제 바이너리를 가리기만 하기 때문이다(§15.2 에서 실측된 결함).
+어느 레이어도 PATH 를 조작하지 않는다(§45 개정). 기동 자체는 `uwsm-app` 없이 통과한다.
 
-> **측정**: 기동에 `omarchy-*` shim 불필요. 메뉴 앱 실행에 `uwsm-app` WRAPPER 필요.
+> **측정**: 기동에 `omarchy-*` shim 불필요. 메뉴 앱 실행의 `uwsm-app` 은 uwsm
+> 패키지의 실제 바이너리가 담당한다. shim 시절의 M3 측정·수정 경위는 §13.3·§15 의
+> 역사 기록을 본다.
 
 ---
 
@@ -240,9 +248,10 @@ esac
 4. **사용자 `~/.config/omarchy/shell.json` 오버라이드** — §2. 우리 기본값이 통째로
    무시될 수 있음. 감지·경고는 M7 doctor 후보.
 
-5. **`uwsm` 부재** — `pacman -Q uwsm` → 미설치(실측). M3 에서
-   `overlay/compat/bin/uwsm-app` WRAPPER 를 추가해 `gtk-launch` 로 위임.
-   `REIMPLEMENT` 아님. 셸 프로세스 PATH 에만 붙음.
+5. **`uwsm` 부재 — 해소됨.** M3 시점에는 미설치(실측)라 compat WRAPPER 로
+   `gtk-launch` 에 위임했었다. 현재는 `cachy-omarchy-shell` 이 `uwsm` 을 hard
+   depends 로 끌어오므로 `/usr/bin/uwsm-app` 은 항상 uwsm 패키지의 실제
+   바이너리다. shim 은 삭제됐다 (§4).
 
 6. **패키지 미설치 상태에서만 검증** — 본 M2 검증은 빌드 산출물을 임시 디렉터리에
    추출해 그 트리를 띄운 것으로, `/usr/share/cachy-omarchy/upstream` 에 실제 설치된
@@ -381,13 +390,16 @@ v0.2.0 부터 셸 패키지는 바 위젯이 bare name 으로 부르는 업스�
 Tier B `omarchy-reminder` `omarchy-notification-send` `omarchy-agent-usage-{update,claude,codex,fireworks}`.
 전부 업스트림과 바이트 동일하다(`tests/package/test_staged_helpers.sh` 가 확인).
 밝기 체인(`omarchy-brightness-display*`, `omarchy-hw-display`)은 의존 명령이 없어
-넣지 않는다. `cachy-omarchy-shell --run` 이 `$OMARCHY_PATH/bin` 을 **셸 프로세스
-PATH 에만** 붙인다 — compat shim 디렉터리가 그보다 앞이라 적응 카피가 동명
-업스트림 파일을 이긴다.
+넣지 않는다. helper 노출은 PATH 조작이 아니라 `/usr/bin/omarchy-*` 상대 심링크로
+이뤄진다 — `cachy-omarchy-shell --run` 은 호출자 PATH 를 그대로 물려준다
+(§45 개정).
 
 `/etc`, `/boot`, `/efi`, system 유닛(`usr/lib/systemd/system/`)은 소유하지 않는다.
-compat shim(6, 7번)은 `/usr/lib/cachy-omarchy/compat/bin/` 에만 있고 `/usr/bin` 으로
-새지 않는다 — `test_installed_tree.sh` 가 두 방향 모두 확인한다.
+compat 적응 카피의 실체는 `/usr/lib/cachy-omarchy/compat/bin/` 에만 두고,
+`/usr/bin` 에는 그 실체를 가리키는 상대 심링크만 놓는다 —
+`test_installed_tree.sh` 가 두 방향 모두 확인한다. (표의 7번 `uwsm-app` 항목은
+M5 스냅샷의 기록이다 — shim 은 삭제됐고 `/usr/bin/uwsm-app` 은 uwsm 패키지
+소유다, §4.)
 
 ### 9.2 `cachy-omarchy-init` 계약
 
@@ -1123,6 +1135,9 @@ PID 3724905  quickshell -n -p /usr/share/cachy-omarchy/upstream/shell
 
 - `OMARCHY_PATH=/usr/share/cachy-omarchy/upstream` — 실 pacman 설치 경로(샌드박스 아님).
 - `PATH=/usr/lib/cachy-omarchy/compat/bin:…` — compat bin 이 셸 PATH 선행. §45 PATH 격리가 autostart 세션에서도 그대로 유지됨(§13.3 과 동일).
+  (이 값은 §45 개정 전 측정이다 — 현재 계약은 어느 레이어도 PATH 를 조작하지
+  않고, `OMARCHY_PATH` 는 uwsm 세션 드롭인
+  `/usr/share/uwsm/env-hyprland.d/10-cachy-omarchy` 가 공급한다. §1·§4 참조.)
 - `QT_QPA_PLATFORM=wayland`, `QT_IM_MODULE=fcitx`, `XDG_RUNTIME_DIR=/run/user/1000`.
 - `COO_RUN_LIVE` 없음 — 깨끗한 자동 기동(테스트 강제 키 아님).
 
@@ -1440,7 +1455,7 @@ $ pgrep -a waybar
   `set -e` 가 없어 부재 시 "command not found" 만 stderr 로 새고 exit 는 0 이다
   — 이 조용한 실패를 메우기 위해 `compat/bin/omarchy-theme-set-{browser,keyboard}`
   no-op shim 2개를 둔다. `test_installed_tree.sh` 가 compat 디렉터리를 순회해
-  모든 shim 의 통제 경로 존재·`/usr/bin` 누출 부재·no-op 내용을 단언한다.
+  모든 shim 의 통제 경로 존재·`/usr/bin` 상대 심링크 노출·no-op 내용을 단언한다.
 
 ### 18.2 진입점
 

@@ -8,6 +8,15 @@ export REPO_ROOT
 only=${1:-}
 failed=0
 total=0
+test_list=$(mktemp "${TMPDIR:-/tmp}/coo-test-list-XXXXXX") || {
+  printf 'error: could not create test discovery list\n' >&2
+  exit 1
+}
+trap 'rm -f "$test_list"' EXIT
+if ! find "$REPO_ROOT/tests" -name 'test_*.sh' -type f -print | sort > "$test_list"; then
+  printf 'error: test discovery failed\n' >&2
+  exit 1
+fi
 
 while IFS= read -r t; do
   [[ -n $only && $t != *"$only"* ]] && continue
@@ -18,6 +27,7 @@ while IFS= read -r t; do
      XDG_CONFIG_HOME="$sandbox/.config" \
      XDG_DATA_HOME="$sandbox/.local/share" \
      XDG_STATE_HOME="$sandbox/.local/state" \
+     XDG_CACHE_HOME="$sandbox/.cache" \
      COO_TEST_SANDBOX="$sandbox" \
      bash "$t"; then
     printf 'PASS %s\n' "${t#"$REPO_ROOT"/}"
@@ -26,7 +36,7 @@ while IFS= read -r t; do
     failed=$((failed + 1))
   fi
   rm -rf "$sandbox"
-done < <(find "$REPO_ROOT/tests" -name 'test_*.sh' -type f | sort)
+done < "$test_list"
 
 printf '\n%d/%d test files passed\n' "$((total - failed))" "$total"
 if [[ $total -eq 0 ]]; then

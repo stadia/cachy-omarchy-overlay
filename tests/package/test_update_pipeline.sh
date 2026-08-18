@@ -12,6 +12,34 @@ fi
 
 root=$COO_TEST_SANDBOX/repo
 mkdir -p "$root/packages" "$root/bin"
+
+# U02 invokes the candidate's real default suite, whose runtime/package tests
+# extract both packages.  Name the required inputs from the current package
+# metadata and snapshot those exact archives before validation; never choose
+# an arbitrary ignored build leftover by directory order or mtime.
+shell_input_ver=$(grep -m1 '^pkgver=' "$REPO_ROOT/packages/cachy-omarchy-shell/PKGBUILD" | cut -d= -f2)
+shell_input_rel=$(grep -m1 '^pkgrel=' "$REPO_ROOT/packages/cachy-omarchy-shell/PKGBUILD" | cut -d= -f2)
+overlay_input_ver=$(grep -m1 '^pkgver=' "$REPO_ROOT/packages/cachy-omarchy-overlay/PKGBUILD" | cut -d= -f2)
+overlay_input_rel=$(grep -m1 '^pkgrel=' "$REPO_ROOT/packages/cachy-omarchy-overlay/PKGBUILD" | cut -d= -f2)
+required_shell_artifact="$REPO_ROOT/build/cachy-omarchy-shell-${shell_input_ver}-${shell_input_rel}-any.pkg.tar.zst"
+required_overlay_artifact="$REPO_ROOT/build/cachy-omarchy-overlay-${overlay_input_ver}-${overlay_input_rel}-any.pkg.tar.zst"
+for required_artifact in "$required_shell_artifact" "$required_overlay_artifact"; do
+  [[ -f $required_artifact ]] || {
+    printf '%s\n' "error: U02 required package artifact missing (run the approved build-before-test step): $required_artifact" >&2
+    exit 1
+  }
+done
+u02_artifact_fixture=$COO_TEST_SANDBOX/u02-package-artifacts
+mkdir -p "$u02_artifact_fixture"
+u02_shell_fixture="$u02_artifact_fixture/shell.pkg.tar.zst"
+u02_overlay_fixture="$u02_artifact_fixture/overlay.pkg.tar.zst"
+cp -a "$required_shell_artifact" "$u02_shell_fixture"
+cp -a "$required_overlay_artifact" "$u02_overlay_fixture"
+assert_eq "$(sha256sum "$u02_shell_fixture" | awk '{print $1}')" "$(sha256sum "$required_shell_artifact" | awk '{print $1}')" \
+  "U02 snapshots the required shell package artifact"
+assert_eq "$(sha256sum "$u02_overlay_fixture" | awk '{print $1}')" "$(sha256sum "$required_overlay_artifact" | awk '{print $1}')" \
+  "U02 snapshots the required overlay package artifact"
+
 cp -a "$REPO_ROOT/upstream.lock" "$REPO_ROOT/UPSTREAM.md" "$root/"
 while IFS= read -r -d '' path; do
   mkdir -p "$root/$(dirname "$path")"
@@ -77,21 +105,16 @@ set -euo pipefail
 printf '%s\n' "$(basename "$PWD")" >>"$COO_TOOL_LOG"
 [[ ${COO_FAKE_BUILD_FAIL:-0} != 1 ]] || exit 7
 mkdir -p "$PKGDEST"
-# build/ legitimately accumulates artifacts across releases, so a plain
-# `find -print -quit` picks whichever one the directory happens to list first
-# and the candidate suite silently validates a stale package. Take the newest
-# by mtime instead; that is the one the working tree just produced.
-newest_artifact() {
-  find "$1" -maxdepth 1 -type f -name "$2" -printf '%T@ %p\n' \
-    | sort -rn | head -1 | cut -d' ' -f2-
-}
 if [[ $PWD == *cachy-omarchy-shell ]]; then
   ver=$(grep -m1 '^pkgver=' PKGBUILD | cut -d= -f2 | tr -d "'\"")
   rel=$(grep -m1 '^pkgrel=' PKGBUILD | cut -d= -f2 | tr -d "'\"")
   target="$PKGDEST/cachy-omarchy-shell-${ver}-${rel}-any.pkg.tar.zst"
-  if [[ -n ${COO_FAKE_ARTIFACT_SOURCE:-} ]]; then
-    source_archive=$(newest_artifact "$COO_FAKE_ARTIFACT_SOURCE" 'cachy-omarchy-shell-*.pkg.tar.zst')
-    cp "$source_archive" "$target"
+  if [[ -n ${COO_FAKE_SHELL_ARTIFACT:-} ]]; then
+    [[ -f $COO_FAKE_SHELL_ARTIFACT ]] || {
+      printf 'error: required fake shell artifact missing: %s\n' "$COO_FAKE_SHELL_ARTIFACT" >&2
+      exit 1
+    }
+    cp "$COO_FAKE_SHELL_ARTIFACT" "$target"
   else
     : >"$target"
   fi
@@ -99,9 +122,12 @@ else
   ver=$(grep -m1 '^pkgver=' PKGBUILD | cut -d= -f2 | tr -d "'\"")
   rel=$(grep -m1 '^pkgrel=' PKGBUILD | cut -d= -f2 | tr -d "'\"")
   target="$PKGDEST/cachy-omarchy-overlay-${ver}-${rel}-any.pkg.tar.zst"
-  if [[ -n ${COO_FAKE_ARTIFACT_SOURCE:-} ]]; then
-    source_archive=$(newest_artifact "$COO_FAKE_ARTIFACT_SOURCE" 'cachy-omarchy-overlay-*.pkg.tar.zst')
-    cp "$source_archive" "$target"
+  if [[ -n ${COO_FAKE_OVERLAY_ARTIFACT:-} ]]; then
+    [[ -f $COO_FAKE_OVERLAY_ARTIFACT ]] || {
+      printf 'error: required fake overlay artifact missing: %s\n' "$COO_FAKE_OVERLAY_ARTIFACT" >&2
+      exit 1
+    }
+    cp "$COO_FAKE_OVERLAY_ARTIFACT" "$target"
   else
     : >"$target"
   fi
@@ -178,9 +204,16 @@ mkdir -p "$doctor_prefix/upstream/bin"
 printf '#!/usr/bin/env bash\nexit 0\n' >"$doctor_prefix/upstream/bin/omarchy-theme-set"
 chmod +x "$doctor_prefix/upstream/bin/omarchy-theme-set"
 ln -s ../share/cachy-omarchy/upstream/bin/omarchy-theme-set "$doctor_root/usr/bin/omarchy-theme-set"
+ln -s ../lib/cachy-omarchy/compat/bin/omarchy-shell "$doctor_root/usr/bin/omarchy-shell"
 cat >"$doctor_fake/pacman" <<'EOF'
 #!/usr/bin/env bash
 case ${1:-} in
+  -Qqo)
+    [[ ${2:-} == */uwsm-app ]] || exit 1
+    printf 'uwsm\n'
+    ;;
+  # Verbose ownership output is unavailable; doctor must use -Qqo.
+  -Qo) exit 1 ;;
   -Q)
     case ${2:-} in
       cachy-omarchy-shell|cachy-omarchy-overlay) printf '%s 0.1.0-1\n' "$2"; exit 0 ;;
@@ -188,7 +221,6 @@ case ${1:-} in
       *) exit 1 ;;
     esac
     ;;
-  -Qo) printf '%s is owned by uwsm 0.26.6-1\n' "${2:-}" ;;
   *) exit 2 ;;
 esac
 EOF
@@ -201,6 +233,8 @@ run_rc_doctor() {
     COO_OS_RELEASE="$doctor_root/os-release" COO_PREFIX_ROOT="$doctor_prefix" COO_COMPAT_BIN="$doctor_compat" \
     COO_HYPR_DIR="$COO_TEST_SANDBOX/doctor-hypr" COO_CONFIG_DIR="$COO_TEST_SANDBOX/doctor-config" \
     COO_OMARCHY_CONFIG_DIR="$COO_TEST_SANDBOX/doctor-omarchy" COO_STATE_DIR="$state" \
+    COO_OMARCHY_PATH="$doctor_prefix/upstream" COO_OMARCHY_STATE_DIR="$COO_TEST_SANDBOX/doctor-omarchy-state" \
+    COO_SHA256_BIN=sha256sum COO_IPC_TIMEOUT=2s \
     "$REPO_ROOT/overlay/bin/cachy-omarchy-doctor" 2>&1
 }
 
@@ -544,7 +578,7 @@ pac_update=$COO_TEST_SANDBOX/update-pacman.log
 # though nothing about independence changed.
 overlay_pkgver_before_update=$(grep -m1 '^pkgver=' "$root/packages/cachy-omarchy-overlay/PKGBUILD")
 code=0
-out=$(WAYLAND_DISPLAY= COO_UPDATE_PIPELINE_NESTED=1 COO_REPO_ROOT="$root" COO_GIT_BIN="$fake/git" COO_STATE_DIR="$update_state" COO_BUILD_DIR="$update_build" COO_OMARCHY_GIT="$REPO_ROOT/build/omarchy" COO_TOOL_LOG="$log" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_FAKE_ARTIFACT_SOURCE="$REPO_ROOT/build" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$pac_update" "$root/bin/update-upstream" 2>&1) || code=$?
+out=$(WAYLAND_DISPLAY= COO_UPDATE_PIPELINE_NESTED=1 COO_REPO_ROOT="$root" COO_GIT_BIN="$fake/git" COO_STATE_DIR="$update_state" COO_BUILD_DIR="$update_build" COO_OMARCHY_GIT="$REPO_ROOT/build/omarchy" COO_TOOL_LOG="$log" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_FAKE_SHELL_ARTIFACT="$u02_shell_fixture" COO_FAKE_OVERLAY_ARTIFACT="$u02_overlay_fixture" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$pac_update" "$root/bin/update-upstream" 2>&1) || code=$?
 assert_eq "$code" "0" "U02 update validates and publishes candidate"
 assert_contains "$out" "PASS tests/runtime/test_m3_docs.sh" "candidate default suite runs M3 docs test"
 assert_contains "$out" "PASS tests/package/test_package_files.sh" "candidate default suite reaches package files test"

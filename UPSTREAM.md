@@ -22,7 +22,7 @@
 ## Components packaged (M1–M5; `pacman -U` 실설치는 2026-08-17 검증됨 — `docs/RUNTIME_STARTUP.md` §12)
 
 두 패키지로 나뉜다. `cachy-omarchy-shell` 은 핀된 업스트림 트리를, `cachy-omarchy-overlay`
-는 CachyOS 통합(공개 명령·compat shim·유저 유닛·기본값)을 소유한다. 서로 다른 산출물이며
+는 CachyOS 통합(공개 명령·compat 적응 카피·기본값·uwsm 세션 드롭인)을 소유한다. 서로 다른 산출물이며
 `cachy-omarchy-overlay` 가 `depends=('cachy-omarchy-shell' 'bash')` 로 전자에 의존한다.
 실측: `tests/runtime/test_installed_tree.sh` (M5) — 두 아티팩트를 겹쳐 추출해 설치된
 것처럼 동작함을 검증. `docs/RUNTIME_STARTUP.md` §9 참조.
@@ -55,19 +55,30 @@
 
 ### `cachy-omarchy-overlay` (`packages/cachy-omarchy-overlay/stage-overlay.sh`)
 
-업스트림 소스가 아니라 이 레포에서 새로 작성한 CachyOS 통합 레이어. 현재 아티팩트의
-소유 파일 15개(2026-08-17 `bsdtar -tf` 실측)는 다음 네 범주다:
+업스트림 소스가 아니라 이 레포에서 새로 작성한 CachyOS 통합 레이어. 소유 파일은
+다음 범주다(정확한 목록은 `tests/package/test_overlay_files.sh` 가 단언한다):
 
-- `usr/bin/cachy-omarchy-{shell,launcher,keybindings,bindings,init,doctor,theme-set}`
-  — 공개 명령 7개.
-- `usr/lib/cachy-omarchy/compat/bin/{omarchy-shell,uwsm-app,omarchy-update-available,
-  omarchy-theme-set-browser,omarchy-theme-set-keyboard}` — compat shim 5개.
-  `/usr/bin` 에는 절대 설치하지 않는다(§44).
+- `usr/bin/cachy-omarchy-{shell,launcher,keybindings,bindings,init,doctor}`
+  — 공개 명령 6개.
+- `usr/lib/cachy-omarchy/compat/bin/{omarchy-shell,omarchy-update-available,
+  omarchy-theme-set-browser,omarchy-theme-set-keyboard}` — compat 적응 카피 4개.
+  실체는 이 통제 경로에만 둔다(§44).
+- `usr/bin/omarchy-{shell,update-available,theme-set-browser,theme-set-keyboard}`
+  — compat 실체를 가리키는 상대 심링크 4개. `/usr/bin` 은 심링크만 놓는 평평한
+  뷰이다(§45 개정).
+- `usr/share/uwsm/env-hyprland.d/10-cachy-omarchy` — uwsm 세션 환경 드롭인.
+  그래픽 세션에 `OMARCHY_PATH=/usr/share/cachy-omarchy/upstream` 을 공급한다(§45).
 - `usr/share/cachy-omarchy/defaults/shell.json` — `cachy-omarchy-init` 가 최초 실행 시
   사용자 설정으로 복사하는 정본. `cachy-omarchy-shell` 패키지의 스테이징된 기본값과
   내용이 동일하다(`test_installed_tree.sh` 가 `jq -S` 로 비교).
 - `usr/share/cachy-omarchy/hypr/{bindings.conf,bindings.lua}` — `cachy-omarchy-bindings`
   가 사용자 `~/.config/cachy-omarchy/hypr/` 로 복사하는 소스.
+
+`uwsm-app` 은 어느 쪽 패키지도 소유하지 않는다 — `/usr/bin/uwsm-app` 은
+uwsm 패키지(`cachy-omarchy-shell` 의 hard depends) 소유다. M3 시절의
+`overlay/compat/bin/uwsm-app` shim 은 uwsm 이 필수 의존으로 자리잡으면서 삭제됐다
+— shim 이 실제 바이너리를 가리던 문제(`docs/RUNTIME_STARTUP.md` §15.2)의
+구조적 해소다.
 
 systemd 유저 유닛은 기동 전환(§"Milestone 8 — Shell Autostart", RUNTIME_STARTUP §16)
 으로 제거됐다 — 더 이상 소유하지 않는다. 과거 11개 시점의 실측은
@@ -102,6 +113,12 @@ CachyOS에서 `omarchy.menu`를 쓰려면 공식 OS가 아니라 **핀된 런타
   토글을 사용자 상태로 생성하거나 패치 필요. §61 "Existing Waybar preserved" 미충족.
 - **`inotify-tools` 미감사 의존** — `PluginRegistry.qml:638` 이 `inotifywait` 호출.
   미설치 시 1초마다 WARN 반복. `PKGBUILD depends` 누락(§28).
-- **`graphical-session.target` 비활성** — `uwsm` 부재로 유닛 자동 시작 안 함(§17 미검증).
 - **패키지 미설치 상태에서만 검증** — 실설치 경로(`/usr/share/cachy-omarchy/upstream`)는 M5.
-- **M3 런처** — 원본 `omarchy.menu` IPC. `uwsm-app` WRAPPER 있음. SUPER+K 는 M4.
+- **M3 런처** — 원본 `omarchy.menu` IPC. `uwsm-app` 은 uwsm 패키지의 실제 바이너리
+  (구 WRAPPER shim 은 삭제됨 — 위 "Components packaged" 참조). SUPER+K 는 M4.
+
+> 역사 기록(해소됨): M2·M3 시점에는 **`graphical-session.target` 비활성** —
+> `uwsm` 부재로 유닛 자동 시작 안 함(§17 미검증) — 도 제한이었다. 현재는 uwsm 이
+> `cachy-omarchy-shell` 의 hard depends 이고, systemd 유저 유닛 자체가 Hyprland
+> autostart 기동 전환(`docs/RUNTIME_STARTUP.md` §16)으로 제거됐으므로 현재
+> 계약의 미해결 제한이 아니다.

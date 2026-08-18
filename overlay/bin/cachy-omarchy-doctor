@@ -247,7 +247,7 @@ omarchy_links=("$BIN_DIR"/omarchy-*)
 shopt -u nullglob
 dangling=0
 if (( ${#omarchy_links[@]} == 0 )); then
-  fail "/usr/bin omarchy-* symlinks missing"
+  fail "no omarchy-* commands exposed in $BIN_DIR — reinstall cachy-omarchy-shell and cachy-omarchy-overlay"
 else
   for link in "${omarchy_links[@]}"; do
     [[ -L $link && -e $link ]] || dangling=$((dangling + 1))
@@ -259,9 +259,21 @@ else
   fi
 fi
 
+# A nonempty view can still be a partial install. Require one upstream and one
+# compat entry explicitly instead of treating any omarchy-* link as complete.
+for required in omarchy-theme-set omarchy-shell; do
+  if [[ -L $BIN_DIR/$required && -e $BIN_DIR/$required ]]; then
+    pass "exposed: $required"
+  else
+    fail "missing from $BIN_DIR: $required"
+  fi
+done
+
 # uwsm-app belongs to the uwsm package, never to either Cachy Omarchy package.
+# -Qqo emits the package name only; unlike -Qo prose it is locale-independent.
 if command -v pacman >/dev/null 2>&1 && command -v uwsm-app >/dev/null 2>&1; then
-  if pacman -Qo "$(command -v uwsm-app)" 2>/dev/null | grep -q 'owned by uwsm '; then
+  owner=$(pacman -Qqo "$(command -v uwsm-app)" 2>/dev/null) || owner=""
+  if [[ $owner == uwsm ]]; then
     pass "uwsm-app owned by uwsm package"
   else
     warn "uwsm-app not owned by the uwsm package"
@@ -341,7 +353,7 @@ fi
 # cachy-omarchy-bindings --force 가 블록을 새 스니펫으로 교체한다.
 if [[ -s $OMARCHY_STATE_DIR/current/theme.name && -f $HYPR_DIR/hyprland.conf ]] \
   && grep -qF '# >>> cachy-omarchy >>>' "$HYPR_DIR/hyprland.conf"; then
-  if grep -q 'current/theme/hyprland.lua' "$HYPR_DIR/hyprland.conf"; then
+  if grep -qE '^[[:space:]]*source[[:space:]]*=[[:space:]]*[^#]*current/theme/hyprland\.lua' "$HYPR_DIR/hyprland.conf"; then
     pass "theme hyprland.lua sourced (managed block)"
   else
     warn "theme hyprland.lua not sourced — run: cachy-omarchy-bindings --force"
