@@ -37,7 +37,7 @@ fi
 # scope-isolation live check (uwsm-less hosts are the original target — the
 # test must not silently verify Tier 1 fallback instead). An absent
 # wayland-wm-app-daemon is a note, not a skip: the negative control still ran.
-unexpected_skips=$(grep -F 'skip:' "$out" | grep -Fv 'skip: 라이브 키 주입 (COO_RUN_LIVE=1 필요)' | grep -Fv 'skip: 라이브 Wayland 런타임 없음 (quickshell/qs/systemd-cat 사용 불가 또는 WAYLAND_DISPLAY 소켓 없음)' | grep -Fv 'skip: 실제 uwsm-app 이 PATH 에 없다 — Tier 2 스코프 격리를 검증할 수 없다 (uwsm 미설치 호스트)' || true)
+unexpected_skips=$(grep -F 'skip:' "$out" | grep -Fv 'skip: 라이브 키 주입 (COO_RUN_LIVE=1 필요)' | grep -Fv 'skip: 라이브 Wayland 런타임 없음 (quickshell/qs/systemd-cat 사용 불가 또는 WAYLAND_DISPLAY 소켓 없음)' | grep -Fv 'skip: 실제 uwsm-app 이 PATH 에 없다 — Tier 2 스코프 격리를 검증할 수 없다 (uwsm 미설치 호스트)' | grep -Fv 'skip: COO_RUN_LIVE=1 이 아니다' || true)
 if [[ -n $unexpected_skips ]]; then
   printf '%s\n' "$unexpected_skips" >&2
   coo_fail 'test runner skipped required coverage'
