@@ -24,7 +24,10 @@ coo_sandbox_pids() {
   for pid in /proc/[0-9]*; do
     pid=${pid#/proc/}
     (( pid == self )) && continue
-    cmdline=$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null) || continue
+    # `2>/dev/null` must precede the input redirection: redirections apply left
+    # to right, so with the order reversed a process that exits mid-scan makes
+    # bash report the failed open before stderr is silenced.
+    cmdline=$(tr '\0' ' ' 2>/dev/null < "/proc/$pid/cmdline") || continue
     [[ $cmdline == *"$dir"* ]] && printf '%s\n' "$pid"
   done
   return 0

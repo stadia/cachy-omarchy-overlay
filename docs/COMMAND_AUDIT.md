@@ -33,7 +33,6 @@
 대표 `DISABLED` (전체 OS 가정):
 
 ```text
-omarchy-theme-set / omarchy-theme-switcher
 omarchy-plymouth-*
 omarchy-launch-screensaver
 omarchy-refresh-config / omarchy-reinstall-configs
@@ -114,7 +113,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-system-lock` | idle | DISABLED | disable plugin |
 | `omarchy-system-wake` | idle | DISABLED | disable plugin |
 | `omarchy-battery-low` / `omarchy-powerprofiles-set` | battery | DISABLED | disable plugin |
-| `omarchy-notification-send` | 여러 패널 | DISABLED until notifications ENABLE | disable |
+| `omarchy-notification-send` | 여러 패널 | SAFE | package — M8 Tier B. `omarchy-reminder` 와 `omarchy-theme-set` 이 부른다(실측). 알림 표시 자체는 셸 플러그인 정책이지 이 helper 의 스테이징 여부와 별개다 |
 | `omarchy-shell osd ...` | AppLibrary 런치 OSD | OPTIONAL | osd 플러그인 정책에 따름 |
 | `omarchy-osd` | osd 패널 | M10: stage | `omarchy-shell -q osd show <jq payload>` 얇은 프런트. volume/mic-mute helper 와 함께 채택, display brightness 체인은 제외 (M10 D6) |
 
@@ -143,6 +142,92 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 2. 메뉴 JSONC의 Omarchy-OS 액션은 끄거나 실패해도 셸이 죽지 않게 둔다(업스트림이 이미 명령 실패를 어떻게 다루는지는 M3에서 실측).
 3. `omarchy-settings`가 제공하는 `omarchy-debug*`는 패키징하지 않는다.
 4. 공식 `bin/` 전체를 `/usr/bin`에 설치하지 않는다.
+
+---
+
+## 스테이징 전수 (`$OMARCHY_PATH/bin` + `/usr/bin` 심링크)
+
+아래 표가 **스테이징 집합의 권위**다. 출처는 `packages/cachy-omarchy-shell/stage-upstream.sh`
+의 `helpers=(` 배열 하나이며, 그 배열이 스테이징과 `/usr/bin` 노출을 동시에 정의한다
+(SPEC §45). 즉 이 표의 명령은 전부 사용자 PATH 에 실제로 올라간다.
+
+바로 아래 "메뉴 노출 전수" 와는 목적이 다르다. 그쪽은 *메뉴에 보이는* 이름을 빠짐없이
+분류하고(대부분 DISABLED — 바이너리를 안 올리므로 실행 시 실패한다), 이쪽은 *우리가
+올린* 것을 빠짐없이 분류한다. 두 집합은 일부만 겹치며, 겹치는 행의 분류는 서로 같아야
+한다. 세 조건 모두 `tests/runtime/test_command_audit.sh` 가 단언한다.
+
+전부 업스트림 원본을 그대로(verbatim) 올리므로 분류는 `SAFE` / `package` 다 — 적응
+카피(`ADAPTED` / `wrapper`)는 이 배열이 아니라 `overlay/bin` 과
+`/usr/lib/cachy-omarchy/compat/bin` 에 있다.
+
+<!-- STAGED_AUDIT_BEGIN -->
+| command | class | action | 왜 올렸나 |
+| --- | --- | --- | --- |
+| `omarchy-agent-usage-claude` | SAFE | package | agents 패널 수집기. 해당 CLI 부재 시 조용히 빈다 |
+| `omarchy-agent-usage-codex` | SAFE | package | agents 패널 수집기. 해당 CLI 부재 시 조용히 빈다 |
+| `omarchy-agent-usage-fireworks` | SAFE | package | agents 패널 수집기. 해당 CLI 부재 시 조용히 빈다 |
+| `omarchy-agent-usage-update` | SAFE | package | agents 패널 (M8 Tier B). CLI 별 수집기를 부른다 |
+| `omarchy-audio-input-mute` | SAFE | package | M10 OSD audio bridge. `brightness-keyboard-mute` 를 무조건 부른다 (D7) |
+| `omarchy-audio-output-sink` | SAFE | package | 바 audio 위젯이 bare name 으로 부름 (M8 Tier A) |
+| `omarchy-audio-output-volume` | SAFE | package | M10 OSD audio bridge. pactl/wpctl. debounce 파일은 runtime dir |
+| `omarchy-bar` | SAFE | package | 메뉴 `style.bar` position/transparent. layer-shell 네임스페이스 `omarchy-bar` 와 동명·별개 |
+| `omarchy-brightness-keyboard-mute` | SAFE | package | M10 mic-mute LED 가드. LED/brightnessctl 부재 시 no-op |
+| `omarchy-clipboard-open` | SAFE | package | M10 clipboard. URL→browser, text→editor, image→`tensaku-edit`(부재 시 127) |
+| `omarchy-clipboard-paste-file` | SAFE | package | M10 clipboard. 선택 시에만 `wl-copy`/`wtype` (D4) |
+| `omarchy-clipboard-paste-text` | SAFE | package | M10 clipboard. 선택 시에만 `wl-copy`/`wtype` (D4) |
+| `omarchy-cmd-present` | SAFE | package | `command -v` 루프뿐인 가드. 여러 helper 와 메뉴 `when` 이 부른다 |
+| `omarchy-hook` | SAFE | package | M9 theme-set post 훅 디스패처 (실측: theme-set 이 부름) |
+| `omarchy-hyprland-focus-app` | SAFE | package | M10 clipboard 전이 closure |
+| `omarchy-hyprland-monitor-scaling` | SAFE | package | 바 monitor 위젯 (M8 Tier A) |
+| `omarchy-hyprland-window-close-all` | SAFE | package | logout/reboot/shutdown 전이 |
+| `omarchy-launch-browser` | SAFE | package | M10 clipboard 전이 closure. xdg-utils + uwsm-app |
+| `omarchy-launch-editor` | SAFE | package | M10 clipboard 전이 closure |
+| `omarchy-launch-tui` | SAFE | package | M10 clipboard 전이 closure |
+| `omarchy-menu-clipboard` | SAFE | package | M10 clipboard. `shell toggle omarchy.clipboard` 얇은 프런트 |
+| `omarchy-menu-emoji` | SAFE | package | M10 emojis. 선택 시 copy+type 1회, 취소 무부작용 |
+| `omarchy-menu-emoji-insert` | SAFE | package | M10 emojis closure |
+| `omarchy-menu-images` | SAFE | package | M9 테마 메뉴 UI 프론트. `omarchy-shell` IPC 만 부른다 |
+| `omarchy-menu-select` | SAFE | package | M4 키바인딩 UI + 메뉴 select mode. payload → `omarchy-shell shell summon omarchy.menu` |
+| `omarchy-monitor-state` | SAFE | package | 바 monitor 위젯 (M8 Tier A). 제외한 밝기 체인을 가드한다 |
+| `omarchy-network-band` | SAFE | package | 바 network 위젯 (M8 Tier A) |
+| `omarchy-network-status` | SAFE | package | 바 network 위젯 (M8 Tier A). 메뉴 `when` 가드로도 쓰임 |
+| `omarchy-notification-send` | SAFE | package | M8 Tier B 묶음. `omarchy-reminder` 와 `omarchy-theme-set` 이 부른다 (실측) |
+| `omarchy-osd` | SAFE | package | M10 OSD. 직접 IPC 프런트, shell 실패는 non-zero 전파 |
+| `omarchy-plugin-catalog` | SAFE | package | `omarchy-bar` 전이 |
+| `omarchy-reminder` | SAFE | package | M8 Tier B. user systemd timer + ${XDG_RUNTIME_DIR}/omarchy-reminders metadata 만 사용 |
+| `omarchy-restart-btop` | SAFE | package | M9 theme-set post 훅 |
+| `omarchy-restart-helix` | SAFE | package | M9 theme-set post 훅 |
+| `omarchy-restart-hyprctl` | SAFE | package | M9 theme-set post 훅 |
+| `omarchy-restart-opencode` | SAFE | package | M9 theme-set post 훅 |
+| `omarchy-restart-terminal` | SAFE | package | M9 theme-set post 훅 — 새 팔레트 반영 |
+| `omarchy-shell-config` | SAFE | package | `omarchy-bar` 가 source 하는 설정 헬퍼 |
+| `omarchy-state` | SAFE | package | reboot/shutdown 전이 |
+| `omarchy-system-lock` | SAFE | package | 메뉴 `system.lock`. `omarchy-shell lock lock` |
+| `omarchy-system-logout` | SAFE | package | 메뉴 `system.logout`. `uwsm stop` + osd/close-all 전이 |
+| `omarchy-system-reboot` | SAFE | package | 메뉴 `system.reboot`. osd/state/close-all 전이 |
+| `omarchy-system-shutdown` | SAFE | package | 메뉴 `system.shutdown`. osd/state/close-all 전이 |
+| `omarchy-theme-bg-cache` | SAFE | package | M9 배경 묶음 (theme-set 이 부름) |
+| `omarchy-theme-bg-current` | SAFE | package | M9 배경 묶음 |
+| `omarchy-theme-bg-next` | SAFE | package | M9 배경 묶음 |
+| `omarchy-theme-bg-set` | SAFE | package | M9 배경 묶음 |
+| `omarchy-theme-bg-switcher` | SAFE | package | M9 배경 묶음 |
+| `omarchy-theme-color` | SAFE | package | M9 테마 코어 |
+| `omarchy-theme-colors-from-alacritty` | SAFE | package | M9 theme-set 코어 체인 |
+| `omarchy-theme-current` | SAFE | package | M9 테마 코어 |
+| `omarchy-theme-list` | SAFE | package | M9 테마 코어 |
+| `omarchy-theme-osc` | SAFE | package | M9 테마 코어 |
+| `omarchy-theme-set` | SAFE | package | M9 테마 코어. $OMARCHY_PATH/themes + default/themed 참조 |
+| `omarchy-theme-set-claude` | SAFE | package | M9 앱별 테마 적용 |
+| `omarchy-theme-set-foot` | SAFE | package | M9 앱별 테마 적용 |
+| `omarchy-theme-set-gnome` | SAFE | package | M9 앱별 테마 적용 |
+| `omarchy-theme-set-obsidian` | SAFE | package | M9 앱별 테마 적용 |
+| `omarchy-theme-set-pi` | SAFE | package | M9 앱별 테마 적용 |
+| `omarchy-theme-set-templates` | SAFE | package | M9 theme-set 코어 체인 |
+| `omarchy-theme-set-tmux` | SAFE | package | M9 앱별 테마 적용 |
+| `omarchy-theme-set-vscode` | SAFE | package | M9 앱별 테마 적용 |
+| `omarchy-theme-switcher` | SAFE | package | M9 테마 전환 UI |
+| `omarchy-toggle-enabled` | SAFE | package | `theme-set-vscode` 의 skip 토글 게이트. 사용자 상태 존재만 읽는 1행 테스트 (RUNTIME_STARTUP §18.6) |
+<!-- STAGED_AUDIT_END -->
 
 ---
 
@@ -188,7 +273,7 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-capture-text` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-channel-current` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-channel-set` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-cmd-present` | DISABLED | disable | when/checked 가드. 바이너리 없으면 행이 숨겨짐 |
+| `omarchy-cmd-present` | SAFE | package | `command -v` 루프뿐인 가드. M9·M10 체인과 메뉴 `when` 이 함께 쓰므로 스테이징한다 (스테이징 전수 참조) |
 | `omarchy-default-agent` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-default-browser` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-default-editor` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
@@ -256,7 +341,7 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-menu-share` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-menu-timezone` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-menu-tmux-keybindings` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-network-status` | DISABLED | disable | when/checked 가드. 바이너리 없으면 행이 숨겨짐 |
+| `omarchy-network-status` | SAFE | package | 바 network 위젯 (M8 Tier A). 메뉴 `when` 가드로도 쓰인다 |
 | `omarchy-pkg-aur-install` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
 | `omarchy-pkg-install` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
 | `omarchy-pkg-present` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
@@ -309,16 +394,16 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-system-reboot` | SAFE | package | 메뉴 `system.reboot`. 전이 `omarchy-osd` + `omarchy-state` + `omarchy-hyprland-window-close-all` |
 | `omarchy-system-shutdown` | SAFE | package | 메뉴 `system.shutdown`. 전이 `omarchy-osd` + `omarchy-state` + `omarchy-hyprland-window-close-all` |
 | `omarchy-theme-bg-install` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
-| `omarchy-theme-bg-set` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
-| `omarchy-theme-bg-switcher` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
+| `omarchy-theme-bg-set` | SAFE | package | M9 배경 묶음 |
+| `omarchy-theme-bg-switcher` | SAFE | package | M9 배경 묶음 |
 | `omarchy-theme-install` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
 | `omarchy-theme-remove` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
-| `omarchy-theme-set` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
-| `omarchy-theme-switcher` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
+| `omarchy-theme-set` | SAFE | package | M9 테마 코어. `$OMARCHY_PATH/themes` + `default/themed` 참조 |
+| `omarchy-theme-switcher` | SAFE | package | M9 테마 전환 UI |
 | `omarchy-theme-update` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
 | `omarchy-toggle-bar` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
 | `omarchy-toggle-crash-capture` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
-| `omarchy-toggle-enabled` | DISABLED | disable | when/checked 가드. 바이너리 없으면 행이 숨겨짐 |
+| `omarchy-toggle-enabled` | SAFE | package | `omarchy-theme-set-vscode` 의 skip 토글 게이트 (RUNTIME_STARTUP §18.6) |
 | `omarchy-toggle-hybrid-gpu` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
 | `omarchy-toggle-idle` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
 | `omarchy-toggle-nightlight` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
