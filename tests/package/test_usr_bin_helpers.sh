@@ -48,4 +48,46 @@ assert_contains "$(cat "$shell_pkgbuild")" "conflicts=('omarchy')" \
 grep -q '^provides=' "$shell_pkgbuild" && has_provides=1 || has_provides=0
 assert_eq "$has_provides" "0" "shell PKGBUILD 는 provides 를 선언하지 않는다"
 
+# --- overlay 패키지: compat 카피 ⇔ /usr/bin 심링크 --------------------------
+coo_overlay_artifact >/dev/null 2>&1 || { echo "skip: 오버레이 아티팩트 없음"; exit "$ASSERT_FAILURES"; }
+ovl_dest="$COO_TEST_SANDBOX/overlay-pkg"
+coo_extract_overlay "$ovl_dest"
+
+ovl_expected=$(cd "$REPO_ROOT/overlay/compat/bin" && ls omarchy-* | sort)
+ovl_actual=$(cd "$ovl_dest/usr/bin" 2>/dev/null && ls omarchy-* 2>/dev/null | sort)
+assert_eq "$ovl_actual" "$ovl_expected" "overlay: /usr/bin 심링크 집합 = compat omarchy-* 파일"
+
+ovl_bad_kind=0; ovl_bad_layer=0; ovl_dangling=0
+for link in "$ovl_dest/usr/bin"/omarchy-*; do
+  [[ -e $link || -L $link ]] || continue
+  [[ -L $link ]] || { ovl_bad_kind=$((ovl_bad_kind + 1)); continue; }
+  target=$(readlink "$link")
+  case "$target" in
+    ../lib/cachy-omarchy/compat/bin/*) ;;
+    *) ovl_bad_layer=$((ovl_bad_layer + 1)) ;;
+  esac
+  [[ -e $link ]] || ovl_dangling=$((ovl_dangling + 1))
+done
+assert_eq "$ovl_bad_kind" "0" "overlay: /usr/bin 항목이 전부 심링크다"
+assert_eq "$ovl_bad_layer" "0" "overlay: 타깃이 ../lib/cachy-omarchy/compat/bin/ 만 향한다"
+assert_eq "$ovl_dangling" "0" "overlay: dangling 심링크 없음"
+
+# 두 패키지가 같은 이름을 소유하면 pacman 이 충돌한다.
+overlap=$(comm -12 <(printf '%s\n' "$expected") <(printf '%s\n' "$ovl_expected"))
+assert_eq "$overlap" "" "shell·overlay 노출 집합이 서로소"
+
+# uwsm-app 은 uwsm 패키지 것이다. 우리 두 패키지 어느 쪽도 소유하지 않는다.
+[[ -e $ovl_dest/usr/bin/uwsm-app || -L $ovl_dest/usr/bin/uwsm-app ]] && own=1 || own=0
+assert_eq "$own" "0" "overlay 가 usr/bin/uwsm-app 을 소유하지 않는다"
+[[ -e $shell_dest/usr/bin/uwsm-app || -L $shell_dest/usr/bin/uwsm-app ]] && own=1 || own=0
+assert_eq "$own" "0" "shell 이 usr/bin/uwsm-app 을 소유하지 않는다"
+[[ -e $ovl_dest/usr/lib/cachy-omarchy/compat/bin/uwsm-app ]] && shim=1 || shim=0
+assert_eq "$shim" "0" "compat 에 uwsm-app shim 이 남아있지 않다"
+
+ovl_pkgbuild="$REPO_ROOT/packages/cachy-omarchy-overlay/PKGBUILD"
+assert_contains "$(cat "$ovl_pkgbuild")" "conflicts=('omarchy')" \
+  "overlay PKGBUILD 가 omarchy 와 충돌 선언"
+grep -q '^provides=' "$ovl_pkgbuild" && has_provides=1 || has_provides=0
+assert_eq "$has_provides" "0" "overlay PKGBUILD 는 provides 를 선언하지 않는다"
+
 exit "$ASSERT_FAILURES"

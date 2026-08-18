@@ -14,9 +14,13 @@ for bad in "etc/" "boot/" "efi/" "usr/lib/systemd/system/" "usr/share/uwsm/"; do
   assert_eq "$n" "0" "금지 경로 미소유: $bad"
 done
 
-# compat shim 은 /usr/bin 에 두지 않는다 (SPEC 44).
+# compat 적응 카피는 /usr/bin 에 심링크로만 노출된다 (SPEC §45 개정 — 이전
+# SPEC 44 는 어떤 노출도 금지했으나, Task 2 가 상대 심링크 노출을 의도적으로
+# 도입했다). 노출 개수가 compat/bin 의 omarchy-* 실체 개수와 정확히 같아야
+# 하고, uwsm-app 처럼 우리가 소유하지 않는 이름은 여전히 금지된다.
+compat_count=$(cd "$REPO_ROOT/overlay/compat/bin" && ls omarchy-* 2>/dev/null | wc -l)
 n=$(printf '%s\n' "$listing" | grep -c "^usr/bin/omarchy-" || true)
-assert_eq "$n" "0" "/usr/bin 에 omarchy-* 가짜 명령 없음"
+assert_eq "$n" "$compat_count" "/usr/bin 의 omarchy-* 노출 개수 = compat 실체 개수"
 n=$(printf '%s\n' "$listing" | grep -c "^usr/bin/uwsm" || true)
 assert_eq "$n" "0" "/usr/bin 에 uwsm shim 없음"
 

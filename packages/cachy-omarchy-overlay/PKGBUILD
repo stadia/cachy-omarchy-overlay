@@ -10,6 +10,10 @@ license=('MIT')
 # omarchy-settings 에는 절대 의존하지 않는다 (SPEC 21).
 depends=('cachy-omarchy-shell' 'bash')
 
+# /usr/bin/omarchy-* 를 공식 omarchy 패키지와 같은 이름으로 소유한다 (compat
+# 적응 카피 4개). 상호 배타가 의도다. provides 는 하지 않는다.
+conflicts=('omarchy')
+
 # bin/build-packages --clean creates this source archive only in its temporary
 # context. No overlay copy is tracked under packages/, so overlay/ remains the
 # single source of truth for normal and clean builds alike.

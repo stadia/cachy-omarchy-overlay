@@ -41,17 +41,21 @@ assert_file_exists "$HOME/.config/cachy-omarchy/hypr/bindings.conf" "init 가 �
 [[ -e "$HOME/.local/state/omarchy/toggles/bar-off" ]] && made=1 || made=0
 assert_eq "$made" "0" "설치 트리의 init 도 bar-off 를 만들지 않는다"
 
-# 4) compat shim 은 전부 통제 경로에 있고, 어느 것도 /usr/bin 으로 새지
-#    않는다. 이름을 하드코딩하지 않고 디렉터리를 순회한다 — shim 이 추가될
-#    때마다 단언이 자동으로 따라간다 (기존에는 omarchy-shell 하나만 검사해
-#    uwsm-app·omarchy-update-available 이 미검증이었다).
+# 4) compat 적응 카피의 **실체**는 통제 경로에만 있고, /usr/bin 에는 그것을
+#    가리키는 상대 심링크만 있다 (SPEC §45 개정). 이름을 하드코딩하지 않고
+#    디렉터리를 순회한다 — shim 이 추가돼도 단언이 자동으로 따라간다.
 for shim in "$COO_COMPAT_BIN"/*; do
-  [[ -e $shim ]] || continue   # 빈 글롭 가드 — 리터럴 * 로 도는 것 방지
+  [[ -e $shim ]] || continue   # 빈 글롭 가드
   name=$(basename "$shim")
   [[ -x $shim ]] && ok=0 || ok=1
   assert_eq "$ok" "0" "compat $name 이 통제 경로에서 실행 가능"
-  [[ -e $BIN/$name ]] && leak=1 || leak=0
-  assert_eq "$leak" "0" "/usr/bin 으로 새지 않았다: $name"
+
+  [[ -L $BIN/$name ]] && linked=0 || linked=1
+  assert_eq "$linked" "0" "/usr/bin/$name 이 심링크로 노출된다"
+
+  target=$(readlink "$BIN/$name" 2>/dev/null)
+  assert_eq "$target" "../lib/cachy-omarchy/compat/bin/$name" \
+    "/usr/bin/$name 이 compat 실체를 상대 경로로 가리킨다"
 done
 # no-op shim 2개는 내용도 단언한다 — 실수로 실제 훅이 compat 에 들어오면
 # (섀도잉, D3 주의) 여기서 잡힌다. shim 파일에는 주석이 있으므로 핵심 행만 본다.

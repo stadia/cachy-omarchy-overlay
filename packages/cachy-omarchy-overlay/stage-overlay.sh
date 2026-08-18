@@ -8,12 +8,17 @@ for b in shell launcher keybindings bindings init doctor theme-set; do
   install -D -m755 "$src/bin/cachy-omarchy-$b" "$dest/usr/bin/cachy-omarchy-$b"
 done
 
-# compat shim 은 통제된 경로에만 둔다. /usr/bin 에 두면 사용자의 일반 PATH 를
-# 오염시키고 SPEC 44 를 위반한다. 셸 프로세스만 이 디렉터리를 PATH 에 붙인다.
+# 적응 카피의 실체는 통제 경로에만 둔다 — "업스트림 verbatim"(셸 패키지)과
+# "우리 적응 카피"를 물리적으로 갈라두는 것이 감사 가치다. /usr/bin 은 두
+# 계층의 평평한 뷰이며 상대 심링크만 놓는다 (SPEC §45).
+# uwsm-app 은 여기에 없다: /usr/bin/uwsm-app 은 uwsm 패키지 소유이고,
+# cachy-omarchy-shell 이 uwsm 을 depends 로 끌어온다.
 install -d "$dest/usr/lib/cachy-omarchy/compat/bin"
-for c in omarchy-shell uwsm-app omarchy-update-available \
+install -d "$dest/usr/bin"
+for c in omarchy-shell omarchy-update-available \
          omarchy-theme-set-browser omarchy-theme-set-keyboard; do
   install -D -m755 "$src/compat/bin/$c" "$dest/usr/lib/cachy-omarchy/compat/bin/$c"
+  ln -sf "../lib/cachy-omarchy/compat/bin/$c" "$dest/usr/bin/$c"
 done
 
 install -D -m644 "$src/defaults/shell.json" \

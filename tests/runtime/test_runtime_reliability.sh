@@ -23,7 +23,7 @@ W="$root/usr/bin/cachy-omarchy-shell"
 defaults="$root/usr/share/cachy-omarchy/defaults/shell.json"
 overlay_artifact=$(coo_overlay_artifact)
 
-assert_file_exists "$W" "R01-R06 and manual-restart extracted wrapper exists"
+assert_file_exists "$W" "R01-R05 and manual-restart extracted wrapper exists"
 assert_file_exists "$defaults" "R08-R10 extracted defaults exist"
 assert_file_exists "$root/usr/share/cachy-omarchy/upstream/shell/shell.qml" \
   "R01-R03 extracted shell.qml exists"
@@ -31,8 +31,10 @@ assert_file_exists "$root/usr/bin/cachy-omarchy-launcher" \
   "R04 extracted launcher exists"
 assert_file_exists "$root/usr/bin/cachy-omarchy-keybindings" \
   "R05 extracted keybindings helper exists"
-assert_file_exists "$root/usr/lib/cachy-omarchy/compat/bin/uwsm-app" \
-  "R06 extracted app-launch compatibility wrapper exists"
+# R06: app-launch now goes through the real uwsm-app from the uwsm package
+# (session-environment redesign) instead of a shim we extract — there is no
+# artifact of ours to assert here. Live coverage moves to Task 7's systemd
+# scope test.
 
 # R08: an archive/extracted-tree audit is the strongest claim possible without
 # writing the user's configuration.  It proves this package owns neither a

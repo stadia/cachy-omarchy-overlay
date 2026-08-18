@@ -20,10 +20,13 @@ for p in \
   usr/bin/cachy-omarchy-doctor \
   usr/bin/cachy-omarchy-theme-set \
   usr/lib/cachy-omarchy/compat/bin/omarchy-shell \
-  usr/lib/cachy-omarchy/compat/bin/uwsm-app \
   usr/lib/cachy-omarchy/compat/bin/omarchy-update-available \
   usr/lib/cachy-omarchy/compat/bin/omarchy-theme-set-browser \
   usr/lib/cachy-omarchy/compat/bin/omarchy-theme-set-keyboard \
+  usr/bin/omarchy-shell \
+  usr/bin/omarchy-update-available \
+  usr/bin/omarchy-theme-set-browser \
+  usr/bin/omarchy-theme-set-keyboard \
   usr/share/cachy-omarchy/defaults/shell.json \
   usr/share/cachy-omarchy/hypr/bindings.conf \
   usr/share/cachy-omarchy/hypr/bindings.lua ; do
