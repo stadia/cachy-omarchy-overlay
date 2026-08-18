@@ -19,8 +19,8 @@ SUPER + K      →  Omarchy 스타일 키바인딩 뷰어
 
 | 패키지 | 버전 | 역할 |
 |---|---|---|
-| `cachy-omarchy-shell` | 4.0.0-6 | 핀된 Omarchy Quattro 셸 런타임 (Quickshell 트리, `omarchy-settings` 제외) |
-| `cachy-omarchy-overlay` | 0.5.0-1 | CachyOS 통합 계층 (래퍼 명령, Hyprland 바인딩, 기본값) |
+| `cachy-omarchy-shell` | 4.0.0-7 | 핀된 Omarchy Quattro 셸 런타임 (Quickshell 트리, `omarchy-settings` 제외) |
+| `cachy-omarchy-overlay` | 0.6.0-1 | CachyOS 통합 계층 (래퍼 명령, Hyprland 바인딩, 기본값) |
 
 업스트림 핀은 `upstream.lock`이 관리한다 (현재 `basecamp/omarchy @ v4.0.0`,
 `f0020448`).
@@ -131,6 +131,10 @@ bin/rollback                 # 이전 핀으로 복귀
 - **v0.5** — 세션 환경: uwsm Hyprland 드롭인이 `OMARCHY_PATH` 를 공급하고,
   `/usr/bin/omarchy-*` 는 심링크만 놓는 뷰이며 PATH 는 조작하지 않는다.
   완료(`v0.5.0`). 실측: `docs/RUNTIME_STARTUP.md` §20.
+- **v0.6** — 메뉴 `style.bar` 와 세션 lock/logout/reboot/shutdown helper 를
+  스테이징한다 (`omarchy-bar` 및 config/catalog/state/window-close 전이).
+  factory-reset 은 Omarchy ISO `@factory` 전제라 PATH 에 올리지 않는다.
+  완료(`v0.6.0`).
 
 ## 라이선스
 
