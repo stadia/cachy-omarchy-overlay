@@ -28,3 +28,8 @@ install -D -m644 "$src/hypr/bindings.conf" \
   "$dest/usr/share/cachy-omarchy/hypr/bindings.conf"
 install -D -m644 "$src/hypr/bindings.lua" \
   "$dest/usr/share/cachy-omarchy/hypr/bindings.lua"
+
+# uwsm 세션 환경 (SPEC §45). desktop 무관한 env.d 가 아니라 env-hyprland.d 를
+# 쓴다 — Quattro 전용 변수를 sway·niri 세션까지 흘리지 않는다.
+install -D -m644 "$src/uwsm/10-cachy-omarchy" \
+  "$dest/usr/share/uwsm/env-hyprland.d/10-cachy-omarchy"

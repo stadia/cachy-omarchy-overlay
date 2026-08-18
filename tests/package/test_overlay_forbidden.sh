@@ -9,10 +9,15 @@ artifact=$(coo_overlay_artifact) || { echo "skip: 오버레이 아티팩트 없�
 listing=$(bsdtar -tf "$artifact")
 
 # 시스템 정체성·부트·로그인 관련은 하나도 소유하지 않는다.
-for bad in "etc/" "boot/" "efi/" "usr/lib/systemd/system/" "usr/share/uwsm/"; do
+# (env-hyprland.d 드롭인은 Task 3 에서 허용됨 — Hyprland 전용 세션 환경)
+for bad in "etc/" "boot/" "efi/" "usr/lib/systemd/system/"; do
   n=$(printf '%s\n' "$listing" | grep -c "^$bad" || true)
   assert_eq "$n" "0" "금지 경로 미소유: $bad"
 done
+# uwsm 드롭인은 env-hyprland.d/ 아래 Hyprland 세션 환경만 허용한다.
+# 파일만 검증 (디렉터리는 install -D 가 생성하는 부산물).
+n=$(printf '%s\n' "$listing" | grep "^usr/share/uwsm/" | grep -v "/$" | grep -v "^usr/share/uwsm/env-hyprland.d/" | wc -l)
+assert_eq "$n" "0" "금지 경로 미소유: usr/share/uwsm/(env-hyprland.d 제외)"
 
 # compat 적응 카피는 /usr/bin 에 심링크로만 노출된다 (SPEC §45 개정 — 이전
 # SPEC 44 는 어떤 노출도 금지했으나, Task 2 가 상대 심링크 노출을 의도적으로

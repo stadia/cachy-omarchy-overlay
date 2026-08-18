@@ -1,0 +1,12 @@
+# Quattro(Omarchy) 런타임 루트를 uwsm 세션 환경에 세운다.
+#
+# uwsm 의 prepare-env.sh 는 XDG_CONFIG_HOME:XDG_CONFIG_DIRS:XDG_DATA_DIRS 를
+# 중요도 오름차순으로 돌면서 각 디렉터리의 uwsm/env-<desktop>.d/* 를 sh 로
+# 소싱한다. /usr/share 는 가장 낮은 우선순위라, 사용자는
+# ~/.config/uwsm/env-hyprland.d/ 에서 이 값을 덮을 수 있다.
+#
+# 업스트림 omarchy 는 이 변수가 항상 존재한다고 가정한다 (AGENTS.md:53 —
+# "set at the top level by the uwsm session environment"). 우리는 helper 를
+# /usr/bin 으로 노출하되 PATH 는 건드리지 않으므로, 이 한 줄이 그래픽 세션에서
+# 업스트림 런타임을 성립시키는 유일한 환경이다.
+export OMARCHY_PATH=/usr/share/cachy-omarchy/upstream

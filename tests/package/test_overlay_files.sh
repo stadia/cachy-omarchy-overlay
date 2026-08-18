@@ -29,7 +29,8 @@ for p in \
   usr/bin/omarchy-theme-set-keyboard \
   usr/share/cachy-omarchy/defaults/shell.json \
   usr/share/cachy-omarchy/hypr/bindings.conf \
-  usr/share/cachy-omarchy/hypr/bindings.lua ; do
+  usr/share/cachy-omarchy/hypr/bindings.lua \
+  usr/share/uwsm/env-hyprland.d/10-cachy-omarchy ; do
   assert_file_exists "$dest/$p" "소유: $p"
 done
 
@@ -38,5 +39,12 @@ for b in shell launcher keybindings bindings init doctor theme-set; do
   [[ -x "$dest/usr/bin/cachy-omarchy-$b" ]] && x=0 || x=1
   assert_eq "$x" "0" "실행 가능: cachy-omarchy-$b"
 done
+
+# uwsm 드롭인은 sh 로 소싱된다 (/usr/lib/uwsm/prepare-env.sh 의 source_dir).
+# 값이 어긋나면 세션 전체가 잘못된 트리를 가리키므로 정확히 단언한다.
+dropin="$dest/usr/share/uwsm/env-hyprland.d/10-cachy-omarchy"
+assert_contains "$(cat "$dropin" 2>/dev/null)" \
+  'export OMARCHY_PATH=/usr/share/cachy-omarchy/upstream' \
+  "uwsm 드롭인이 OMARCHY_PATH 를 정확한 값으로 export 한다"
 
 exit "$ASSERT_FAILURES"
