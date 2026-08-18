@@ -174,21 +174,30 @@ for command in cachy-omarchy-shell cachy-omarchy-launcher cachy-omarchy-bindings
 done
 printf '#!/usr/bin/env bash\nexit 0\n' >"$doctor_compat/omarchy-shell"
 chmod +x "$doctor_compat/omarchy-shell"
+mkdir -p "$doctor_prefix/upstream/bin"
+printf '#!/usr/bin/env bash\nexit 0\n' >"$doctor_prefix/upstream/bin/omarchy-theme-set"
+chmod +x "$doctor_prefix/upstream/bin/omarchy-theme-set"
+ln -s ../share/cachy-omarchy/upstream/bin/omarchy-theme-set "$doctor_root/usr/bin/omarchy-theme-set"
 cat >"$doctor_fake/pacman" <<'EOF'
 #!/usr/bin/env bash
-[[ ${1:-} == -Q ]] || exit 2
-case ${2:-} in
-  cachy-omarchy-shell|cachy-omarchy-overlay) printf '%s 0.1.0-1\n' "$2"; exit 0 ;;
-  omarchy|omarchy-settings) exit 1 ;;
-  *) exit 1 ;;
+case ${1:-} in
+  -Q)
+    case ${2:-} in
+      cachy-omarchy-shell|cachy-omarchy-overlay) printf '%s 0.1.0-1\n' "$2"; exit 0 ;;
+      omarchy|omarchy-settings) exit 1 ;;
+      *) exit 1 ;;
+    esac
+    ;;
+  -Qo) printf '%s is owned by uwsm 0.26.6-1\n' "${2:-}" ;;
+  *) exit 2 ;;
 esac
 EOF
-for command in pgrep hyprctl quickshell; do printf '#!/usr/bin/env bash\nexit 1\n' >"$doctor_fake/$command"; done
+for command in pgrep hyprctl quickshell uwsm-app; do printf '#!/usr/bin/env bash\nexit 1\n' >"$doctor_fake/$command"; done
 chmod +x "$doctor_fake"/*
 printf 'ID=arch\n' >"$doctor_root/os-release"
 run_rc_doctor() {
   local state=$1
-  PATH="$doctor_fake:/usr/bin:/bin" WAYLAND_DISPLAY= \
+  PATH="$doctor_fake:/usr/bin:/bin" WAYLAND_DISPLAY= OMARCHY_PATH="$doctor_prefix/upstream" \
     COO_OS_RELEASE="$doctor_root/os-release" COO_PREFIX_ROOT="$doctor_prefix" COO_COMPAT_BIN="$doctor_compat" \
     COO_HYPR_DIR="$COO_TEST_SANDBOX/doctor-hypr" COO_CONFIG_DIR="$COO_TEST_SANDBOX/doctor-config" \
     COO_OMARCHY_CONFIG_DIR="$COO_TEST_SANDBOX/doctor-omarchy" COO_STATE_DIR="$state" \

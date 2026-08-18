@@ -15,6 +15,10 @@ USER_OMARCHY_CONFIG_DIR=${COO_OMARCHY_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.conf
 OMARCHY_STATE_DIR=${COO_OMARCHY_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/omarchy}
 INSTALL_ROOT=$(dirname "$(dirname "$PREFIX_ROOT")")
 BIN_DIR=$INSTALL_ROOT/bin
+# Keep the inherited value before resolving the compatibility root below. The
+# latter must let doctor inspect extracted trees, but cannot prove the graphical
+# session received UWSM's environment.
+SESSION_OMARCHY_PATH=${OMARCHY_PATH:-}
 OMARCHY_PATH=${COO_OMARCHY_PATH:-$PREFIX_ROOT/upstream}
 SHA256_BIN=${COO_SHA256_BIN:-sha256sum}
 IPC_TIMEOUT_RAW=${COO_IPC_TIMEOUT-2s}
@@ -226,6 +230,45 @@ check_executable "launcher invocation" "$BIN_DIR/cachy-omarchy-launcher"
 check_executable "binding helper" "$BIN_DIR/cachy-omarchy-bindings"
 check_executable "keybinding invocation" "$BIN_DIR/cachy-omarchy-keybindings"
 check_executable "compat omarchy-shell" "$COMPAT_BIN/omarchy-shell"
+
+# UWSM sources /usr/share/uwsm/env-hyprland.d/10-cachy-omarchy for the
+# graphical session. Without the inherited value, bare /usr/bin helpers cannot
+# locate their runtime tree.
+if [[ -n $SESSION_OMARCHY_PATH ]]; then
+  pass "session OMARCHY_PATH ($SESSION_OMARCHY_PATH)"
+else
+  fail "OMARCHY_PATH not in session environment — log in with the \"Hyprland (uwsm-managed)\" session"
+fi
+
+# /usr/bin is a symlink-only view of the audited helper sets. An empty view is
+# just as broken as a dangling entry, so do not let an unmatched glob pass.
+shopt -s nullglob
+omarchy_links=("$BIN_DIR"/omarchy-*)
+shopt -u nullglob
+dangling=0
+if (( ${#omarchy_links[@]} == 0 )); then
+  fail "/usr/bin omarchy-* symlinks missing"
+else
+  for link in "${omarchy_links[@]}"; do
+    [[ -L $link && -e $link ]] || dangling=$((dangling + 1))
+  done
+  if (( dangling == 0 )); then
+    pass "/usr/bin omarchy-* symlinks resolve"
+  else
+    fail "/usr/bin omarchy-* symlinks broken: $dangling"
+  fi
+fi
+
+# uwsm-app belongs to the uwsm package, never to either Cachy Omarchy package.
+if command -v pacman >/dev/null 2>&1 && command -v uwsm-app >/dev/null 2>&1; then
+  if pacman -Qo "$(command -v uwsm-app)" 2>/dev/null | grep -q 'owned by uwsm '; then
+    pass "uwsm-app owned by uwsm package"
+  else
+    warn "uwsm-app not owned by the uwsm package"
+  fi
+else
+  warn "uwsm-app presence not measurable"
+fi
 
 if has_binding_conflict; then
   fail "Hyprland binding conflict: SUPER+SPACE or SUPER+K already bound"

@@ -43,23 +43,36 @@ exit 0
 EOF
 cat >"$fake_bin/pacman" <<'EOF'
 #!/usr/bin/env bash
-[[ ${1:-} == -Q ]] || exit 2
-printf '%s\n' "${2:-}" >>"${COO_PACMAN_LOG:?}"
-case ${2:-} in
-  omarchy|omarchy-settings)
-    [[ ${COO_FAKE_OFFICIAL_PRESENT:-} == "$2" ]] && { printf '%s 1.0-1\n' "$2"; exit 0; }
+case ${1:-} in
+  -Q)
+    printf '%s\n' "${2:-}" >>"${COO_PACMAN_LOG:?}"
+    case ${2:-} in
+      omarchy|omarchy-settings)
+        [[ ${COO_FAKE_OFFICIAL_PRESENT:-} == "$2" ]] && { printf '%s 1.0-1\n' "$2"; exit 0; }
+        ;;
+    esac
+    exit 1
     ;;
+  -Qo)
+    [[ ${2:-} == "$COO_FAKE_UWSM_APP" ]] || exit 1
+    printf '%s is owned by uwsm 0.26.6-1\n' "$2"
+    ;;
+  *) exit 2 ;;
 esac
-exit 1
 EOF
-for cmd in hyprctl quickshell; do printf '#!/usr/bin/env bash\nexit 0\n' >"$fake_bin/$cmd"; done
-chmod +x "$fake_bin/pgrep" "$fake_bin/qs" "$fake_bin/pacman" "$fake_bin/hyprctl" "$fake_bin/quickshell"
+for cmd in hyprctl quickshell uwsm-app; do printf '#!/usr/bin/env bash\nexit 0\n' >"$fake_bin/$cmd"; done
+chmod +x "$fake_bin/pgrep" "$fake_bin/qs" "$fake_bin/pacman" "$fake_bin/hyprctl" "$fake_bin/quickshell" "$fake_bin/uwsm-app"
 printf '#!/usr/bin/env bash\nexit 0\n' >"$compat/omarchy-shell"
 chmod +x "$compat/omarchy-shell"
+mkdir -p "$prefix/upstream/bin"
+printf '#!/usr/bin/env bash\nexit 0\n' >"$prefix/upstream/bin/omarchy-theme-set"
+chmod +x "$prefix/upstream/bin/omarchy-theme-set"
+ln -s ../share/cachy-omarchy/upstream/bin/omarchy-theme-set "$root/usr/bin/omarchy-theme-set"
 
 pacman_log=$COO_TEST_SANDBOX/pacman.log
 run_doctor() {
   PATH="$fake_bin:/usr/bin:/bin" WAYLAND_DISPLAY="${COO_TEST_WAYLAND_DISPLAY:-}" \
+    OMARCHY_PATH="$prefix/upstream" COO_FAKE_UWSM_APP="$fake_bin/uwsm-app" \
     COO_PACMAN_LOG="$pacman_log" COO_PREFIX_ROOT="$prefix" COO_COMPAT_BIN="$compat" COO_HYPR_DIR="$hypr" \
     COO_CONFIG_DIR="$config" COO_OMARCHY_CONFIG_DIR="$user_config" COO_STATE_DIR="$state" "$DOCTOR" 2>&1
 }
@@ -75,6 +88,25 @@ assert_contains "$out" "WARN: Quickshell process not observed" "baseline does no
 assert_contains "$out" "WARN: IPC ping not measurable" "absent process leaves IPC explicitly unmeasured"
 assert_contains "$(cat "$pacman_log")" "omarchy" "doctor queries official omarchy package"
 assert_contains "$(cat "$pacman_log")" "omarchy-settings" "doctor queries official omarchy-settings package"
+
+# 세션 환경은 uwsm 이 공급한다. doctor 자체의 fallback 경로가 이 사실을 가리면
+# 잘못된 세션을 정상으로 오진하므로 상속값을 별도로 검사해야 한다.
+assert_contains "$out" "PASS: session OMARCHY_PATH" "세션 변수가 있으면 PASS"
+assert_contains "$out" "PASS: /usr/bin omarchy-* symlinks resolve" "심링크가 있으면 PASS"
+assert_contains "$out" "PASS: uwsm-app owned by uwsm package" "uwsm-app 소유권을 확인한다"
+
+out_nosession=$(PATH="$fake_bin:/usr/bin:/bin" \
+  WAYLAND_DISPLAY="${COO_TEST_WAYLAND_DISPLAY:-}" COO_FAKE_UWSM_APP="$fake_bin/uwsm-app" \
+  COO_PACMAN_LOG="$pacman_log" COO_PREFIX_ROOT="$prefix" COO_COMPAT_BIN="$compat" \
+  COO_HYPR_DIR="$hypr" COO_CONFIG_DIR="$config" \
+  COO_OMARCHY_CONFIG_DIR="$user_config" COO_STATE_DIR="$state" \
+  env -u OMARCHY_PATH "$DOCTOR" 2>&1); nocode=$?
+assert_contains "$out_nosession" "FAIL: OMARCHY_PATH not in session environment" \
+  "세션 변수가 없으면 FAIL"
+assert_contains "$out_nosession" "Hyprland (uwsm-managed)" \
+  "무엇을 해야 하는지 알려준다"
+[[ $nocode -ne 0 ]] && nz=0 || nz=1
+assert_eq "$nz" "0" "세션 변수 부재는 nonzero exit"
 
 # M9: 테마 런타임 점검. 부재는 §66 상 실패가 아니라 WARN, 존재는 PASS.
 # (run_doctor 는 COO_OMARCHY_STATE_DIR 를 안 세우므로 기본값
