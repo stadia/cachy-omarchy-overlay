@@ -19,8 +19,8 @@ SUPER + K      →  Omarchy 스타일 키바인딩 뷰어
 
 | 패키지 | 버전 | 역할 |
 |---|---|---|
-| `cachy-omarchy-shell` | 4.0.0-5 | 핀된 Omarchy Quattro 셸 런타임 (Quickshell 트리, `omarchy-settings` 제외) |
-| `cachy-omarchy-overlay` | 0.4.0-1 | CachyOS 통합 계층 (래퍼 명령, Hyprland 바인딩, 기본값) |
+| `cachy-omarchy-shell` | 4.0.0-6 | 핀된 Omarchy Quattro 셸 런타임 (Quickshell 트리, `omarchy-settings` 제외) |
+| `cachy-omarchy-overlay` | 0.5.0-1 | CachyOS 통합 계층 (래퍼 명령, Hyprland 바인딩, 기본값) |
 
 업스트림 핀은 `upstream.lock`이 관리한다 (현재 `basecamp/omarchy @ v4.0.0`,
 `f0020448`).
@@ -128,6 +128,9 @@ bin/rollback                 # 이전 핀으로 복귀
 - **v0.4 (Milestone 10)** — 유틸리티 플러그인(clipboard·emojis·image-picker·
   reminders·OSD) helper/의존성 채택. 완료(`v0.4.0`). 실측:
   `docs/RUNTIME_STARTUP.md` §19.2.
+- **v0.5** — 세션 환경: uwsm Hyprland 드롭인이 `OMARCHY_PATH` 를 공급하고,
+  `/usr/bin/omarchy-*` 는 심링크만 놓는 뷰이며 PATH 는 조작하지 않는다.
+  완료(`v0.5.0`). 실측: `docs/RUNTIME_STARTUP.md` §20.
 
 ## 라이선스
 

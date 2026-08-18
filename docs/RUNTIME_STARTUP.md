@@ -1606,3 +1606,42 @@ timer/message 0건, 볼륨 100%·마이크 unmuted 원복.
 2. 디버깅 중 `wtype hello`·`wtype -k Return` 이 실제 포커스 창(firefox)에
    1회 입력됐다 — 라이브 키 주입의 타깃 확인 절차가 필요하다는 교훈.
    이후 측정은 전부 격리 kitty(주소 포커스 확인 후)로만 진행했다.
+
+## 20. 세션 환경 — uwsm 드롭인 + `/usr/bin` 심링크 뷰 (2026-08-19)
+
+계약: `OMARCHY_PATH` 는 overlay 소유 uwsm 드롭인
+`/usr/share/uwsm/env-hyprland.d/10-cachy-omarchy` 가 그래픽 세션에 공급한다.
+업스트림 helper 55개와 compat 적응 카피 4개는 `/usr/bin/omarchy-*` 상대
+심링크로만 노출한다. 어느 레이어도 PATH 를 조작하지 않는다. `uwsm-app` 은
+uwsm 패키지 소유 실 바이너리다 (shim 삭제). SPEC §45.
+
+### 20.1 패키지·단위 증거
+
+- `tests/package/test_usr_bin_helpers.sh` — 집합 일치, 서로소, 상대 심링크,
+  dangling 없음, 어느 패키지도 `usr/bin/uwsm-app` 을 소유하지 않음.
+- `tests/runtime/test_installed_tree.sh` — 심링크 뷰 양방향.
+- `tests/runtime/test_shell_path.sh` — 래퍼가 PATH 를 건드리지 않음.
+- `tests/runtime/test_init_theme_seed.sh` — 추출 페이로드 init, 격리 PATH
+  에서 `omarchy-theme-set` 부재는 exact note.
+- `tests/runtime/test_doctor.sh` — 세션 `OMARCHY_PATH` 부재 FAIL, 개별
+  `omarchy-theme-set`/`omarchy-shell` 노출, `pacman -Qqo` 로케일 무관 소유권.
+- `tests/runtime/test_app_scope.sh` + `test_app_scope_safety.sh` — 추출 셸만
+  기동, AppLibrary→real `/usr/bin/uwsm-app`→`app-graphical.slice`, 프로덕션
+  `--restart` 금지.
+
+### 20.2 라이브 실측 (2026-08-19)
+
+`COO_RUN_LIVE=1 ./bin/test-packages` 최종 게이트: 50/50, skip 0
+(`/tmp/coo-final-live-gate2.log`). 프로덕션 셸 pid 1168513,
+`OMARCHY_PATH=/usr/share/cachy-omarchy/upstream` (세션·프로세스 모두).
+`cachy-omarchy-doctor` 전 항목 PASS (exit 0; WARN 1건은 사용자
+`~/.config/omarchy/shell.json` 오버라이드 — 의도된 보고). SUPER+SPACE /
+SUPER+K 는 사용자가 직접 눌러 둘 다 정상 확인. 메뉴 Style > Theme 목록
+표시 후 Escape, 테마는 `tokyo-night` 유지. 레이어는 `omarchy-background`·
+`omarchy-bar`. PID-scoped 저널 QML ERROR 0건.
+
+사용자 선택으로 생략: `omarchy-theme-set "Nord"` (테마 변경), 프로덕션 셸
+`--restart` 생존. 앱 scope 생존은 추출 셸 경로의 `test_app_scope` 가 실측.
+
+`wtype` 가상 키보드는 이 호스트의 Hyprland 0.56.2 `__lua` 바인드 매칭을
+발화시키지 못했다. 레포 라이브 테스트는 IPC 경로를 쓰므로 영향 없음.

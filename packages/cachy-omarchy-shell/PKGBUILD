@@ -1,7 +1,7 @@
 # Maintainer: Cachy Omarchy Overlay
 pkgname=cachy-omarchy-shell
 pkgver=4.0.0
-pkgrel=5
+pkgrel=6
 pkgdesc='Pinned Omarchy Quattro shell runtime for CachyOS (no omarchy-settings)'
 arch=('any')
 url='https://github.com/basecamp/omarchy'
@@ -16,7 +16,7 @@ license=('MIT')
 #   (mic mute). pipewire-pulse: pactl (output volume). xdg-utils:
 #   xdg-settings/xdg-mime/xdg-terminal-exec (clipboard-open 의 launch closure).
 # uwsm: AppLibrary.qml:85 등이 uwsm-app 을 bare name 으로 부른다. 업스트림도
-#   uwsm 세션을 전제한다 (AGENTS.md:53). /usr/bin/uwsm-app 은 이 패키지가
+#   uwsm 세션을 전제한다 (AGENTS.md:53). /usr/bin/uwsm-app 은 uwsm 패키지가
 #   제공하며 우리는 shim 을 두지 않는다.
 depends=('quickshell' 'hyprland' 'uwsm' 'inotify-tools' 'libvips' 'procps-ng'
          'psmisc' 'jq' 'wl-clipboard' 'wtype' 'wireplumber' 'pipewire-pulse'
