@@ -32,10 +32,16 @@ assert_eq "$(jq -S . "$COO_PREFIX_ROOT/upstream/config/omarchy/shell.json")" \
           "$(jq -S . "$COO_PREFIX_ROOT/defaults/shell.json")" \
           "defaults 와 스테이징된 기본값이 동일"
 
-# 3) init 가 설치 트리만으로 동작한다.
+# 3) init 가 설치 트리만으로 동작한다. 이 테스트는 반드시 headless 시드
+# 경로만 타야 한다. 실제 세션의 quickshell 을 pgrep 이 발견하면 theme-set post
+# 훅이 호스트 Hyprland에 reload를 보낼 수 있다.
+stub="$COO_TEST_SANDBOX/stub-bin"
+mkdir -p "$stub"
+printf '#!/usr/bin/env bash\nexit 1\n' > "$stub/pgrep"
+chmod +x "$stub/pgrep"
 export COO_HYPR_DIR="$COO_TEST_SANDBOX/hypr"
 mkdir -p "$COO_HYPR_DIR"; : > "$COO_HYPR_DIR/hyprland.conf"
-out=$(PATH="$BIN:$PATH" "$BIN/cachy-omarchy-init" 2>&1); code=$?
+out=$(PATH="$stub:$BIN:$PATH" "$BIN/cachy-omarchy-init" 2>&1); code=$?
 assert_eq "$code" "0" "설치 트리에서 init exit 0"
 assert_file_exists "$HOME/.config/cachy-omarchy/hypr/bindings.conf" "init 가 바인딩 배치"
 [[ -e "$HOME/.local/state/omarchy/toggles/bar-off" ]] && made=1 || made=0
