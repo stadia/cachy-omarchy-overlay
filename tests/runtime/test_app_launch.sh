@@ -57,15 +57,27 @@ export OMARCHY_PATH="$root"
 # 그 심링크가 있지만 /usr/bin 에 설치되지 않았으므로, 호출자 PATH 로 같은
 # 가시성을 만든다 — 래퍼는 더 이상 PATH 를 조작하지 않는다 (SPEC §45).
 export PATH="$root/bin:$PATH"
+SHELL_PAT="quickshell -n -p $root/shell"
+
+test_shell_pid() {
+  local pid
+  for pid in $(pgrep -f "$SHELL_PAT" 2>/dev/null || true); do
+    [[ $pid =~ ^[0-9]+$ && -r /proc/$pid/comm ]] || continue
+    [[ $(<"/proc/$pid/comm") == quickshell ]] || continue
+    printf '%s\n' "$pid"
+    return 0
+  done
+  return 1
+}
 
 "$W" --run >/dev/null 2>&1 &
-shell_pid=$!
+wrapper_pid=$!
 
 cleanup() {
   "$W" --ipc shell hide omarchy.menu >/dev/null 2>&1 || true
-  [[ -n ${shell_pid:-} ]] || return 0
-  local pid=$shell_pid
-  shell_pid=""
+  [[ -n ${wrapper_pid:-} ]] || return 0
+  local pid=$wrapper_pid
+  wrapper_pid=""
   kill -TERM "$pid" 2>/dev/null
   { sleep 2; kill -KILL "$pid" 2>/dev/null; } &
   local watchdog=$!
@@ -84,17 +96,23 @@ trap 'cleanup; exit 143' TERM
 reply=""
 for _ in $(seq 1 40); do
   reply=$("$W" --ipc shell ping 2>/dev/null) && [[ -n $reply ]] && break
-  kill -0 "$shell_pid" 2>/dev/null || break
+  kill -0 "$wrapper_pid" 2>/dev/null || break
   sleep 0.25
 done
 assert_eq "$reply" "ok" "셸 ping (R06 전)"
 
-envp=$(tr '\0' '\n' <"/proc/$shell_pid/environ" 2>/dev/null || true)
+qs_pid=$(test_shell_pid 2>/dev/null || true)
+[[ $qs_pid =~ ^[0-9]+$ ]] && qs_found=0 || qs_found=1
+assert_eq "$qs_found" "0" "test-owned extracted real quickshell PID 를 찾았다"
+(( ASSERT_FAILURES == 0 )) || exit "$ASSERT_FAILURES"
+
+envp=$(tr '\0' '\n' <"/proc/$qs_pid/environ" 2>/dev/null || true)
 assert_contains "$envp" "$root/bin" "셸 프로세스가 호출자 PATH 를 그대로 물려받았다"
 
 menu_layers() {
-  hyprctl -j layers 2>/dev/null | jq -c \
-    '[ to_entries[].value.levels | to_entries[].value[] | select(.namespace == "omarchy-menu") ]' \
+  hyprctl -j layers 2>/dev/null | jq -c --argjson pid "$qs_pid" \
+    '[ to_entries[].value.levels | to_entries[].value[]
+       | select(.namespace == "omarchy-menu" and .pid == $pid) ]' \
     || echo '[]'
 }
 
@@ -124,7 +142,7 @@ assert_eq "$launched" "0" "R06 dummy 앱이 마커를 남겼다"
 
 "$W" --ipc shell hide omarchy.menu >/dev/null 2>&1 || true
 sleep 0.2
-remaining=$(hyprctl layers 2>/dev/null | grep -ci "omarchy-menu" || true)
+remaining=$(jq -r 'length' <<<"$(menu_layers)")
 assert_eq "$remaining" "0" "종료 전 omarchy-menu 가 닫혔다"
 
 exit "$ASSERT_FAILURES"
