@@ -43,64 +43,78 @@ cp -a "$src/default/themed" "$dest/usr/share/cachy-omarchy/upstream/default/"
 # 샌다 (D7). audio-output-switch/audio-tuning, brightness-display 체인은
 # M10 Tier C — pipewire/wireplumber 사용자 설정·서비스 정책과 하드웨어
 # 정책을 끌고 오므로 넣지 않는다.
-for helper in \
-  omarchy-menu-select \
-  omarchy-cmd-present \
-  omarchy-audio-output-sink \
-  omarchy-network-status \
-  omarchy-network-band \
-  omarchy-monitor-state \
-  omarchy-hyprland-monitor-scaling \
-  omarchy-reminder \
-  omarchy-notification-send \
-  omarchy-agent-usage-update \
-  omarchy-agent-usage-claude \
-  omarchy-agent-usage-codex \
-  omarchy-agent-usage-fireworks \
-  omarchy-theme-set \
-  omarchy-theme-set-templates \
-  omarchy-theme-color \
-  omarchy-theme-list \
-  omarchy-theme-current \
-  omarchy-theme-osc \
-  omarchy-theme-colors-from-alacritty \
-  omarchy-hook \
-  omarchy-restart-terminal \
-  omarchy-restart-hyprctl \
-  omarchy-restart-btop \
-  omarchy-restart-opencode \
-  omarchy-restart-helix \
-  omarchy-menu-images \
-  omarchy-theme-switcher \
-  omarchy-theme-bg-set \
-  omarchy-theme-bg-next \
-  omarchy-theme-bg-current \
-  omarchy-theme-bg-switcher \
-  omarchy-theme-bg-cache \
-  omarchy-theme-set-foot \
-  omarchy-theme-set-tmux \
-  omarchy-theme-set-gnome \
-  omarchy-theme-set-pi \
-  omarchy-theme-set-claude \
-  omarchy-theme-set-vscode \
-  omarchy-theme-set-obsidian \
-  omarchy-toggle-enabled \
-  omarchy-menu-clipboard \
-  omarchy-clipboard-open \
-  omarchy-clipboard-paste-text \
-  omarchy-clipboard-paste-file \
-  omarchy-launch-browser \
-  omarchy-launch-editor \
-  omarchy-launch-tui \
-  omarchy-hyprland-focus-app \
-  omarchy-menu-emoji \
-  omarchy-menu-emoji-insert \
-  omarchy-osd \
-  omarchy-audio-output-volume \
-  omarchy-audio-input-mute \
-  omarchy-brightness-keyboard-mute ; do
+# 노출 집합 = 스테이징 집합 (SPEC §45). 이 배열이 단일 정의다 — 아래 두 루프가
+# 같은 배열을 돌기 때문에 스테이징 목록과 /usr/bin 노출 목록이 갈라질 수 없다.
+# tests/package/test_usr_bin_helpers.sh 가 `helpers=(` 로 이 블록을 파싱한다.
+helpers=(
+  omarchy-menu-select
+  omarchy-cmd-present
+  omarchy-audio-output-sink
+  omarchy-network-status
+  omarchy-network-band
+  omarchy-monitor-state
+  omarchy-hyprland-monitor-scaling
+  omarchy-reminder
+  omarchy-notification-send
+  omarchy-agent-usage-update
+  omarchy-agent-usage-claude
+  omarchy-agent-usage-codex
+  omarchy-agent-usage-fireworks
+  omarchy-theme-set
+  omarchy-theme-set-templates
+  omarchy-theme-color
+  omarchy-theme-list
+  omarchy-theme-current
+  omarchy-theme-osc
+  omarchy-theme-colors-from-alacritty
+  omarchy-hook
+  omarchy-restart-terminal
+  omarchy-restart-hyprctl
+  omarchy-restart-btop
+  omarchy-restart-opencode
+  omarchy-restart-helix
+  omarchy-menu-images
+  omarchy-theme-switcher
+  omarchy-theme-bg-set
+  omarchy-theme-bg-next
+  omarchy-theme-bg-current
+  omarchy-theme-bg-switcher
+  omarchy-theme-bg-cache
+  omarchy-theme-set-foot
+  omarchy-theme-set-tmux
+  omarchy-theme-set-gnome
+  omarchy-theme-set-pi
+  omarchy-theme-set-claude
+  omarchy-theme-set-vscode
+  omarchy-theme-set-obsidian
+  omarchy-toggle-enabled
+  omarchy-menu-clipboard
+  omarchy-clipboard-open
+  omarchy-clipboard-paste-text
+  omarchy-clipboard-paste-file
+  omarchy-launch-browser
+  omarchy-launch-editor
+  omarchy-launch-tui
+  omarchy-hyprland-focus-app
+  omarchy-menu-emoji
+  omarchy-menu-emoji-insert
+  omarchy-osd
+  omarchy-audio-output-volume
+  omarchy-audio-input-mute
+  omarchy-brightness-keyboard-mute
+)
+
+for helper in "${helpers[@]}"; do
   install -D -m755 "$src/bin/$helper" \
     "$dest/usr/share/cachy-omarchy/upstream/bin/$helper"
+done
+
+# 업스트림 프로덕션과 같은 노출 방식이다 (upstream default/bash/env-bootstrap
+# 주석: 프로덕션에서는 helper 가 이미 /usr/bin/omarchy-* 로 있다). 실체는
+# 옮기지 않는다 — /usr/bin 은 상대 심링크로 만든 평평한 뷰다.
+install -d "$dest/usr/bin"
+for helper in "${helpers[@]}"; do
+  ln -sf "../share/cachy-omarchy/upstream/bin/$helper" "$dest/usr/bin/$helper"
 done
 # 정본 shell.json 은 overlay/defaults 에 있고 핀 커밋 업스트림 원본과 동일하다
 # (M8 원칙 0: 억제는 실측 충돌이 있을 때만). 그래도 업스트림 파일을 그냥 두지

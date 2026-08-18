@@ -20,7 +20,9 @@ if [[ $ASSERT_FAILURES -eq 0 ]]; then
   printf 'ok:   P01 no /etc /boot /efi paths\n'
 fi
 
-allowed_regex='^/usr/share/(cachy-omarchy|licenses/cachy-omarchy-shell)/'
+# /usr/bin/omarchy-* 는 SPEC §45 노출 심링크다 (Task 1) — stage-upstream.sh
+# 의 helpers 배열이 소유를 선언하는 것과 같은 이름 규칙이라 여기서도 허용한다.
+allowed_regex='^/usr/share/(cachy-omarchy|licenses/cachy-omarchy-shell)/|^/usr/bin/omarchy-[a-z0-9-]+$'
 for f in "${files[@]}"; do
   if [[ ! $f =~ $allowed_regex ]]; then
     printf 'FAIL: P10 unowned path %s\n' "$f"

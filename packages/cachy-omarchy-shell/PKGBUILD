@@ -15,8 +15,15 @@ license=('MIT')
 #   ·copy(wl-copy). wtype: emoji/clipboard 선택 paste. wireplumber: wpctl
 #   (mic mute). pipewire-pulse: pactl (output volume). xdg-utils:
 #   xdg-settings/xdg-mime/xdg-terminal-exec (clipboard-open 의 launch closure).
-depends=('quickshell' 'hyprland' 'inotify-tools' 'libvips' 'procps-ng' 'psmisc'
-         'jq' 'wl-clipboard' 'wtype' 'wireplumber' 'pipewire-pulse' 'xdg-utils')
+# uwsm: AppLibrary.qml:85 등이 uwsm-app 을 bare name 으로 부른다. 업스트림도
+#   uwsm 세션을 전제한다 (AGENTS.md:53). /usr/bin/uwsm-app 은 이 패키지가
+#   제공하며 우리는 shim 을 두지 않는다.
+depends=('quickshell' 'hyprland' 'uwsm' 'inotify-tools' 'libvips' 'procps-ng'
+         'psmisc' 'jq' 'wl-clipboard' 'wtype' 'wireplumber' 'pipewire-pulse'
+         'xdg-utils')
+# /usr/bin/omarchy-* 를 공식 omarchy 패키지와 같은 이름으로 소유한다. 상호
+# 배타가 의도다. provides 는 하지 않는다 — Omarchy 전체를 제공하지 않는다.
+conflicts=('omarchy')
 makedepends=('git')
 optdepends=(
   'tmux: omarchy-theme-set-tmux hook'
