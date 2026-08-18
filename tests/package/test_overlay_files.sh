@@ -43,8 +43,9 @@ done
 # uwsm 드롭인은 sh 로 소싱된다 (/usr/lib/uwsm/prepare-env.sh 의 source_dir).
 # 값이 어긋나면 세션 전체가 잘못된 트리를 가리키므로 정확히 단언한다.
 dropin="$dest/usr/share/uwsm/env-hyprland.d/10-cachy-omarchy"
-assert_contains "$(cat "$dropin" 2>/dev/null)" \
-  'export OMARCHY_PATH=/usr/share/cachy-omarchy/upstream' \
-  "uwsm 드롭인이 OMARCHY_PATH 를 정확한 값으로 export 한다"
+grep -qxF 'export OMARCHY_PATH=/usr/share/cachy-omarchy/upstream' "$dropin" && ok=0 || ok=1
+assert_eq "$ok" "0" "uwsm 드롭인의 OMARCHY_PATH export 가 정확한 한 줄로 존재한다"
+n=$(grep -c '^export ' "$dropin" || true)
+assert_eq "$n" "1" "드롭인에 export 는 이 한 줄뿐이다"
 
 exit "$ASSERT_FAILURES"
