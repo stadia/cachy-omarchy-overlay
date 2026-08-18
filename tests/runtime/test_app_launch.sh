@@ -1,30 +1,15 @@
 #!/usr/bin/env bash
 # R06: dummy desktop is launched through AppLibrary (uwsm-app -- gtk-launch).
-# Shim delegates to a real uwsm-app when one is on PATH, else falls back to
-# exec'ing the target directly (see test_uwsm_app_shim.sh for both paths in
-# isolation). PATH is shell-process only.
+# uwsm-app is no longer a shim we ship — it comes from the uwsm package. This
+# test proves the QML source calls it correctly and that a live app launch
+# reaches the target through the shell (below). The real uwsm-app's process
+# placement (systemd scope) is measured live by Task 7, not here.
 set -uo pipefail
 REPO_ROOT="${REPO_ROOT:?}"
 source "$REPO_ROOT/tests/lib/assert.sh"
 source "$REPO_ROOT/lib/runtime.sh"
 
-SHIM="$REPO_ROOT/overlay/compat/bin/uwsm-app"
 W="$REPO_ROOT/overlay/bin/cachy-omarchy-shell"
-
-assert_file_exists "$SHIM" "uwsm-app shim 존재"
-[[ -x $SHIM ]] && x=0 || x=1
-assert_eq "$x" "0" "uwsm-app shim 실행 가능"
-[[ -x $SHIM ]] || exit 1
-
-src=$(cat "$SHIM")
-assert_contains "$src" 'exec "$@"' "shim 은 나머지를 exec 한다 (REIMPLEMENT 아님)"
-
-host=$(command -v uwsm-app 2>/dev/null || true)
-if [[ -n $host ]]; then
-  echo "info: 호스트에 실제 uwsm-app 있음 ($host) — 아래 exec 는 shim 의 위임 경로를 탄다"
-else
-  echo "info: 호스트에 uwsm-app 없음 — 아래 exec 는 shim 의 fallback 경로를 탄다"
-fi
 
 marker=$COO_TEST_SANDBOX/r06.marker
 : >"$COO_TEST_SANDBOX/r06.probe.sh"
@@ -33,15 +18,6 @@ cat >"$COO_TEST_SANDBOX/r06.probe.sh" <<EOF
 printf 'launched\n' > '$marker'
 EOF
 chmod +x "$COO_TEST_SANDBOX/r06.probe.sh"
-
-out=$("$SHIM" -- "$COO_TEST_SANDBOX/r06.probe.sh"); code=$?
-# 위임인지 fallback 인지는 호스트 PATH 에 실제 uwsm-app 유무로 갈린다(위 info
-# 메시지). 여기서는 "대상이 실행됐다"만 단언한다 — "위임한다"라고 쓰면 uwsm
-# 없는 머신에서 Tier 1 이 발동해도 통과하는 false-green 이 된다. 위임의 효과
-# (스코프 격리)는 test_uwsm_scope.sh 가 PATH 를 통제해 실측한다.
-assert_eq "$code" "0" "shim -- cmd 가 대상을 실행한다"
-assert_eq "$(cat "$marker")" "launched" "shim 이 대상 명령을 실행했다"
-rm -f "$marker"
 
 wrap=$(cat "$W")
 assert_contains "$wrap" 'COMPAT_BIN' "래퍼가 compat PATH 를 셸 프로세스에만 붙인다"
