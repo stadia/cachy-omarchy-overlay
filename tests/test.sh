@@ -4,6 +4,7 @@
 set -uo pipefail
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 export REPO_ROOT
+source "$REPO_ROOT/tests/lib/sandbox.sh"
 
 only=${1:-}
 failed=0
@@ -35,6 +36,10 @@ while IFS= read -r t; do
     printf 'FAIL %s\n' "${t#"$REPO_ROOT"/}"
     failed=$((failed + 1))
   fi
+  # Order matters: kill first, then delete.  A watcher left running inside the
+  # sandbox does not exit when its directory disappears, so deleting first
+  # would strand it for the life of the session (tests/lib/sandbox.sh).
+  coo_reap_sandbox_procs "$sandbox"
   rm -rf "$sandbox"
 done < "$test_list"
 

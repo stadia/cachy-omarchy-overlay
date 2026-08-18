@@ -113,6 +113,16 @@ CachyOS에서 `omarchy.menu`를 쓰려면 공식 OS가 아니라 **핀된 런타
   토글을 사용자 상태로 생성하거나 패치 필요. §61 "Existing Waybar preserved" 미충족.
 - **`inotify-tools` 미감사 의존** — `PluginRegistry.qml:638` 이 `inotifywait` 호출.
   미설치 시 1초마다 WARN 반복. `PKGBUILD depends` 누락(§28).
+- **셸 종료 시 `inotifywait` 자식이 남는다** — Quickshell 0.3.0 의 `Io.Process` 는
+  종료할 때 자식을 정리하지 않는다(실측: quickshell 은 SIGTERM 에 ~250ms 만에
+  정상 종료하고, 자식은 `systemd --user` 로 재부모화된 채 계속 산다). 끄는
+  프로퍼티도 없다 — 설치된 `quickshell-io.qmltypes` 의 `Process` 는 `running /
+  processId / command / workingDirectory / environment / clearEnvironment /
+  stdout / stderr / stdinEnabled` 뿐. 감시 디렉터리를 지워도 해소되지 않는다:
+  워치가 전부 제거되면 이벤트가 영영 오지 않아 `select()` 에서 무한 대기한다
+  (`/proc/<pid>/fdinfo` 에 워치 0개, `wchan: do_select`). 셸을 재시작할 때마다
+  하나씩 쌓인다. 테스트 하네스 쪽은 `tests/lib/sandbox.sh` 가 샌드박스 경로로
+  스코프해 회수하지만, **실세션 재시작 누수는 미해결**이다.
 - **패키지 미설치 상태에서만 검증** — 실설치 경로(`/usr/share/cachy-omarchy/upstream`)는 M5.
 - **M3 런처** — 원본 `omarchy.menu` IPC. `uwsm-app` 은 uwsm 패키지의 실제 바이너리
   (구 WRAPPER shim 은 삭제됨 — 위 "Components packaged" 참조). SUPER+K 는 M4.
