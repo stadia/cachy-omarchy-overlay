@@ -4,6 +4,9 @@
 # 전이 closure: omarchy-bar → omarchy-shell-config + omarchy-plugin-catalog;
 # logout/reboot/shutdown → omarchy-hyprland-window-close-all + omarchy-state.
 # omarchy-osd / omarchy-cmd-present / omarchy-shell 은 이미 다른 계층.
+# omarchy-apply-lock 은 omarchy-system-lock 의 전제다 — 이것이 만드는
+# /etc/pam.d/omarchy-lock-password 가 없으면 lock 플러그인이 IPC 에서
+# "missing-pam" 으로 물러나고 omarchy-system-lock 은 그 실패를 삼킨다.
 set -uo pipefail
 REPO_ROOT="${REPO_ROOT:?}"
 source "$REPO_ROOT/tests/lib/assert.sh"
@@ -21,6 +24,7 @@ staged=(
   omarchy-shell-config
   omarchy-plugin-catalog
   omarchy-system-lock
+  omarchy-apply-lock
   omarchy-system-logout
   omarchy-system-reboot
   omarchy-system-shutdown

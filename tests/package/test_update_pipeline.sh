@@ -227,6 +227,11 @@ EOF
 for command in pgrep hyprctl quickshell uwsm-app; do printf '#!/usr/bin/env bash\nexit 1\n' >"$doctor_fake/$command"; done
 chmod +x "$doctor_fake"/*
 printf 'ID=arch\n' >"$doctor_root/os-release"
+# The lock-screen PAM service lives outside every package prefix, so pin it to
+# the fixture as well -- the fake lane must not read the real /etc/pam.d.
+doctor_pam=$doctor_root/pam/omarchy-lock-password
+mkdir -p "$(dirname "$doctor_pam")"
+printf '#%%PAM-1.0\n' >"$doctor_pam"
 run_rc_doctor() {
   local state=$1
   PATH="$doctor_fake:/usr/bin:/bin" WAYLAND_DISPLAY= OMARCHY_PATH="$doctor_prefix/upstream" \
@@ -234,6 +239,7 @@ run_rc_doctor() {
     COO_HYPR_DIR="$COO_TEST_SANDBOX/doctor-hypr" COO_CONFIG_DIR="$COO_TEST_SANDBOX/doctor-config" \
     COO_OMARCHY_CONFIG_DIR="$COO_TEST_SANDBOX/doctor-omarchy" COO_STATE_DIR="$state" \
     COO_OMARCHY_PATH="$doctor_prefix/upstream" COO_OMARCHY_STATE_DIR="$COO_TEST_SANDBOX/doctor-omarchy-state" \
+    COO_PAM_LOCK_FILE="$doctor_pam" \
     COO_SHA256_BIN=sha256sum COO_IPC_TIMEOUT=2s \
     "$REPO_ROOT/overlay/bin/cachy-omarchy-doctor" 2>&1
 }

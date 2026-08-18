@@ -52,6 +52,15 @@ cp -a "$src/default/themed" "$dest/usr/share/cachy-omarchy/upstream/default/"
 # omarchy-shell-config 후 omarchy-plugin-catalog / omarchy-shell IPC 를
 # 부르고, logout/reboot/shutdown 은 omarchy-osd(이미 위) +
 # omarchy-hyprland-window-close-all + omarchy-state 를 부른다.
+# omarchy-apply-lock 은 omarchy-system-lock 의 전제라 같이 온다. 업스트림은
+# 이것을 install/config/lockscreen-pam.sh 에서 한 번 돌려
+# /etc/pam.d/omarchy-lock-password 를 만드는데, 우리는 업스트림 설치
+# 스크립트를 쓰지 않으므로 그 파일이 생길 자리가 없었다. 없으면 lock 플러그인
+# (shell/plugins/lock/Service.qml:485 FileView)이 passwordPamConfigured=false
+# 로 남고 IPC lock.lock 이 "missing-pam" 을 돌려주는데, omarchy-system-lock 은
+# 그 출력을 >/dev/null 로 버려서 exit 0 으로 아무 일도 안 한다. 전이는
+# omarchy-cmd-present + omarchy-shell 뿐이라 둘 다 이미 있다.
+# 스탠자 자체는 우리가 복사하지 않는다 — 업스트림 소유다.
 helpers=(
   omarchy-menu-select
   omarchy-cmd-present
@@ -112,6 +121,7 @@ helpers=(
   omarchy-shell-config
   omarchy-plugin-catalog
   omarchy-system-lock
+  omarchy-apply-lock
   omarchy-system-logout
   omarchy-system-reboot
   omarchy-system-shutdown

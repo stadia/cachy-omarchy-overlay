@@ -28,7 +28,7 @@ if [[ -f $shell_artifact ]]; then
            omarchy-menu-emoji-insert omarchy-osd omarchy-audio-output-volume \
            omarchy-audio-input-mute omarchy-brightness-keyboard-mute \
            omarchy-bar omarchy-shell-config omarchy-plugin-catalog \
-           omarchy-system-lock omarchy-system-logout omarchy-system-reboot \
+           omarchy-system-lock omarchy-apply-lock omarchy-system-logout omarchy-system-reboot \
            omarchy-system-shutdown omarchy-hyprland-window-close-all omarchy-state; do
     assert_contains "$list" "usr/share/cachy-omarchy/upstream/bin/$h" "shell artifact has helper: $h"
   done

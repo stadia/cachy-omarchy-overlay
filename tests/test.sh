@@ -23,6 +23,12 @@ while IFS= read -r t; do
   [[ -n $only && $t != *"$only"* ]] && continue
   total=$((total + 1))
   sandbox=$(mktemp -d "${TMPDIR:-/tmp}/coo-test-XXXXXX")
+  # cachy-omarchy-init delegates the lock-screen PAM service to
+  # omarchy-apply-lock, which needs root. Pinning the detection path at an
+  # existing sandbox file means no test can reach the real /etc/pam.d or
+  # provoke a sudo prompt; tests that need the missing branch override it.
+  mkdir -p "$sandbox/pam"
+  printf '#%%PAM-1.0\n' > "$sandbox/pam/omarchy-lock-password"
   printf '\n=== %s ===\n' "${t#"$REPO_ROOT"/}"
   if HOME="$sandbox" \
      XDG_CONFIG_HOME="$sandbox/.config" \
@@ -30,6 +36,7 @@ while IFS= read -r t; do
      XDG_STATE_HOME="$sandbox/.local/state" \
      XDG_CACHE_HOME="$sandbox/.cache" \
      COO_TEST_SANDBOX="$sandbox" \
+     COO_PAM_LOCK_FILE="$sandbox/pam/omarchy-lock-password" \
      bash "$t"; then
     printf 'PASS %s\n' "${t#"$REPO_ROOT"/}"
   else

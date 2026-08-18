@@ -9,6 +9,10 @@ assert_eq "${XDG_CONFIG_HOME:-}" "$COO_TEST_SANDBOX/.config" "sandbox XDG config
 assert_eq "${XDG_DATA_HOME:-}" "$COO_TEST_SANDBOX/.local/share" "sandbox XDG data isolation"
 assert_eq "${XDG_STATE_HOME:-}" "$COO_TEST_SANDBOX/.local/state" "sandbox XDG state isolation"
 assert_eq "${XDG_CACHE_HOME:-}" "$COO_TEST_SANDBOX/.cache" "sandbox XDG cache isolation"
+# Without this pin, any test that runs cachy-omarchy-init would read the real
+# /etc/pam.d and could hand omarchy-apply-lock a sudo prompt mid-suite.
+assert_eq "${COO_PAM_LOCK_FILE:-}" "$COO_TEST_SANDBOX/pam/omarchy-lock-password" "sandbox lock PAM isolation"
+assert_file_exists "${COO_PAM_LOCK_FILE:-}" "sandbox lock PAM fixture exists" 
 
 # A discovery failure must be reported as such, not hidden by process
 # substitution and misreported later as an empty test selection.

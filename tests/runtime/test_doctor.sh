@@ -20,7 +20,8 @@ fake_bin=$COO_TEST_SANDBOX/fake-bin
 unset COO_IPC_TIMEOUT COO_TEST_DOCTOR_SHA256_BIN \
   COO_FAKE_PROCESS COO_FAKE_PING_FAIL COO_FAKE_OFFICIAL_PRESENT COO_TEST_WAYLAND_DISPLAY \
   TEST_DOCTOR_PROCESS TEST_DOCTOR_PING_FAIL TEST_DOCTOR_OFFICIAL_PRESENT \
-  TEST_DOCTOR_WAYLAND_DISPLAY TEST_DOCTOR_UWSM_APP
+  TEST_DOCTOR_WAYLAND_DISPLAY TEST_DOCTOR_UWSM_APP \
+  COO_TEST_DOCTOR_PAM_LOCK_FILE
 mkdir -p "$prefix/upstream/shell" "$prefix/upstream/default/omarchy" "$compat" \
   "$root/usr/bin" "$root/usr/lib/systemd/user" "$hypr" "$config" "$user_config" "$state" "$fake_bin"
 printf '// fixture shell\n' >"$prefix/upstream/shell/shell.qml"
@@ -28,6 +29,11 @@ printf '{}\n' >"$prefix/upstream/default/omarchy/omarchy-menu.jsonc"
 printf '# no conflicting bindings\n' >"$hypr/hyprland.conf"
 os_release=$COO_TEST_SANDBOX/os-release
 printf 'ID=cachyos\n' >"$os_release"
+# The lock plugin refuses to lock without this PAM service, so the fixture
+# needs one to be healthy. Never point this at the real /etc/pam.d.
+pam_lock=$COO_TEST_SANDBOX/pam/omarchy-lock-password
+mkdir -p "$(dirname "$pam_lock")"
+printf '#%%PAM-1.0\n' >"$pam_lock"
 omarchy_state=$COO_TEST_SANDBOX/.local/state/omarchy
 for cmd in cachy-omarchy-launcher cachy-omarchy-bindings cachy-omarchy-keybindings; do
   printf '#!/usr/bin/env bash\nexit 0\n' >"$root/usr/bin/$cmd"
@@ -115,6 +121,7 @@ run_doctor() {
     COO_CONFIG_DIR="$config" COO_OMARCHY_CONFIG_DIR="$user_config" COO_STATE_DIR="$state" \
     COO_OMARCHY_PATH="$prefix/upstream" COO_OS_RELEASE="$os_release" \
     COO_OMARCHY_STATE_DIR="$omarchy_state" \
+    COO_PAM_LOCK_FILE="${COO_TEST_DOCTOR_PAM_LOCK_FILE:-$pam_lock}" \
     COO_SHA256_BIN="${COO_TEST_DOCTOR_SHA256_BIN:-sha256sum}" "$DOCTOR" 2>&1
 }
 
@@ -131,9 +138,21 @@ assert_contains "$out" "PASS: shell.qml" "healthy tree reports shell.qml"
 assert_contains "$out" "PASS: launcher invocation" "healthy tree reports launcher reachability"
 assert_contains "$out" "WARN: Quickshell process not observed" "baseline does not inherit a real Quickshell process"
 assert_contains "$out" "WARN: IPC ping not measurable" "absent process leaves IPC explicitly unmeasured"
+assert_contains "$out" "PASS: lock screen PAM service" "healthy tree reports the lock PAM service"
+
 assert_contains "$(cat "$pacman_log")" "omarchy" "doctor queries official omarchy package"
 assert_contains "$(cat "$pacman_log")" "omarchy-settings" "doctor queries official omarchy-settings package"
 assert_eq "$(cat "$owner_query_log")" "-Qqo"   "healthy doctor queries uwsm-app ownership with pacman -Qqo"
+
+# Regression for the defect this check exists to catch: without
+# /etc/pam.d/omarchy-lock-password the lock plugin returns "missing-pam" and
+# omarchy-system-lock discards that answer, so the command exits 0 and locks
+# nothing. Doctor is the only place that can say so out loud.
+out=$(COO_TEST_DOCTOR_PAM_LOCK_FILE="$COO_TEST_SANDBOX/pam/absent" run_doctor); code=$?
+assert_eq "$code" 1 "missing lock PAM service fails closed"
+assert_contains "$out" "FAIL: lock screen PAM service missing" "missing lock PAM service is explicit"
+assert_contains "$out" "omarchy-apply-lock" "missing lock PAM service names the recovery command"
+
 
 # Every doctor override except deliberately injected COO_IPC_TIMEOUT is pinned
 # by run_doctor. Hostile inherited values must not redirect this fixture.

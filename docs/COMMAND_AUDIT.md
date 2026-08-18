@@ -40,7 +40,7 @@ omarchy-update* / omarchy-pkg-*
 omarchy-launch-about (브랜딩/os-release)
 ```
 
-`systemctl suspend|hibernate` 등 표준 명령은 SAFE. `omarchy-system-lock|logout|reboot|shutdown` 은 메뉴 세션 경로로 스테이징한다. `omarchy-system-factory-reset` 은 Omarchy ISO `@factory` 전제라 올리지 않는다.
+`systemctl suspend|hibernate` 등 표준 명령은 SAFE. `omarchy-system-lock|logout|reboot|shutdown` 은 메뉴 세션 경로로 스테이징한다. `omarchy-system-factory-reset` 은 Omarchy ISO `@factory` 전제라 올리지 않는다. `omarchy-system-lock` 은 `omarchy-apply-lock` 없이는 아무것도 잠그지 않으므로 둘을 같이 올린다 — 업스트림은 후자를 `install/config/lockscreen-pam.sh` 로 한 번 돌리는데 우리는 업스트림 설치 스크립트를 쓰지 않아 그 자리가 비어 있었다.
 
 ---
 
@@ -167,6 +167,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-agent-usage-codex` | SAFE | package | agents 패널 수집기. 해당 CLI 부재 시 조용히 빈다 |
 | `omarchy-agent-usage-fireworks` | SAFE | package | agents 패널 수집기. 해당 CLI 부재 시 조용히 빈다 |
 | `omarchy-agent-usage-update` | SAFE | package | agents 패널 (M8 Tier B). CLI 별 수집기를 부른다 |
+| `omarchy-apply-lock` | SAFE | package | 잠금 화면 PAM 서비스를 만든다 (`requires-sudo`). `omarchy-system-lock` 의 전제 — 없으면 lock IPC 가 `missing-pam` 으로 물러난다. `cachy-omarchy-init` 이 파일 부재 시에만 부른다 |
 | `omarchy-audio-input-mute` | SAFE | package | M10 OSD audio bridge. `brightness-keyboard-mute` 를 무조건 부른다 (D7) |
 | `omarchy-audio-output-sink` | SAFE | package | 바 audio 위젯이 bare name 으로 부름 (M8 Tier A) |
 | `omarchy-audio-output-volume` | SAFE | package | M10 OSD audio bridge. pactl/wpctl. debounce 파일은 runtime dir |
@@ -202,7 +203,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-restart-terminal` | SAFE | package | M9 theme-set post 훅 — 새 팔레트 반영 |
 | `omarchy-shell-config` | SAFE | package | `omarchy-bar` 가 source 하는 설정 헬퍼 |
 | `omarchy-state` | SAFE | package | reboot/shutdown 전이 |
-| `omarchy-system-lock` | SAFE | package | 메뉴 `system.lock`. `omarchy-shell lock lock` |
+| `omarchy-system-lock` | SAFE | package | 메뉴 `system.lock`. `omarchy-shell lock lock`. `omarchy-apply-lock` 이 만든 PAM 서비스가 있어야 실제로 잠긴다 |
 | `omarchy-system-logout` | SAFE | package | 메뉴 `system.logout`. `uwsm stop` + osd/close-all 전이 |
 | `omarchy-system-reboot` | SAFE | package | 메뉴 `system.reboot`. osd/state/close-all 전이 |
 | `omarchy-system-shutdown` | SAFE | package | 메뉴 `system.shutdown`. osd/state/close-all 전이 |

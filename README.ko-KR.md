@@ -92,6 +92,13 @@ bin/install-packages         # 빌드 산출물 설치
 cachy-omarchy-init           # 최초 1회: 바인딩 + 사용자 상태 생성
 ```
 
+`cachy-omarchy-init` 은 첫 실행에서 잠금 화면도 설정한다. 업스트림
+`omarchy-apply-lock` 헬퍼에 위임하며, 그 헬퍼가 `/etc/pam.d/omarchy-lock-password`
+를 쓰기 때문에 sudo 를 묻는다. 이 PAM 서비스가 없으면 셸은 잠금을 거부하고
+`omarchy-system-lock` 은 아무 일도 안 한 채 exit 0 이므로, 프롬프트를 건너뛰었다면
+나중에 `omarchy-apply-lock` 을 직접 실행한다. `cachy-omarchy-doctor` 는 이
+서비스의 부재를 FAIL 로 보고한다.
+
 업스트림 추적:
 
 ```bash

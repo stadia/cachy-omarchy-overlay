@@ -95,6 +95,13 @@ bin/install-packages         # install the build output
 cachy-omarchy-init           # one-time: create bindings and user state
 ```
 
+`cachy-omarchy-init` also configures the lock screen the first time it runs. It
+delegates to the upstream `omarchy-apply-lock` helper, which writes
+`/etc/pam.d/omarchy-lock-password` and therefore asks for sudo. Without that PAM
+service the shell refuses to lock and `omarchy-system-lock` exits 0 having done
+nothing, so run `omarchy-apply-lock` yourself if you skip the prompt.
+`cachy-omarchy-doctor` reports a missing service as a failure.
+
 Upstream tracking:
 
 ```bash

@@ -25,6 +25,12 @@ usage() {
   ~/.config/cachy-omarchy/hypr/bindings.{conf,lua}
   사용자 Hyprland 설정에 관리 source 블록       (충돌 시 주입하지 않음)
   기본 테마 시드 "Tokyo Night"                  (테마가 없을 때만, SPEC 6.6)
+  /etc/pam.d/omarchy-lock-password              (없을 때만, omarchy-apply-lock
+                                                 에 위임 — sudo 를 물을 수 있음)
+
+잠금 화면 PAM 서비스가 없으면 omarchy-system-lock 은 exit 0 인 채 아무것도
+잠그지 않는다. 이 단계가 실패해도 init 은 계속 진행하며, 나중에
+omarchy-apply-lock 을 직접 실행해 복구할 수 있다.
 
 Omarchy 내장 바는 기본으로 보인다. 숨기려면 직접 토글을 만든다:
   : > ~/.local/state/omarchy/toggles/bar-off
@@ -98,6 +104,29 @@ if [[ -n $THEME_SET ]]; then
   fi
 else
   note "note: omarchy-theme-set 없음 — 테마 시드를 건너뛴다"
+fi
+
+# 2.6) 잠금 화면 PAM 서비스. 업스트림은 install/config/lockscreen-pam.sh 에서
+#    omarchy-apply-lock 을 한 번 돌려 /etc/pam.d/omarchy-lock-password 를
+#    만든다. 우리는 업스트림 설치 스크립트를 쓰지 않으므로 그 자리를 여기서
+#    메운다 — 스탠자를 복사하지 않고 같은 헬퍼에 위임한다 (SPEC 20).
+#    이것이 없으면 lock 플러그인이 passwordPamConfigured=false 로 남아
+#    IPC lock.lock 이 "missing-pam" 을 돌려주고, omarchy-system-lock 은 그
+#    출력을 버리므로 exit 0 인 채 아무것도 잠기지 않는다.
+#    이미 있으면 부르지 않는다 — 파일 존재 확인만으로 멱등하고 sudo 도 필요
+#    없다. 실패는 격하한다: 잠금 설정 때문에 아래 바인딩 설치가 막히면 안 된다.
+PAM_LOCK_FILE=${COO_PAM_LOCK_FILE:-/etc/pam.d/omarchy-lock-password}
+APPLY_LOCK=$(command -v omarchy-apply-lock 2>/dev/null || true)
+if [[ -e $PAM_LOCK_FILE ]]; then
+  : # 이미 설정됨 — 사용자 시스템 상태이므로 다시 쓰지 않는다.
+elif [[ -z $APPLY_LOCK ]]; then
+  note "note: omarchy-apply-lock 없음 — 잠금 화면 PAM 설정을 건너뛴다 (omarchy-system-lock 은 아무것도 잠그지 못한다)"
+elif (( DRY )); then
+  note "would: $APPLY_LOCK (잠금 화면 PAM 설정 $PAM_LOCK_FILE — sudo 필요)"
+else
+  note "잠금 화면 PAM 설정을 만든다: $PAM_LOCK_FILE (root 권한이 필요해 sudo 암호를 물을 수 있다)"
+  "$APPLY_LOCK" \
+    || note "note: 잠금 화면 PAM 설정 실패 — 나중에 omarchy-apply-lock 을 직접 실행할 수 있다"
 fi
 
 # 3) Hyprland 바인딩. 충돌 감지와 --force 정책을 재구현하지 않고 위임한다

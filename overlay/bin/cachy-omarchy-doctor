@@ -13,6 +13,10 @@ USER_OMARCHY_CONFIG_DIR=${COO_OMARCHY_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.conf
 # Upstream omarchy keeps its own state tree, separate from STATE_DIR above
 # (which is ours). The bar toggle lives in theirs.
 OMARCHY_STATE_DIR=${COO_OMARCHY_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/omarchy}
+# The lock plugin (shell/plugins/lock/Service.qml) watches this file and refuses
+# to lock without it. Upstream's installer creates it; ours delegates to
+# omarchy-apply-lock from cachy-omarchy-init.
+PAM_LOCK_FILE=${COO_PAM_LOCK_FILE:-/etc/pam.d/omarchy-lock-password}
 INSTALL_ROOT=$(dirname "$(dirname "$PREFIX_ROOT")")
 BIN_DIR=$INSTALL_ROOT/bin
 # Keep the inherited value before resolving the compatibility root below. The
@@ -37,7 +41,7 @@ Usage: cachy-omarchy-doctor
 Read-only diagnostics for the installed or extracted Cachy Omarchy tree.
 Environment overrides: COO_PREFIX_ROOT, COO_COMPAT_BIN, COO_HYPR_DIR,
 COO_CONFIG_DIR, COO_STATE_DIR, COO_OMARCHY_PATH, COO_OMARCHY_CONFIG_DIR,
-COO_IPC_TIMEOUT (1–10 seconds, optional `s` suffix).
+COO_PAM_LOCK_FILE, COO_IPC_TIMEOUT (1–10 seconds, optional `s` suffix).
 USAGE
 }
 
@@ -230,6 +234,15 @@ check_executable "launcher invocation" "$BIN_DIR/cachy-omarchy-launcher"
 check_executable "binding helper" "$BIN_DIR/cachy-omarchy-bindings"
 check_executable "keybinding invocation" "$BIN_DIR/cachy-omarchy-keybindings"
 check_executable "compat omarchy-shell" "$COMPAT_BIN/omarchy-shell"
+
+# omarchy-system-lock pipes the shell's answer to /dev/null, so a missing PAM
+# service makes it exit 0 while locking nothing. Nothing else in the session
+# reports that, which is why this check is a FAIL and not a WARN.
+if [[ -e $PAM_LOCK_FILE ]]; then
+  pass "lock screen PAM service ($PAM_LOCK_FILE)"
+else
+  fail "lock screen PAM service missing: $PAM_LOCK_FILE — omarchy-system-lock exits 0 without locking; run: omarchy-apply-lock"
+fi
 
 # UWSM sources /usr/share/uwsm/env-hyprland.d/10-cachy-omarchy for the
 # graphical session. Without the inherited value, bare /usr/bin helpers cannot
