@@ -46,6 +46,12 @@ cp -a "$src/default/themed" "$dest/usr/share/cachy-omarchy/upstream/default/"
 # 노출 집합 = 스테이징 집합 (SPEC §45). 이 배열이 단일 정의다 — 아래 두 루프가
 # 같은 배열을 돌기 때문에 스테이징 목록과 /usr/bin 노출 목록이 갈라질 수 없다.
 # tests/package/test_usr_bin_helpers.sh 가 `helpers=(` 로 이 블록을 파싱한다.
+# 메뉴 style.bar + 세션 lock/logout/reboot/shutdown. factory-reset 은
+# Omarchy ISO @factory 전제라 PATH 에 올리지 않는다. 전이는 메뉴 exec 가
+# 극장 실패하지 않도록 기능 단위로 묶는다: omarchy-bar 는 source
+# omarchy-shell-config 후 omarchy-plugin-catalog / omarchy-shell IPC 를
+# 부르고, logout/reboot/shutdown 은 omarchy-osd(이미 위) +
+# omarchy-hyprland-window-close-all + omarchy-state 를 부른다.
 helpers=(
   omarchy-menu-select
   omarchy-cmd-present
@@ -102,6 +108,15 @@ helpers=(
   omarchy-audio-output-volume
   omarchy-audio-input-mute
   omarchy-brightness-keyboard-mute
+  omarchy-bar
+  omarchy-shell-config
+  omarchy-plugin-catalog
+  omarchy-system-lock
+  omarchy-system-logout
+  omarchy-system-reboot
+  omarchy-system-shutdown
+  omarchy-hyprland-window-close-all
+  omarchy-state
 )
 
 for helper in "${helpers[@]}"; do

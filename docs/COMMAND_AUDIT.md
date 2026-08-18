@@ -35,13 +35,13 @@
 ```text
 omarchy-theme-set / omarchy-theme-switcher
 omarchy-plymouth-*
-omarchy-system-lock / omarchy-launch-screensaver
+omarchy-launch-screensaver
 omarchy-refresh-config / omarchy-reinstall-configs
 omarchy-update* / omarchy-pkg-*
 omarchy-launch-about (브랜딩/os-release)
 ```
 
-`systemctl suspend|hibernate` 등 표준 명령은 SAFE. `omarchy-system-logout|reboot|shutdown`은 감사 후 ADAPTED 또는 disable.
+`systemctl suspend|hibernate` 등 표준 명령은 SAFE. `omarchy-system-lock|logout|reboot|shutdown` 은 메뉴 세션 경로로 스테이징한다. `omarchy-system-factory-reset` 은 Omarchy ISO `@factory` 전제라 올리지 않는다.
 
 ---
 
@@ -106,6 +106,7 @@ omarchy-launch-about (브랜딩/os-release)
 ## 셸 인프라 (기본 활성 플러그인이 부름)
 
 idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러그인 DISABLE이 우선.
+아래 `omarchy-system-lock` 행은 **idle 플러그인 정책**이다. 메뉴 `system.lock` 헬퍼는 전수 표에서 SAFE/package 다.
 
 | command | plugin | class | action |
 | --- | --- | --- | --- |
@@ -132,7 +133,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-osd` | osd | SAFE | 직접 IPC 프런트. shell 실패는 non-zero 전파 |
 | `omarchy-audio-output-volume` / `-input-mute` | osd audio bridge | SAFE | pactl(pipewire-pulse)/wpctl(wireplumber). debounce 파일은 runtime dir |
 | `omarchy-brightness-keyboard-mute` | input-mute closure | SAFE | mic-mute LED 가드. LED/brightnessctl 부재 시 no-op |
-| (제외) `omarchy-audio-output-switch` / `-tuning`, `omarchy-brightness-display*`, `omarchy-hw-display`, `omarchy-system-*` | — | DISABLED | M10 Tier C — pipewire/wireplumber 사용자 설정·서비스 정책, 하드웨어 밝기, power 정책 |
+| (제외) `omarchy-audio-output-switch` / `-tuning`, `omarchy-brightness-display*`, `omarchy-hw-display` | — | DISABLED | M10 Tier C — pipewire/wireplumber 사용자 설정·서비스 정책, 하드웨어 밝기. 세션 lock/logout/reboot/shutdown 은 별도 스테이징 |
 
 ---
 
@@ -150,6 +151,13 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 출처: 핀된 `default/omarchy/omarchy-menu.jsonc` 의 `action`/`when`/`checked` 와
 `shell/plugins/menu/Menu.qml` 하드코딩 `omarchy-*` (fonts/powerprofiles provider).
 앱 목록(`provider: apps`)은 데스크톱 엔트리이지 `omarchy-*`가 아니다 — R06.
+
+전수는 `\bomarchy-[a-z0-9-]+\b` 토큰 추출이라, 메뉴 action
+`omarchy-bar position top` / `omarchy-bar transparent toggle` 의 첫 단어가
+명령 이름으로 잡힌다. 그 행은 업스트림 바 설정 헬퍼(`bin/omarchy-bar`,
+공개 경로 `omarchy bar`)의 분류다. `hyprctl layers` 의 layer-shell
+네임스페이스 `omarchy-bar` 는 실행 가능한 명령이 아니며 이 표의 대상이
+아니다. 가시성 토글은 `omarchy-toggle-bar` 다.
 
 ### 비활성 경로
 
@@ -170,7 +178,7 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 <!-- MENU_AUDIT_BEGIN -->
 | command | class | action | note |
 | --- | --- | --- | --- |
-| `omarchy-bar` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
+| `omarchy-bar` | SAFE | package | 업스트림 `bin/omarchy-bar` (`omarchy bar`). 메뉴 `style.bar` position/transparent. 전이 `omarchy-shell-config` + `omarchy-plugin-catalog`. layer-shell 네임스페이스 `omarchy-bar` 와 동명·별개. 가시성 토글은 `omarchy-toggle-bar` |
 | `omarchy-branding-about` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
 | `omarchy-branding-screensaver` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
 | `omarchy-capture-qr` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
@@ -295,11 +303,11 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-setup-security-sshd` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-shell` | ADAPTED | wrapper | M2 `cachy-omarchy-shell --ipc`. 메뉴의 summon/toggle 경로 |
 | `omarchy-sudo-passwordless` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-system-factory-reset` | DISABLED | disable | 세션/전원/팩토리리셋. 전체 OS 헬퍼 |
-| `omarchy-system-lock` | DISABLED | disable | 세션/전원/팩토리리셋. 전체 OS 헬퍼 |
-| `omarchy-system-logout` | DISABLED | disable | 세션/전원/팩토리리셋. 전체 OS 헬퍼 |
-| `omarchy-system-reboot` | DISABLED | disable | 세션/전원/팩토리리셋. 전체 OS 헬퍼 |
-| `omarchy-system-shutdown` | DISABLED | disable | 세션/전원/팩토리리셋. 전체 OS 헬퍼 |
+| `omarchy-system-factory-reset` | DISABLED | disable | Omarchy ISO `@factory` 전제. CachyOS PATH 에 올리지 않음. lock/logout/reboot/shutdown 과 별개 |
+| `omarchy-system-lock` | SAFE | package | 메뉴 `system.lock`. `omarchy-shell lock lock` + 이미 스테이징된 `omarchy-cmd-present` |
+| `omarchy-system-logout` | SAFE | package | 메뉴 `system.logout`. 전이 `omarchy-osd` + `omarchy-hyprland-window-close-all`. `uwsm stop` |
+| `omarchy-system-reboot` | SAFE | package | 메뉴 `system.reboot`. 전이 `omarchy-osd` + `omarchy-state` + `omarchy-hyprland-window-close-all` |
+| `omarchy-system-shutdown` | SAFE | package | 메뉴 `system.shutdown`. 전이 `omarchy-osd` + `omarchy-state` + `omarchy-hyprland-window-close-all` |
 | `omarchy-theme-bg-install` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
 | `omarchy-theme-bg-set` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
 | `omarchy-theme-bg-switcher` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |

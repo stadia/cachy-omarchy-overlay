@@ -33,6 +33,27 @@ assert_file_exists "$audit" "COMMAND_AUDIT.md 존재"
 asrc=$(cat "$audit")
 assert_contains "$asrc" "MENU_AUDIT_BEGIN" "메뉴 전수 표가 있다"
 assert_contains "$asrc" "compat shim 삭제됨" "감사 표가 uwsm-app shim 삭제를 기록"
+omarchy_bar_row=$(grep -F '| `omarchy-bar` |' <<<"$asrc" || true)
+assert_contains "$omarchy_bar_row" "bin/omarchy-bar" \
+  "omarchy-bar 전수 행은 업스트림 바 설정 헬퍼다"
+assert_contains "$omarchy_bar_row" "SAFE" \
+  "omarchy-bar 전수 행은 스테이징된 SAFE 헬퍼다"
+assert_contains "$omarchy_bar_row" "package" \
+  "omarchy-bar 전수 행의 조치는 package 다"
+assert_contains "$omarchy_bar_row" "layer-shell" \
+  "omarchy-bar 전수 행이 layer-shell 네임스페이스와 동명임을 적는다"
+assert_contains "$omarchy_bar_row" "omarchy-toggle-bar" \
+  "omarchy-bar 전수 행이 가시성 토글과 구분된다"
+grep -qF '바/토글. 내장 바는 M5. 플러그인 disable이 우선' <<<"$omarchy_bar_row" \
+  && bar_toggle_copypaste=1 || bar_toggle_copypaste=0
+assert_eq "$bar_toggle_copypaste" "0" \
+  "omarchy-bar 행에 토글/플러그인 copypaste 설명이 남아있지 않다"
+grep -qE '미스테이징|command not found' <<<"$omarchy_bar_row" \
+  && bar_unstaged=1 || bar_unstaged=0
+assert_eq "$bar_unstaged" "0" \
+  "omarchy-bar 행이 미스테이징으로 남아있지 않다"
+assert_contains "$asrc" "실행 가능한 명령이 아니며" \
+  "전수 서문이 layer-shell 네임스페이스는 명령이 아님을 적는다"
 grep -qF '있으면 위임' <<<"$asrc" && stale=1 || stale=0
 assert_eq "$stale" "0" "감사 표에 삭제된 shim 위임 설명이 남아있지 않다"
 

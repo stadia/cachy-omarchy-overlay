@@ -26,12 +26,16 @@ if [[ -f $shell_artifact ]]; then
            omarchy-clipboard-paste-file omarchy-launch-browser omarchy-launch-editor \
            omarchy-launch-tui omarchy-hyprland-focus-app omarchy-menu-emoji \
            omarchy-menu-emoji-insert omarchy-osd omarchy-audio-output-volume \
-           omarchy-audio-input-mute omarchy-brightness-keyboard-mute; do
-    assert_contains "$list" "usr/share/cachy-omarchy/upstream/bin/$h" "shell artifact has M10 helper: $h"
+           omarchy-audio-input-mute omarchy-brightness-keyboard-mute \
+           omarchy-bar omarchy-shell-config omarchy-plugin-catalog \
+           omarchy-system-lock omarchy-system-logout omarchy-system-reboot \
+           omarchy-system-shutdown omarchy-hyprland-window-close-all omarchy-state; do
+    assert_contains "$list" "usr/share/cachy-omarchy/upstream/bin/$h" "shell artifact has helper: $h"
   done
-  for h in omarchy-audio-output-switch omarchy-audio-tuning omarchy-brightness-display; do
+  for h in omarchy-audio-output-switch omarchy-audio-tuning omarchy-brightness-display \
+           omarchy-system-factory-reset omarchy-system-factory-reset-finish; do
     if [[ $list == *"upstream/bin/$h"* ]]; then
-      printf 'FAIL: M10 Tier C helper leaked into artifact: %s\n' "$h"
+      printf 'FAIL: excluded helper leaked into artifact: %s\n' "$h"
       ASSERT_FAILURES=$((ASSERT_FAILURES + 1))
     fi
   done
