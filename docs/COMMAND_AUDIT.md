@@ -5,7 +5,9 @@
 분류: `SAFE` | `ADAPTED` | `DISABLED`  
 조치: `package` | `copy` | `wrapper` | `disable`
 
-전역 `/usr/bin`에 가짜 `omarchy-*`를 대량 설치하지 말 것. 필요 시 `PATH=/usr/lib/cachy-omarchy/compat/bin:...` (SPEC §44–45).
+감사되지 않은 업스트림 `bin/` 을 `/usr/bin`에 대량 설치하지 말 것. 노출 집합은
+`stage-upstream.sh` 가 스테이징하는 감사 완료 부분집합과 정확히 일치한다
+(SPEC §44–45).
 
 ---
 

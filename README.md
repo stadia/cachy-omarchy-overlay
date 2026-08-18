@@ -34,7 +34,12 @@ Seven public commands are installed into `/usr/bin`:
 - `cachy-omarchy-bindings` — inject/remove the managed source block in your Hyprland config
 - `cachy-omarchy-init` — one-time user setup (never overwrites existing files)
 - `cachy-omarchy-doctor` — read-only diagnostics (including theme state)
-- `cachy-omarchy-theme-set` — apply a theme (thin wrapper over upstream `omarchy-theme-set`)
+- `omarchy-theme-set` — apply a theme from the audited upstream helper set
+
+## Session requirement
+
+Choose **Hyprland (uwsm-managed)** at login. The packages conflict with the official
+`omarchy` package because both own `/usr/bin/omarchy-*` names.
 
 ## Themes
 
@@ -42,7 +47,7 @@ The upstream theme pipeline is used as-is (M9). The first `cachy-omarchy-init` s
 "Tokyo Night" only when no theme is present.
 
 ```bash
-cachy-omarchy-theme-set "Nord"     # switch — bar and menu update without a shell restart
+omarchy-theme-set "Nord"     # switch — bar and menu update without a shell restart
 ```
 
 You can also use `Style > Theme` in the launcher menu. Theme state lives where upstream
@@ -70,9 +75,8 @@ helpers their QML calls and the runtime dependencies they need (`jq`, `wl-clipbo
   systemd timers (`omarchy-reminder-*.timer`) and metadata under
   `${XDG_RUNTIME_DIR:-/tmp}/omarchy-reminders/` — no system units, no `/etc`, no root.
 - **OSD** — the volume and microphone-mute helpers plus `omarchy-osd` raise the upstream
-  `omarchy.osd` panel. These helpers are staged under `$OMARCHY_PATH/bin` and are
-  deliberately absent from a normal user PATH — calling them directly requires either the
-  shell environment's PATH or an absolute path. No XF86 media-key bindings are injected;
+  `omarchy.osd` panel. Audited helpers are exposed as `/usr/bin/omarchy-*`; they require
+  the graphical uwsm session's `OMARCHY_PATH` to run correctly. No XF86 media-key bindings are injected;
   the only reachable paths are the explicit CLI and the menu. (The screen-brightness chain
   is out of scope.)
 
@@ -124,7 +128,7 @@ file only.
   them (vertical reservation `36 → 62px`), and we neither stop nor remove Waybar.
 - **v0.3 (Milestone 9)** — adopt the upstream theme runtime. Done (`v0.3.0`). Stages
   `themes/` + `default/themed/` + the theme helpers from the same pin, and runs upstream
-  `omarchy-theme-set` unpatched through the `cachy-omarchy-theme-set` wrapper.
+  `omarchy-theme-set` unpatched through its `/usr/bin` symlink.
   Measurements: `docs/RUNTIME_STARTUP.md` §18.6.
 - **v0.4 (Milestone 10)** — adopt the utility plugin helpers and dependencies
   (clipboard, emojis, image-picker, reminders, OSD). Done (`v0.4.0`). Measurements:

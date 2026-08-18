@@ -33,7 +33,12 @@ SUPER + K      →  Omarchy 스타일 키바인딩 뷰어
 - `cachy-omarchy-bindings` — 사용자 Hyprland 설정에 관리 source 블록 주입/제거
 - `cachy-omarchy-init` — 최초 1회 사용자 설정 생성 (기존 파일 덮어쓰지 않음)
 - `cachy-omarchy-doctor` — 읽기 전용 진단 (테마 상태 포함)
-- `cachy-omarchy-theme-set` — 테마 적용 (업스트림 `omarchy-theme-set` 얇은 래퍼)
+- `omarchy-theme-set` — 감사된 업스트림 helper 집합으로 테마 적용
+
+## 세션 요구사항
+
+로그인할 때 **Hyprland (uwsm-managed)** 를 선택해야 한다. 두 패키지는 공식
+`omarchy` 패키지와 같은 `/usr/bin/omarchy-*` 이름을 소유하므로 서로 충돌한다.
 
 ## 테마
 
@@ -41,7 +46,7 @@ SUPER + K      →  Omarchy 스타일 키바인딩 뷰어
 없을 때만 "Tokyo Night" 를 시드한다.
 
 ```bash
-cachy-omarchy-theme-set "Nord"     # 전환 — 셸 재시작 없이 바·메뉴에 반영
+omarchy-theme-set "Nord"     # 전환 — 셸 재시작 없이 바·메뉴에 반영
 ```
 
 또는 런처 메뉴의 `Style > Theme`. 테마 상태는 업스트림과 같은
@@ -68,9 +73,8 @@ helper 와 런타임 의존성(`jq`, `wl-clipboard`, `wtype`, `wireplumber`,
   (`omarchy-reminder-*.timer`)와 `${XDG_RUNTIME_DIR:-/tmp}/omarchy-reminders/`
   메타데이터만 사용한다 — system 유닛·`/etc`·root 없음.
 - **OSD** — 볼륨/마이크 뮤트 helper 와 `omarchy-osd` 가 upstream `omarchy.osd`
-  패널을 띄운다. 이 helper 들은 `$OMARCHY_PATH/bin` 아래 스테이징되며 일반
-  사용자 PATH 에는 없다 — 직접 호출하려면 셸 환경의 PATH(셸이 붙이는 경로)나
-  절대 경로가 필요하다. XF86 미디어 키 바인딩은 주입하지 않는다 — 도달 경로는
+  패널을 띄운다. 감사된 helper 는 `/usr/bin/omarchy-*`로 노출되며, 올바르게
+  동작하려면 그래픽 uwsm 세션이 공급하는 `OMARCHY_PATH`가 필요하다. XF86 미디어 키 바인딩은 주입하지 않는다 — 도달 경로는
   명시적 CLI/메뉴뿐이다 (화면 밝기 체인은 범위 밖).
 
 ## 기동 모델
@@ -120,8 +124,7 @@ bin/rollback                 # 이전 핀으로 복귀
   쌓이며(세로 예약 `36 → 62px`), 우리는 Waybar를 중지·제거하지 않는다.
 - **v0.3 (Milestone 9)** — 업스트림 테마 런타임 채택. 완료(`v0.3.0`).
   `themes/`+`default/themed/`+테마 helper 를 같은 핀에서 스테이징하고,
-  `cachy-omarchy-theme-set` 래퍼로 업스트림 `omarchy-theme-set` 을 무패치
-  실행한다. 실측: `docs/RUNTIME_STARTUP.md` §18.6.
+  `/usr/bin` 심링크로 업스트림 `omarchy-theme-set` 을 무패치 실행한다. 실측: `docs/RUNTIME_STARTUP.md` §18.6.
 - **v0.4 (Milestone 10)** — 유틸리티 플러그인(clipboard·emojis·image-picker·
   reminders·OSD) helper/의존성 채택. 완료(`v0.4.0`). 실측:
   `docs/RUNTIME_STARTUP.md` §19.2.

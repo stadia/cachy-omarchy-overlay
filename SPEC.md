@@ -642,7 +642,6 @@ must be an explicit architecture decision.
 /usr/bin/cachy-omarchy-launcher
 /usr/bin/cachy-omarchy-keybindings
 /usr/bin/cachy-omarchy-doctor
-/usr/bin/cachy-omarchy-theme-set
 /usr/bin/cachy-omarchy-build
 /usr/bin/cachy-omarchy-update
 ```
@@ -1605,7 +1604,7 @@ cachy-omarchy-init
 Since v0.3.0 (M9) init also seeds the default theme: if
 `~/.local/state/omarchy/current/theme.name` is absent *or empty* (the same
 `[[ ! -s ]]` test upstream's `install/user/theme.sh` uses), it applies
-"Tokyo Night" via `cachy-omarchy-theme-set` — headless (symlink only) when
+"Tokyo Night" via `omarchy-theme-set` — headless (symlink only) when
 no shell is running, through the live path otherwise. An existing theme is
 never overwritten (§6.6).
 
@@ -1755,8 +1754,8 @@ omarchy-shell
 
 omarchy-theme-set
   ADOPT (M9 — was "DISABLE initially" at M2)
-  Run upstream verbatim through the cachy-omarchy-theme-set wrapper,
-  which exports OMARCHY_PATH and prepends compat/bin. Theme runtime
+  Run upstream verbatim through `/usr/bin/omarchy-theme-set`; the uwsm
+  session supplies OMARCHY_PATH and no layer alters PATH. Theme runtime
   ships from the same pin (§9.1).
 ```
 
@@ -1764,44 +1763,35 @@ omarchy-theme-set
 
 # 44. Compatibility Shim Policy
 
-Small wrapper commands are preferred over invasive upstream patches.
+Compatibility adapters are used only where CachyOS requires actual behavioral
+changes. Their executable bodies remain under `/usr/lib/cachy-omarchy/compat/bin`,
+with `/usr/bin` containing relative symlinks only.
 
-Example:
-
-```text
-upstream expects:
-omarchy-shell
-
-we provide:
-compat/bin/omarchy-shell
-```
-
-only inside the controlled runtime environment.
-
-Avoid placing large numbers of fake `omarchy-*` commands globally in
-`/usr/bin`.
-
-Preferred search path:
+Classification rule:
 
 ```text
-/usr/lib/cachy-omarchy/compat/bin
+environment difference only  → use the upstream command as-is (/usr/bin)
+actual behavioural difference → cachy-omarchy-* adapter
 ```
-
-prepended only for the shell process.
 
 ---
 
-# 45. Environment Isolation
+# 45. Session Environment
 
-The systemd user service can define:
+The graphical Omarchy session provides the upstream Omarchy runtime environment.
 
-```text
-OMARCHY_PATH=/usr/share/cachy-omarchy/upstream
-PATH=/usr/lib/cachy-omarchy/compat/bin:...
-```
+- `OMARCHY_PATH` is supplied by the uwsm session environment
+  (`/usr/share/uwsm/env-hyprland.d/10-cachy-omarchy`). It exists only inside
+  the graphical session; it does not propagate to TTY or SSH.
+- `PATH` is never manipulated at any layer.
+- Audited, staged upstream helpers are exposed globally as `/usr/bin/omarchy-*`.
+  The names resolve system-wide, but outside the graphical session they do not
+  work because `OMARCHY_PATH` is absent. This is intended.
+- Nothing is installed under `/etc` (P01 forbidden paths).
 
-This allows compatibility helpers without polluting the user's general shell
-environment.
+The session manager is uwsm (`hyprland-uwsm.desktop`, shipped by the Arch
+`hyprland` package). Shell startup stays on the Hyprland `hyprland.start`
+autostart; it is not moved back to a systemd unit.
 
 ---
 
@@ -2210,7 +2200,7 @@ record lives in the private development tree
   pinned commit as the shell — `colors.toml` and `*.tpl` are one co-evolving
   pair (§9.1).
 - Theme application is upstream `omarchy-theme-set` run verbatim through the
-  thin wrapper `cachy-omarchy-theme-set` (OMARCHY_PATH + PATH only, §14/§44).
+  `/usr/bin/omarchy-theme-set`, with OMARCHY_PATH supplied by the uwsm session (§45).
 - Theme state stays at `~/.local/state/omarchy/current/theme/` — the paths
   Quattro's `shell/Commons/Color.qml` already reads. No relocation.
 - The first-run default is "Tokyo Night", seeded by `cachy-omarchy-init`

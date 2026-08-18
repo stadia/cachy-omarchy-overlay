@@ -368,8 +368,9 @@ overlay 패키지, `cachy-omarchy-init`, Waybar 처리와 실제 설치 통합�
 | 12 | `usr/lib/cachy-omarchy/compat/bin/omarchy-update-available` (v0.2.0) |
 
 > **M9 갱신 (v0.3.0)**: 위 표는 M5 시점의 실측 스냅샷이다. 현재 오버레이 패키지는
-> 여기에 `usr/bin/cachy-omarchy-doctor`·`usr/bin/cachy-omarchy-theme-set` 과
-> compat no-op shim 2개(`omarchy-theme-set-browser`·`-keyboard`)를 더 소유한다.
+> 여기에 `usr/bin/cachy-omarchy-doctor`와 `/usr/bin/omarchy-*` 상대 심링크를
+> 더 소유한다. compat no-op shim 2개(`omarchy-theme-set-browser`·`-keyboard`)의
+> 실체는 `/usr/lib/cachy-omarchy/compat/bin`에 남는다.
 > 셸 패키지는 M9 부터 `themes/`·`default/themed/`·테마 helper Tier A/B 도
 > 스테이징한다 — §18 참조.
 
@@ -1443,12 +1444,9 @@ $ pgrep -a waybar
 
 ### 18.2 진입점
 
-- `cachy-omarchy-theme-set` (공개 래퍼, D6) — `OMARCHY_PATH` 를 export 하고
-  `compat/bin:$OMARCHY_PATH/bin` 을 PATH 앞에 붙인 뒤 업스트림
-  `omarchy-theme-set` 을 exec 한다. 테마 로직 재구현 없음.
-  `tests/runtime/test_theme_set_wrapper.sh` 가 샌드박스 HOME 에서 headless
-  끝단 적용(colors.toml·shell.toml·theme.name·background symlink)과 사용자
-  오버레이(`~/.config/omarchy/themes/<name>/`) 우선순위를 실측한다.
+- `omarchy-theme-set` — `/usr/bin` 상대 심링크로 노출된 업스트림 원본이다.
+  uwsm 그래픽 세션이 `OMARCHY_PATH`를 공급하며, `cachy-omarchy-init`은 세션 밖
+  시드를 위해 그 값을 명시적으로 주입한다. 테마 로직 재구현 없음.
 - `cachy-omarchy-init` 시드(D4) — `~/.local/state/omarchy/current/theme.name`
   이 없거나 **비어 있으면**(upstream `install/user/theme.sh` 와 같은
   `[[ ! -s ]]`) "Tokyo Night" 를 시드한다. 셸이 떠 있으면 일반 경로, 아니면
@@ -1496,7 +1494,7 @@ env HOME=$H COO_OMARCHY_PATH=$tmp/.../upstream \
     COO_COMPAT_BIN=$ovl/.../compat/bin \
     $ovl/usr/bin/cachy-omarchy-shell --run > $H/shell.log 2>&1 &
 env HOME=$H COO_OMARCHY_PATH=... COO_COMPAT_BIN=... \
-    $ovl/usr/bin/cachy-omarchy-theme-set "Tokyo Night" 2>$H/t1.err
+    OMARCHY_PATH=$tmp/.../upstream $tmp/usr/bin/omarchy-theme-set "Tokyo Night" 2>$H/t1.err
 env HOME=$H ... theme-set "Nord" 2>$H/t2.err
 ```
 
