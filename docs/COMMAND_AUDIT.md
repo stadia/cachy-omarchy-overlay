@@ -115,12 +115,13 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-battery-low` / `omarchy-powerprofiles-set` | battery | DISABLED | disable plugin |
 | `omarchy-notification-send` | 여러 패널 | SAFE | package — M8 Tier B. `omarchy-reminder` 와 `omarchy-theme-set` 이 부른다(실측). 알림 표시 자체는 셸 플러그인 정책이지 이 helper 의 스테이징 여부와 별개다 |
 | `omarchy-shell osd ...` | AppLibrary 런치 OSD | OPTIONAL | osd 플러그인 정책에 따름 |
-| `omarchy-osd` | osd 패널 | M10: stage | `omarchy-shell -q osd show <jq payload>` 얇은 프런트. volume/mic-mute helper 와 함께 채택, display brightness 체인은 제외 (M10 D6) |
+| `omarchy-osd` | osd 패널 | M10: stage | `omarchy-shell -q osd show <jq payload>` 얇은 프런트. volume/mic-mute helper 와 함께 채택. display brightness 체인은 이후 verbatim 확장에서 채택 |
 
 ### M10 스테이징 목록 (verbatim, `$OMARCHY_PATH/bin`)
 
-`packages/cachy-omarchy-shell/stage-upstream.sh` 와 1:1 대응 — 회귀는
+`packages/cachy-omarchy-shell/stage-upstream.sh` 의 M10 슬라이스 — 회귀는
 `tests/package/test_staged_plugin_helpers.sh` + `test_makepkg.sh` 가 단언한다.
+전체 스테이징 집합은 아래 전수 표가 권위다.
 
 | helper | plugin | class | note |
 | --- | --- | --- | --- |
@@ -132,7 +133,9 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-osd` | osd | SAFE | 직접 IPC 프런트. shell 실패는 non-zero 전파 |
 | `omarchy-audio-output-volume` / `-input-mute` | osd audio bridge | SAFE | pactl(pipewire-pulse)/wpctl(wireplumber). debounce 파일은 runtime dir |
 | `omarchy-brightness-keyboard-mute` | input-mute closure | SAFE | mic-mute LED 가드. LED/brightnessctl 부재 시 no-op |
-| (제외) `omarchy-audio-output-switch` / `-tuning`, `omarchy-brightness-display*`, `omarchy-hw-display` | — | DISABLED | M10 Tier C — pipewire/wireplumber 사용자 설정·서비스 정책, 하드웨어 밝기. 세션 lock/logout/reboot/shutdown 은 별도 스테이징 |
+| `omarchy-audio-output-switch` / `-set-default` / `-tuning` | osd audio bridge | SAFE | 출력 순환 + 전이. tuning `on` 만 사용자 pipewire/systemd --user 템플릿을 복사한다. `restart-audio` 는 stale daemon drop-in 경로 |
+| `omarchy-brightness-display*` / `omarchy-hw-display` | monitor | SAFE | 내부 `brightnessctl`(optdepend) · 외부 `ddcutil` · Apple `asdcontrol`. `omarchy-monitor-state` 가 이미 부름 |
+| `omarchy-hw-touchpad` / `-touchscreen` + toggle | hardware | SAFE | 메뉴 `when` 가드 + `hyprctl eval` 즉시 토글. `hw-laptop`/모니터 체인은 래퍼 필요라 제외 |
 
 ---
 
@@ -169,16 +172,28 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-agent-usage-update` | SAFE | package | agents 패널 (M8 Tier B). CLI 별 수집기를 부른다 |
 | `omarchy-apply-lock` | SAFE | package | 잠금 화면 PAM 서비스를 만든다 (`requires-sudo`). `omarchy-system-lock` 의 전제 — 없으면 lock IPC 가 `missing-pam` 으로 물러난다. `cachy-omarchy-init` 이 파일 부재 시에만 부른다 |
 | `omarchy-audio-input-mute` | SAFE | package | M10 OSD audio bridge. `brightness-keyboard-mute` 를 무조건 부른다 (D7) |
+| `omarchy-audio-output-set-default` | SAFE | package | audio-output-switch 전이. wpctl/pactl 로 default + 앱 스트림만 이동 |
 | `omarchy-audio-output-sink` | SAFE | package | 바 audio 위젯이 bare name 으로 부름 (M8 Tier A) |
+| `omarchy-audio-output-switch` | SAFE | package | 출력 순환. `audio-tuning fronted-sink` 로 튜닝 물리 싱크를 목록에서 뺀다 |
 | `omarchy-audio-output-volume` | SAFE | package | M10 OSD audio bridge. pactl/wpctl. debounce 파일은 runtime dir |
+| `omarchy-audio-tuning` | SAFE | package | 노트북 스피커 튜닝. `on` 만 `~/.config/pipewire` + user unit 템플릿을 복사. 데이터는 `$OMARCHY_PATH/default/audio` |
 | `omarchy-bar` | SAFE | package | 메뉴 `style.bar` position/transparent. layer-shell 네임스페이스 `omarchy-bar` 와 동명·별개 |
+| `omarchy-brightness-display` | SAFE | package | 포커스 모니터 밝기. 내부 backlight / DDC / Apple 로 분기. 바 `omarchy-monitor-state` 가 부름 |
+| `omarchy-brightness-display-apple` | SAFE | package | brightness-display Apple 분기. `sudo asdcontrol`(부재 시 실패) |
+| `omarchy-brightness-display-ddc` | SAFE | package | brightness-display 외부 모니터 분기. `ddcutil` optdepend |
 | `omarchy-brightness-keyboard-mute` | SAFE | package | M10 mic-mute LED 가드. LED/brightnessctl 부재 시 no-op |
 | `omarchy-clipboard-open` | SAFE | package | M10 clipboard. URL→browser, text→editor, image→`tensaku-edit`(부재 시 127) |
 | `omarchy-clipboard-paste-file` | SAFE | package | M10 clipboard. 선택 시에만 `wl-copy`/`wtype` (D4) |
 | `omarchy-clipboard-paste-text` | SAFE | package | M10 clipboard. 선택 시에만 `wl-copy`/`wtype` (D4) |
 | `omarchy-cmd-present` | SAFE | package | `command -v` 루프뿐인 가드. 여러 helper 와 메뉴 `when` 이 부른다 |
 | `omarchy-hook` | SAFE | package | M9 theme-set post 훅 디스패처 (실측: theme-set 이 부름) |
+| `omarchy-hw-display` | SAFE | package | `/sys/class/backlight` 에서 패널 장치 이름. brightness-display 내부 경로 |
+| `omarchy-hw-match` | SAFE | package | DMI product name/family 부분 일치. audio-tuning match 가 부름 |
+| `omarchy-hw-touchpad` | SAFE | package | `hyprctl devices -j` + jq. 메뉴 `when` 과 toggle-input-device 가 부름 |
+| `omarchy-hw-touchscreen` | SAFE | package | `hyprctl devices -j` + jq. 메뉴 `when` 과 toggle-input-device 가 부름 |
 | `omarchy-hyprland-focus-app` | SAFE | package | M10 clipboard 전이 closure |
+| `omarchy-hyprland-monitor-focused` | SAFE | package | brightness-display 가 포커스 모니터 이름을 얻을 때 부름 |
+| `omarchy-hyprland-monitor-focused-apple` | SAFE | package | brightness-display Apple 분기 가드 |
 | `omarchy-hyprland-monitor-scaling` | SAFE | package | 바 monitor 위젯 (M8 Tier A) |
 | `omarchy-hyprland-window-close-all` | SAFE | package | logout/reboot/shutdown 전이 |
 | `omarchy-launch-browser` | SAFE | package | M10 clipboard 전이 closure. xdg-utils + uwsm-app |
@@ -189,13 +204,14 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-menu-emoji-insert` | SAFE | package | M10 emojis closure |
 | `omarchy-menu-images` | SAFE | package | M9 테마 메뉴 UI 프론트. `omarchy-shell` IPC 만 부른다 |
 | `omarchy-menu-select` | SAFE | package | M4 키바인딩 UI + 메뉴 select mode. payload → `omarchy-shell shell summon omarchy.menu` |
-| `omarchy-monitor-state` | SAFE | package | 바 monitor 위젯 (M8 Tier A). 제외한 밝기 체인을 가드한다 |
+| `omarchy-monitor-state` | SAFE | package | 바 monitor 위젯 (M8 Tier A). 첫 줄이 `omarchy-brightness-display` |
 | `omarchy-network-band` | SAFE | package | 바 network 위젯 (M8 Tier A) |
 | `omarchy-network-status` | SAFE | package | 바 network 위젯 (M8 Tier A). 메뉴 `when` 가드로도 쓰임 |
 | `omarchy-notification-send` | SAFE | package | M8 Tier B 묶음. `omarchy-reminder` 와 `omarchy-theme-set` 이 부른다 (실측) |
 | `omarchy-osd` | SAFE | package | M10 OSD. 직접 IPC 프런트, shell 실패는 non-zero 전파 |
 | `omarchy-plugin-catalog` | SAFE | package | `omarchy-bar` 전이 |
 | `omarchy-reminder` | SAFE | package | M8 Tier B. user systemd timer + ${XDG_RUNTIME_DIR}/omarchy-reminders metadata 만 사용 |
+| `omarchy-restart-audio` | SAFE | package | audio-tuning stale daemon drop-in 제거 경로. pipewire/wireplumber user 서비스. USB 복구는 `usbreset` 가드 |
 | `omarchy-restart-btop` | SAFE | package | M9 theme-set post 훅 |
 | `omarchy-restart-helix` | SAFE | package | M9 theme-set post 훅 |
 | `omarchy-restart-hyprctl` | SAFE | package | M9 theme-set post 훅 |
@@ -228,6 +244,9 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-theme-set-vscode` | SAFE | package | M9 앱별 테마 적용 |
 | `omarchy-theme-switcher` | SAFE | package | M9 테마 전환 UI |
 | `omarchy-toggle-enabled` | SAFE | package | `theme-set-vscode` 의 skip 토글 게이트. 사용자 상태 존재만 읽는 1행 테스트 (RUNTIME_STARTUP §18.6) |
+| `omarchy-toggle-input-device` | SAFE | package | touchpad/touchscreen 토글 실체. `hyprctl eval` 즉시 적용. hypr toggles lua 지속은 CachyOS 에서 best-effort |
+| `omarchy-toggle-touchpad` | SAFE | package | `omarchy-toggle-input-device touchpad` 프런트. 메뉴 Hardware > Touchpad |
+| `omarchy-toggle-touchscreen` | SAFE | package | `omarchy-toggle-input-device touchscreen` 프런트. 메뉴 Hardware > Touchscreen |
 <!-- STAGED_AUDIT_END -->
 
 ---
@@ -290,9 +309,9 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-hw-dell-xps-haptic-touchpad` | DISABLED | disable | when/checked 가드. 바이너리 없으면 행이 숨겨짐 |
 | `omarchy-hw-fingerprint` | DISABLED | disable | when/checked 가드. 바이너리 없으면 행이 숨겨짐 |
 | `omarchy-hw-hybrid-gpu` | DISABLED | disable | when/checked 가드. 바이너리 없으면 행이 숨겨짐 |
-| `omarchy-hw-laptop` | DISABLED | disable | when/checked 가드. 바이너리 없으면 행이 숨겨짐 |
-| `omarchy-hw-touchpad` | DISABLED | disable | when/checked 가드. 바이너리 없으면 행이 숨겨짐 |
-| `omarchy-hw-touchscreen` | DISABLED | disable | when/checked 가드. 바이너리 없으면 행이 숨겨짐 |
+| `omarchy-hw-laptop` | DISABLED | disable | when 가드. 올리면 laptop-display/mirror 행이 드러나는데 그 action 은 CachyOS 에서 래퍼가 필요하므로 가드도 올리지 않는다 |
+| `omarchy-hw-touchpad` | SAFE | package | `hyprctl devices -j` 읽기. 메뉴 Hardware > Touchpad `when` |
+| `omarchy-hw-touchscreen` | SAFE | package | `hyprctl devices -j` 읽기. 메뉴 Hardware > Touchscreen `when` |
 | `omarchy-hw-webcam` | DISABLED | disable | when/checked 가드. 바이너리 없으면 행이 숨겨짐 |
 | `omarchy-hyprland-monitor-internal` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-hyprland-monitor-internal-mirror` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
@@ -376,7 +395,7 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-remove-security-sshd` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
 | `omarchy-remove-service-dropbox` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
 | `omarchy-remove-service-tailscale` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
-| `omarchy-restart-audio` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-restart-audio` | SAFE | package | audio-tuning 전이. 메뉴 `update.hardware.audio` 는 여전히 `omarchy-launch-floating-terminal-with-presentation` 뒤에 붙어 그 런처가 없으면 행 실행은 실패 |
 | `omarchy-restart-bluetooth` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-restart-hyprsunset` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-restart-shell` | ADAPTED | wrapper | later `cachy-omarchy-reload`. M3 미구현 |
@@ -410,8 +429,8 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-toggle-nightlight` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
 | `omarchy-toggle-notification-silencing` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
 | `omarchy-toggle-screensaver` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
-| `omarchy-toggle-touchpad` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
-| `omarchy-toggle-touchscreen` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
+| `omarchy-toggle-touchpad` | SAFE | package | 메뉴 Hardware > Touchpad. `hyprctl eval` 즉시 토글. hypr lua 지속은 CachyOS 에서 best-effort |
+| `omarchy-toggle-touchscreen` | SAFE | package | 메뉴 Hardware > Touchscreen. `hyprctl eval` 즉시 토글 |
 | `omarchy-transcode` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-tui-install` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-tui-remove` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |

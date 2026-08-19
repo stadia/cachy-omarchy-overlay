@@ -32,6 +32,9 @@ else
 fi
 assert_file_exists "$root/themes/tokyo-night/colors.toml" "themes staged (M9)"
 assert_file_exists "$root/default/themed/shell.toml.tpl" "themed templates staged (M9)"
+assert_file_exists "$root/default/audio/filter-chain-host.conf" "audio tuning host config staged"
+assert_file_exists "$root/default/systemd/user/omarchy-speaker-tuning.service" \
+  "speaker-tuning unit template staged"
 
 id=$(grep -E '"id"' "$root/shell/plugins/menu/manifest.json" | head -1)
 assert_contains "$id" "omarchy.menu" "menu plugin id"

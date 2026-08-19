@@ -40,10 +40,13 @@
   `omarchy-clipboard-{open,paste-text,paste-file}` + launch browser/editor/tui/
   focus-app 전이 closure), emojis(`omarchy-menu-emoji{,-insert}`),
   OSD(`omarchy-osd` + `omarchy-audio-output-volume`/`omarchy-audio-input-mute` +
-  mic-LED 가드 `omarchy-brightness-keyboard-mute`). `omarchy-audio-output-switch`/
-  `omarchy-audio-tuning`(pipewire·wireplumber 사용자 설정/서비스 정책)과 display
-  brightness 체인은 Tier C — 넣지 않는다 (SPEC "Milestone 10 — Utility Plugin
-  Runtime", 설계 문서 §3).
+  mic-LED 가드 `omarchy-brightness-keyboard-mute`). 이후 확장에서
+  `omarchy-audio-output-switch`/`omarchy-audio-tuning`(템플릿은
+  `$OMARCHY_PATH/default/audio` + speaker-tuning user unit)과 display
+  brightness 체인, touchpad/touchscreen 가드를 verbatim 으로 올렸다.
+  `omarchy-hw-laptop` 과 monitor-internal 체인은 래퍼가 필요해서 넣지 않는다.
+  XF86 media 키는 주입하지 않는다 (SPEC "Milestone 10 — Utility Plugin
+  Runtime" 과 이어지는 Helper expansion 절).
 - 메뉴 `style.bar` + 세션 lock/logout/reboot/shutdown (`omarchy-bar`,
   `omarchy-system-lock`/`-logout`/`-reboot`/`-shutdown`) 과 전이
   (`omarchy-shell-config`, `omarchy-plugin-catalog`,
@@ -100,9 +103,8 @@ systemd 유저 유닛은 기동 전환(§"Milestone 8 — Shell Autostart", RUNT
 - 공식 `bin/` 전체의 `/usr/bin` 설치
 - 테마 Tier C helper(`omarchy-theme-install/update/remove`, plymouth/browser/
   keyboard 훅)의 스테이징 — M9 부터 나머지 테마 워크플로는 채택했다
-- M10 Tier C helper(`omarchy-audio-output-switch`, `omarchy-audio-tuning`,
-  `omarchy-brightness-display*`, `omarchy-hw-display`)의 스테이징과 XF86 media
-  키의 자동 주입
+- XF86 media 키의 자동 주입, `omarchy-hw-laptop` 과 monitor-internal 체인
+  (CachyOS 가 hypr toggles lua 를 source 하지 않아 래퍼 필요)
 - `omarchy-system-factory-reset` / `-finish` (Omarchy ISO `@factory` 전제)
 - 락/알림의 기본 활성 (OSD 패널은 M10 에서 채택 — direct CLI/audio helper 경로만)
 

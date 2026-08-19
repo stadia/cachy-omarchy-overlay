@@ -1,7 +1,7 @@
 # Maintainer: Cachy Omarchy Overlay
 pkgname=cachy-omarchy-shell
 pkgver=4.0.0
-pkgrel=8
+pkgrel=9
 pkgdesc='Pinned Omarchy Quattro shell runtime for CachyOS (no omarchy-settings)'
 arch=('any')
 url='https://github.com/basecamp/omarchy'
@@ -28,6 +28,9 @@ makedepends=('git')
 optdepends=(
   'tmux: omarchy-theme-set-tmux hook'
   'foot: omarchy-theme-set-foot hook (OSC reload)'
+  'brightnessctl: omarchy-brightness-display internal backlight'
+  'ddcutil: omarchy-brightness-display-ddc external monitors'
+  'lsp-plugins-lv2: omarchy-audio-tuning limiter'
 )
 _commit='f0020448ca87329199de7cb12f2015ebc4a3e5e7'
 

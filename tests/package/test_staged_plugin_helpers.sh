@@ -45,13 +45,11 @@ for h in omarchy-menu-images omarchy-reminder omarchy-notification-send \
   assert_file_exists "$bin/$h" "기존 stage 의존: $h"
 done
 
-# M10 Tier C — 넣지 않는다 (audio-tuning 정책 표면, display brightness 체인).
-# omarchy-system-logout 은 세션 메뉴 경로로 별도 스테이징한다.
-for h in omarchy-audio-output-switch omarchy-audio-tuning \
-         omarchy-brightness-display omarchy-brightness-display-ddc \
-         omarchy-hw-display omarchy-system-factory-reset ; do
+# P01 회귀는 그대로 — factory-reset 만 이 파일에서 미스테이징을 본다.
+# switch/tuning/brightness 채택은 tests/package/test_staged_audio_brightness_helpers.sh.
+for h in omarchy-system-factory-reset; do
   [[ -e $bin/$h ]] && x=1 || x=0
-  assert_eq "$x" "0" "M10 Tier C 미스테이징: $h"
+  assert_eq "$x" "0" "미스테이징: $h"
 done
 
 # P01 회귀 — five first-party plugin 이 upstream 규칙대로 default-enabled 인 채로

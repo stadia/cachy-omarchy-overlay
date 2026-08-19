@@ -29,17 +29,32 @@ if [[ -f $shell_artifact ]]; then
            omarchy-audio-input-mute omarchy-brightness-keyboard-mute \
            omarchy-bar omarchy-shell-config omarchy-plugin-catalog \
            omarchy-system-lock omarchy-apply-lock omarchy-system-logout omarchy-system-reboot \
-           omarchy-system-shutdown omarchy-hyprland-window-close-all omarchy-state; do
+           omarchy-system-shutdown omarchy-hyprland-window-close-all omarchy-state \
+           omarchy-audio-output-switch omarchy-audio-output-set-default \
+           omarchy-audio-tuning omarchy-hw-match omarchy-restart-audio \
+           omarchy-brightness-display omarchy-brightness-display-ddc \
+           omarchy-brightness-display-apple omarchy-hw-display \
+           omarchy-hyprland-monitor-focused omarchy-hyprland-monitor-focused-apple \
+           omarchy-hw-touchpad omarchy-hw-touchscreen omarchy-toggle-touchpad \
+           omarchy-toggle-touchscreen omarchy-toggle-input-device; do
     assert_contains "$list" "usr/share/cachy-omarchy/upstream/bin/$h" "shell artifact has helper: $h"
   done
-  for h in omarchy-audio-output-switch omarchy-audio-tuning omarchy-brightness-display \
-           omarchy-system-factory-reset omarchy-system-factory-reset-finish; do
+  assert_contains "$list" "usr/share/cachy-omarchy/upstream/default/audio/filter-chain-host.conf" \
+    "shell artifact has audio tuning host config"
+  assert_contains "$list" "usr/share/cachy-omarchy/upstream/default/systemd/user/omarchy-speaker-tuning.service" \
+    "shell artifact has speaker-tuning unit template"
+  for h in omarchy-system-factory-reset omarchy-system-factory-reset-finish \
+           omarchy-hw-laptop omarchy-hyprland-monitor-internal; do
     if [[ $list == *"upstream/bin/$h"* ]]; then
       printf 'FAIL: excluded helper leaked into artifact: %s\n' "$h"
       ASSERT_FAILURES=$((ASSERT_FAILURES + 1))
     fi
   done
-  printf 'ok:   M10 Tier C helpers absent from artifact (if no FAIL above)\n'
+  if [[ $list == *"omarchy-crash-watch.service"* ]]; then
+    printf 'FAIL: excluded user unit leaked into artifact: omarchy-crash-watch.service\n'
+    ASSERT_FAILURES=$((ASSERT_FAILURES + 1))
+  fi
+  printf 'ok:   excluded helpers/units absent from artifact (if no FAIL above)\n'
 fi
 if [[ -f $overlay_artifact ]]; then
   list=$(bsdtar -tf "$overlay_artifact")

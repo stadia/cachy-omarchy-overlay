@@ -16,6 +16,13 @@ install -D -m644 "$src/default/omarchy/omarchy-menu.jsonc" \
 # 이 블록은 그 뒤에 있어야 한다.
 cp -a "$src/themes" "$dest/usr/share/cachy-omarchy/upstream/"
 cp -a "$src/default/themed" "$dest/usr/share/cachy-omarchy/upstream/default/"
+# 스피커 튜닝 템플릿. omarchy-audio-tuning on 이 $OMARCHY_PATH/default/audio 와
+# default/systemd/user/omarchy-speaker-tuning.service 를 읽는다. 패키지는
+# 사용자 ~/.config/pipewire 나 systemd --user 유닛을 만들지 않는다 — 헬퍼가
+# 사용자가 on 을 실행할 때만 복사한다. crash-watch 등 다른 unit 은 올리지 않는다.
+cp -a "$src/default/audio" "$dest/usr/share/cachy-omarchy/upstream/default/"
+install -D -m644 "$src/default/systemd/user/omarchy-speaker-tuning.service" \
+  "$dest/usr/share/cachy-omarchy/upstream/default/systemd/user/omarchy-speaker-tuning.service"
 # 바·패널 위젯이 bare name 으로 부르는 업스트림 helper 를 verbatim 으로
 # 스테이징한다 (셸 래퍼가 $OMARCHY_PATH/bin 을 셸 프로세스 PATH 에 붙인다).
 # 목록은 위젯 실측에서 나왔다 — M8 평가 문서 "helper 처리 방침" Tier A·B.
@@ -24,8 +31,6 @@ cp -a "$src/default/themed" "$dest/usr/share/cachy-omarchy/upstream/default/"
 # omarchy-reminder 는 omarchy-notification-send 를 부르고, agents 패널은
 # omarchy-agent-usage-update 가 CLI 별 수집기를 부른다. 수집기는 해당 CLI 가
 # 없으면 조용히 빈다.
-# 밝기 체인(omarchy-brightness-display*, omarchy-hw-display)은 의존 명령이
-# CachyOS 에 없어 넣지 않는다 — omarchy-monitor-state 가 가드한다.
 # omarchy-menu-keybindings 도 넣지 않는다: 데이터 수집을 CachyOS 에 맞춘
 # 우리 적응 카피가 overlay/bin 에 있다. 나머지 업스트림 bin/ 은 전체 OS
 # 가정이라 여전히 넣지 않는다 (docs/COMMAND_AUDIT.md).
@@ -40,9 +45,11 @@ cp -a "$src/default/themed" "$dest/usr/share/cachy-omarchy/upstream/default/"
 # clipboard-open 의 launch-browser/editor/tui/hyprland-focus-app 은 전이
 # closure 다. brightness-keyboard-mute 는 이름과 달리 mic-mute LED no-op
 # 가드 helper — audio-input-mute 가 무조건 부르므로 빼면 command not found 가
-# 샌다 (D7). audio-output-switch/audio-tuning, brightness-display 체인은
-# M10 Tier C — pipewire/wireplumber 사용자 설정·서비스 정책과 하드웨어
-# 정책을 끌고 오므로 넣지 않는다.
+# 샌다 (D7). 이후 확장에서 audio-output-switch/audio-tuning 과
+# brightness-display 체인, touchpad/touchscreen 가드를 verbatim 으로 올렸다.
+# omarchy-hw-laptop 과 monitor-internal 체인은 CachyOS 가 toggles/hypr 를
+# source 하지 않아 래퍼가 필요하므로 넣지 않는다. XF86 키는 여전히 주입하지
+# 않는다 (M10 D6).
 # 노출 집합 = 스테이징 집합 (SPEC §45). 이 배열이 단일 정의다 — 아래 두 루프가
 # 같은 배열을 돌기 때문에 스테이징 목록과 /usr/bin 노출 목록이 갈라질 수 없다.
 # tests/package/test_usr_bin_helpers.sh 가 `helpers=(` 로 이 블록을 파싱한다.
@@ -127,6 +134,22 @@ helpers=(
   omarchy-system-shutdown
   omarchy-hyprland-window-close-all
   omarchy-state
+  omarchy-audio-output-switch
+  omarchy-audio-output-set-default
+  omarchy-audio-tuning
+  omarchy-hw-match
+  omarchy-restart-audio
+  omarchy-brightness-display
+  omarchy-brightness-display-ddc
+  omarchy-brightness-display-apple
+  omarchy-hw-display
+  omarchy-hyprland-monitor-focused
+  omarchy-hyprland-monitor-focused-apple
+  omarchy-hw-touchpad
+  omarchy-hw-touchscreen
+  omarchy-toggle-touchpad
+  omarchy-toggle-touchscreen
+  omarchy-toggle-input-device
 )
 
 for helper in "${helpers[@]}"; do

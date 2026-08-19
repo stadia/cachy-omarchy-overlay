@@ -56,17 +56,20 @@ assert_contains "$deps" "pipewire-pulse" "depends pipewire-pulse (M10 pactl volu
 assert_contains "$deps" "xdg-utils" "depends xdg-utils (M10 clipboard-open launch closure)"
 
 # M10: jq 는 hard depends 로 승격됐으므로 optdepends 에 남아 있으면 안 된다.
-optdeps=$(grep -A10 -E '^optdepends=' "$pkgbuild")
+optdeps=$(sed -n '/^optdepends=(/,/^)/p' "$pkgbuild")
 if [[ $optdeps == *"'jq:"* ]]; then
   printf 'FAIL: jq 가 optdepends 에 잔존 (M10 에서 hard depends 로 승격)\n'
   ASSERT_FAILURES=$((ASSERT_FAILURES + 1))
 fi
-for bad in tensaku brightnessctl; do
+for bad in tensaku brightnessctl ddcutil; do
   if [[ $deps == *"$bad"* ]]; then
-    printf 'FAIL: M10 범위 밖 dependency %s in depends\n' "$bad"
+    printf 'FAIL: optional-only dependency %s in depends\n' "$bad"
     ASSERT_FAILURES=$((ASSERT_FAILURES + 1))
   fi
 done
+assert_contains "$optdeps" "brightnessctl" "optdepends brightnessctl (internal backlight)"
+assert_contains "$optdeps" "ddcutil" "optdepends ddcutil (DDC brightness)"
+assert_contains "$optdeps" "lsp-plugins-lv2" "optdepends lsp-plugins-lv2 (speaker tuning limiter)"
 printf 'ok:   P02-P04 unsafe deps absent (if no FAIL above)\n'
 
 [[ $ASSERT_FAILURES -eq 0 ]]

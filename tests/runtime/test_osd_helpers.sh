@@ -123,9 +123,8 @@ assert_contains "$src_body" 'platform::micmute' "keyboard-mute: micmute LED 노�
 if grep -q 'brightness-display' <<<"$src_body"; then x=1; else x=0; fi
 assert_eq "$x" "0" "keyboard-mute: display brightness 체인 참조 없음"
 
-# --- M10 제외 확인: staged 트리에 switch/tuning 이 없어야 함은 package 테스트가
-#     담당한다 (test_staged_plugin_helpers.sh Tier C). 여기서는 소스 수준에서
-#     audio-output-volume 이 tuning/switch 를 참조하지 않음을 단언한다. ---
+# --- M10 소스 경계: audio-output-volume 은 여전히 switch/tuning 을 부르지 않는다.
+#     switch 채택은 tests/runtime/test_audio_brightness_input_helpers.sh. ---
 vol_body=$(cat "$bin_src/omarchy-audio-output-volume")
 if grep -q 'audio-tuning\|output-switch' <<<"$vol_body"; then x=1; else x=0; fi
 assert_eq "$x" "0" "volume: audio-tuning/switch 참조 없음"

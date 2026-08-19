@@ -2251,14 +2251,46 @@ record lives in the private development tree
   not state dir, and verbatim so it stays that way. No system units, /etc,
   or root.
 - OSD adoption is the direct `omarchy-osd` IPC plus the volume/mic-mute
-  audio bridge (`pactl`/`wpctl`). `omarchy-audio-output-switch` is excluded
-  because `omarchy-audio-tuning` writes pipewire/wireplumber user config and
-  manages user services. The display-brightness chain stays out; the
-  mic-mute LED helper (`omarchy-brightness-keyboard-mute`) is a guarded
-  no-op without `/sys/class/leds/platform::micmute` and ships verbatim.
+  audio bridge (`pactl`/`wpctl`). M10 left `omarchy-audio-output-switch` and
+  the display-brightness chain unstaged because they pull pipewire user
+  config and hardware tools; a later verbatim expansion staged both (see the
+  following section). The mic-mute LED helper
+  (`omarchy-brightness-keyboard-mute`) is a guarded no-op without
+  `/sys/class/leds/platform::micmute` and ships verbatim.
   No XF86 media key is injected into the managed bindings — audio helpers
   are reachable only via explicit CLI/menu paths until a future milestone
   audits real user binds and gets approval.
+
+---
+
+# Helper expansion — audio switch, display brightness, input guards
+
+*(번호 없는 절 — M8–M10 과 같은 방식.)*
+
+Stage the remaining verbatim closures that M10 classified as Tier C, plus the
+menu `when` guards for touchpad and touchscreen. No wrappers. Things that
+need an adapted wrapper stay out: `omarchy-hw-laptop` and the
+`omarchy-hyprland-monitor-internal(-mirror)` chain, because CachyOS Hyprland
+configs do not source `~/.local/state/omarchy/toggles/hypr/`. Staging the
+laptop guard would unhide menu rows whose actions cannot persist.
+
+- Audio: `omarchy-audio-output-switch` plus
+  `omarchy-audio-output-set-default`, `omarchy-audio-tuning`,
+  `omarchy-hw-match`, and `omarchy-restart-audio`. Matching templates live
+  under `$OMARCHY_PATH/default/audio/` and
+  `default/systemd/user/omarchy-speaker-tuning.service`. The package does
+  not write `~/.config/pipewire` or enable user units; `omarchy-audio-tuning
+  on` copies those templates. Other shipped user units (`omarchy-crash-watch`
+  and friends) stay unstaged.
+- Brightness: `omarchy-brightness-display{,-ddc,-apple}`, `omarchy-hw-display`,
+  `omarchy-hyprland-monitor-focused{,-apple}`. The bar's `omarchy-monitor-state`
+  already calls this chain. `brightnessctl`, `ddcutil`, and `lsp-plugins-lv2`
+  are optdepends — missing tools fail that path; they are not hard depends.
+- Input: `omarchy-hw-touchpad`/`-touchscreen` plus
+  `omarchy-toggle-touchpad`/`-touchscreen`/`-input-device`. The immediate
+  toggle is `hyprctl eval`. Persistence via the hypr toggles lua directory
+  is best-effort on CachyOS.
+- XF86 media keys remain uninjected (M10 D6).
 
 ---
 

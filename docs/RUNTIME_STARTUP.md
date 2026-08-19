@@ -389,10 +389,9 @@ v0.2.0 부터 셸 패키지는 바 위젯이 bare name 으로 부르는 업스�
 `omarchy-network-band` `omarchy-monitor-state` `omarchy-hyprland-monitor-scaling`,
 Tier B `omarchy-reminder` `omarchy-notification-send` `omarchy-agent-usage-{update,claude,codex,fireworks}`.
 전부 업스트림과 바이트 동일하다(`tests/package/test_staged_helpers.sh` 가 확인).
-밝기 체인(`omarchy-brightness-display*`, `omarchy-hw-display`)은 의존 명령이 없어
-넣지 않는다. helper 노출은 PATH 조작이 아니라 `/usr/bin/omarchy-*` 상대 심링크로
-이뤄진다 — `cachy-omarchy-shell --run` 은 호출자 PATH 를 그대로 물려준다
-(§45 개정).
+밝기 체인은 이후 verbatim 확장에서 올렸다 — §21. helper 노출은 PATH 조작이
+아니라 `/usr/bin/omarchy-*` 상대 심링크로 이뤄진다 — `cachy-omarchy-shell --run`
+은 호출자 PATH 를 그대로 물려준다 (§45 개정).
 
 `/etc`, `/boot`, `/efi`, system 유닛(`usr/lib/systemd/system/`)은 소유하지 않는다.
 compat 적응 카피의 실체는 `/usr/lib/cachy-omarchy/compat/bin/` 에만 두고,
@@ -1555,8 +1554,9 @@ watch 하므로 파일 교체 자체가 전파 경로다(IPC 로그가 없는 �
 단위 증거 (전부 sandbox HOME + fake 명령, 실 세션 무접촉):
 
 - `tests/package/test_staged_plugin_helpers.sh` — 14개 stage·executable·
-  바이트 동일, Tier C(switch/tuning/brightness-display/power) 미스테이징,
-  P01 회귀(`disabledPlugins` 부재·`plugins: []`·다섯 manifest `keepLoaded`).
+  바이트 동일, factory-reset 미스테이징, P01 회귀(`disabledPlugins` 부재·
+  `plugins: []`·다섯 manifest `keepLoaded`). 이후 switch/tuning/brightness
+  채택은 `test_staged_audio_brightness_helpers.sh` (§21).
 - `tests/runtime/test_clipboard_helpers.sh` — capture text/image JSON, 민감
   selection·KDE password hint 미저장(D3), copy-only vs typed paste side
   effect(D4), malformed index non-zero, clipboard-open 의 browser/editor/
@@ -1645,3 +1645,29 @@ SUPER+K 는 사용자가 직접 눌러 둘 다 정상 확인. 메뉴 Style > The
 
 `wtype` 가상 키보드는 이 호스트의 Hyprland 0.56.2 `__lua` 바인드 매칭을
 발화시키지 못했다. 레포 라이브 테스트는 IPC 경로를 쓰므로 영향 없음.
+
+## 21. 오디오 전환·밝기·입력 가드 (verbatim)
+
+M10 이 남긴 audio-output-switch / audio-tuning / brightness-display 체인과
+메뉴 `when` 가드 `omarchy-hw-touchpad`/`-touchscreen` 을 verbatim 으로
+스테이징한다. 래퍼가 필요한 `omarchy-hw-laptop` 과
+`omarchy-hyprland-monitor-internal(-mirror)` 는 올리지 않는다 — CachyOS
+Hyprland 설정이 `~/.local/state/omarchy/toggles/hypr/` 를 source 하지 않아
+가드만 올리면 동작하지 않는 메뉴 행이 드러난다.
+
+패키지는 사용자 `~/.config/pipewire` 와 systemd --user 유닛을 만들지 않는다.
+`omarchy-audio-tuning on` 이 `$OMARCHY_PATH/default/audio` 와
+`default/systemd/user/omarchy-speaker-tuning.service` 템플릿을 복사한다.
+`brightnessctl` / `ddcutil` / `lsp-plugins-lv2` 는 optdepends. XF86 키는
+주입하지 않는다 (M10 D6).
+
+단위 증거 (sandbox HOME + fake pactl/wpctl/hyprctl/brightnessctl, 실 세션
+무접촉. `omarchy-restart-audio` 와 `audio-tuning on/off` 는 실행하지 않음):
+
+- `tests/package/test_staged_audio_brightness_helpers.sh` — 16개 helper
+  verbatim, audio/unit 템플릿, hw-laptop·monitor-internal·crash-watch
+  미스테이징.
+- `tests/runtime/test_audio_brightness_input_helpers.sh` — switch 순환,
+  hw-display sysfs, brightness +5%, touchpad toggle 상태 파일.
+- `tests/package/test_forbidden.sh` — brightnessctl/ddcutil 은 depends 가
+  아니라 optdepends.

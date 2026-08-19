@@ -41,12 +41,12 @@ for h in omarchy-reminder omarchy-notification-send \
   assert_eq "$x" "0" "실행 가능: $h"
 done
 
-# Tier D — 밝기 체인은 넣지 않는다 (brightnessctl/ddcutil 미설치, 꼬리가 길다).
-# omarchy-monitor-state 가 가드하므로 밝기 행만 빈다.
+# 바 monitor 위젯이 부르는 밝기 체인 — 채택 후 업스트림과 바이트 동일.
 for h in omarchy-brightness-display omarchy-brightness-display-ddc \
          omarchy-hw-display ; do
-  [[ -e $bin/$h ]] && x=1 || x=0
-  assert_eq "$x" "0" "Tier D 미스테이징: $h"
+  assert_file_exists "$bin/$h" "밝기 체인 스테이징: $h"
+  if cmp -s "$src/bin/$h" "$bin/$h"; then x=0; else x=1; fi
+  assert_eq "$x" "0" "verbatim: $h 는 업스트림과 바이트 동일"
 done
 
 exit "$ASSERT_FAILURES"
