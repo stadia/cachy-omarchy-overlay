@@ -20,8 +20,11 @@
 #      CachyOS 에는 그 대상이 없다.
 #   4. 인자 처리(--help/--print)와 셸 기동 pre-flight 는 우리 래퍼 관례를 따른다.
 #   5. 사용자 Lua는 제한 환경 loadfile(..., "t", env)로만 읽는다. config에는
-#      fake hl, 순수 Lua 기본 기능, 읽기 전용 string/table/math, os.getenv만 보이며
-#      io/package/require/debug/dofile/loadfile은 없다.
+#      fake hl, 순수 Lua 기본 기능, 읽기 전용 string/table/math, os.getenv, 그리고
+#      제한 dofile만 보이며 io/package/require/debug/loadfile은 없다. 제한 dofile은
+#      관리 source 블록(~/.config/cachy-omarchy/hypr/bindings.lua)을 따라가되
+#      포함 파일을 같은 제한 환경에 올린다 — 그것이 없으면 우리 자신의 SUPER+K가
+#      시트에서 빠지고, 우리가 덮어쓴 bind는 덮이기 전 명령을 계속 보여준다.
 #
 # IPC 를 재발명하지 않는다: 선택 UI 는 omarchy-menu-select 가
 # `omarchy-shell shell summon omarchy.menu` 를 부르고, compat 의 omarchy-shell
@@ -306,7 +309,44 @@ local function readonly(source)
 end
 
 local system_getenv = os.getenv
-local scan_env = {
+
+-- ADAPTED: our own binds (SUPER+K included) live in
+-- ~/.config/cachy-omarchy/hypr/bindings.lua, which hyprland.lua pulls in with
+-- a managed `pcall(dofile, ...)` block. Without a dofile the scanner never saw
+-- them: SUPER+K vanished from its own sheet and binds it overrides kept
+-- showing the superseded command. Supply one that stays inside the sandbox —
+-- the included file loads text-only into this same restricted environment, so
+-- it gains no capability the top-level config lacks.
+local scan_env
+local scan_dofile_depth = 0
+
+local function scan_dofile(path)
+  if type(path) ~= "string" then
+    error("restricted dofile requires a file path", 2)
+  end
+
+  -- Bounded nesting: a config that includes itself must fail, not hang.
+  if scan_dofile_depth >= 8 then
+    error("restricted dofile nested too deeply: " .. path, 2)
+  end
+
+  local chunk, load_err = loadfile(path, "t", scan_env)
+  if not chunk then
+    error(load_err, 2)
+  end
+
+  scan_dofile_depth = scan_dofile_depth + 1
+  local results = table.pack(pcall(chunk))
+  scan_dofile_depth = scan_dofile_depth - 1
+
+  if not results[1] then
+    error(results[2], 2)
+  end
+
+  return table.unpack(results, 2, results.n)
+end
+
+scan_env = {
   assert = assert,
   error = error,
   ipairs = ipairs,
@@ -318,6 +358,7 @@ local scan_env = {
   tostring = tostring,
   type = type,
   unpack = table.unpack,
+  dofile = scan_dofile,
   hl = hl,
   math = readonly(math),
   string = readonly(string),
@@ -553,9 +594,9 @@ output_binding_records_uncached() {
 
 keybindings_cache_key() {
   {
-    # v12 invalidates upstream v11 records: this adapted command changes both
-    # record encoding and the source-derived Lua metadata.
-    printf 'v12\n'
+    # v13 invalidates v12 (and upstream v11) records: the Lua scan now follows
+    # managed `dofile` includes, so the source-derived metadata changed again.
+    printf 'v13\n'
     hyprctl devices 2>/dev/null | grep -F 'active keymap:'
     hyprctl binds 2>/dev/null
   } | sha256sum | awk '{ print $1 }'

@@ -298,17 +298,24 @@ esac
 호스트 CachyOS Lua 설정은 `description` 없는 `__lua` bind 48개를 보고한다. 원본
 스크립트는 description 조인 때문에 webapp 정적 2행만 출력했다. 적응 카피는
 `modmask+key`로 Lua 캐시를 조인하고 설명을 합성하며, CachyOS에 없는 정적 webapp
-행은 제거했다. 실사용 설정으로 한 `--print`는 정확히 **48** record를 출력한다.
-캐시 schema는 업스트림 v11을 재사용하지 않는 **v12**다.
+행은 제거했다. 실사용 설정으로 한 `--print`는 v12 시점 **48** record였고, 관리 source
+블록까지 스캔하는 v13에서는 빠져 있던 `SUPER+K`가 돌아와 **49** record다(2026-08-20 실측).
+캐시 schema는 이전(업스트림 v11, 적응 v12)을 재사용하지 않는 **v13**다.
+
+관리 source 블록(`pcall(dofile, ~/.config/cachy-omarchy/hypr/bindings.lua)`)의 bind도
+스캔한다. 이것이 없던 v12에서는 오버레이 자신의 `SUPER+K`가 시트에서 통째로 빠지고,
+오버레이가 덮어쓴 bind(`SUPER+space`)는 덮이기 전 명령(`walker`)을 계속 보여줬다.
 
 `code:NNN` bind가 Hyprland에서 기호 키를 주지 않으면 조인이 빗나갈 수 있고, 같은
 modmask+key를 submap/중복 정의하면 마지막 Lua source record가 이긴다. 이 두 한계는
 M4에서 해소하지 않았다.
 
 사용자 Lua source는 실행 가능한 신뢰 입력으로 취급하지 않는다. 스캐너는
-`loadfile(config, "t", env)` 제한 환경에서만 `pcall(chunk)` 하며 **dofile 하지 않는다**.
-config에는 fake `hl`, 순수 Lua 기능, 읽기 전용 `string`/`table`/`math`, `os.getenv`만
-보이고 `io`/`package`/`require`/`debug`/`dofile`/`loadfile`은 없다. `os.execute`로
+`loadfile(config, "t", env)` 제한 환경에서만 `pcall(chunk)` 하며 **표준 dofile 하지
+않는다**. config에는 fake `hl`, 순수 Lua 기능, 읽기 전용 `string`/`table`/`math`,
+`os.getenv`, 그리고 제한 `dofile`만 보이고 `io`/`package`/`require`/`debug`/`loadfile`은
+없다. 제한 `dofile`은 포함 파일을 같은 제한 환경에 text-only(`"t"`)로 올리므로 새 권한을
+주지 않으며, 자기 자신을 포함하는 config가 멈추지 않도록 중첩 깊이 8로 끊는다. `os.execute`로
 marker를 만들려는 회귀 fixture가 실행되지 않음을 검증했다. 지원하지 않는 config API는
 fail-closed 되므로 그 뒤 bind가 누락될 수 있다.
 

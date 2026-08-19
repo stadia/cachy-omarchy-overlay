@@ -30,9 +30,9 @@ assert_contains "$src" "omarchy-menu-select" "선택 UI 는 업스트림 omarchy
 [[ $src == *"qs ipc"* ]] && q=1 || q=0
 assert_eq "$q" "0" "keybindings 스크립트는 qs ipc 를 직접 부르지 않는다"
 assert_contains "$src" "modmask" "hyprctl binds + Lua 캐시 데이터 수집을 감싼다"
-assert_contains "$src" "printf 'v12" "적응 캐시 스키마는 v12 이다"
-[[ $src == *"printf 'v11"* ]] && v=1 || v=0
-assert_eq "$v" "0" "upstream v11 캐시는 재사용하지 않는다"
+assert_contains "$src" "printf 'v13" "적응 캐시 스키마는 v13 이다"
+[[ $src == *"printf 'v11"* || $src == *"printf 'v12"* ]] && v=1 || v=0
+assert_eq "$v" "0" "이전(v11/v12) 캐시는 재사용하지 않는다"
 
 # --- 스테이징: 이 뷰어가 쓰는 업스트림 bin 헬퍼 ------------------------------
 # (M9 갱신: omarchy-theme-set 체인은 M9 부터 스테이징 대상이다. "나머지 전부
@@ -95,8 +95,25 @@ hl.bind(mainMod .. " + T", hl.dsp.exec_cmd("ghostty"))
 hl.bind(mainMod .. " + C", hl.dsp.window.close())
 hl.bind(mainMod .. " + D", hl.dsp.exec_cmd("discord"), { description = "Discord" })
 hl.bind(mainMod .. " + X", hl.dsp.exec_cmd("foo --label=a,b"))
+hl.bind(mainMod .. " + O", hl.dsp.exec_cmd("stale-old-command"))
+-- >>> cachy-omarchy >>>
+pcall(dofile, "$HOME/.config/cachy-omarchy/hypr/bindings.lua")
+-- <<< cachy-omarchy <<<
 -- Regression: a prior dofile(config) scanner would execute this after T/X.
 os.execute("touch $side_effect_marker")
+LUA
+
+# The overlay's own binds live behind that managed dofile. They must reach the
+# scanner (SUPER+K would otherwise be missing from its own sheet), and their
+# override of an earlier bind must win — while staying just as sandboxed.
+mkdir -p "$HOME/.config/cachy-omarchy/hypr"
+overlay_side_effect_marker="$COO_TEST_SANDBOX/lua-overlay-side-effect"
+cat >"$HOME/.config/cachy-omarchy/hypr/bindings.lua" <<LUA
+hl.unbind("SUPER + K")
+hl.bind("SUPER + K", hl.dsp.exec_cmd("cachy-omarchy-keybindings"))
+hl.unbind("SUPER + O")
+hl.bind("SUPER + O", hl.dsp.exec_cmd("cachy-omarchy-launcher"))
+os.execute("touch $overlay_side_effect_marker")
 LUA
 
 stubbin="$COO_TEST_SANDBOX/stubbin"
@@ -111,6 +128,8 @@ case ${1:-} in
     printf 'bind\n\tmodmask: 64\n\tsubmap: \n\tkey: D\n\tkeycode: 0\n\tcatchall: false\n\tdescription: \n\tdispatcher: __lua\n\targ: 3\n\n'
     printf 'bind\n\tmodmask: 64\n\tsubmap: \n\tkey: X\n\tkeycode: 0\n\tcatchall: false\n\tdescription: \n\tdispatcher: __lua\n\targ: 4\n\n'
     printf 'bind\n\tmodmask: 64\n\tsubmap: \n\tkey: B\n\tkeycode: 0\n\tcatchall: false\n\tdescription: Browser\n\tdispatcher: exec\n\targ: firefox\n\n'
+    printf 'bind\n\tmodmask: 64\n\tsubmap: \n\tkey: K\n\tkeycode: 0\n\tcatchall: false\n\tdescription: \n\tdispatcher: __lua\n\targ: 5\n\n'
+    printf 'bind\n\tmodmask: 64\n\tsubmap: \n\tkey: O\n\tkeycode: 0\n\tcatchall: false\n\tdescription: \n\tdispatcher: __lua\n\targ: 6\n\n'
     ;;
   devices)
     printf 'Keyboards:\n\t\tactive keymap: stub\n'
@@ -141,6 +160,13 @@ out=$(PATH="$stubbin:$root/bin:$PATH" XDG_CACHE_HOME="$cachehome" \
 assert_eq "$code" "0" "--print 는 셸 없이 목록을 만든다 (exit 0)"
 [[ -e $side_effect_marker ]] && side_effect=1 || side_effect=0
 assert_eq "$side_effect" "0" "제한 Lua 환경은 os.execute 부작용을 실행하지 않는다"
+[[ -e $overlay_side_effect_marker ]] && side_effect=1 || side_effect=0
+assert_eq "$side_effect" "0" "관리 dofile 로 읽은 파일도 같은 제한 환경에서 돈다"
+assert_contains "$out" "SUPER + K" "관리 source 블록의 bind 도 시트에 나온다"
+assert_contains "$out" "cachy-omarchy-keybindings" "관리 source 블록 bind 의 명령이 표시된다"
+assert_contains "$out" "cachy-omarchy-launcher" "나중 bind 가 앞선 bind 를 덮어쓴다"
+[[ $out == *"stale-old-command"* ]] && stale=1 || stale=0
+assert_eq "$stale" "0" "덮어쓰인 옛 bind 는 남지 않는다"
 [[ $out == *"STALE V11 RECORD"* ]] && stale=1 || stale=0
 assert_eq "$stale" "0" "v11 캐시 레코드는 선택되지 않는다"
 assert_contains "$out" "SUPER + T" "악성 행 전의 description-less lua bind 가 계속 수집된다"
