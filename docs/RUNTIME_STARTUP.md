@@ -1448,8 +1448,10 @@ $ pgrep -a waybar
   등) + 배경 묶음 + `omarchy-menu-images`(메뉴 미리보기). Tier B 훅 7개
   (foot/tmux/gnome/pi/claude/vscode/obsidian). 목록과 근거는 설계 문서
   "helper 분류", 단언은 `tests/package/test_staged_theme_helpers.sh`.
-- Tier C 11개 미스테이징 — 네트워크 설치(`theme-install/update/remove`),
-  `/etc` 쓰기(plymouth, browser), 하드웨어 전용(keyboard*), 개발 도구.
+- Tier C 8개 미스테이징 — `/etc` 쓰기(plymouth, browser), 하드웨어 전용
+  (keyboard*), 개발 도구. `omarchy-theme-install`/`-update`/`-remove` 는
+  0.8.0 감사 실측으로 self-contained(`git clone`/`pull` + `rm -rf` +
+  이미 staged `omarchy-theme-set`) 가 확인돼 Tier C 에서 회수·스테이징됐다.
   `omarchy-theme-set` 이 post 훅으로 browser/keyboard 를 **무조건** 호출하고
   `set -e` 가 없어 부재 시 "command not found" 만 stderr 로 새고 exit 는 0 이다
   — 이 조용한 실패를 메우기 위해 `compat/bin/omarchy-theme-set-{browser,keyboard}`
@@ -1490,9 +1492,10 @@ theme-set 경로에서 불필요(감사 실측 — 설계 문서).
 
 ### 18.5 알려진 범위 밖
 
-- Tier C 를 부르는 메뉴 항목(Install/Update/Remove theme, Plymouth,
-  Browser/Keyboard 훅)은 `omarchy-menu.jsonc` 에 그대로 남는다 — 무패치 원칙상
-  죽은 항목으로 둔다 (D3).
+- Tier C 를 부르는 메뉴 항목(Plymouth, Browser/Keyboard 훅)은
+  `omarchy-menu.jsonc` 에 그대로 남는다 — 무패치 원칙상 죽은 항목으로 둔다 (D3).
+  Install/Update/Remove theme 행은 0.8.0 에서 `omarchy-theme-install`/`-update`/
+  `-remove` 가 스테이징돼 동작한다.
 - 헤드리스 모드는 post 훅 전체를 건너뛴다 — 샌드박스 테스트는 훅을 검증하지
   않는다. 훅 체인의 유일한 검증은 라이브 비헤드리스 실측(§18.6 예정)이다.
 
@@ -1674,7 +1677,7 @@ Hyprland 설정이 `~/.local/state/omarchy/toggles/hypr/` 를 source 하지 않�
 
 ### 21.1 라이브 실측 (2026-08-19 22:54–22:56 KST)
 
-설치본 `cachy-omarchy-shell 4.0.0-9` / overlay `0.6.1-1`. 프로덕션 셸 pid
+설치본 `cachy-omarchy-shell 4.0.0-10` / overlay `0.7.0-1`. 프로덕션 셸 pid
 921196 을 `--restart` 하지 않았다. XF86 주입, `audio-tuning on/off`,
 `omarchy-restart-audio`, 밝기 `+5%`, 터치패드 토글은 하지 않았다.
 

@@ -39,10 +39,16 @@ for h in "${staged[@]}"; do
   assert_eq "$x" "0" "verbatim: $h 는 업스트림과 바이트 동일"
 done
 
+# 0.8.0: omarchy-toggle-bar 가 스테이징됐다 — omarchy-toggle 디스패처와
+# 함께 가시성 토글이 동작한다. verbatim 단언.
+for h in omarchy-toggle-bar; do
+  assert_file_exists "$bin/$h" "0.8.0 스테이징: $h"
+  if cmp -s "$src/bin/$h" "$bin/$h"; then x=0; else x=1; fi
+  assert_eq "$x" "0" "verbatim: $h 는 업스트림과 바이트 동일"
+done
+
 # factory-reset 은 Omarchy ISO @factory 전제 — PATH 에 올리지 않는다.
-# toggle-bar 는 가시성 토글이며 이번 범위가 아니다.
-for h in omarchy-system-factory-reset omarchy-system-factory-reset-finish \
-         omarchy-toggle-bar; do
+for h in omarchy-system-factory-reset omarchy-system-factory-reset-finish; do
   [[ -e $bin/$h ]] && x=1 || x=0
   assert_eq "$x" "0" "미스테이징: $h"
 done

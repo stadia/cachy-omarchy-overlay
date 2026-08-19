@@ -61,11 +61,41 @@ for h in omarchy-osd omarchy-audio-output-sink omarchy-cmd-present; do
   assert_file_exists "$bin/$h" "기존 stage 의존: $h"
 done
 
+# 0.8.0 하이프랜드 토글 묶음 + hw 가드 회수 — verbatim 스테이징.
+# omarchy-hyprland-toggle 의 on() 이 $OMARCHY_PATH/default/hypr/toggles/$FLAG.lua
+# 를 복사하므로 토글 데이터도 같이 올라간다.
+hyprland_toggles=(
+  omarchy-hyprland-window-gaps-toggle
+  omarchy-hyprland-window-single-square-aspect-toggle
+  omarchy-hyprland-workspace-layout-toggle
+  omarchy-hyprland-monitor-internal
+  omarchy-hyprland-monitor-internal-mirror
+  omarchy-hyprland-toggle
+  omarchy-hyprland-toggle-enabled
+  omarchy-hyprland-toggle-disabled
+  omarchy-hyprland-monitor-laptop
+  omarchy-hyprland-monitor-external-active
+  omarchy-hw-laptop
+  omarchy-hw-webcam
+  omarchy-hw-dell-xps-haptic-touchpad
+)
+for h in "${hyprland_toggles[@]}"; do
+  assert_file_exists "$bin/$h" "0.8.0 토글/hw 스테이징: $h"
+  [[ -x $bin/$h ]] && x=0 || x=1
+  assert_eq "$x" "0" "실행 가능: $h"
+  if cmp -s "$src/bin/$h" "$bin/$h"; then x=0; else x=1; fi
+  assert_eq "$x" "0" "verbatim: $h 는 업스트림과 바이트 동일"
+done
+
+# 토글 데이터 — 정적 lua 스니펫 3개. omarchy-hyprland-toggle:18 FLAG_SOURCE.
+for f in flags.lua single-window-aspect-ratio.lua window-no-gaps.lua; do
+  assert_file_exists "$root/default/hypr/toggles/$f" "토글 데이터 스테이징: $f"
+  if cmp -s "$src/default/hypr/toggles/$f" "$root/default/hypr/toggles/$f"; then x=0; else x=1; fi
+  assert_eq "$x" "0" "verbatim: toggles/$f 는 업스트림과 바이트 동일"
+done
+
 # 래퍼/적응이 필요하거나 전체 OS 가정인 것은 올리지 않는다.
-for h in omarchy-hw-laptop omarchy-hyprland-monitor-internal \
-         omarchy-hyprland-monitor-internal-mirror \
-         omarchy-system-factory-reset omarchy-system-factory-reset-finish \
-         omarchy-toggle-bar; do
+for h in omarchy-system-factory-reset omarchy-system-factory-reset-finish; do
   [[ -e $bin/$h ]] && x=1 || x=0
   assert_eq "$x" "0" "미스테이징: $h"
 done

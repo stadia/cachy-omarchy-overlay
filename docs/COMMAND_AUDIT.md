@@ -28,16 +28,18 @@
 | --- | --- | --- | --- | --- |
 | `uwsm-app -- gtk-launch` | `AppLibrary.qml` | 앱 실행 | SAFE | package — uwsm 패키지(`cachy-omarchy-shell` hard depends)의 실제 바이너리. compat shim 삭제됨 |
 | `omarchy-remove-launcher-entry` | `AppLibrary.remove` | 숨김 항목 | OPTIONAL / ADAPTED | copy into compat if hide-from-menu를 살릴 때 |
-| 메뉴 `action` 문자열 전반 | `omarchy-menu.jsonc` | 테마/락/캡처/네트워크/업데이트 등 | 대부분 DISABLED | disable — 항목은 JSONC에 남아도 실행 시 실패. v0.1은 앱 목록 + 안전 항목만 남기거나 `when`으로 숨김 |
+| 메뉴 `action` 문자열 전반 | `omarchy-menu.jsonc` | 테마/락/캡처/네트워크/업데이트 등 | 혼재 | 0.8.0 감사 실측이 "전체 OS 가정" 분류를 뒤집어 캡처·토글·파워프로파일·기본앱·웹앱·DNS·폰트·재시작·테마 설치 등 self-contained 명령을 verbatim 스테이징했다(스테이징 전수·메뉴 전수 표 참조). 남은 DISABLED 는 아래 대표 목록 |
 
-대표 `DISABLED` (전체 OS 가정):
+대표 `DISABLED` (전체 OS 가정 — 감사 실측 후에도 verbatim 불가):
 
 ```text
 omarchy-plymouth-*
-omarchy-launch-screensaver
-omarchy-refresh-config / omarchy-reinstall-configs
-omarchy-update* / omarchy-pkg-*
-omarchy-launch-about (브랜딩/os-release)
+omarchy-launch-screensaver / -about / -floating-terminal-with-presentation
+omarchy-reinstall-configs
+omarchy-update / omarchy-update-firmware / omarchy-pkg-*
+omarchy-install-* / omarchy-remove-*
+omarchy-channel-* / omarchy-setup-security-* / omarchy-system-factory-reset
+omarchy-branding-* / omarchy-theme-bg-install / omarchy-plymouth-*
 ```
 
 `systemctl suspend|hibernate` 등 표준 명령은 SAFE. `omarchy-system-lock|logout|reboot|shutdown` 은 메뉴 세션 경로로 스테이징한다. `omarchy-system-factory-reset` 은 Omarchy ISO `@factory` 전제라 올리지 않는다. `omarchy-system-lock` 은 `omarchy-apply-lock` 없이는 아무것도 잠그지 않으므로 둘을 같이 올린다 — 업스트림은 후자를 `install/config/lockscreen-pam.sh` 로 한 번 돌리는데 우리는 업스트림 설치 스크립트를 쓰지 않아 그 자리가 비어 있었다.
@@ -49,7 +51,7 @@ omarchy-launch-about (브랜딩/os-release)
 | command | called from | purpose | class | action |
 | --- | --- | --- | --- | --- |
 | `omarchy-menu-keybindings` | 메뉴 `learn.keybindings` | `hyprctl binds` + Lua 캐시 + 검색 메뉴 | ADAPTED | **SUPER+K / `cachy-omarchy-keybindings` 전용** wrapper — 적응 카피 + compat `omarchy-shell` + 스테이징 `omarchy-menu-select`/`omarchy-cmd-present`. 메뉴의 동명 action 은 compat shim 이 없어 여전히 실패(전수 표 참조). **M4 실측 완료**(아래). 데이터 수집만 CachyOS Hyprland 설정에 맞춘다 |
-| `omarchy-menu-tmux-keybindings` | 메뉴 | Tmux 전용 | DISABLED | disable |
+| `omarchy-menu-tmux-keybindings` | 메뉴 | Tmux 전용 | SAFE | package — 0.8.0 verbatim stage. tmux(opt) 바인딩 검색. config/tmux 폴백 미출시지만 사용자 설정 없으면 exit 1 로 degrade |
 | `omarchy-menu-herdr-keybindings` | 메뉴 | Herdr 전용 | DISABLED | disable |
 
 별도 QML 키바인드 플러그인은 없다. UI는 이 헬퍼(+ 메뉴 오버레이)다.
@@ -135,7 +137,35 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-brightness-keyboard-mute` | input-mute closure | SAFE | mic-mute LED 가드. LED/brightnessctl 부재 시 no-op |
 | `omarchy-audio-output-switch` / `-set-default` / `-tuning` | osd audio bridge | SAFE | 출력 순환 + 전이. tuning `on` 만 사용자 pipewire/systemd --user 템플릿을 복사한다. `restart-audio` 는 stale daemon drop-in 경로 |
 | `omarchy-brightness-display*` / `omarchy-hw-display` | monitor | SAFE | 내부 `brightnessctl`(optdepend) · 외부 `ddcutil` · Apple `asdcontrol`. `omarchy-monitor-state` 가 이미 부름 |
-| `omarchy-hw-touchpad` / `-touchscreen` + toggle | hardware | SAFE | 메뉴 `when` 가드 + `hyprctl eval` 즉시 토글. `hw-laptop`/모니터 체인은 래퍼 필요라 제외 |
+| `omarchy-hw-touchpad` / `-touchscreen` + toggle | hardware | SAFE | 메뉴 `when` 가드 + `hyprctl eval` 즉시 토글. `hw-laptop`/모니터 체인은 0.8.0 에서 verbatim 으로 회수(아래) |
+
+### 0.8.0 verbatim 확장 (감사 실측 회수)
+
+`stage-upstream.sh` helpers 배열에 55개 helper 를 추가한 슬라이스. 출처는
+감사 에이전트가 업스트림 `bin/` 본문을 정독해 "공식 omarchy 전체 OS 가정"
+분류를 뒤집은 실측이다. 전부 업스트림 원본 그대로(verbatim) 올리며
+`/usr/bin` 노출 집합은 스테이징 집합과 같다(SPEC §45). 회귀는
+`tests/package/test_staged_theme_helpers.sh`·`test_staged_session_helpers.sh`·
+`test_staged_audio_brightness_helpers.sh`·`test_makepkg.sh`·
+`test_usr_bin_helpers.sh` 가 단언하고, 감사 일관성은
+`tests/runtime/test_command_audit.sh` 가 단언한다. 전체 집합은 아래 전수 표이고,
+메뉴 가시 행은 메뉴 전수 표에서 SAFE 로 재분류됐다.
+
+| 묶음 | helper | class | note |
+| --- | --- | --- | --- |
+| 캡처 | `omarchy-capture-qr`/`-text`/`-screenshot`/`-screenrecording`/`-with-webcam` + `-region`/`-webcam-list`/`-webcam-resize` 전이 | SAFE | hyprpicker/slurp/grim + wl-copy. gpu-screen-recorder/tesseract/zbarimg/mpv/ffmpeg(opt) 부재 시 조용히 빈 결과·exit 1 |
+| 하이프랜드 토글 | `omarchy-hyprland-window-gaps-toggle`/`-single-square-aspect-toggle`/`-workspace-layout-toggle`/`-monitor-internal`/`-internal-mirror` + `omarchy-hyprland-toggle`/`-toggle-enabled`/`-toggle-disabled`/`-monitor-laptop`/`-monitor-external-active` 전이 | SAFE | `omarchy-hyprland-toggle` 의 on() 이 `$OMARCHY_PATH/default/hypr/toggles/$FLAG.lua` 를 복사 — 같은 배치에서 `default/hypr/toggles/`(flags·window-no-gaps·single-window-aspect-ratio) 를 ship. `workspace-layout-toggle` 은 `hyprctl keyword` 폴백이라 토글 helper 미사용 |
+| 가시성/잠금 토글 | `omarchy-toggle-bar`/`-screensaver` + `omarchy-toggle` 디스패처; `omarchy-toggle-idle`/`-nightlight`/`-notification-silencing` | SAFE | `omarchy-toggle` 은 `~/.local/state/omarchy/toggles/$FLAG` 파일 플립(순수 사용자 상태). `toggle-crash-capture` 는 미출시 user unit 이 필요해 제외, `toggle-hybrid-gpu` 는 `omarchy-pkg-add` cascade 로 제외 |
+| 파워프로파일 | `omarchy-powerprofiles-list`/`-set` | SAFE | powerprofilesctl + busctl(UPower). `-set` 이 `-list` 전이 |
+| 기본 앱 | `omarchy-default-browser`/`-editor`/`-terminal` | SAFE | xdg-settings/xdg-terminal-exec + 사용자 상태. omarchy-* 의존 0 |
+| 웹앱/TUI 런치 | `omarchy-launch-webapp`(keystone)/`-config-editor`/`-discord-community` + `omarchy-webapp-install`/`-remove`/`omarchy-tui-install`/`-remove` | SAFE | `launch-webapp` 가 .desktop Exec 추출 → `uwsm-app --app=$url`. `webapp-install`·`tui-install` 이 gum(런타임 불변)+curl+gtk-update-icon-cache |
+| 하드웨어 탐지 | `omarchy-hw-laptop`/`-webcam`/`-dell-xps-haptic-touchpad` | SAFE | sysfs/DMI/hyprctl 읽기 전용 when/checked 프로브. `hw-laptop` 행 action 은 monitor-internal 스크립트(스테이징됨) — cascade 정합. `hw-fingerprint`/`-hybrid-gpu` 는 action 이 미스테이지드 설치 스크립트라 제외 |
+| 단독 self-contained | `omarchy-menu`/`-timezone`/`-tmux-keybindings`, `omarchy-dns`, `omarchy-font-current`/`-list`, `omarchy-hibernation-available`, `omarchy-refresh-config`, `omarchy-restart-bluetooth`/`-wifi`/`-trackpad`, `omarchy-update-time`, `omarchy-sudo-passwordless` | SAFE | 표준 도구 + 이미 staged helper 만. `sudo-passwordless` 는 self-contained 이고 패스워드리스 sudo 를 부여하는 보안 민감 토글. `hibernation-available` 은 `omarchy_resume.conf` 부재 시 exit 1 로 행 숨김(기능 caveat) |
+| 테마 사용자 설치 | `omarchy-theme-install`/`-remove`/`-update` | SAFE | git clone/pull + `omarchy-theme-set`(staged). SPEC §44 Tier C "network installs" 제외에서 회수 — 스크립트는 self-contained, channel/pkg 인프라 미사용 |
+
+정책 참고: `omarchy-pkg-present` 는 `pacman -Q` 루프 자체는 동작하지만, 가드
+통과 시 미스테이지드 `omarchy-pkg-install`/`-remove` 행이 드러나 cascade 실패하는
+`omarchy-hw-laptop` 반증과 동일 패턴이라 올리지 않는다(메뉴 전수 표 참조).
 
 ---
 
@@ -182,43 +212,84 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-brightness-display-apple` | SAFE | package | brightness-display Apple 분기. `sudo asdcontrol`(부재 시 실패) |
 | `omarchy-brightness-display-ddc` | SAFE | package | brightness-display 외부 모니터 분기. `ddcutil` optdepend |
 | `omarchy-brightness-keyboard-mute` | SAFE | package | M10 mic-mute LED 가드. LED/brightnessctl 부재 시 no-op |
+| `omarchy-capture-qr` | SAFE | package | 0.8.0 캡처. hyprpicker/slurp/grim + wl-copy. zbarimg(opt) 부재 시 빈 결과 |
+| `omarchy-capture-region` | SAFE | package | 0.8.0 캡처 전이. hyprctl/jq/slurp/grim 영역 선택 |
+| `omarchy-capture-screenrecording` | SAFE | package | 0.8.0 캡처. gpu-screen-recorder/mpv/ffmpeg(opt) 부재 시 조용히 빈다 |
+| `omarchy-capture-screenrecording-with-webcam` | SAFE | package | 0.8.0 캡처. capture-webcam-list + capture-screenrecording 얇은 프런트 |
+| `omarchy-capture-screenshot` | SAFE | package | 0.8.0 캡처. capture-region 전이. grim + wl-copy |
+| `omarchy-capture-text` | SAFE | package | 0.8.0 캡처. slurp/grim + tesseract(opt) 부재 시 exit 1 |
+| `omarchy-capture-webcam-list` | SAFE | package | 0.8.0 캡처 전이. v4l2-ctl(opt) 웹캠 목록 |
+| `omarchy-capture-webcam-resize` | SAFE | package | 0.8.0 캡처 전이. ffmpeg/opt 웹캠 해상도 |
 | `omarchy-clipboard-open` | SAFE | package | M10 clipboard. URL→browser, text→editor, image→`tensaku-edit`(부재 시 127) |
 | `omarchy-clipboard-paste-file` | SAFE | package | M10 clipboard. 선택 시에만 `wl-copy`/`wtype` (D4) |
 | `omarchy-clipboard-paste-text` | SAFE | package | M10 clipboard. 선택 시에만 `wl-copy`/`wtype` (D4) |
 | `omarchy-cmd-present` | SAFE | package | `command -v` 루프뿐인 가드. 여러 helper 와 메뉴 `when` 이 부른다 |
+| `omarchy-default-browser` | SAFE | package | 0.8.0 기본 앱. xdg-settings default-web-browser. omarchy-* 의존 0 |
+| `omarchy-default-editor` | SAFE | package | 0.8.0 기본 앱. ~/.local/state/omarchy/defaults/editor 사용자 상태 |
+| `omarchy-default-terminal` | SAFE | package | 0.8.0 기본 앱. xdg-terminal-exec + ~/.config/xdg-terminals.list |
+| `omarchy-dns` | SAFE | package | 0.8.0. nmcli/systemctl/resolved DNS 설정. Omarchy 의존 0 |
+| `omarchy-font-current` | SAFE | package | 0.8.0. fc-match 단일 호출 |
+| `omarchy-font-list` | SAFE | package | 0.8.0. fc-list 단일 호출 |
+| `omarchy-hibernation-available` | SAFE | package | 0.8.0. /proc/swaps + /sys 읽기 전용 프로브. omarchy_resume.conf 부재 시 exit 1 |
 | `omarchy-hook` | SAFE | package | M9 theme-set post 훅 디스패처 (실측: theme-set 이 부름) |
+| `omarchy-hw-dell-xps-haptic-touchpad` | SAFE | package | 0.8.0 hw 가드. omarchy-hw-match + /sys/bus/i2c. 행 action 은 cmd-present opt-in |
 | `omarchy-hw-display` | SAFE | package | `/sys/class/backlight` 에서 패널 장치 이름. brightness-display 내부 경로 |
+| `omarchy-hw-laptop` | SAFE | package | 0.8.0 hw 가드. /proc/acpi + DMI sysfs. laptop-display/mirror 행 action 은 monitor-internal 스크립트(스테이징됨) |
 | `omarchy-hw-match` | SAFE | package | DMI product name/family 부분 일치. audio-tuning match 가 부름 |
 | `omarchy-hw-touchpad` | SAFE | package | `hyprctl devices -j` + jq. 메뉴 `when` 과 toggle-input-device 가 부름 |
 | `omarchy-hw-touchscreen` | SAFE | package | `hyprctl devices -j` + jq. 메뉴 `when` 과 toggle-input-device 가 부름 |
+| `omarchy-hw-webcam` | SAFE | package | 0.8.0 hw 가드. capture-webcam-list 전이 1행 |
 | `omarchy-hyprland-focus-app` | SAFE | package | M10 clipboard 전이 closure |
+| `omarchy-hyprland-monitor-external-active` | SAFE | package | 0.8.0 하이프랜드 토글 전이. hyprctl monitors -j 외부 활성 검사 |
 | `omarchy-hyprland-monitor-focused` | SAFE | package | brightness-display 가 포커스 모니터 이름을 얻을 때 부름 |
 | `omarchy-hyprland-monitor-focused-apple` | SAFE | package | brightness-display Apple 분기 가드 |
+| `omarchy-hyprland-monitor-internal` | SAFE | package | 0.8.0 하이프랜드 토글. 내부 모니터 on/off. hyprland-toggle + monitor-laptop/-external-active 전이 |
+| `omarchy-hyprland-monitor-internal-mirror` | SAFE | package | 0.8.0 하이프랜드 토글. 내부 미러. 동일 전이 체인 |
+| `omarchy-hyprland-monitor-laptop` | SAFE | package | 0.8.0 하이프랜드 토글 전이. hyprctl 로 내부 패널 이름 |
 | `omarchy-hyprland-monitor-scaling` | SAFE | package | 바 monitor 위젯 (M8 Tier A) |
+| `omarchy-hyprland-toggle` | SAFE | package | 0.8.0 하이프랜드 토글 디스패처. $OMARCHY_PATH/default/hypr/toggles/$FLAG.lua 복사. 순수 사용자 상태 |
+| `omarchy-hyprland-toggle-disabled` | SAFE | package | 0.8.0 하이프랜드 토글 전이. 토글 플래그 부재 검사 |
+| `omarchy-hyprland-toggle-enabled` | SAFE | package | 0.8.0 하이프랜드 토글 전이. 토글 플래그 존재 검사 |
 | `omarchy-hyprland-window-close-all` | SAFE | package | logout/reboot/shutdown 전이 |
+| `omarchy-hyprland-window-gaps-toggle` | SAFE | package | 0.8.0 하이프랜드 토글. hyprland-toggle window-no-gaps 전이. toggles/window-no-gaps.lua 데이터 |
+| `omarchy-hyprland-window-single-square-aspect-toggle` | SAFE | package | 0.8.0 하이프랜드 토글. hyprland-toggle 전이 + notification. toggles/single-window-aspect-ratio.lua |
+| `omarchy-hyprland-workspace-layout-toggle` | SAFE | package | 0.8.0 하이프랜드 토글. hyprctl keyword layout 폴백. 토글 helper 미사용이라 가장 깔끔 |
 | `omarchy-launch-browser` | SAFE | package | M10 clipboard 전이 closure. xdg-utils + uwsm-app |
+| `omarchy-launch-config-editor` | SAFE | package | 0.8.0 런처. launch-editor(staged) 3행 래퍼 |
+| `omarchy-launch-discord-community` | SAFE | package | 0.8.0 런처. cmd-present discord 가드 후 launch-webapp 전이 |
 | `omarchy-launch-editor` | SAFE | package | M10 clipboard 전이 closure |
 | `omarchy-launch-tui` | SAFE | package | M10 clipboard 전이 closure |
+| `omarchy-launch-webapp` | SAFE | package | 0.8.0 런처 keystone. .desktop Exec 추출 → uwsm-app --app=$url. omarchy-* 의존 0 |
+| `omarchy-menu` | SAFE | package | 0.8.0. 순수 IPC 래퍼 — omarchy-shell shell toggle/summon/hide/call 만 호출 |
 | `omarchy-menu-clipboard` | SAFE | package | M10 clipboard. `shell toggle omarchy.clipboard` 얇은 프런트 |
 | `omarchy-menu-emoji` | SAFE | package | M10 emojis. 선택 시 copy+type 1회, 취소 무부작용 |
 | `omarchy-menu-emoji-insert` | SAFE | package | M10 emojis closure |
 | `omarchy-menu-images` | SAFE | package | M9 테마 메뉴 UI 프론트. `omarchy-shell` IPC 만 부른다 |
 | `omarchy-menu-select` | SAFE | package | M4 키바인딩 UI + 메뉴 select mode. payload → `omarchy-shell shell summon omarchy.menu` |
+| `omarchy-menu-timezone` | SAFE | package | 0.8.0. timedatectl list-timezones + menu-select + sudo set-timezone(대화형) |
+| `omarchy-menu-tmux-keybindings` | SAFE | package | 0.8.0. tmux(opt) 바인딩 검색. config/tmux/tmux.conf 폴백 미출시지만 사용자 설정 없으면 exit 1 로 degrade |
 | `omarchy-monitor-state` | SAFE | package | 바 monitor 위젯 (M8 Tier A). 첫 줄이 `omarchy-brightness-display` |
 | `omarchy-network-band` | SAFE | package | 바 network 위젯 (M8 Tier A) |
 | `omarchy-network-status` | SAFE | package | 바 network 위젯 (M8 Tier A). 메뉴 `when` 가드로도 쓰임 |
 | `omarchy-notification-send` | SAFE | package | M8 Tier B 묶음. `omarchy-reminder` 와 `omarchy-theme-set` 이 부른다 (실측) |
 | `omarchy-osd` | SAFE | package | M10 OSD. 직접 IPC 프런트, shell 실패는 non-zero 전파 |
 | `omarchy-plugin-catalog` | SAFE | package | `omarchy-bar` 전이 |
+| `omarchy-powerprofiles-list` | SAFE | package | 0.8.0. powerprofilesctl list 파싱 |
+| `omarchy-powerprofiles-set` | SAFE | package | 0.8.0. busctl UPower OnBattery + 사용자 상태. powerprofiles-list 전이 |
+| `omarchy-refresh-config` | SAFE | package | 0.8.0. $OMARCHY_PATH/config/* → ~/.config 복사 유틸. 파일 부재 시 exit 1 |
 | `omarchy-reminder` | SAFE | package | M8 Tier B. user systemd timer + ${XDG_RUNTIME_DIR}/omarchy-reminders metadata 만 사용 |
 | `omarchy-restart-audio` | SAFE | package | audio-tuning stale daemon drop-in 제거 경로. pipewire/wireplumber user 서비스. USB 복구는 `usbreset` 가드 |
+| `omarchy-restart-bluetooth` | SAFE | package | 0.8.0. rfkill unblock/list bluetooth. Omarchy 의존 0 |
 | `omarchy-restart-btop` | SAFE | package | M9 theme-set post 훅 |
 | `omarchy-restart-helix` | SAFE | package | M9 theme-set post 훅 |
 | `omarchy-restart-hyprctl` | SAFE | package | M9 theme-set post 훅 |
 | `omarchy-restart-opencode` | SAFE | package | M9 theme-set post 훅 |
 | `omarchy-restart-terminal` | SAFE | package | M9 theme-set post 훅 — 새 팔레트 반영 |
+| `omarchy-restart-trackpad` | SAFE | package | 0.8.0. i2c_hid_acpi 언바인드/바인드 + modprobe. 표준 sysfs/sudo |
+| `omarchy-restart-wifi` | SAFE | package | 0.8.0. rfkill unblock wifi + nmcli radio. 표준 도구 |
 | `omarchy-shell-config` | SAFE | package | `omarchy-bar` 가 source 하는 설정 헬퍼 |
 | `omarchy-state` | SAFE | package | reboot/shutdown 전이 |
+| `omarchy-sudo-passwordless` | SAFE | package | 0.8.0. /etc/sudoers.d/99-omarchy-nopasswd-$USER 작성 + systemd-run 자동 만료. self-contained |
 | `omarchy-system-lock` | SAFE | package | 메뉴 `system.lock`. `omarchy-shell lock lock`. `omarchy-apply-lock` 이 만든 PAM 서비스가 있어야 실제로 잠긴다 |
 | `omarchy-system-logout` | SAFE | package | 메뉴 `system.logout`. `uwsm stop` + osd/close-all 전이 |
 | `omarchy-system-reboot` | SAFE | package | 메뉴 `system.reboot`. osd/state/close-all 전이 |
@@ -231,8 +302,10 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-theme-color` | SAFE | package | M9 테마 코어 |
 | `omarchy-theme-colors-from-alacritty` | SAFE | package | M9 theme-set 코어 체인 |
 | `omarchy-theme-current` | SAFE | package | M9 테마 코어 |
+| `omarchy-theme-install` | SAFE | package | 0.8.0. git clone + omarchy-theme-set. SPEC §44 Tier C 에서 회수 — channel/pkg 인프라 미사용 |
 | `omarchy-theme-list` | SAFE | package | M9 테마 코어 |
 | `omarchy-theme-osc` | SAFE | package | M9 테마 코어 |
+| `omarchy-theme-remove` | SAFE | package | 0.8.0. ~/.config/omarchy/themes rm -rf + menu-select. SPEC §44 Tier C 에서 회수 |
 | `omarchy-theme-set` | SAFE | package | M9 테마 코어. $OMARCHY_PATH/themes + default/themed 참조 |
 | `omarchy-theme-set-claude` | SAFE | package | M9 앱별 테마 적용 |
 | `omarchy-theme-set-foot` | SAFE | package | M9 앱별 테마 적용 |
@@ -243,10 +316,22 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-theme-set-tmux` | SAFE | package | M9 앱별 테마 적용 |
 | `omarchy-theme-set-vscode` | SAFE | package | M9 앱별 테마 적용 |
 | `omarchy-theme-switcher` | SAFE | package | M9 테마 전환 UI |
+| `omarchy-theme-update` | SAFE | package | 0.8.0. 사용자 테마 git 디르 git pull. SPEC §44 Tier C 에서 회수 |
+| `omarchy-toggle` | SAFE | package | 0.8.0 토글 디스패처. ~/.local/state/omarchy/toggles/$FLAG 파일 플립. toggle-enabled 과 동일 티어 |
+| `omarchy-toggle-bar` | SAFE | package | 0.8.0. omarchy-toggle bar-off 전이. 바 플러그인이 플래그 읽음 |
 | `omarchy-toggle-enabled` | SAFE | package | `theme-set-vscode` 의 skip 토글 게이트. 사용자 상태 존재만 읽는 1행 테스트 (RUNTIME_STARTUP §18.6) |
+| `omarchy-toggle-idle` | SAFE | package | 0.8.0. ~/.local/state/omarchy/indicators/stay-awake 토글. 외부 의존 0 |
 | `omarchy-toggle-input-device` | SAFE | package | touchpad/touchscreen 토글 실체. `hyprctl eval` 즉시 적용. hypr toggles lua 지속은 CachyOS 에서 best-effort |
+| `omarchy-toggle-nightlight` | SAFE | package | 0.8.0. hyprsunset 온도 토글 + uwsm-app 기동 보장 + shell IPC |
+| `omarchy-toggle-notification-silencing` | SAFE | package | 0.8.0. omarchy-shell notifications toggleDnd 2행 IPC |
+| `omarchy-toggle-screensaver` | SAFE | package | 0.8.0. omarchy-toggle screensaver-off 전이. 잠금 플러그인이 플래그 읽음 |
 | `omarchy-toggle-touchpad` | SAFE | package | `omarchy-toggle-input-device touchpad` 프런트. 메뉴 Hardware > Touchpad |
 | `omarchy-toggle-touchscreen` | SAFE | package | `omarchy-toggle-input-device touchscreen` 프런트. 메뉴 Hardware > Touchscreen |
+| `omarchy-tui-install` | SAFE | package | 0.8.0. ~/.local/share/applications TUI .desktop 작성. gum/curl/gtk-update-icon-cache |
+| `omarchy-tui-remove` | SAFE | package | 0.8.0. xdg-terminal-exec TUI .desktop 스캔/삭제. menu-select 전이 |
+| `omarchy-update-time` | SAFE | package | 0.8.0. sudo systemctl restart systemd-timesyncd |
+| `omarchy-webapp-install` | SAFE | package | 0.8.0. ~/.local/share/applications webapp .desktop + 아이콘. launch-webapp 가 Exec |
+| `omarchy-webapp-remove` | SAFE | package | 0.8.0. launch-webapp Exec .desktop 스캔/삭제. menu-select + update-desktop-database |
 <!-- STAGED_AUDIT_END -->
 
 ---
@@ -286,38 +371,38 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-bar` | SAFE | package | 업스트림 `bin/omarchy-bar` (`omarchy bar`). 메뉴 `style.bar` position/transparent. 전이 `omarchy-shell-config` + `omarchy-plugin-catalog`. layer-shell 네임스페이스 `omarchy-bar` 와 동명·별개. 가시성 토글은 `omarchy-toggle-bar` |
 | `omarchy-branding-about` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
 | `omarchy-branding-screensaver` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
-| `omarchy-capture-qr` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-capture-screenrecording` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-capture-screenrecording-with-webcam` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-capture-screenshot` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-capture-text` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-capture-qr` | SAFE | package | 0.8.0 verbatim stage. hyprpicker/slurp/grim + zbarimg(opt) |
+| `omarchy-capture-screenrecording` | SAFE | package | 0.8.0 verbatim stage. capture-region/-webcam-* 전이. gpu-screen-recorder 등 opt |
+| `omarchy-capture-screenrecording-with-webcam` | SAFE | package | 0.8.0 verbatim stage. capture-webcam-list + capture-screenrecording 프런트 |
+| `omarchy-capture-screenshot` | SAFE | package | 0.8.0 verbatim stage. capture-region 전이 + grim |
+| `omarchy-capture-text` | SAFE | package | 0.8.0 verbatim stage. slurp/grim + tesseract(opt) 부재 시 exit 1 |
 | `omarchy-channel-current` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-channel-set` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-cmd-present` | SAFE | package | `command -v` 루프뿐인 가드. M9·M10 체인과 메뉴 `when` 이 함께 쓰므로 스테이징한다 (스테이징 전수 참조) |
 | `omarchy-default-agent` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-default-browser` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-default-editor` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-default-terminal` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-dns` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-default-browser` | SAFE | package | 0.8.0 verbatim stage. xdg-settings default-web-browser |
+| `omarchy-default-editor` | SAFE | package | 0.8.0 verbatim stage. ~/.local/state/omarchy/defaults/editor 사용자 상태 |
+| `omarchy-default-terminal` | SAFE | package | 0.8.0 verbatim stage. xdg-terminal-exec + xdg-terminals.list |
+| `omarchy-dns` | SAFE | package | 0.8.0 verbatim stage. nmcli/systemctl/resolved. Omarchy 의존 0 |
 | `omarchy-drive-password` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-emacs` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-font-current` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-font-list` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-font-current` | SAFE | package | 0.8.0 verbatim stage. fc-match |
+| `omarchy-font-list` | SAFE | package | 0.8.0 verbatim stage. fc-list |
 | `omarchy-font-set` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-games-retro-install` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-hibernation-available` | DISABLED | disable | when/checked 가드. 바이너리 없으면 행이 숨겨짐 |
-| `omarchy-hw-dell-xps-haptic-touchpad` | DISABLED | disable | when/checked 가드. 바이너리 없으면 행이 숨겨짐 |
+| `omarchy-hibernation-available` | SAFE | package | 0.8.0 verbatim stage. /proc/swaps·/sys 읽기 전용 프로브. omarchy_resume.conf 부재 시 exit 1 로 행 숨김(기능 caveat: CachyOS resume 이 다른 경로면 행이 계속 숨음) |
+| `omarchy-hw-dell-xps-haptic-touchpad` | SAFE | package | 0.8.0 verbatim stage. omarchy-hw-match + /sys/bus/i2c. 행 action 은 cmd-present dell-xps-touchpad-haptics opt-in |
 | `omarchy-hw-fingerprint` | DISABLED | disable | when/checked 가드. 바이너리 없으면 행이 숨겨짐 |
 | `omarchy-hw-hybrid-gpu` | DISABLED | disable | when/checked 가드. 바이너리 없으면 행이 숨겨짐 |
-| `omarchy-hw-laptop` | DISABLED | disable | when 가드. 올리면 laptop-display/mirror 행이 드러나는데 그 action 은 CachyOS 에서 래퍼가 필요하므로 가드도 올리지 않는다 |
+| `omarchy-hw-laptop` | SAFE | package | 0.8.0 verbatim stage. /proc/acpi + DMI sysfs. laptop-display/mirror 행 action 은 monitor-internal 스크립트(스테이징됨) — cascade 정합 |
 | `omarchy-hw-touchpad` | SAFE | package | `hyprctl devices -j` 읽기. 메뉴 Hardware > Touchpad `when` |
 | `omarchy-hw-touchscreen` | SAFE | package | `hyprctl devices -j` 읽기. 메뉴 Hardware > Touchscreen `when` |
-| `omarchy-hw-webcam` | DISABLED | disable | when/checked 가드. 바이너리 없으면 행이 숨겨짐 |
-| `omarchy-hyprland-monitor-internal` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-hyprland-monitor-internal-mirror` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-hyprland-window-gaps-toggle` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-hyprland-window-single-square-aspect-toggle` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-hyprland-workspace-layout-toggle` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-hw-webcam` | SAFE | package | 0.8.0 verbatim stage. capture-webcam-list 전이. 행 action 은 capture-screenrecording-with-webcam(스테이징됨) |
+| `omarchy-hyprland-monitor-internal` | SAFE | package | 0.8.0 verbatim stage. hyprland-toggle + monitor-laptop/-external-active 전이. toggles/*.lua 데이터 함께 ship |
+| `omarchy-hyprland-monitor-internal-mirror` | SAFE | package | 0.8.0 verbatim stage. 동일 hyprland-toggle/monitor 전이 체인 |
+| `omarchy-hyprland-window-gaps-toggle` | SAFE | package | 0.8.0 verbatim stage. hyprland-toggle window-no-gaps 전이 + toggles/window-no-gaps.lua |
+| `omarchy-hyprland-window-single-square-aspect-toggle` | SAFE | package | 0.8.0 verbatim stage. hyprland-toggle 전이 + toggles/single-window-aspect-ratio.lua |
+| `omarchy-hyprland-workspace-layout-toggle` | SAFE | package | 0.8.0 verbatim stage. hyprctl keyword layout 폴백. 토글 helper 미사용 |
 | `omarchy-install-ai-chatgpt` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
 | `omarchy-install-and-launch` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
 | `omarchy-install-app` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
@@ -348,30 +433,30 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-install-service-tailscale` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
 | `omarchy-install-terminal` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
 | `omarchy-launch-about` | DISABLED | disable | 공식 런처/웹앱/플로팅 터미널 |
-| `omarchy-launch-config-editor` | DISABLED | disable | 공식 런처/웹앱/플로팅 터미널 |
-| `omarchy-launch-discord-community` | DISABLED | disable | 공식 런처/웹앱/플로팅 터미널 |
+| `omarchy-launch-config-editor` | SAFE | package | 0.8.0 verbatim stage. launch-editor(staged) 3행 래퍼 |
+| `omarchy-launch-discord-community` | SAFE | package | 0.8.0 verbatim stage. cmd-present discord 후 launch-webapp 전이 |
 | `omarchy-launch-floating-terminal-with-presentation` | DISABLED | disable | 공식 런처/웹앱/플로팅 터미널 |
 | `omarchy-launch-screensaver` | DISABLED | disable | 공식 런처/웹앱/플로팅 터미널 |
-| `omarchy-launch-webapp` | DISABLED | disable | 공식 런처/웹앱/플로팅 터미널 |
-| `omarchy-menu` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-launch-webapp` | SAFE | package | 0.8.0 verbatim stage. .desktop Exec 추출 → uwsm-app --app=$url. keystone |
+| `omarchy-menu` | SAFE | package | 0.8.0 verbatim stage. 순수 IPC 래퍼 — omarchy-shell toggle/summon/hide/call |
 | `omarchy-menu-emoji` | SAFE | package | M10: verbatim stage (`shell toggle omarchy.emojis`) + `omarchy-menu-emoji-insert` closure. wtype/wl-copy 는 hard depends |
 | `omarchy-menu-herdr-keybindings` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-menu-keybindings` | ADAPTED | wrapper | M4 SUPER+K → `cachy-omarchy-keybindings`. compat 에 같은 이름의 shim 을 두지 않으므로 메뉴 행 실행은 여전히 실패(범위는 SUPER+K 만) |
 | `omarchy-menu-plugin` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-menu-share` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-menu-timezone` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-menu-tmux-keybindings` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-menu-timezone` | SAFE | package | 0.8.0 verbatim stage. timedatectl + menu-select + 대화형 sudo set-timezone |
+| `omarchy-menu-tmux-keybindings` | SAFE | package | 0.8.0 verbatim stage. tmux(opt) 바인딩 검색. config/tmux 폴백 미출시지만 exit 1 로 degrade |
 | `omarchy-network-status` | SAFE | package | 바 network 위젯 (M8 Tier A). 메뉴 `when` 가드로도 쓰인다 |
 | `omarchy-pkg-aur-install` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
 | `omarchy-pkg-install` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
-| `omarchy-pkg-present` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-pkg-present` | DISABLED | disable | pacman -Q 루프 자체는 동작하나, 가드 통과 시 미스테이지드 omarchy-pkg-install/-remove 행이 드러나 cascade 실패 — omarchy-hw-laptop 반증과 동일 패턴이라 올리지 않는다 |
 | `omarchy-pkg-remove` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
 | `omarchy-plugin-add` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-plymouth-reset` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
 | `omarchy-plymouth-set-by-theme` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
 | `omarchy-plymouth-switcher` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
-| `omarchy-powerprofiles-list` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-powerprofiles-set` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-powerprofiles-list` | SAFE | package | 0.8.0 verbatim stage. powerprofilesctl list 파싱 |
+| `omarchy-powerprofiles-set` | SAFE | package | 0.8.0 verbatim stage. busctl UPower + 사용자 상태. powerprofiles-list 전이 |
 | `omarchy-refresh-hyprland` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-refresh-hyprsunset` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-refresh-plymouth` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
@@ -396,18 +481,18 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-remove-service-dropbox` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
 | `omarchy-remove-service-tailscale` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
 | `omarchy-restart-audio` | SAFE | package | audio-tuning 전이. 메뉴 `update.hardware.audio` 는 여전히 `omarchy-launch-floating-terminal-with-presentation` 뒤에 붙어 그 런처가 없으면 행 실행은 실패 |
-| `omarchy-restart-bluetooth` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-restart-bluetooth` | SAFE | package | 0.8.0 verbatim stage. rfkill unblock/list bluetooth |
 | `omarchy-restart-hyprsunset` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-restart-shell` | ADAPTED | wrapper | later `cachy-omarchy-reload`. M3 미구현 |
-| `omarchy-restart-trackpad` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-restart-wifi` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-restart-trackpad` | SAFE | package | 0.8.0 verbatim stage. i2c_hid_acpi 언바인드/바인드 + modprobe |
+| `omarchy-restart-wifi` | SAFE | package | 0.8.0 verbatim stage. rfkill + nmcli radio |
 | `omarchy-restart-xcompose` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-setup-direct-boot` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-setup-security-fido2` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-setup-security-fingerprint` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-setup-security-sshd` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-shell` | ADAPTED | wrapper | M2 `cachy-omarchy-shell --ipc`. 메뉴의 summon/toggle 경로 |
-| `omarchy-sudo-passwordless` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-sudo-passwordless` | SAFE | package | 0.8.0 verbatim stage. /etc/sudoers.d/99-omarchy-nopasswd-$USER + systemd-run 자동 만료. self-contained 이고 패스워드리스 sudo 를 부여하는 보안 민감 토글 |
 | `omarchy-system-factory-reset` | DISABLED | disable | Omarchy ISO `@factory` 전제. CachyOS PATH 에 올리지 않음. lock/logout/reboot/shutdown 과 별개 |
 | `omarchy-system-lock` | SAFE | package | 메뉴 `system.lock`. `omarchy-shell lock lock` + 이미 스테이징된 `omarchy-cmd-present` |
 | `omarchy-system-logout` | SAFE | package | 메뉴 `system.logout`. 전이 `omarchy-osd` + `omarchy-hyprland-window-close-all`. `uwsm stop` |
@@ -416,31 +501,31 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-theme-bg-install` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
 | `omarchy-theme-bg-set` | SAFE | package | M9 배경 묶음 |
 | `omarchy-theme-bg-switcher` | SAFE | package | M9 배경 묶음 |
-| `omarchy-theme-install` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
-| `omarchy-theme-remove` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
+| `omarchy-theme-install` | SAFE | package | 0.8.0 verbatim stage. git clone + omarchy-theme-set. SPEC §44 Tier C 에서 회수 — channel/pkg 미사용 |
+| `omarchy-theme-remove` | SAFE | package | 0.8.0 verbatim stage. ~/.config/omarchy/themes rm + menu-select. SPEC §44 Tier C 회수 |
 | `omarchy-theme-set` | SAFE | package | M9 테마 코어. `$OMARCHY_PATH/themes` + `default/themed` 참조 |
 | `omarchy-theme-switcher` | SAFE | package | M9 테마 전환 UI |
-| `omarchy-theme-update` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
-| `omarchy-toggle-bar` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
+| `omarchy-theme-update` | SAFE | package | 0.8.0 verbatim stage. 사용자 테마 git 디르 git pull. SPEC §44 Tier C 회수 |
+| `omarchy-toggle-bar` | SAFE | package | 0.8.0 verbatim stage. omarchy-toggle bar-off 전이(디스패처 동반 스테이징). 바 플러그인이 플래그 읽음 |
 | `omarchy-toggle-crash-capture` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
 | `omarchy-toggle-enabled` | SAFE | package | `omarchy-theme-set-vscode` 의 skip 토글 게이트 (RUNTIME_STARTUP §18.6) |
 | `omarchy-toggle-hybrid-gpu` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
-| `omarchy-toggle-idle` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
-| `omarchy-toggle-nightlight` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
-| `omarchy-toggle-notification-silencing` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
-| `omarchy-toggle-screensaver` | DISABLED | disable | 바/토글. 내장 바는 M5. 플러그인 disable이 우선 |
+| `omarchy-toggle-idle` | SAFE | package | 0.8.0 verbatim stage. ~/.local/state/omarchy/indicators/stay-awake 토글. 외부 의존 0 |
+| `omarchy-toggle-nightlight` | SAFE | package | 0.8.0 verbatim stage. hyprsunset 온도 토글 + shell IPC |
+| `omarchy-toggle-notification-silencing` | SAFE | package | 0.8.0 verbatim stage. omarchy-shell notifications toggleDnd 2행 IPC |
+| `omarchy-toggle-screensaver` | SAFE | package | 0.8.0 verbatim stage. omarchy-toggle screensaver-off 전이. 잠금 플러그인이 플래그 읽음 |
 | `omarchy-toggle-touchpad` | SAFE | package | 메뉴 Hardware > Touchpad. `hyprctl eval` 즉시 토글. hypr lua 지속은 CachyOS 에서 best-effort |
 | `omarchy-toggle-touchscreen` | SAFE | package | 메뉴 Hardware > Touchscreen. `hyprctl eval` 즉시 토글 |
 | `omarchy-transcode` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-tui-install` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-tui-remove` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-tui-install` | SAFE | package | 0.8.0 verbatim stage. ~/.local/share/applications TUI .desktop + 아이콘 |
+| `omarchy-tui-remove` | SAFE | package | 0.8.0 verbatim stage. xdg-terminal-exec TUI .desktop 스캔/삭제 |
 | `omarchy-update` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-update-firmware` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-update-time` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-update-time` | SAFE | package | 0.8.0 verbatim stage. sudo systemctl restart systemd-timesyncd |
 | `omarchy-voxtype-install` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-voxtype-remove` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-webapp-handler` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-webapp-install` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-webapp-remove` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-webapp-install` | SAFE | package | 0.8.0 verbatim stage. ~/.local/share/applications webapp .desktop + 아이콘. launch-webapp 가 Exec |
+| `omarchy-webapp-remove` | SAFE | package | 0.8.0 verbatim stage. launch-webapp Exec .desktop 스캔/삭제 |
 | `omarchy-windows-vm` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 <!-- MENU_AUDIT_END -->

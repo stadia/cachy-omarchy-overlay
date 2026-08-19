@@ -36,15 +36,23 @@ if [[ -f $shell_artifact ]]; then
            omarchy-brightness-display-apple omarchy-hw-display \
            omarchy-hyprland-monitor-focused omarchy-hyprland-monitor-focused-apple \
            omarchy-hw-touchpad omarchy-hw-touchscreen omarchy-toggle-touchpad \
-           omarchy-toggle-touchscreen omarchy-toggle-input-device; do
+           omarchy-toggle-touchscreen omarchy-toggle-input-device \
+           omarchy-theme-install omarchy-theme-update omarchy-theme-remove \
+           omarchy-toggle-bar omarchy-hw-laptop omarchy-hyprland-monitor-internal \
+           omarchy-hyprland-toggle omarchy-capture-screenshot omarchy-capture-region \
+           omarchy-powerprofiles-set omarchy-launch-webapp omarchy-sudo-passwordless \
+           omarchy-menu omarchy-dns; do
     assert_contains "$list" "usr/share/cachy-omarchy/upstream/bin/$h" "shell artifact has helper: $h"
   done
   assert_contains "$list" "usr/share/cachy-omarchy/upstream/default/audio/filter-chain-host.conf" \
     "shell artifact has audio tuning host config"
   assert_contains "$list" "usr/share/cachy-omarchy/upstream/default/systemd/user/omarchy-speaker-tuning.service" \
     "shell artifact has speaker-tuning unit template"
-  for h in omarchy-system-factory-reset omarchy-system-factory-reset-finish \
-           omarchy-hw-laptop omarchy-hyprland-monitor-internal; do
+  for f in flags.lua single-window-aspect-ratio.lua window-no-gaps.lua; do
+    assert_contains "$list" "usr/share/cachy-omarchy/upstream/default/hypr/toggles/$f" \
+      "shell artifact has toggle snippet: $f"
+  done
+  for h in omarchy-system-factory-reset omarchy-system-factory-reset-finish; do
     if [[ $list == *"upstream/bin/$h"* ]]; then
       printf 'FAIL: excluded helper leaked into artifact: %s\n' "$h"
       ASSERT_FAILURES=$((ASSERT_FAILURES + 1))

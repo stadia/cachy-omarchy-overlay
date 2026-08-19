@@ -38,13 +38,23 @@ for h in omarchy-theme-set-foot omarchy-theme-set-tmux \
   assert_file_exists "$bin/$h" "Tier B 스테이징: $h"
 done
 
-# Tier C — 넣지 않는다 (네트워크/전체 OS 가정/하드웨어 전용, 설계 문서 D3).
+# 0.8.0 회수 — theme-install/update/remove 는 self-contained 실측으로
+# Tier C 에서 회수돼 verbatim 스테이징된다 (git clone/pull + rm -rf +
+# 이미 staged omarchy-theme-set). SPEC §44 갱신 참조.
+for h in omarchy-theme-install omarchy-theme-update omarchy-theme-remove ; do
+  assert_file_exists "$bin/$h" "0.8.0 회수 스테이징: $h"
+  [[ -x $bin/$h ]] && x=0 || x=1
+  assert_eq "$x" "0" "실행 가능: $h"
+  if cmp -s "$src/bin/$h" "$bin/$h"; then x=0; else x=1; fi
+  assert_eq "$x" "0" "verbatim: $h 는 업스트림과 바이트 동일"
+done
+
+# Tier C — 넣지 않는다 (/etc 쓰기·하드웨어 전용·개발 도구, 설계 문서 D3).
 # 이 단언은 $OMARCHY_PATH/bin (스테이징된 upstream bin) 에만 건다 — 트리
 # 전체를 대상으로 하면 Task 3 의 compat no-op shim 2개(browser/keyboard)에
 # 걸려 거짓 실패한다. shim 은 stage-overlay.sh 가 compat/bin 에 놓는 우리
 # 자산이므로 이 스테이징 산출물에는 애초에 나타나지 않는다 (R02 ①).
-for h in omarchy-theme-install omarchy-theme-update omarchy-theme-remove \
-         omarchy-theme-bg-install omarchy-plymouth-set-by-theme \
+for h in omarchy-theme-bg-install omarchy-plymouth-set-by-theme \
          omarchy-theme-set-browser omarchy-theme-set-keyboard \
          omarchy-theme-set-keyboard-asus-rog omarchy-theme-set-keyboard-f16 \
          omarchy-dev-theme-preview omarchy-dev-benchmark-theme-switcher ; do

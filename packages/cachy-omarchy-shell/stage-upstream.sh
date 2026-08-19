@@ -23,6 +23,14 @@ cp -a "$src/default/themed" "$dest/usr/share/cachy-omarchy/upstream/default/"
 cp -a "$src/default/audio" "$dest/usr/share/cachy-omarchy/upstream/default/"
 install -D -m644 "$src/default/systemd/user/omarchy-speaker-tuning.service" \
   "$dest/usr/share/cachy-omarchy/upstream/default/systemd/user/omarchy-speaker-tuning.service"
+# 하이프랜드 토글 스니펫 (0.8.0): omarchy-hyprland-toggle 의 on() 경로가
+# $OMARCHY_PATH/default/hypr/toggles/$FLAG.lua 를 사용자 hypr 설정으로 복사한다
+# (bin/omarchy-hyprland-toggle:18 FLAG_SOURCE). 정적 lua 조각 3개 —
+# flags.lua / single-window-aspect-ratio.lua / window-no-gaps.lua. default/hypr
+# 전체가 아니라 이 디렉터리만 올린다 (나머지 hypr 설정은 CachyOS 소유).
+install -d "$dest/usr/share/cachy-omarchy/upstream/default/hypr"
+cp -a "$src/default/hypr/toggles" \
+  "$dest/usr/share/cachy-omarchy/upstream/default/hypr/toggles"
 # 바·패널 위젯이 bare name 으로 부르는 업스트림 helper 를 verbatim 으로
 # 스테이징한다 (셸 래퍼가 $OMARCHY_PATH/bin 을 셸 프로세스 PATH 에 붙인다).
 # 목록은 위젯 실측에서 나왔다 — M8 평가 문서 "helper 처리 방침" Tier A·B.
@@ -150,6 +158,93 @@ helpers=(
   omarchy-toggle-touchpad
   omarchy-toggle-touchscreen
   omarchy-toggle-input-device
+  # ── verbatim 확장 (0.8.0): 감사 실측이 "공식 omarchy 전체 OS 가정" 분류를
+  # 뒤집은 명령들. 전부 업스트림 원본 그대로 올린다 — 래퍼/적응 카피 없음.
+  # docs/COMMAND_AUDIT.md 의 감사 실측과 테스트 전수가 근거다.
+  #
+  # 캡처 묶음: screenshot/screenrecording/-with-webcam/qr/text 는
+  # omarchy-capture-region/-webcam-list/-webcam-resize 전이 closure 다.
+  # 중하드웨어 도구(gpu-screen-recorder/tesseract/zbarimg/mpv)는 optdepend —
+  # 부재 시 조용히 빈 결과/exit 1, 셸을 죽이지 않는다.
+  omarchy-capture-qr
+  omarchy-capture-text
+  omarchy-capture-screenshot
+  omarchy-capture-screenrecording
+  omarchy-capture-screenrecording-with-webcam
+  omarchy-capture-region
+  omarchy-capture-webcam-list
+  omarchy-capture-webcam-resize
+  # 하이프랜드 토글 묶음: window/monitor/workspace 토글 본체 + 그 전이
+  # 디스패처(toggle/-toggle-enabled/-toggle-disabled/-monitor-laptop/
+  # -monitor-external-active). on() 경로가 $OMARCHY_PATH/default/hypr/toggles
+  # 의 정적 lua 스니펫을 복사한다 — 아래 데이터 cp 로 같이 올린다.
+  omarchy-hyprland-window-gaps-toggle
+  omarchy-hyprland-window-single-square-aspect-toggle
+  omarchy-hyprland-workspace-layout-toggle
+  omarchy-hyprland-monitor-internal
+  omarchy-hyprland-monitor-internal-mirror
+  omarchy-hyprland-toggle
+  omarchy-hyprland-toggle-enabled
+  omarchy-hyprland-toggle-disabled
+  omarchy-hyprland-monitor-laptop
+  omarchy-hyprland-monitor-external-active
+  # 가시성/잠금화면 토글: 본체가 `omarchy-toggle <flag>-off` 디스패처를 부른다.
+  # omarchy-toggle 은 ~/.local/state/omarchy/toggles/<flag> 파일을 뒤집는 순수
+  # 사용자 상태 플리퍼(omarchy-toggle-enabled 와 동일 티어). crash-capture 는
+  # 미출시 user unit 이 필요해 제외. nightlight/idle/notification-silencing 는
+  # IPC 또는 사용자 상태 파일만 건드린다.
+  omarchy-toggle-bar
+  omarchy-toggle-screensaver
+  omarchy-toggle
+  omarchy-toggle-idle
+  omarchy-toggle-nightlight
+  omarchy-toggle-notification-silencing
+  # 파워프로파일: powerprofilesctl + busctl(UPower). -set 이 -list 를 부른다.
+  omarchy-powerprofiles-list
+  omarchy-powerprofiles-set
+  # 기본 앱 설정: xdg-settings/xdg-terminal-exec + 사용자 상태. omarchy-* 의존 0.
+  omarchy-default-browser
+  omarchy-default-editor
+  omarchy-default-terminal
+  # 웹앱/TUI 런치 묶음: launch-webapp 가 keystone — .desktop Exec 추출 후
+  # uwsm-app --app=$url. discord-community 와 webapp-install(.desktop 가
+  # launch-webapp 를 가리킴) 이 전이. webapp-remove/tui-remove 는 메뉴 선택으로
+  # 삭제. tui-install/webapp-install 은 gum(이미 다른 staged helper 의 런타임
+  # 불변) + curl + gtk-update-icon-cache.
+  omarchy-launch-webapp
+  omarchy-launch-config-editor
+  omarchy-launch-discord-community
+  omarchy-webapp-install
+  omarchy-webapp-remove
+  omarchy-tui-install
+  omarchy-tui-remove
+  # 하드웨어 탐지 가드: sysfs/DMI/hyprctl 만 읽는 when/checked 프로브.
+  # hw-laptop 은 laptop-display/mirror 행을 드러내는데 그 action 이 위
+  # monitor-internal 스크립트로 라우팅된다(스테이징됨). hw-webcam 은
+  # capture-webcam-list 전이. haptic-touchpad 행은 cmd-present 가드로 opt-in.
+  omarchy-hw-laptop
+  omarchy-hw-webcam
+  omarchy-hw-dell-xps-haptic-touchpad
+  # 단독 self-contained: 표준 도구 + 이미 staged helper 만.
+  omarchy-menu
+  omarchy-menu-timezone
+  omarchy-menu-tmux-keybindings
+  omarchy-dns
+  omarchy-font-current
+  omarchy-font-list
+  omarchy-hibernation-available
+  omarchy-refresh-config
+  omarchy-restart-bluetooth
+  omarchy-restart-wifi
+  omarchy-restart-trackpad
+  omarchy-update-time
+  omarchy-sudo-passwordless
+  # 테마 사용자 설치/갱신/삭제: git clone/pull + rm -rf ~/.config/omarchy/themes.
+  # SPEC §44 Tier C "network installs" 제외에서 회수 — 스크립트는 self-contained
+  # 이고 omarchy-theme-set(staged) 만 부른다. channel/pkg 인프라 미사용.
+  omarchy-theme-install
+  omarchy-theme-remove
+  omarchy-theme-update
 )
 
 for helper in "${helpers[@]}"; do

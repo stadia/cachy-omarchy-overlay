@@ -2205,15 +2205,21 @@ record lives in the private development tree
   Quattro's `shell/Commons/Color.qml` already reads. No relocation.
 - The first-run default is "Tokyo Night", seeded by `cachy-omarchy-init`
   only when no theme exists yet (§38).
-- Tier C helpers are not staged: `omarchy-theme-install/update/remove`
-  (network installs), `omarchy-plymouth-set-by-theme` (writes /etc),
-  `omarchy-theme-set-browser` (writes /etc policies),
+- Tier C helpers are not staged: `omarchy-plymouth-set-by-theme`
+  (writes /etc), `omarchy-theme-set-browser` (writes /etc policies),
   `omarchy-theme-set-keyboard*` (hardware-specific). Because
   `omarchy-theme-set` unconditionally calls the browser/keyboard hooks by
   name, both ship as no-op compat shims (`compat/bin/`, §44) — without them
   every theme switch leaks "command not found" to stderr while exiting 0.
   The menu entries for excluded helpers remain visible as dead entries; that
   is accepted rather than patching the staged `omarchy-menu.jsonc`.
+- `omarchy-theme-install`/`-update`/`-remove` were Tier C ("network installs")
+  but are staged as of 0.8.0: the audit read of the upstream scripts showed
+  they are self-contained (`git clone`/`git pull`/`rm -rf ~/.config/omarchy/themes`
+  + the already-staged `omarchy-theme-set`) with no channel/pkg/`omarchy-settings`
+  dependency. The 0.8.0 verbatim expansion (`docs/COMMAND_AUDIT.md`) reclaimed
+  them alongside 52 other helpers the "full Omarchy OS" assumption had
+  mis-classified as DISABLED.
 
 The shell-side palette requires no code change: Color.qml watches
 `current/theme/colors.toml` and `shell.toml`, and the generated
