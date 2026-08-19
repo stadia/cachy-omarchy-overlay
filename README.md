@@ -20,8 +20,8 @@ Two Arch packages are produced.
 
 | Package | Version | Role |
 |---|---|---|
-| `cachy-omarchy-shell` | 4.0.0-8 | The pinned Omarchy Quattro shell runtime (Quickshell tree, `omarchy-settings` excluded) |
-| `cachy-omarchy-overlay` | 0.6.1-1 | The CachyOS integration layer (wrapper commands, Hyprland bindings, defaults) |
+| `cachy-omarchy-shell` | 4.0.0-9 | The pinned Omarchy Quattro shell runtime (Quickshell tree, `omarchy-settings` excluded) |
+| `cachy-omarchy-overlay` | 0.7.0-1 | The CachyOS integration layer (wrapper commands, Hyprland bindings, defaults) |
 
 The upstream pin is managed by `upstream.lock` (currently `basecamp/omarchy @ v4.0.0`,
 `f0020448`).
@@ -146,6 +146,9 @@ file only.
 - **v0.6** — stage menu `style.bar` and session lock/logout/reboot/shutdown
   helpers (`omarchy-bar` plus config/catalog/state/window-close). Factory-reset
   stays off PATH (Omarchy ISO `@factory`). Done (`v0.6.0`).
+- **v0.7** — stage audio output switch/tuning templates, display brightness,
+  and touchpad/touchscreen guards verbatim. Laptop/monitor-internal stay off
+  PATH (need wrappers). Done (`v0.7.0`). Measurements: `docs/RUNTIME_STARTUP.md` §21.1.
 
 ## License
 
