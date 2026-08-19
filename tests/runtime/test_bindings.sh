@@ -20,8 +20,12 @@ csrc=$(cat "$CONF")
 assert_contains "$csrc" "SUPER, SPACE" "conf 가 SUPER+SPACE 를 바인딩한다"
 assert_contains "$csrc" "cachy-omarchy-launcher" "conf 대상은 런처"
 assert_contains "$csrc" "unbind = SUPER, K" "conf 는 SUPER+K 를 먼저 unbind 한다"
-assert_contains "$csrc" "bind = SUPER, K, exec, cachy-omarchy-keybindings" "conf 가 SUPER+K 를 keybindings 명령에 바인딩한다"
-[[ $csrc == *"bind = SUPER, K,"* ]] && klive=1 || klive=0
+# bindd = MOD, key, description, dispatcher, params — Hyprland 0.56.2 실측으로
+# 지원되고 `hyprctl binds` 가 description 을 그대로 보고한다(레코드 머리글은
+# `bindd` 지만 파서의 /^bind/ 가 접두로 잡는다). lua 쪽 description 과 짝이다.
+assert_contains "$csrc" "bindd = SUPER, K, Keybindings, exec, cachy-omarchy-keybindings" "conf 가 SUPER+K 를 description 과 함께 바인딩한다"
+assert_contains "$csrc" "bindd = SUPER, SPACE, Launch apps, exec, cachy-omarchy-launcher" "conf 런처 bind 도 description 을 단다"
+[[ $csrc == *"bindd = SUPER, K,"* ]] && klive=1 || klive=0
 assert_eq "$klive" "1" "conf 는 SUPER+K 를 활성화한다"
 
 lsrc=$(cat "$LUA")
@@ -29,7 +33,10 @@ assert_contains "$lsrc" 'SUPER + space' "lua 가 SUPER+SPACE 를 바인딩한다
 assert_contains "$lsrc" "cachy-omarchy-launcher" "lua 대상은 런처"
 assert_contains "$lsrc" "hl.unbind" "lua 는 unbind 후 bind 한다"
 assert_contains "$lsrc" 'hl.unbind("SUPER + K")' "lua 는 SUPER+K 를 먼저 unbind 한다"
-assert_contains "$lsrc" 'hl.bind("SUPER + K", hl.dsp.exec_cmd("cachy-omarchy-keybindings"))' "lua 가 SUPER+K 를 keybindings 명령에 바인딩한다"
+assert_contains "$lsrc" 'hl.bind("SUPER + K", hl.dsp.exec_cmd("cachy-omarchy-keybindings"), { description = "Keybindings" })' "lua 가 SUPER+K 를 keybindings 명령에 바인딩한다"
+# description 은 장식이 아니다: 업스트림 prioritize_entries 가 이 영어 문자열로
+# 시트 정렬 우선순위를 매긴다 (Keybindings=0, Launch apps=5).
+assert_contains "$lsrc" '{ description = "Launch apps" }' "lua 런처 bind 가 Launch apps description 을 단다"
 [[ $lsrc == *'hl.bind("SUPER + K"'* ]] && klive=1 || klive=0
 assert_eq "$klive" "1" "lua 는 SUPER+K 를 활성화한다"
 
@@ -129,6 +136,20 @@ assert_contains "$out" "기존 설정은 삭제하지 않는다" "K 충돌 --for
 body=$(cat "$hypr/hyprland.lua")
 assert_contains "$body" "-- >>> cachy-omarchy >>>" "K 충돌 --force 후 관리 블록"
 assert_contains "$body" "existing-k" "K 충돌 --force 도 기존 bind 줄을 지우지 않는다"
+
+# --- conf bindd SUPER+K is a conflict too -----------------------------------
+# lua 가 conf 보다 우선하므로(대상 선택), conf 경로를 재려면 lua 를 치워야 한다.
+mv "$hypr/hyprland.lua" "$hypr/hyprland.lua.bak"
+cat >"$hypr/hyprland.conf" <<'EOF'
+bindd = SUPER, K, Existing sheet, exec, existing-k
+EOF
+before=$(cat "$hypr/hyprland.conf")
+out=$(COO_HYPR_DIR="$hypr" COO_CONFIG_DIR="$HOME/.config/cachy-omarchy" "$H" 2>&1); code=$?
+assert_eq "$code" "0" "conf bindd 충돌도 기본 모드는 exit 0"
+assert_contains "$out" "SUPER+K" "conf 의 bindd SUPER+K 도 충돌로 잡는다"
+assert_eq "$(cat "$hypr/hyprland.conf")" "$before" "conf bindd 충돌 시 본문이 그대로다"
+rm -f "$hypr/hyprland.conf"
+mv "$hypr/hyprland.lua.bak" "$hypr/hyprland.lua"
 
 # --- literal Lua SUPER+K remains a conflict --------------------------------
 cat >"$hypr/hyprland.lua" <<'EOF'

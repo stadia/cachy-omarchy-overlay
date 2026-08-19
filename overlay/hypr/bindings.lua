@@ -1,9 +1,13 @@
 -- Milestone 3 Hyprland bindings (lua).
 -- Loaded via a managed pcall(dofile) block. The helper must not hyprctl reload.
+--
+-- The description strings are a contract, not decoration: the keybindings sheet
+-- displays them instead of the raw command, and upstream prioritize_entries
+-- ranks rows by matching this exact English text (Keybindings=0, Launch apps=5).
 hl.unbind("SUPER + space")
-hl.bind("SUPER + space", hl.dsp.exec_cmd("cachy-omarchy-launcher"))
+hl.bind("SUPER + space", hl.dsp.exec_cmd("cachy-omarchy-launcher"), { description = "Launch apps" })
 hl.unbind("SUPER + K")
-hl.bind("SUPER + K", hl.dsp.exec_cmd("cachy-omarchy-keybindings"))
+hl.bind("SUPER + K", hl.dsp.exec_cmd("cachy-omarchy-keybindings"), { description = "Keybindings" })
 
 -- Quattro shell autostart: 세션 시작 1회 발화(hyprland.start). 리로드로는
 -- 재기동하지 않는다 — 복구는 수동 `cachy-omarchy-shell --restart`. 업스트림

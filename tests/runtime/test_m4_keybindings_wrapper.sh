@@ -110,9 +110,9 @@ mkdir -p "$HOME/.config/cachy-omarchy/hypr"
 overlay_side_effect_marker="$COO_TEST_SANDBOX/lua-overlay-side-effect"
 cat >"$HOME/.config/cachy-omarchy/hypr/bindings.lua" <<LUA
 hl.unbind("SUPER + K")
-hl.bind("SUPER + K", hl.dsp.exec_cmd("cachy-omarchy-keybindings"))
+hl.bind("SUPER + K", hl.dsp.exec_cmd("cachy-omarchy-keybindings"), { description = "Keybindings" })
 hl.unbind("SUPER + O")
-hl.bind("SUPER + O", hl.dsp.exec_cmd("cachy-omarchy-launcher"))
+hl.bind("SUPER + O", hl.dsp.exec_cmd("cachy-omarchy-launcher"), { description = "Launch apps" })
 os.execute("touch $overlay_side_effect_marker")
 LUA
 
@@ -163,8 +163,13 @@ assert_eq "$side_effect" "0" "제한 Lua 환경은 os.execute 부작용을 실�
 [[ -e $overlay_side_effect_marker ]] && side_effect=1 || side_effect=0
 assert_eq "$side_effect" "0" "관리 dofile 로 읽은 파일도 같은 제한 환경에서 돈다"
 assert_contains "$out" "SUPER + K" "관리 source 블록의 bind 도 시트에 나온다"
-assert_contains "$out" "cachy-omarchy-keybindings" "관리 source 블록 bind 의 명령이 표시된다"
-assert_contains "$out" "cachy-omarchy-launcher" "나중 bind 가 앞선 bind 를 덮어쓴다"
+assert_contains "$out" "Keybindings" "관리 source 블록 bind 가 시트에 표시된다"
+assert_contains "$out" "Launch apps" "나중 bind 가 앞선 bind 를 덮어쓴다"
+# 우선순위: description 이 있으면 명령 문자열 대신 그것을 보여주고, upstream
+# prioritize_entries 가 Keybindings 를 맨 위로 올린다.
+assert_eq "$(head -1 <<<"$out")" "$(grep -m1 'Keybindings' <<<"$out")" "Keybindings 행이 시트 맨 위다"
+[[ $out == *"→ cachy-omarchy-keybindings"* ]] && raw=1 || raw=0
+assert_eq "$raw" "0" "description 이 있으면 날 명령 문자열을 보여주지 않는다"
 [[ $out == *"stale-old-command"* ]] && stale=1 || stale=0
 assert_eq "$stale" "0" "덮어쓰인 옛 bind 는 남지 않는다"
 [[ $out == *"STALE V11 RECORD"* ]] && stale=1 || stale=0
