@@ -1671,3 +1671,43 @@ Hyprland 설정이 `~/.local/state/omarchy/toggles/hypr/` 를 source 하지 않�
   hw-display sysfs, brightness +5%, touchpad toggle 상태 파일.
 - `tests/package/test_forbidden.sh` — brightnessctl/ddcutil 은 depends 가
   아니라 optdepends.
+
+### 21.1 라이브 실측 (2026-08-19 22:54–22:56 KST)
+
+설치본 `cachy-omarchy-shell 4.0.0-9` / overlay `0.6.1-1`. 프로덕션 셸 pid
+921196 을 `--restart` 하지 않았다. XF86 주입, `audio-tuning on/off`,
+`omarchy-restart-audio`, 밝기 `+5%`, 터치패드 토글은 하지 않았다.
+
+읽기 전용:
+
+- `cachy-omarchy-doctor` exit 0. WARN 1건은 기존 사용자
+  `~/.config/omarchy/shell.json` 오버라이드.
+- `omarchy-speaker-tuning.service` / `omarchy-crash-watch.service` 둘 다
+  user unit `not-found`. 패키지가 user 유닛을 enable 하지 않음.
+- `omarchy-audio-tuning status`: Installed no, Matches nothing ships for
+  this laptop. `match` exit 1.
+- 이 호스트는 데스크톱: `/sys/class/backlight` 비어 `omarchy-hw-display`
+  exit 1, `brightnessctl` 부재, 포커스 모니터 `DP-1` LG HDR 4K.
+  `omarchy-brightness-display` 조회도 exit 1 (내부 backlight 없음, DDC
+  도구 없음).
+- `hyprctl devices`: 마우스 2개, touch/tablet 0. `omarchy-hw-touchpad` /
+  `-touchscreen` exit 1 — 메뉴 Hardware 행은 `when` 실패로 숨은 채.
+
+격리 인스턴스 (추출 트리 + sandbox HOME + `bar-off`, pid 1209690):
+
+| 항목 | 기대 | 실측 |
+| --- | --- | --- |
+| IPC ping | `ok` | `ok` |
+| OSD | 격리 pid 에 레이어 | `omarchy-osd` xywh 0 0 3072 1728 pid 1209690, 1.5s 후 0개 |
+| bar | 주차 | `omarchy-bar` y=-26 (`bar-off`) |
+| 정리 | 격리만 종료 | isolated 잔여 없음, 프로덕션 921196 생존 |
+
+라이브 오디오 (원복):
+
+- `omarchy-audio-output-volume lower`: 52%→47%, `pactl set-sink-volume` 로
+  52% 복원.
+- `omarchy-audio-output-switch` exit 0. sink 1개뿐이라 default 는
+  `alsa_output.pci-0000_65_00.6.analog-stereo` 유지. OSD 경로에서 장치
+  description 의 비-ASCII 에 대해 `Invalid ASCII character` 가 stderr 로
+  보임 (헬퍼 exit 0, 싱크 불변).
+- `~/.config/pipewire` 에 speaker-tuning 드롭인 없음.
