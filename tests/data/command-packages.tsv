@@ -103,3 +103,7 @@ v4l2-ctl	v4l-utils	OPT	웹캠 설정 메뉴 항목
 xkbcli	libxkbcommon	BASE	이미 선언된 의존의 전이 의존(§4.2 개정)
 zbarimg	zbar	OPT	QR 코드 스캔 메뉴 항목
 tailscale	tailscale	OPT	Tailscale 패널 대상 애플리케이션 — QML .js command: 배열에서 도달(C1 수정 후 신규 발견), 사용자가 tailscale 을 가짐으로써 선택하는 능력
+which	which	HARD	Tailscale 패널의 존재 확인 구동 기계(C1 4번째 패턴 .command= 에서 신규 발견) — 대상이 아니라 패널 자체가 이 명령 없이는 상태를 못 읽음
+dropbox-cli	dropbox-cli	OPT	Dropbox 패널 대상 애플리케이션(AUR) — 사용자가 Dropbox 를 가짐으로써 선택하는 능력, C1 4번째 패턴에서 신규 발견
+python3	python	OPT	Dropbox 패널의 번들 상태 스크립트(status.py) 실행기 — Dropbox 통합을 선택한 사용자에게만 의미 있음, C1 4번째 패턴에서 신규 발견
+list.sh	cachy-omarchy-shell	BASE	image-picker 플러그인이 함께 배포하는 번들 스크립트 — Arch 패키지가 아니라 같은 패키지 파일트리 안의 파일이라 항상 존재, C1 4번째 패턴에서 신규 발견

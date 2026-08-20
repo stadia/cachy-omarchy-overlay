@@ -384,8 +384,12 @@ def scan_commands(text, extra_defined=frozenset()):
     bash_commands() so callers that need the cleaned text for something
     else too (the omarchy-* root scan also runs OMARCHY_RE over it) can
     preprocess exactly once instead of relying on bash_commands() to do
-    it again — preprocessing is close to idempotent now but there's no
-    reason to pay for a second pass, or to depend on that idempotency.
+    it again. strip_heredocs() is verified idempotent (heredoc markers
+    are blanked once consumed, so a repeat pass matches nothing); this
+    only relies on preprocessing running exactly once per file, which
+    the split guarantees by construction rather than by idempotency of
+    every step (strip_quoted_noise is not verified idempotent on all
+    inputs, e.g. Python triple-quoted strings scanned as bash).
 
     `extra_defined` is for functions this file doesn't define itself but
     pulls in via `source omarchy-shell-config` — a single-file scan can't
@@ -426,27 +430,143 @@ QML_STR_RE = re.compile(r'"((?:[^"\\]|\\.)*)"')
 EXEC_DETACHED_RE = re.compile(r"Quickshell\.execDetached\(\s*\[(.*?)\]", re.S)
 # `<Bar>.run("shell command line")` — a single string that's a full shell
 # command line (may itself contain `$(...)`), not an argv array.
+# A command name never contains whitespace or quote characters; this
+# rejects stray non-command quoted strings an array-literal scan can
+# pick up as "the first quoted string" (a join() separator, an empty
+# placeholder, ...) that would otherwise pass the merely-truthy check.
+COMMAND_SHAPE_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]*$")
 RUN_CALL_RE = re.compile(r'\.run\(\s*"((?:[^"\\]|\\.)*)"')
+# `someProc.command = ["omarchy-foo", ...]` — the JS-field-assignment
+# spelling of the same argv array a `command:` QML property declares.
+# Process helpers in this codebase use this form almost exclusively
+# (Service.qml files especially), and several roots have *no other* call
+# site — losing this form doesn't just drop sub-arguments off an
+# already-found command, it drops whole omarchy-* helpers out of the
+# reachable set entirely (confirmed: omarchy-network-qr,
+# omarchy-network-password, omarchy-weather-location,
+# omarchy-display-text-size, omarchy-network-speedtest,
+# omarchy-bluetooth-device all had zero other invocation sites).
+COMMAND_ASSIGN_HEAD_RE = re.compile(r"\w+\.command\s*=")
 
 
-def _argv0_or_shell(parts):
+def _extract_bracket_arrays(s, max_arrays=4):
+    """All top-level `[...]` bodies in s, via balanced-bracket scanning."""
+    out = []
+    i, n = 0, len(s)
+    while i < n and len(out) < max_arrays:
+        if s[i] == "[":
+            depth, j = 1, i + 1
+            start = j
+            while j < n and depth > 0:
+                if s[j] == "[":
+                    depth += 1
+                elif s[j] == "]":
+                    depth -= 1
+                j += 1
+            out.append(s[start:j - 1])
+            i = j
+        else:
+            i += 1
+    return out
+
+
+def command_assignment_arrays(text):
+    """Array bodies from `.command = [...]`, ternary form included.
+
+    `X.command = cond ? [...] : [...]` is common (two alternative argv
+    arrays depending on runtime state, both genuinely reachable). This
+    codebase's QML/JS relies on ASI (no trailing `;`), so the value can
+    spill across a few following lines for the ternary form — a fixed
+    lookahead window stands in for real statement-boundary parsing.
+    """
+    arrays = []
+    for m in COMMAND_ASSIGN_HEAD_RE.finditer(text):
+        window = text[m.end():m.end() + 400]
+        semi = window.find(";")
+        if semi != -1:
+            window = window[:semi]
+        arrays.extend(_extract_bracket_arrays(window))
+    return arrays
+
+
+RETURN_ARRAY_RE = re.compile(r"return\s*\[(.*?)\]", re.S)
+
+
+def return_arrays(text):
+    """Array bodies from `return [...]` inside a helper function.
+
+    Some panels build the argv array in a small helper (`function
+    deviceCommand(action, address) { return ["omarchy-bluetooth-device",
+    action, address] }`) and only ever call it indirectly
+    (`Quickshell.execDetached(deviceCommand(...))`), so neither the
+    `command:`/`execDetached([`/`.command =` literal-array forms nor a
+    plain function-call argument to execDetached ever shows the array
+    itself at the call site.
+
+    Unlike the other four invocation shapes, a bare `return [...]` is
+    NOT unambiguous by itself -- plain data (`return ["Sun", "Mon", ...,
+    "Sat"][d.getDay()]`) is built the exact same way and was caught here
+    before this filter was added. The distinguishing signal is that an
+    argv-building helper almost always threads a caller-supplied
+    variable through alongside the literal command name (`action,
+    address` above); an all-literal array of short strings indexed by a
+    JS expression is the weekday/data-table shape instead. Requiring at
+    least one bare (non-quoted) identifier in the array body keeps the
+    real case and drops the data-table one.
+    """
+    arrays = []
+    for body in RETURN_ARRAY_RE.findall(text):
+        if re.search(r"[A-Za-z_]", QML_STR_RE.sub("", body)):
+            arrays.append(body)
+    return arrays
+
+
+def _argv0_or_shell(body):
     """First array element's basename; `bash -c` payloads are re-parsed.
+
+    Takes the raw array body text (not just the pre-extracted quoted
+    strings) because trusting `parts[1:]` as shell-script payloads
+    depends on whether the array was fully literal.
 
     The nightlight service is the case that forces the bash/sh branch: it
     does not call hyprsunset as argv[0], it calls it inside a `bash -c`
     string. `root.omarchyPath + "/bin/omarchy-foo"` concatenations are
-    common for the first element too — QML_STR_RE only sees the string
+    common for the first element too -- QML_STR_RE only sees the string
     literal part, so the basename split still lands on "omarchy-foo".
+
+    But a fully-literal `["bash", "-c", "omarchy-hyprland-session-locked"]`
+    and a partially-literal `["bash", "-c", Model.enterpriseConnectScript,
+    "nmcli-eap", ssid, identity]` produce the *same* parts list once
+    QML_STR_RE has stripped the non-string elements out -- ["bash", "-c",
+    "<word>"] either way. In the first, that third string genuinely is
+    the `-c` script. In the second, the real script is a JS variable
+    reference invisible to QML_STR_RE, and "nmcli-eap" is really the
+    script's own positional argument ($1), not further shell code. The
+    two are only distinguishable by looking at the *raw* array body: if
+    anything in it besides quoted strings and punctuation survives (a
+    bare identifier), some element was a variable, so parts[1:] cannot
+    be trusted as the actual script text and is left unscanned.
     """
+    parts = QML_STR_RE.findall(body)
     if not parts:
         return set()
     head = parts[0].split("/")[-1]
     if head in ("bash", "sh"):
+        if re.search(r"[A-Za-z_]", QML_STR_RE.sub("", body)):
+            return set()
         found = set()
         for payload in parts[1:]:
             found |= bash_commands(payload)
         return found
-    return {head} if head else set()
+    # Only accept command-name-shaped heads. A `return [...]` array can
+    # capture a non-command quoted string that just happens to be
+    # QML_STR_RE's first match -- `aliases.join(" ")`'s separator
+    # argument, for instance, leaves " " as the only quoted literal in
+    # its array, and a bare space is truthy in Python so `if head` alone
+    # would not have caught it.
+    if not COMMAND_SHAPE_RE.match(head):
+        return set()
+    return {head}
 
 
 def qml_commands(text):
@@ -457,20 +577,25 @@ def qml_commands(text):
     merely look like one — `reloadableId: "omarchy-battery"`,
     `WlrLayershell.namespace: "omarchy-background"` — which invoke
     nothing and have no staged file to ever satisfy. Restricting the
-    scan to the three shapes Quickshell actually uses to run a process
-    (a `command:` array, `Quickshell.execDetached([...])`, and
-    `<Bar>.run("...")`) avoids manufacturing UNSTAGED_REACHABLE findings
-    for strings that were never reachable as commands.
+    scan to the five shapes Quickshell/JS actually use to run a process
+    (a `command:` array, `Quickshell.execDetached([...])`, `<Bar>.run(...)`,
+    `X.command = [...]`, and `return [...]`) avoids manufacturing
+    UNSTAGED_REACHABLE findings for strings that were never reachable as
+    commands, while still catching every real one.
     """
     found = set()
     for body in QML_ARRAY_RE.findall(text):
-        found |= _argv0_or_shell(QML_STR_RE.findall(body))
+        found |= _argv0_or_shell(body)
     for body in EXEC_DETACHED_RE.findall(text):
-        found |= _argv0_or_shell(QML_STR_RE.findall(body))
+        found |= _argv0_or_shell(body)
     for raw in RUN_CALL_RE.findall(text):
         # QML string-literal escapes -> the actual runtime string value.
         payload = raw.replace('\\"', '"').replace("\\\\", "\\")
         found |= bash_commands(payload)
+    for body in command_assignment_arrays(text):
+        found |= _argv0_or_shell(body)
+    for body in return_arrays(text):
+        found |= _argv0_or_shell(body)
     return {c for c in found if c not in BUILTINS}
 
 
