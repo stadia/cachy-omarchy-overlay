@@ -177,6 +177,11 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 2. 메뉴 JSONC의 Omarchy-OS 액션은 끄거나 실패해도 셸이 죽지 않게 둔다(업스트림이 이미 명령 실패를 어떻게 다루는지는 M3에서 실측).
 3. `omarchy-settings`가 제공하는 `omarchy-debug*`는 패키징하지 않는다.
 4. 공식 `bin/` 전체를 `/usr/bin`에 설치하지 않는다.
+5. `omarchy-launch-tui`/`omarchy-default-terminal`/`omarchy-launch-floating-terminal-with-presentation`
+   는 스테이징돼 배포되지만 `xdg-terminal-exec` 없이는 전부 실패한다 — 그 패키지는
+   AUR 전용이라 `depends` 에 못 두고 `optdepends` 로만 선언돼 있다(v0.9 클로저 스캐너,
+   fix round 1). 이 실행 환경은 실측 시점에 `xdg-terminal-exec` 미설치였고 세 헬퍼
+   모두 실제로 깨져 있었다 — 스캐너가 없었으면 안 드러났을 라이브 간극.
 
 ---
 

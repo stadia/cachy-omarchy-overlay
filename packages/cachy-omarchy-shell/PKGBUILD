@@ -1,7 +1,7 @@
 # Maintainer: Cachy Omarchy Overlay
 pkgname=cachy-omarchy-shell
 pkgver=4.0.0
-pkgrel=11
+pkgrel=12
 pkgdesc='Pinned Omarchy Quattro shell runtime for CachyOS (no omarchy-settings)'
 arch=('any')
 url='https://github.com/basecamp/omarchy'
@@ -17,11 +17,12 @@ license=('MIT')
 #   실소유 패키지는 libpulse 다(pacman -Qqo 실측, 아래 v0.9 블록 참고). xdg-utils:
 #   xdg-settings/xdg-mime (clipboard-open 의 launch closure). xdg-terminal-exec
 #   는 xdg-utils 가 제공한다던 이전 주석은 오류였다 — 별도 AUR 패키지이며
-#   아래에서 따로 선언한다(pacman -Ql 실측, 컨트롤러 룰링).
+#   optdepends 에서 AUR class 로 따로 선언한다(pacman -Ql 실측, 컨트롤러 룰링;
+#   fix round 1 에서 depends 에서 optdepends 로 재배치 — 아래 참고).
 # uwsm: AppLibrary.qml:85 등이 uwsm-app 을 bare name 으로 부른다. 업스트림도
 #   uwsm 세션을 전제한다 (AGENTS.md:53). /usr/bin/uwsm-app 은 uwsm 패키지가
 #   제공하며 우리는 shim 을 두지 않는다.
-# v0.9 클로저 스캐너 실측으로 승격(tests/data/command-packages.tsv 근거, 11건):
+# v0.9 클로저 스캐너 실측으로 승격(tests/data/command-packages.tsv 근거, 10건):
 #   gum·git: 테마 install/update 경로(Theme > Install 메뉴) — git 은
 #     makedepends 에도 남는다(PKGBUILD source 가 git+https 다). perl:
 #     omarchy-menu-select 가 -MEncode -MJSON::PP 로 select payload 를 만드는
@@ -36,11 +37,13 @@ license=('MIT')
 #     아니라 우리 자신의 설치 경로에서 도달한다(컨트롤러 룰링).
 #   which: Tailscale 패널의 존재 확인 구동 기계 — 패널 자체가 이 명령 없이는
 #     상태를 못 읽는다(.command= 경로에서 신규 발견).
-#   xdg-terminal-exec: 별도 AUR 패키지(upstream install/omarchy-base.packages:144).
+#   (xdg-terminal-exec 도 §4.2 성격의 구동 기계지만 리포엔 없고 AUR 전용이라
+#     depends 에 못 둔다 — fix round 1 에서 optdepends AUR class 로 재배치.
+#     아래 optdepends 블록 참고.)
 depends=('quickshell' 'hyprland' 'uwsm' 'inotify-tools' 'libvips' 'procps-ng'
          'psmisc' 'jq' 'wl-clipboard' 'wtype' 'wireplumber' 'pipewire-pulse'
          'xdg-utils' 'git' 'grim' 'gum' 'hyprsunset' 'libnotify' 'libpulse'
-         'perl' 'slurp' 'sudo' 'which' 'xdg-terminal-exec')
+         'perl' 'slurp' 'sudo' 'which')
 # /usr/bin/omarchy-* 를 공식 omarchy 패키지와 같은 이름으로 소유한다. 상호
 # 배타가 의도다. provides 는 하지 않는다 — Omarchy 전체를 제공하지 않는다.
 conflicts=('omarchy')
@@ -52,11 +55,21 @@ optdepends=(
   'ddcutil: omarchy-brightness-display-ddc external monitors'
   'lsp-plugins-lv2: omarchy-audio-tuning limiter'
   # v0.9 클로저 스캐너 실측으로 신규 선언(tests/data/command-packages.tsv 근거,
-  # 19건). 메뉴/패널 항목이며 기본 경로에서 도달하지 않는다 — 사용자가 그
+  # 18건). 메뉴/패널 항목이며 기본 경로에서 도달하지 않는다 — 사용자가 그
   # 기능을 씀으로써 선택한다.
-  'asdcontrol: Apple Studio Display 밝기 제어(AUR, 하드웨어 한정)'
+  #
+  # asdcontrol(Apple Studio Display 밝기, omarchy-brightness-display-apple)는
+  # 여기 없다 — AUR RPC info/search 둘 다 0건(fix round 1 실측), 공식 리포에도
+  # AUR 에도 제공자가 없는 UNPACKAGED 다. 어디에도 선언할 수 없다; 없으면 그
+  # 헬퍼 하나만 조용히 동작하지 않는다(tests/data/command-packages.tsv 참고).
+  #
+  # 아래 AUR class 4건은 리포엔 없고 AUR 에만 존재한다(각 AUR RPC info 로 실측,
+  # fix round 1). pacman -U 는 depends 를 리포/설치된 패키지로만 해결하므로
+  # (bin/install-packages:55) depends 에 넣으면 우리 패키지 자체가 설치
+  # 불가해진다 — 그래서 HARD 성격이라도 optdepends 에 둔다:
+  'xdg-terminal-exec: AUR — 터미널 실행의 구동 기계, omarchy-launch-tui/omarchy-launch-terminal/omarchy-launch-floating-terminal-with-presentation 전부 이것 없이는 실패(HARD 성격이나 리포에 없어 depends 불가)'
   'discord: Discord 커뮤니티 실행 메뉴 항목'
-  'dropbox-cli: Dropbox 패널 대상 애플리케이션(AUR)'
+  'dropbox-cli: AUR — Dropbox 패널 대상 애플리케이션'
   'ffmpeg: 화면 녹화 인코딩'
   'gpu-screen-recorder: 화면 녹화 메뉴 항목'
   'gtk-update-icon-cache: 웹앱 아이콘 설치 후처리'
@@ -68,7 +81,7 @@ optdepends=(
   'power-profiles-daemon: 전원 프로파일 전환 메뉴 항목'
   'python: Dropbox 패널의 번들 상태 스크립트(status.py) 실행기'
   'tailscale: Tailscale 패널 대상 애플리케이션'
-  'tensaku-edit: 클립보드/스크린샷 편집기 기본값(AUR, 폴백 없음)'
+  'tensaku: AUR — 클립보드/스크린샷 편집기 기본값, 폴백 없음(바이너리명 tensaku-edit 는 패키지명이 아니다 — 실제 AUR 패키지는 tensaku)'
   'tesseract: OCR 메뉴 항목'
   'usbutils: USB 장치 진단 메뉴 항목'
   'v4l-utils: 웹캠/캡처 장치 진단 메뉴 항목'

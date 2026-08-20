@@ -821,7 +821,16 @@ def main():
             continue
         package, klass, rationale = entry
         table.append((cmd, package, klass, rationale))
-        if klass in ("HARD", "OPT"):
+        # AUR: real package, but repo-less — pacman -U (bin/install-packages:55)
+        # resolves depends against repos and already-installed packages only,
+        # never AUR, so declaring it in `depends` would make our own package
+        # uninstallable via its own install path. It still has to show up
+        # *somewhere* or the closure is silently unaudited, so it is held to
+        # the same "declared in optdepends" bar as OPT below.
+        # UNPACKAGED: no provider anywhere (repo or AUR) — nothing to declare,
+        # so it is deliberately excluded from this reachable_pkgs tracking;
+        # it only ever surfaces via --emit-table.
+        if klass in ("HARD", "OPT", "AUR"):
             reachable_pkgs.setdefault(package, klass)
             if klass == "HARD":
                 reachable_pkgs[package] = "HARD"
@@ -837,6 +846,15 @@ def main():
             violations.append(f"MISSING_HARD_DEP {package}")
         if klass == "OPT" and package not in depends and package not in optdeps:
             violations.append(f"MISSING_OPT_DEP {package}")
+        if klass == "AUR":
+            # AUR packages must be declared (in optdepends — never depends,
+            # see the reachable_pkgs comment above) or the closure gap is
+            # invisible again; and if one lands in depends anyway, pacman -U
+            # would refuse to resolve it, so that is its own violation.
+            if package not in optdeps:
+                violations.append(f"MISSING_OPT_DEP {package}")
+            if package in depends:
+                violations.append(f"AUR_IN_DEPENDS {package}")
 
     for name in sorted(unstaged):
         if name not in exceptions:
