@@ -68,13 +68,20 @@ FUNC_RE = re.compile(
 # (a hyphen is a non-word character), so `\bomarchy-` matched inside
 # "cachy-omarchy-launcher" -- our own overlay's command, staged and
 # real -- and silently stripped the "cachy-" off, reporting it as an
-# unstaged upstream helper nobody had written yet. A negative lookbehind
-# for any word character *or* hyphen closes that: real omarchy-* names
-# in these root files are always preceded by something else entirely --
-# a quote, a slash (`"$OMARCHY_PATH/bin/omarchy-clipboard-paste-file"`),
-# a bracket, a backtick, or the start of the line -- never by a hyphen
-# or an alphanumeric that would make it part of a longer identifier.
-OMARCHY_RE = re.compile(r"(?<![A-Za-z0-9_-])(omarchy-[a-z0-9]+(?:-[a-z0-9]+)*)")
+# unstaged upstream helper nobody had written yet.
+#
+# 다만 "앞 글자가 하이픈이면 무조건 거부"는 너무 넓다. 그 형태는 bash 의
+# `:-` 파라미터 확장 기본값 안에 있는 진짜 호출
+# (`${CUSTOM_EXEC:-omarchy-launch-webapp $APP_URL}`)까지 함께 버린다.
+# 판별 기준은 하이픈 자체가 아니라 하이픈 앞에 오는 글자다 —
+# 단어 문자면 그 하이픈은 더 긴 식별자의 일부이고(`cachy-omarchy-launcher`,
+# 설정 파일 이름 `90-omarchy-speaker-tuning.conf`), `:` 같은 비단어
+# 문자면 연산자다. 그래서 고정 폭 lookbehind 둘을 연달아 둔다: 바로 앞이
+# 단어 문자인 경우와, 바로 앞 두 글자가 `단어문자 + 하이픈`인 경우만 거부.
+# 진짜 omarchy-* 이름은 따옴표·슬래시·대괄호·백틱·`:-`·줄 시작 뒤에 온다.
+OMARCHY_RE = re.compile(
+    r"(?<![A-Za-z0-9_])(?<![A-Za-z0-9_]-)(omarchy-[a-z0-9]+(?:-[a-z0-9]+)*)"
+)
 HEREDOC_RE = re.compile(r"<<-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
 # `case` arm labels — `chromium.desktop) echo ...` or
 # `chromium|chrome|brave) ...` — sit in the exact position CMD_RE treats as
