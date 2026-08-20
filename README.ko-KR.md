@@ -145,6 +145,13 @@ bin/rollback                 # 이전 핀으로 복귀
 - **v0.7** — 오디오 출력 전환/튜닝 템플릿, 디스플레이 밝기, 터치패드·터치스크린
   가드를 verbatim 스테이징. laptop/monitor-internal 은 래퍼가 필요해서 PATH 에
   올리지 않는다. 완료(`v0.7.0`). 실측: `docs/RUNTIME_STARTUP.md` §21.1.
+- **v0.8** — 테마 설치/갱신/제거(`omarchy-theme-install`/`-update`/`-remove`),
+  Hyprland 토글, 하드웨어 helper 를 verbatim 스테이징(`v0.8.0`). 키바인딩 시트가
+  오버레이 자신의 바인드를 읽고(`v0.8.1`), 명령이 아니라 이름으로 보이게 라벨을
+  단다(`v0.8.2`).
+- **잠금 공존 실측** — SPEC §61 인수 기준의 마지막 항목이 2026-08-20 에 닫혀
+  **21/21 측정됨**이 됐다. 중첩 Hyprland 격리에서 hyprlock 과 양방향으로 쟀다.
+  실측: `docs/RUNTIME_STARTUP.md` §22.
 
 ## 라이선스
 

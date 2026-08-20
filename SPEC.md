@@ -2321,15 +2321,20 @@ All must be true:
 - [x] Existing Hyprland config is preserved.
 - [x] An installed Waybar is not removed or stopped by us. *(2026-08-17 실측 — waybar 0.15.0 설치·실행 상태에서 바를 켠 셸을 띄웠고 waybar 프로세스는 그대로였다. 두 바는 겹치지 않고 쌓인다(예약 36→62px). RUNTIME_STARTUP §17.6)*
 - [x] A running notification daemon is not stopped, masked or uninstalled by us. *(v0.2.0 개정 — 셸이 알림 플러그인을 켠 채로 뜬다. mako 가 이름을 쥐고 있으면 물러나고, 셸이 먼저 잡으면 mako 는 활성화되지 않는다 — 밀어내기가 아니라 순서. §17.4 실측, 재로그인 실측 §17.7)*
-- [ ] An installed lock helper is not removed or stopped by us. *(미검증 — hyprlock 등 live lock 설정과 상호작용 실측 안 함)*
+- [x] An installed lock helper is not removed or stopped by us. *(2026-08-20 실측 — 중첩 Hyprland 격리에서 hyprlock 0.9.6 과 양방향 공존을 쟀다. 우리 셸이 떠 있어도 hyprlock 은 세션을 정상 잠근다. 우리는 어떤 lock 경로/유닛도 소유하지 않고, stop/mask/disable/제거하는 코드가 없다. RUNTIME_STARTUP §22)*
 - [x] Rebuild against a newer upstream release is automated.
 - [x] Failed updates do not install.
 - [x] Previous working package can be rolled back.
 
 Evidence ledger: `docs/RC_GAP_INVENTORY.md` (측정됨 / 미검증 / 추론됨 구분). 라이브
-실측 기록은 `docs/RUNTIME_STARTUP.md` §12–§17. 20/21 측정됨; Waybar 공존은
-2026-08-17 waybar 설치 후 §17.6 에서 해소됐고, 남은 1건(lock 공존)은 hyprlock 과의
-라이브 상호작용을 아직 측정하지 않았다.
+실측 기록은 `docs/RUNTIME_STARTUP.md` §12–§22. **21/21 측정됨** — Waybar 공존은
+2026-08-17 waybar 설치 후 §17.6 에서, lock 공존은 2026-08-20 §22 에서 해소됐다.
+
+§22 가 함께 드러낸 것: ext-session-lock 은 클라이언트 하나만 쥔다. 거부당할 때
+hyprlock 은 살아남지만 quickshell 은 프로토콜 오류로 **죽는다**. 업스트림의
+stranded-lock 회수 경로(`omarchy-hyprland-session-locked`)를 스테이징하면 hyprlock
+잠금 중 셸 재시작마다 셸이 사망하므로, 그 헬퍼는 의도적으로 올리지 않는다
+(§43 분류: DISABLED — 공존 위험. 테스트가 고정: `test_staged_session_helpers.sh`).
 0.1.2 release (cachy-omarchy-overlay 0.1.2-1) 시점 기준. R07 자동 복구는
 systemd 유닛 제거(4c5731b)로 더 이상 shipped feature 가 아님(§16.6) — 이는 §61 의
 명시 항목이 아님.

@@ -24,9 +24,9 @@
 | 일반 앱 launch | 측정됨 | 라이브 런처에서 앱 실행에 성공했다. 이 호스트에 `uwsm` 이 없으므로 compat shim 이 실제로 사용된 증거다(§13.3). **정정:** 그 뒤 `uwsm` 이 hard depends 가 되고 shim 은 삭제됐다 — 현재는 uwsm 패키지의 실제 `uwsm-app` 이 앱을 `app-graphical.slice` scope 로 격리한다(RUNTIME_STARTUP §4·§15). |
 | SUPER+K keybinding UI | 측정됨 | 사용자가 실제로 눌러 키바인딩 UI 가 열렸다(§13.1). 업스트림 select-mode 재사용이므로 별도 layer 를 남기지 않는다. |
 | 기존 Hyprland config 보존 | 측정됨 | 2026-08-17 설치된 `cachy-omarchy-init`을 사용자의 실제 `~/.config/hypr/hyprland.lua`에 대해 실행했다. `SUPER+SPACE` 충돌(walker, `:295`)을 감지해 주입을 거부했고 md5는 불변이었다(§12.3). |
-| 기존 Waybar 보존 | 측정됨 (bar 억제); 미검증 (Waybar 공존) | 2026-08-17 `bar-off` 가 있으면 `omarchy-bar` 가 `y=-26` 에 주차되고 `reserved=[0,0,0,0]` 임을 실제 설치본에서 확인했다(§14.4). 이 호스트는 Waybar 를 실행하지 않으므로 Waybar 자체와의 공존은 여전히 미검증이다. |
+| 기존 Waybar 보존 | 측정됨 | **2026-08-17 갱신.** waybar 0.15.0 설치·실행 상태에서 바를 켠 셸을 띄웠고 waybar 프로세스는 그대로였다. 두 바는 겹치지 않고 쌓인다(세로 예약 36→62px) — §17.6. `bar-off` 주차 관측(`y=-26`, `reserved=[0,0,0,0]`)은 §14.4 로 유지된다. |
 | 기존 notification daemon 보존 | 측정됨 | 라이브 세션에서 사용자 `mako`(pid 652539)가 생존했고, 우리 바가 상단 26px 를 점유하자 `y=0 → y=26` 으로 재배치됐다 — 두 layer-shell 클라이언트의 정상 협상(§13.2). |
-| 기존 lock setup 보존 | 미검증 | `disabledPlugins`가 `omarchy.lock`을 끄지만 hyprlock 등과 상호작용을 실측하지 않았다. |
+| 기존 lock setup 보존 | 측정됨 | **2026-08-20 개정.** v0.2.0 부터 `omarchy.lock` 은 켜진 채 출고된다(`disabledPlugins` 자체가 없다). 중첩 Hyprland 격리에서 hyprlock 0.9.6 과 양방향으로 쟀다: 우리 셸이 떠 있어도 hyprlock 이 세션을 정상 잠그고(D1), 우리가 먼저 잠그면 hyprlock 이 거부당하되 죽지 않는다(D2). 우리 패키지는 lock `/etc`·시스템 유닛을 0건 소유하고, stop/mask/disable/제거 코드가 없다. RUNTIME_STARTUP §22 |
 | newer upstream rebuild 자동화 | 측정됨 | M6 U01–U08 fake git/makepkg/bsdtar 경로가 candidate 검증 후 metadata 발행을 검사한다. `tests/package/test_update_pipeline.sh`. |
 | failed update 미설치 | 측정됨 (fake) | `tests/package/test_update_pipeline.sh` U05–U08은 fake pacman 호출 없이 원래 lock/PKGBUILD를 보존한다. |
 | prior working package rollback | 측정됨 (real pacman) | 2026-08-17 실제 `4.0.0-2 → 4.0.0-1` 다운그레이드를 `bin/rollback`으로 수행했다. 이전 쌍 아카이브·매니페스트 복귀·pending 부재·`pacman -Qkk` 대체 0개를 확인했다(§12.4). fake pacman 테스트는 U09–U10 그대로 유지된다. |
@@ -47,8 +47,8 @@
 | R06 application launch | 측정됨 | 라이브 런처에서 앱이 실행됐다(§13.1). compat PATH 격리도 `/proc/<pid>/environ` 으로 실측했다(§13.3). |
 | R07 restarting service recovers | 측정됨 (systemd service, **제거됨**) | 2026-08-17 `MainPID` 를 SIGKILL 하자 systemd 가 `Failed with result 'signal'` → `Scheduled restart job` → 2초 내 새 PID 로 복구했고 `NRestarts=1`, 복구 후 IPC `ok`. 정상 `stop` 은 재시작을 유발하지 않았다(§14.2, §14.3). **주의:** systemd user unit 이 4c5731b 로 제거되면서 이 자동 복구 반은 더 이상 shipped feature 가 아니다(§16.6). 새 모델은 수동 `cachy-omarchy-shell --restart`(1a3ac95)만 제공하며, `hyprland.start` 는 단발화라 셸이 그 후 죽으면 자동 재기동이 없다. §61 의 명시 항목은 아니지만 릴리스에 드러나야 할 동작 변화. |
 | R08 absence of Waybar modification | 측정됨 (package ownership) | archive/extracted tree에 `/etc`, system unit, home/Waybar path, `.INSTALL`이 없음을 확인했다. 실제 사용자 Waybar 공존은 여전히 미검증이다. |
-| R09 absence of notification replacement | 측정됨 (package ownership) | `omarchy.notifications`는 disabledPlugins에 있고 notification `/etc`·system-unit path가 없다. **dunst/mako 등 live user daemon 보존은 미검증**이다. |
-| R10 absence of lock replacement | 측정됨 (package ownership) | `omarchy.lock`은 disabledPlugins에 있고 lock `/etc`·system-unit path가 없다. **hyprlock 등 live lock setup 보존은 미검증**이다. |
+| R09 no notification daemon stopped/masked/uninstalled | 측정됨 | **v0.2.0 개정 — 이전 문장(`disabledPlugins`)은 폐기됐다.** 알림 플러그인은 켜진 채 출고된다. notification `/etc`·시스템 유닛 소유 0건이고, 셸은 이미 주인이 있는 D-Bus 이름을 뺏을 수단이 아예 없다(§17.4). mako 가 먼저면 물러나고, 셸이 먼저면 mako 는 활성화되지 않는다 — 순서지 밀어내기가 아니다(§17.7). |
+| R10 no lock helper stopped/masked/uninstalled | 측정됨 | **2026-08-20 개정 — 이전 문장(`disabledPlugins`)은 폐기됐다.** lock 플러그인은 켜진 채 출고된다. lock `/etc`·시스템 유닛 소유 0건이고, hyprlock 과의 라이브 상호작용을 중첩 인스턴스에서 양방향으로 실측했다(§22). 부수 발견: ext-session-lock 거부 시 quickshell 은 죽고 hyprlock 은 산다 — 그래서 stranded 복구 헬퍼는 의도적 미스테이징(§22.4). |
 
 ## M7 upgrade / rollback RC (U01–U10)
 
@@ -125,11 +125,21 @@ restart IPC 관측을 systemd supervision으로 해석하지 않는다.
    local Git HEAD에서 `git archive`로 만든다. tracked `packages/` 아래에는 overlay 사본을
    만들지 않으며, source tar는 종료 시 삭제된다. 사용 전 prepared chroot root와
    `build/omarchy` pinned tree가 필요하다.
-   현재 호스트에서는 `makechrootpkg`, `archbuild`, `devtools`가 PATH에 없고
-   `pacman -Q devtools`도 package not found를 반환했다. sudo/host package 변경 없이
-   실제 chroot를 만들 수 없어 fake makechrootpkg transport+archive audit만 측정됐다.
-2. 승인된 격리 Wayland 세션에서 shell start, IPC, launcher, app/keybinding UI와 기존
-   Waybar/notification/lock daemon 공존을 관측한다.
+   **2026-08-17 해소 — 이 문단의 아래 문장은 그날 이전의 기록이다.** 그 시점의 호스트에는
+   `makechrootpkg`/`archbuild`/`devtools`가 없어 fake makechrootpkg transport+archive
+   audit만 측정됐으나, 이후 `devtools 1:1.5.1-1` + `mkarchroot` 로 만든 실제 Arch chroot
+   에서 `build-packages --clean`이 두 패키지를 빌드했고 산출물 파일 목록·권한이 호스트
+   빌드본과 동일했다(§12.5). 2026-08-20 재확인: `devtools 1:1.5.1-1`,
+   `/usr/bin/makechrootpkg` 존재. 남은 경계는 `--nodeps`라 **의존 선언의 충분성은 이
+   경로로 검증되지 않는다**는 점 하나다.
+2. ~~승인된 격리 Wayland 세션에서 shell start, IPC, launcher, app/keybinding UI와 기존
+   Waybar/notification/lock daemon 공존을 관측한다.~~ **완료** — shell/IPC/launcher/
+   keybinding 은 §13, Waybar 공존은 §17.6, notification 은 §17.4·§17.7,
+   lock 은 §22(중첩 Hyprland 격리).
 3. 실제 `pacman -U`는 별도 사용자 승인 후 격리 환경에서만 upgrade/rollback smoke로
    수행한다. 그 전에는 M6 fake lane을 release safety evidence로 유지한다.
 4. 위 관측 결과로 이 표의 `추론됨`/`미검증`만 `측정됨`으로 변경한다.
+
+**2026-08-20 현재 §61 은 21/21 측정됨이다.** 이 문서에 남은 `추론됨`은 R03(menu
+discoverable) 하나이며, 나머지 미측정 경계는 위 1·3 — `--nodeps` clean build 의
+의존 충분성과 실제 `pacman -U` upgrade/rollback smoke 다.

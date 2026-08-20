@@ -220,17 +220,19 @@ esac
 
 ## 6. 알려진 한계 (미해결)
 
-1. **바 억제 미충족 (§4.3)** — §3 참조. `disabledPlugins` 로 내장 바를 못 끈다.
-   패키징 기본값만으로는 사용자 Waybar 위에 `omarchy-bar` 가 뜬다. M5 `cachy-omarchy-init`
-   가 `bar-off` 토글을 사용자 상태로 생성하거나, 패치가 필요. **§61 "Existing Waybar
-   preserved" 는 이 항목 해결 전까지 성립하지 않는다.**
+1. **바 억제 미충족 (§4.3) — 폐기됨 (M2 기록).** 전제가 v0.2.0 에서 뒤집혔다. 이제
+   업스트림 바를 켠 채 출고하는 것이 기본이고 억제가 opt-out 이다. 그리고 "두 바는 못
+   쓴다"는 가정 자체가 실측으로 틀렸다 — waybar 와 `omarchy-bar` 는 layer-shell
+   exclusive zone 을 누적해 겹치지 않고 쌓인다(세로 예약 36→62px). §61 "Existing
+   Waybar preserved" 는 §17.6 에서 충족됐다.
 
 2. **`inotify-tools` 미감사 의존성** — `services/PluginRegistry.qml:638` 의
    `localPluginWatcher` 가 `inotifywait` 로 `~/.config/omarchy/plugins` 를 감시한다.
    이 호스트에 `inotify-tools` 가 없어 **1초마다 WARN 이 반복**된다(`onExited` →
    1초 재시작 타이머). 기능은 정상(37개 플러그인 등록)이지만 로그 스팸. `PKGBUILD depends`
    에 없고 `RUNTIME_DEPENDENCIES.md` 에도 없었다 — M1 의존성 감사(§28)의 누락.
-   → `RUNTIME_DEPENDENCIES.md` 갱신 + `inotify-tools` 를 `depends` 에 추가할지 결정 필요.
+   → **해소됨.** `inotify-tools` 는 `cachy-omarchy-shell` 의 `depends` 에 들어가 있다
+   (2026-08-20 확인). 실제 `pacman -U` 트랜잭션이 이것을 끌어온 기록은 §12.2.
 
 3. **셸 자동 기동 누락** — 셸은 Hyprland autostart(`overlay/hypr/bindings.lua`
    의 `hl.on("hyprland.start", …)`)로 기동한다. 업그레이드로 autostart 줄이
@@ -238,15 +240,17 @@ esac
    없이 갱신되지 않는다. 해결: `cachy-omarchy-bindings --force` 로 정본 새로고침
    후 재로그인(또는 수동 `cachy-omarchy-shell --run`). `hyprctl reload` 만으로는
    `hyprland.start` 가 재발화하지 않으므로 셸이 뜨지 않는 게 정상이다.
-   참고: `hyprland.start` 트리거의 1회 발화 자체는 아직 실측되지 않았다 —
-   첫 재로그인 시 확인(프로젝트 관행 "문서 < 실측"). 정적 테스트는 이벤트 이름이
-   bindings 파일에 존재함만 검증하며, 실제 발화를 증명하지 않는다. 또, 과거에
+   참고: `hyprland.start` 트리거의 1회 발화는 **실측됐다** — 재로그인 후 라이브 셸의
+   부모가 곧 `Hyprland` 인 것을 확인했다(§16.1). 이 문단의 "아직 실측되지 않았다"는
+   그 이전 기록이다. 정적 테스트가 이벤트 이름 존재만 검증한다는 점은 그대로다. 또, 과거에
    구 유닛을 수동으로 `enable` 했던 사용자는 `systemctl --user disable
    cachy-omarchy-shell.service` 로 잔여 `wants/` 심볼릭 링크를 정리해야 한다
    (pacman 은 유닛 파일은 지우지만 symlink 는 남길 수 있다).
 
 4. **사용자 `~/.config/omarchy/shell.json` 오버라이드** — §2. 우리 기본값이 통째로
-   무시될 수 있음. 감지·경고는 M7 doctor 후보.
+   무시될 수 있음. **감지·경고는 구현됐다** — `cachy-omarchy-doctor` 가 WARN 으로
+   보고한다(이 호스트가 실제로 그 상태). 딥머지가 없다는 한계 자체는 업스트림
+   동작이라 그대로 남는다.
 
 5. **`uwsm` 부재 — 해소됨.** M3 시점에는 미설치(실측)라 compat WRAPPER 로
    `gtk-launch` 에 위임했었다. 현재는 `cachy-omarchy-shell` 이 `uwsm` 을 hard
