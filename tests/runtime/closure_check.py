@@ -76,25 +76,36 @@ CASE_ARM_RE = re.compile(
 
 
 def strip_heredocs(text):
-    """Drop heredoc bodies before scanning.
+    """Drop heredoc bodies before scanning, idempotently.
 
     A heredoc body is data (jq/awk/sql/JSON payloads embedded in these
     helpers), not shell command text. Left in, it floods the scan with
     every bare word in the payload as a fake command.
+
+    Must be safe to run twice on its own output. The original version
+    left the opening line's `<<TOKEN` marker untouched while dropping the
+    delimiter line; a second pass would then match that same marker
+    again, fail to find the (now-deleted) delimiter, and silently
+    consume the rest of the file as heredoc body (omarchy-menu was
+    truncated 28 -> 21 lines this way once preprocessing ran twice).
+    Blanking the `<<TOKEN` marker itself after consuming its heredoc
+    means a repeat pass finds nothing left to match.
     """
     lines = text.splitlines()
     out = []
     i = 0
     while i < len(lines):
-        out.append(lines[i])
-        m = HEREDOC_RE.search(lines[i])
+        line = lines[i]
+        m = HEREDOC_RE.search(line)
         if m:
             delim = m.group(2)
+            out.append(line[:m.start()] + " " * (m.end() - m.start()) + line[m.end():])
             i += 1
             while i < len(lines) and lines[i].strip() != delim:
                 i += 1
             i += 1  # skip the delimiter line itself
             continue
+        out.append(line)
         i += 1
     return "\n".join(out)
 
@@ -276,11 +287,58 @@ ESCAPED_SEP_RE = re.compile(r"\\([|;&(){}`])")
 # `[[ $x =~ ^(a|b|c)$ ]]` — bash's own extended-regex syntax for the `=~`
 # operator, written bare (no quotes needed or wanted around it). Its `(`
 # and `|` read exactly like command grouping / piping to CMD_RE. Blank
-# from `=~` to the closing `]]` of the enclosing `[[ ... ]]` test — not
-# to the first single `]`, since these patterns routinely contain their
-# own POSIX bracket expressions (`([0-9]+)x([0-9]+)`) whose closing `]`
-# would otherwise end the blanked span far too early.
-REGEX_MATCH_RE = re.compile(r"=~.*?\]\]")
+# from `=~` to the closing `]]` of the enclosing `[[ ... ]]` test.
+#
+# A naive "first `]]`" search is not good enough: POSIX bracket
+# expressions inside the pattern (`[[:space:]]`, `[0-9]`) contain their
+# own `]`, and `[[:space:]]` even contains a literal `]]` of its own
+# (the class token's `]` immediately followed by the bracket
+# expression's own `]`) — that terminates the blank early and leaves
+# the rest of the regex, `x` included, exposed to CMD_RE as command
+# text. _skip_bracket_expr jumps over an entire `[...]` (POSIX class
+# tokens included) as one unit so only a `]]` outside any bracket
+# expression can end the span.
+def _skip_bracket_expr(text, i, n):
+    """`text[i]` is '['. Returns the index just past its matching ']'."""
+    j = i + 1
+    if j < n and text[j] == "^":
+        j += 1
+    if j < n and text[j] == "]":
+        j += 1  # ']' right after '[' / '[^' is a literal member, not a close
+    while j < n:
+        if text[j:j + 2] in ("[:", "[.", "[="):
+            closer = text[j + 1] + "]"
+            end = text.find(closer, j + 2)
+            j = end + 2 if end != -1 else n
+            continue
+        if text[j] == "]":
+            return j + 1
+        if text[j] == "\n":
+            return j
+        j += 1
+    return j
+
+
+def strip_regex_match(text):
+    out = []
+    i, n = 0, len(text)
+    while i < n:
+        if text[i:i + 2] != "=~":
+            out.append(text[i])
+            i += 1
+            continue
+        j = i + 2
+        while j < n:
+            if text[j] == "[":
+                j = _skip_bracket_expr(text, j, n)
+                continue
+            if text[j:j + 2] == "]]" or text[j] == "\n":
+                break
+            j += 1
+        out.append("=~")
+        out.extend("\n" if ch == "\n" else " " for ch in text[i + 2:j])
+        i = j
+    return "".join(out)
 
 
 def preprocess_bash(text):
@@ -303,7 +361,7 @@ def preprocess_bash(text):
     text = strip_arithmetic(text)
     text = strip_array_literals(text)
     text = ESCAPED_SEP_RE.sub("  ", text)
-    text = REGEX_MATCH_RE.sub(lambda m: "=~" + " " * (len(m.group(0)) - 2), text)
+    text = strip_regex_match(text)
     # Trailing (non-full-line) comments, now that they're safe to find: any
     # `#` still surviving at this point cannot be inside a string (those
     # were already blanked above), so a whitespace-preceded `#` here is
@@ -316,10 +374,27 @@ def preprocess_bash(text):
     return text
 
 
-def bash_commands(text):
-    """Commands appearing in command position, minus builtins and local funcs."""
-    text = preprocess_bash(text)
-    defined = set(FUNC_RE.findall(text))
+SOURCE_RE = re.compile(r"(?:^|;)[ \t]*(?:source|\.)[ \t]+([A-Za-z_][A-Za-z0-9_.-]*)", re.M)
+
+
+def scan_commands(text, extra_defined=frozenset()):
+    """Commands appearing in command position, minus builtins and local funcs.
+
+    `text` must already be preprocess_bash()-clean. Kept separate from
+    bash_commands() so callers that need the cleaned text for something
+    else too (the omarchy-* root scan also runs OMARCHY_RE over it) can
+    preprocess exactly once instead of relying on bash_commands() to do
+    it again — preprocessing is close to idempotent now but there's no
+    reason to pay for a second pass, or to depend on that idempotency.
+
+    `extra_defined` is for functions this file doesn't define itself but
+    pulls in via `source omarchy-shell-config` — a single-file scan can't
+    see those without help; the caller resolves `source` targets against
+    the staged set and passes their function names in here (e.g.
+    omarchy-bar calls `fail`/`commit`, both defined only in the
+    omarchy-shell-config it sources).
+    """
+    defined = set(FUNC_RE.findall(text)) | set(extra_defined)
     found = set()
     for line in text.splitlines():
         m = CASE_ARM_RE.match(line)
@@ -339,27 +414,63 @@ def bash_commands(text):
     return {c for c in found if c not in BUILTINS and c not in defined}
 
 
+def bash_commands(text):
+    """preprocess_bash() + scan_commands(), for callers with raw source text."""
+    return scan_commands(preprocess_bash(text))
+
+
 QML_ARRAY_RE = re.compile(r"command:\s*\[(.*?)\]", re.S)
 QML_STR_RE = re.compile(r'"((?:[^"\\]|\\.)*)"')
+# `Quickshell.execDetached([argv0, argv1, ...])` — same argv-array shape as
+# a `command:` property, just spelled as a direct call instead.
+EXEC_DETACHED_RE = re.compile(r"Quickshell\.execDetached\(\s*\[(.*?)\]", re.S)
+# `<Bar>.run("shell command line")` — a single string that's a full shell
+# command line (may itself contain `$(...)`), not an argv array.
+RUN_CALL_RE = re.compile(r'\.run\(\s*"((?:[^"\\]|\\.)*)"')
+
+
+def _argv0_or_shell(parts):
+    """First array element's basename; `bash -c` payloads are re-parsed.
+
+    The nightlight service is the case that forces the bash/sh branch: it
+    does not call hyprsunset as argv[0], it calls it inside a `bash -c`
+    string. `root.omarchyPath + "/bin/omarchy-foo"` concatenations are
+    common for the first element too — QML_STR_RE only sees the string
+    literal part, so the basename split still lands on "omarchy-foo".
+    """
+    if not parts:
+        return set()
+    head = parts[0].split("/")[-1]
+    if head in ("bash", "sh"):
+        found = set()
+        for payload in parts[1:]:
+            found |= bash_commands(payload)
+        return found
+    return {head} if head else set()
 
 
 def qml_commands(text):
-    """argv[0] of each `command:` array; shell payloads are re-parsed as bash.
+    """Commands referenced from actual invocation call sites only.
 
-    The nightlight service is the case that forces this: it does not call
-    hyprsunset as argv[0], it calls it inside a `bash -c` string.
+    Scanning a QML file's full text for anything shaped like
+    `omarchy-[a-z-]+` also matches non-command identifier strings that
+    merely look like one — `reloadableId: "omarchy-battery"`,
+    `WlrLayershell.namespace: "omarchy-background"` — which invoke
+    nothing and have no staged file to ever satisfy. Restricting the
+    scan to the three shapes Quickshell actually uses to run a process
+    (a `command:` array, `Quickshell.execDetached([...])`, and
+    `<Bar>.run("...")`) avoids manufacturing UNSTAGED_REACHABLE findings
+    for strings that were never reachable as commands.
     """
     found = set()
     for body in QML_ARRAY_RE.findall(text):
-        parts = QML_STR_RE.findall(body)
-        if not parts:
-            continue
-        head = parts[0].split("/")[-1]
-        if head in ("bash", "sh"):
-            for payload in parts[1:]:
-                found |= bash_commands(payload)
-        else:
-            found.add(head)
+        found |= _argv0_or_shell(QML_STR_RE.findall(body))
+    for body in EXEC_DETACHED_RE.findall(text):
+        found |= _argv0_or_shell(QML_STR_RE.findall(body))
+    for raw in RUN_CALL_RE.findall(text):
+        # QML string-literal escapes -> the actual runtime string value.
+        payload = raw.replace('\\"', '"').replace("\\\\", "\\")
+        found |= bash_commands(payload)
     return {c for c in found if c not in BUILTINS}
 
 
@@ -379,6 +490,39 @@ def disabled_plugins(shell_json):
     """Empty set == every plugin is active, which is today's default."""
     cfg = json.loads(Path(shell_json).read_text())
     return set(cfg.get("disabledPlugins") or [])
+
+
+def load_plugin_ids(plugroot):
+    """Plugin directory (absolute Path) -> its manifest.json "id" field.
+
+    `disabledPlugins` entries and PluginRegistry.qml's own comparison
+    (Util.canonicalWidgetId(), confirmed to be an identity function) both
+    key on this dotted manifest id (e.g. "omarchy.polkit"), not on a
+    directory name — and plugins can nest (plugins/services/battery/),
+    so a directory-name guess like `parts[0]` would land on "services"
+    for half of them anyway.
+    """
+    ids = {}
+    for manifest in plugroot.rglob("manifest.json"):
+        try:
+            data = json.loads(manifest.read_text())
+        except (OSError, ValueError):
+            continue
+        pid = data.get("id")
+        if pid:
+            ids[manifest.parent] = pid
+    return ids
+
+
+def plugin_id_for(path, plugin_ids, plugroot):
+    """Manifest id of the nearest ancestor directory that owns one."""
+    d = path.parent
+    while True:
+        if d in plugin_ids:
+            return plugin_ids[d]
+        if d == plugroot or d.parent == d:
+            return None
+        d = d.parent
 
 
 def main():
@@ -413,6 +557,7 @@ def main():
                     staged.setdefault(p.name, p)
 
     disabled = disabled_plugins(repo / "overlay/defaults/shell.json")
+    unmatched_disabled_plugins = set()
 
     # --- roots -----------------------------------------------------------
     roots = set()
@@ -421,14 +566,32 @@ def main():
         roots |= set(OMARCHY_RE.findall(text))
     qml_seed = set()
     plugroot = upstream / "shell/plugins"
+    matched_disabled = set()
     if plugroot.is_dir():
-        for qml in plugroot.rglob("*.qml"):
-            plugin = qml.relative_to(plugroot).parts[0]
-            if plugin in disabled:
+        plugin_ids = load_plugin_ids(plugroot)
+        # *.js too, not just *.qml: NotificationLogic.js and friends run
+        # commands from the same plugin trees but were invisible to a
+        # *.qml-only glob.
+        src_files = list(plugroot.rglob("*.qml")) + list(plugroot.rglob("*.js"))
+        for src in src_files:
+            pid = plugin_id_for(src, plugin_ids, plugroot)
+            if pid is not None and pid in disabled:
+                matched_disabled.add(pid)
                 continue
-            text = qml.read_text(errors="replace")
+            text = src.read_text(errors="replace")
+            # qml_commands() only harvests actual invocation call sites
+            # (command: arrays, execDetached([, .run(") — not every
+            # substring in the file that happens to look like an
+            # omarchy-* name (reloadableId, WlrLayershell.namespace, ...
+            # are identifiers, not commands, and were manufacturing
+            # UNSTAGED_REACHABLE findings for names nothing ever runs).
             qml_seed |= qml_commands(text)
-            roots |= set(OMARCHY_RE.findall(text))
+    roots |= qml_seed
+    # A non-empty disabledPlugins that matches no plugin id at all is a
+    # silent typo/rot risk (this repo's least-forgivable failure mode),
+    # not something to pass over quietly.
+    for pid in sorted(disabled - matched_disabled):
+        unmatched_disabled_plugins.add(pid)
     menu = upstream / "default/omarchy/omarchy-menu.jsonc"
     if menu.is_file():
         audit = (repo / "docs/COMMAND_AUDIT.md").read_text()
@@ -441,11 +604,12 @@ def main():
         roots |= set(OMARCHY_RE.findall(menu.read_text())) - known_bad
 
     # --- BFS over staged helpers ----------------------------------------
+    sourced_funcs_cache = {}
     seen, queue, unstaged = set(), sorted(roots), set()
-    # omarchy-* names from qml_commands() are already covered by the
-    # OMARCHY_RE root scan above (line 337) and belong in the BFS so their
-    # staged/unstaged status is checked, not dumped straight into
-    # `external` where they'd need a nonexistent Arch package mapping.
+    # omarchy-* names from qml_commands() are folded into `roots` above
+    # (`roots |= qml_seed`) and belong in the BFS so their staged/unstaged
+    # status is checked, not dumped straight into `external` where they'd
+    # need a nonexistent Arch package mapping.
     # Bare `omarchy` (no trailing hyphen) is upstream's own top-level
     # dispatcher (`omarchy osd --help`, `omarchy default browser ...`).
     # It shares the same staged/unstaged fate as every `omarchy-*` helper,
@@ -465,7 +629,17 @@ def main():
                 unstaged.add(name)
             continue
         text = preprocess_bash(path.read_text(errors="replace"))
-        cmds = bash_commands(text)
+        extra_defined = set()
+        for src_name in SOURCE_RE.findall(text):
+            src_path = staged.get(src_name)
+            if src_path is None or src_path == path:
+                continue
+            src_text = sourced_funcs_cache.get(src_name)
+            if src_text is None:
+                src_text = FUNC_RE.findall(preprocess_bash(src_path.read_text(errors="replace")))
+                sourced_funcs_cache[src_name] = src_text
+            extra_defined.update(src_text)
+        cmds = scan_commands(text, extra_defined)
         for c in cmds:
             if is_omarchy_name(c):
                 queue.append(c)
@@ -505,14 +679,23 @@ def main():
         if name not in exceptions:
             violations.append(f"UNSTAGED_REACHABLE {name}")
 
-    # Verify the map against the live system where possible.  A lookup that
-    # cannot run is not silently accepted; it is reported.
+    # Cross-check the map against the live system where possible. This
+    # audits *declarations* (the map + PKGBUILD depends/optdepends), not
+    # this development machine's installed set: demanding that an
+    # optdepends candidate already be installed here, just to prove the
+    # optdepends declaration itself is correct, is self-contradictory and
+    # makes a green run impossible on any machine that lacks every
+    # optional tool. So a missing binary is not a violation — it is noted
+    # for --emit-table only. When the binary *is* present, pacman still
+    # has to agree with the mapped package, and a mismatch stays a real
+    # violation.
+    not_installed = set()
     for cmd, package, klass, _ in table:
         if klass == "BASE":
             continue
         which = shutil.which(cmd)
         if which is None:
-            violations.append(f"UNMAPPED_COMMAND {cmd} (not installed; cannot verify)")
+            not_installed.add(cmd)
             continue
         owner = subprocess.run(
             ["pacman", "-Qqo", which], capture_output=True, text=True
@@ -524,13 +707,17 @@ def main():
                     f"UNMAPPED_COMMAND {cmd} (map says {package}, pacman says {actual})"
                 )
 
+    for pid in sorted(unmatched_disabled_plugins):
+        violations.append(f"UNMATCHED_DISABLED_PLUGIN {pid}")
+
     if args.emit_table:
         print("| command | package | class | 근거 |")
         print("| --- | --- | --- | --- |")
         for cmd, package, klass, rationale in table:
             if klass == "BASE":
                 continue
-            print(f"| `{cmd}` | `{package}` | {klass} | {rationale} |")
+            note = " (미설치 — 검증 생략)" if cmd in not_installed else ""
+            print(f"| `{cmd}` | `{package}` | {klass} | {rationale}{note} |")
         return 0
 
     for v in violations:

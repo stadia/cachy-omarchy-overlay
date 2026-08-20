@@ -64,7 +64,7 @@ wtype	wtype	HARD	이미 depends
 wl-copy	wl-clipboard	HARD	이미 depends
 xdg-mime	xdg-utils	HARD	이미 depends
 xdg-settings	xdg-utils	HARD	이미 depends
-xdg-terminal-exec	xdg-utils	HARD	이미 depends(PKGBUILD 주석 D8)
+xdg-terminal-exec	xdg-terminal-exec	HARD	별도 AUR 패키지(upstream install/omarchy-base.packages:144) — xdg-utils 는 이 바이너리를 제공하지 않는다(pacman -Ql 실측, PKGBUILD 주석 D8 오류로 확인)
 pgrep	procps-ng	HARD	이미 depends
 pkill	procps-ng	HARD	이미 depends
 ps	procps-ng	HARD	이미 depends
@@ -76,29 +76,30 @@ hyprsunset	hyprsunset	HARD	nightlight 서비스가 기본 활성 — depends 없
 asdcontrol	asdcontrol	OPT	Apple Studio Display 밝기 제어(하드웨어 한정)
 brightnessctl	brightnessctl	OPT	내장 백라이트 — 이미 optdepends
 checkupdates	pacman-contrib	OPT	업데이트 확인 메뉴 항목
-curl	curl	OPT	웹앱 아이콘 다운로드 등 메뉴 경로
+curl	curl	BASE	이미 선언된 의존의 전이 의존(§4.2 개정)
 ddcutil	ddcutil	OPT	외부 모니터 밝기 — 이미 optdepends
 discord	discord	OPT	Discord 커뮤니티 실행 메뉴 항목
-fc-list	fontconfig	OPT	폰트 조회 메뉴 경로
-fc-match	fontconfig	OPT	폰트 매칭 메뉴 경로
+fc-list	fontconfig	BASE	이미 선언된 의존의 전이 의존(§4.2 개정)
+fc-match	fontconfig	BASE	이미 선언된 의존의 전이 의존(§4.2 개정)
 ffmpeg	ffmpeg	OPT	화면 녹화 인코딩
 gpu-screen-recorder	gpu-screen-recorder	OPT	화면 녹화 메뉴 항목
-grim	grim	OPT	스크린샷 캡처 메뉴 항목
+grim	grim	HARD	스크린샷 캡처 행의 구동 기계(§4.2 개정) — grim 없이는 그 메뉴 행 자체가 동작 못 함
 gtk-update-icon-cache	gtk-update-icon-cache	OPT	웹앱 아이콘 설치 후처리
 hyprpicker	hyprpicker	OPT	색상 선택 메뉴 항목
-ip	iproute2	OPT	네트워크 진단 메뉴 항목
+ip	iproute2	BASE	base 그룹 — 이미 선언된 의존의 전이 의존(§4.2 개정)
 iw	iw	OPT	Wi-Fi 진단 메뉴 항목
 mpv	mpv	OPT	미디어 미리보기 메뉴 항목
 nmcli	networkmanager	OPT	네트워크 관리 메뉴 항목
-pkexec	polkit	OPT	권한 상승이 필요한 메뉴 동작
+pkexec	polkit	BASE	이미 선언된 의존의 전이 의존(§4.2 개정)
 powerprofilesctl	power-profiles-daemon	OPT	전원 프로필 메뉴 항목
-slurp	slurp	OPT	영역 캡처 메뉴 항목
-sudo	sudo	OPT	omarchy-sudo-passwordless 설정 — 사용자가 명시적으로 실행
+slurp	slurp	HARD	스크린샷 영역 선택 행의 구동 기계(§4.2 개정) — grim과 짝을 이루는 동일 기능
+sudo	sudo	HARD	omarchy-sudo-passwordless 의 구동 기계(§4.2 개정) — 대상이 아니라 헬퍼 자체가 sudo 없이 동작 못 함
 tensaku-edit	tensaku-edit	OPT	클립보드/스크린샷 편집기 기본값 — 미설치 시 폴백 없음(AUR)
 tesseract	tesseract	OPT	OCR 메뉴 항목
 tmux	tmux	OPT	tmux 테마 훅 — 이미 optdepends
-update-desktop-database	desktop-file-utils	OPT	웹앱 설치 후처리
+update-desktop-database	desktop-file-utils	BASE	이미 선언된 의존의 전이 의존(§4.2 개정)
 usbreset	usbutils	OPT	USB 오디오 장치 복구 메뉴 항목
 v4l2-ctl	v4l-utils	OPT	웹캠 설정 메뉴 항목
-xkbcli	libxkbcommon	OPT	키보드 레이아웃 조회 메뉴 항목
+xkbcli	libxkbcommon	BASE	이미 선언된 의존의 전이 의존(§4.2 개정)
 zbarimg	zbar	OPT	QR 코드 스캔 메뉴 항목
+tailscale	tailscale	OPT	Tailscale 패널 대상 애플리케이션 — QML .js command: 배열에서 도달(C1 수정 후 신규 발견), 사용자가 tailscale 을 가짐으로써 선택하는 능력
