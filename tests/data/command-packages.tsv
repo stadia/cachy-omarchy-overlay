@@ -1,0 +1,104 @@
+# command	package	class	rationale
+# class: BASE = 기반 시스템(항상 존재, depends 불필요) | HARD = 기본 활성 경로에서 도달 | OPT = 사용자가 명시적으로 호출해야 도달
+# 이 파일은 스캐너의 판정 근거다. 새 명령이 나오면 UNMAPPED_COMMAND 로 빨개지며,
+# 그때 한 줄을 추가하며 판단을 남긴다. 조용히 넘어가는 경로는 없다.
+cat	coreutils	BASE	기반
+cp	coreutils	BASE	기반
+mkdir	coreutils	BASE	기반
+rm	coreutils	BASE	기반
+ln	coreutils	BASE	기반
+sleep	coreutils	BASE	기반
+printf	coreutils	BASE	기반
+date	coreutils	BASE	기반
+sort	coreutils	BASE	기반
+head	coreutils	BASE	기반
+tail	coreutils	BASE	기반
+tr	coreutils	BASE	기반
+cut	coreutils	BASE	기반
+wc	coreutils	BASE	기반
+readlink	coreutils	BASE	기반
+basename	coreutils	BASE	기반
+dirname	coreutils	BASE	기반
+mktemp	coreutils	BASE	기반
+timeout	coreutils	BASE	기반
+env	coreutils	BASE	기반
+tee	coreutils	BASE	기반
+sed	sed	BASE	기반
+awk	gawk	BASE	기반
+grep	grep	BASE	기반
+find	findutils	BASE	기반
+xargs	findutils	BASE	기반
+bash	bash	BASE	기반
+sh	bash	BASE	기반
+systemd-cat	systemd	BASE	기반
+systemctl	systemd	BASE	기반
+notify-send	libnotify	HARD	omarchy-notification-send 폴백 경로
+base64	coreutils	BASE	기반
+chmod	coreutils	BASE	기반
+install	coreutils	BASE	기반
+kill	util-linux	BASE	기반
+ls	coreutils	BASE	기반
+md5sum	coreutils	BASE	기반
+mv	coreutils	BASE	기반
+nohup	coreutils	BASE	기반
+nproc	coreutils	BASE	기반
+realpath	coreutils	BASE	기반
+rmdir	coreutils	BASE	기반
+stat	coreutils	BASE	기반
+tac	coreutils	BASE	기반
+touch	coreutils	BASE	기반
+cmp	diffutils	BASE	기반(base 그룹)
+file	file	BASE	기반(base 그룹)
+flock	util-linux	BASE	기반
+setpriv	util-linux	BASE	기반
+setsid	util-linux	BASE	기반
+rfkill	util-linux	BASE	기반
+modprobe	kmod	BASE	기반(base 그룹)
+busctl	systemd	BASE	기반
+systemd-run	systemd	BASE	기반
+timedatectl	systemd	BASE	기반
+jq	jq	HARD	클립보드/리마인더/OSD JSON — 이미 depends
+hyprctl	hyprland	HARD	이미 depends(hyprland)
+uwsm-app	uwsm	HARD	이미 depends(uwsm)
+wtype	wtype	HARD	이미 depends
+wl-copy	wl-clipboard	HARD	이미 depends
+xdg-mime	xdg-utils	HARD	이미 depends
+xdg-settings	xdg-utils	HARD	이미 depends
+xdg-terminal-exec	xdg-utils	HARD	이미 depends(PKGBUILD 주석 D8)
+pgrep	procps-ng	HARD	이미 depends
+pkill	procps-ng	HARD	이미 depends
+ps	procps-ng	HARD	이미 depends
+pactl	libpulse	HARD	pactl 실소유 패키지는 pipewire-pulse 아닌 libpulse(pacman -Qqo 실측) — depends 는 pipewire-pulse 만 있음, MISSING_HARD_DEP 로 드러나는 진짜 결함
+gum	gum	HARD	테마/온보딩 TUI 프롬프트 — 기본 경로에서 도달하나 depends 없음
+git	git	HARD	테마 git clone/update 경로 — 기본 경로에서 도달하나 depends 없음
+perl	perl	HARD	텍스트 처리 헬퍼 — 기본 경로에서 도달하나 depends 없음
+hyprsunset	hyprsunset	HARD	nightlight 서비스가 기본 활성 — depends 없음
+asdcontrol	asdcontrol	OPT	Apple Studio Display 밝기 제어(하드웨어 한정)
+brightnessctl	brightnessctl	OPT	내장 백라이트 — 이미 optdepends
+checkupdates	pacman-contrib	OPT	업데이트 확인 메뉴 항목
+curl	curl	OPT	웹앱 아이콘 다운로드 등 메뉴 경로
+ddcutil	ddcutil	OPT	외부 모니터 밝기 — 이미 optdepends
+discord	discord	OPT	Discord 커뮤니티 실행 메뉴 항목
+fc-list	fontconfig	OPT	폰트 조회 메뉴 경로
+fc-match	fontconfig	OPT	폰트 매칭 메뉴 경로
+ffmpeg	ffmpeg	OPT	화면 녹화 인코딩
+gpu-screen-recorder	gpu-screen-recorder	OPT	화면 녹화 메뉴 항목
+grim	grim	OPT	스크린샷 캡처 메뉴 항목
+gtk-update-icon-cache	gtk-update-icon-cache	OPT	웹앱 아이콘 설치 후처리
+hyprpicker	hyprpicker	OPT	색상 선택 메뉴 항목
+ip	iproute2	OPT	네트워크 진단 메뉴 항목
+iw	iw	OPT	Wi-Fi 진단 메뉴 항목
+mpv	mpv	OPT	미디어 미리보기 메뉴 항목
+nmcli	networkmanager	OPT	네트워크 관리 메뉴 항목
+pkexec	polkit	OPT	권한 상승이 필요한 메뉴 동작
+powerprofilesctl	power-profiles-daemon	OPT	전원 프로필 메뉴 항목
+slurp	slurp	OPT	영역 캡처 메뉴 항목
+sudo	sudo	OPT	omarchy-sudo-passwordless 설정 — 사용자가 명시적으로 실행
+tensaku-edit	tensaku-edit	OPT	클립보드/스크린샷 편집기 기본값 — 미설치 시 폴백 없음(AUR)
+tesseract	tesseract	OPT	OCR 메뉴 항목
+tmux	tmux	OPT	tmux 테마 훅 — 이미 optdepends
+update-desktop-database	desktop-file-utils	OPT	웹앱 설치 후처리
+usbreset	usbutils	OPT	USB 오디오 장치 복구 메뉴 항목
+v4l2-ctl	v4l-utils	OPT	웹캠 설정 메뉴 항목
+xkbcli	libxkbcommon	OPT	키보드 레이아웃 조회 메뉴 항목
+zbarimg	zbar	OPT	QR 코드 스캔 메뉴 항목
