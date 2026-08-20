@@ -36,7 +36,11 @@ fi
 pkgbuild=$REPO_ROOT/packages/cachy-omarchy-shell/PKGBUILD
 # depends= 배열은 여러 줄일 수 있다 — 괄호가 닫힐 때까지 읽는다.
 deps=$(sed -n '/^depends=(/,/)/p' "$pkgbuild")
-for bad in omarchy-settings limine snapper sddm plymouth omarchy-keyring perl; do
+# perl 은 M1 감사(docs/superpowers/plans/2026-08-16-spec10-m1.md) 시점엔 기동에
+# 안 쓰인다고 봐서 금지 목록에 있었다. v0.9 클로저 스캐너 실측(task-2-input.md)
+# 으로 omarchy-menu-select 의 -MEncode -MJSON::PP 키바인딩 UI 경로가 실제로
+# perl 을 부른다는 것이 드러났다 — HARD 승격 대상이지 금지 대상이 아니다.
+for bad in omarchy-settings limine snapper sddm plymouth omarchy-keyring; do
   if [[ $deps == *"$bad"* ]]; then
     printf 'FAIL: forbidden dependency %s in %s\n' "$bad" "$deps"
     ASSERT_FAILURES=$((ASSERT_FAILURES + 1))

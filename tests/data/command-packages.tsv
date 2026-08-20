@@ -93,7 +93,7 @@ nmcli	networkmanager	OPT	네트워크 관리 메뉴 항목
 pkexec	polkit	BASE	이미 선언된 의존의 전이 의존(§4.2 개정)
 powerprofilesctl	power-profiles-daemon	OPT	전원 프로필 메뉴 항목
 slurp	slurp	HARD	스크린샷 영역 선택 행의 구동 기계(§4.2 개정) — grim과 짝을 이루는 동일 기능
-sudo	sudo	HARD	omarchy-sudo-passwordless 의 구동 기계(§4.2 개정) — 대상이 아니라 헬퍼 자체가 sudo 없이 동작 못 함
+sudo	sudo	HARD	cachy-omarchy-init 이 락스크린 PAM 서비스 설정을 omarchy-apply-lock 에 위임하며 그것이 root 를 요구한다 — 메뉴 행이 아니라 우리 설치 경로에서 도달(컨트롤러 룰링, task-2)
 tensaku-edit	tensaku-edit	OPT	클립보드/스크린샷 편집기 기본값 — 미설치 시 폴백 없음(AUR)
 tesseract	tesseract	OPT	OCR 메뉴 항목
 tmux	tmux	OPT	tmux 테마 훅 — 이미 optdepends

@@ -1,7 +1,7 @@
 # Maintainer: Cachy Omarchy Overlay
 pkgname=cachy-omarchy-shell
 pkgver=4.0.0
-pkgrel=10
+pkgrel=11
 pkgdesc='Pinned Omarchy Quattro shell runtime for CachyOS (no omarchy-settings)'
 arch=('any')
 url='https://github.com/basecamp/omarchy'
@@ -13,14 +13,34 @@ license=('MIT')
 # jq (M10 승격): clipboard history/read/write, reminders timer JSON, OSD payload —
 #   더 이상 theme-hook 전용이 아니다. wl-clipboard: clipboard watcher(wl-paste)
 #   ·copy(wl-copy). wtype: emoji/clipboard 선택 paste. wireplumber: wpctl
-#   (mic mute). pipewire-pulse: pactl (output volume). xdg-utils:
-#   xdg-settings/xdg-mime/xdg-terminal-exec (clipboard-open 의 launch closure).
+#   (mic mute). pipewire-pulse는 pactl 을 스스로 제공하지 않는다 — pactl 의
+#   실소유 패키지는 libpulse 다(pacman -Qqo 실측, 아래 v0.9 블록 참고). xdg-utils:
+#   xdg-settings/xdg-mime (clipboard-open 의 launch closure). xdg-terminal-exec
+#   는 xdg-utils 가 제공한다던 이전 주석은 오류였다 — 별도 AUR 패키지이며
+#   아래에서 따로 선언한다(pacman -Ql 실측, 컨트롤러 룰링).
 # uwsm: AppLibrary.qml:85 등이 uwsm-app 을 bare name 으로 부른다. 업스트림도
 #   uwsm 세션을 전제한다 (AGENTS.md:53). /usr/bin/uwsm-app 은 uwsm 패키지가
 #   제공하며 우리는 shim 을 두지 않는다.
+# v0.9 클로저 스캐너 실측으로 승격(tests/data/command-packages.tsv 근거, 11건):
+#   gum·git: 테마 install/update 경로(Theme > Install 메뉴) — git 은
+#     makedepends 에도 남는다(PKGBUILD source 가 git+https 다). perl:
+#     omarchy-menu-select 가 -MEncode -MJSON::PP 로 select payload 를 만드는
+#     키바인딩 UI 경로. hyprsunset: omarchy.nightlight 플러그인이 기본
+#     활성이고 Service.qml 이 uwsm-app -- hyprsunset 으로 데몬을 직접 띄운다.
+#   grim·slurp: 스크린샷 캡처/영역 선택 메뉴 행의 구동 기계 — 이 둘 없이는
+#     그 메뉴 행 자체가 동작하지 못한다(§4.2 개정).
+#   libnotify: omarchy-notification-send 폴백 경로(notify-send). libpulse:
+#     pactl 의 실소유 패키지(위 참고) — pipewire-pulse 만으로는 부족했다.
+#   sudo: cachy-omarchy-init 이 락스크린 PAM 서비스 설정을
+#     omarchy-apply-lock 에 위임하며 그것이 root 를 요구한다 — 메뉴 행이
+#     아니라 우리 자신의 설치 경로에서 도달한다(컨트롤러 룰링).
+#   which: Tailscale 패널의 존재 확인 구동 기계 — 패널 자체가 이 명령 없이는
+#     상태를 못 읽는다(.command= 경로에서 신규 발견).
+#   xdg-terminal-exec: 별도 AUR 패키지(upstream install/omarchy-base.packages:144).
 depends=('quickshell' 'hyprland' 'uwsm' 'inotify-tools' 'libvips' 'procps-ng'
          'psmisc' 'jq' 'wl-clipboard' 'wtype' 'wireplumber' 'pipewire-pulse'
-         'xdg-utils')
+         'xdg-utils' 'git' 'grim' 'gum' 'hyprsunset' 'libnotify' 'libpulse'
+         'perl' 'slurp' 'sudo' 'which' 'xdg-terminal-exec')
 # /usr/bin/omarchy-* 를 공식 omarchy 패키지와 같은 이름으로 소유한다. 상호
 # 배타가 의도다. provides 는 하지 않는다 — Omarchy 전체를 제공하지 않는다.
 conflicts=('omarchy')
@@ -31,6 +51,28 @@ optdepends=(
   'brightnessctl: omarchy-brightness-display internal backlight'
   'ddcutil: omarchy-brightness-display-ddc external monitors'
   'lsp-plugins-lv2: omarchy-audio-tuning limiter'
+  # v0.9 클로저 스캐너 실측으로 신규 선언(tests/data/command-packages.tsv 근거,
+  # 19건). 메뉴/패널 항목이며 기본 경로에서 도달하지 않는다 — 사용자가 그
+  # 기능을 씀으로써 선택한다.
+  'asdcontrol: Apple Studio Display 밝기 제어(AUR, 하드웨어 한정)'
+  'discord: Discord 커뮤니티 실행 메뉴 항목'
+  'dropbox-cli: Dropbox 패널 대상 애플리케이션(AUR)'
+  'ffmpeg: 화면 녹화 인코딩'
+  'gpu-screen-recorder: 화면 녹화 메뉴 항목'
+  'gtk-update-icon-cache: 웹앱 아이콘 설치 후처리'
+  'hyprpicker: 색상 선택 메뉴 항목'
+  'iw: Wi-Fi 진단 메뉴 항목'
+  'mpv: 미디어 미리보기 메뉴 항목'
+  'networkmanager: 네트워크 상태/제어 패널 대상 애플리케이션'
+  'pacman-contrib: checkupdates 업데이트 확인 메뉴 항목'
+  'power-profiles-daemon: 전원 프로파일 전환 메뉴 항목'
+  'python: Dropbox 패널의 번들 상태 스크립트(status.py) 실행기'
+  'tailscale: Tailscale 패널 대상 애플리케이션'
+  'tensaku-edit: 클립보드/스크린샷 편집기 기본값(AUR, 폴백 없음)'
+  'tesseract: OCR 메뉴 항목'
+  'usbutils: USB 장치 진단 메뉴 항목'
+  'v4l-utils: 웹캠/캡처 장치 진단 메뉴 항목'
+  'zbar: QR/바코드 스캔 메뉴 항목'
 )
 _commit='f0020448ca87329199de7cb12f2015ebc4a3e5e7'
 
