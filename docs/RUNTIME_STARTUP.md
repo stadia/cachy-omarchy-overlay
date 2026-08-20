@@ -1721,3 +1721,118 @@ Hyprland 설정이 `~/.local/state/omarchy/toggles/hypr/` 를 source 하지 않�
   description 의 비-ASCII 에 대해 `Invalid ASCII character` 가 stderr 로
   보임 (헬퍼 exit 0, 싱크 불변).
 - `~/.config/pipewire` 에 speaker-tuning 드롭인 없음.
+
+---
+
+## 22. 잠금 화면 공존 실측 — hyprlock (2026-08-20)
+
+SPEC §61 의 마지막 미검증 항목("An installed lock helper is not removed or
+stopped by us")을 닫기 위한 실측. **사용자 세션의 화면을 잠그지 않았다** —
+`env -u HYPRLAND_INSTANCE_SIGNATURE` 로 띄운 **중첩 Hyprland** 안에서만
+잠금을 걸고 풀었다. 사용자 `~/.config/hypr` 는 읽기만 했고, 중첩 인스턴스는
+전용 `XDG_CONFIG_HOME`/`HOME` 샌드박스를 썼다.
+
+환경: Hyprland 0.56.2(중첩, `WAYLAND-1` 1507x1658), hyprlock 0.9.6-2.1,
+quickshell 0.3.0, 격리 셸은 `/usr/share/cachy-omarchy/upstream` 사본을
+`quickshell -n -p <사본>/shell` 로 기동.
+
+### 22.1 Lane A — 소유·정지·제거 (읽기 전용, 실세션)
+
+| 질문 | 실측 |
+| --- | --- |
+| hyprlock 은 누가 소유하나 | `hyprlock 0.9.6-2.1` (우리 패키지 아님) |
+| 우리 패키지가 hyprlock 경로/`/etc`/시스템 유닛을 소유하나 | 두 아카이브 모두 **0건** |
+| 우리 코드가 lock 데몬을 stop/mask/disable/제거하나 | `pkill`/`killall`/`systemctl stop|mask|disable`/`pacman -R` **일치 0건**. 트리 안의 유일한 `kill` 은 `cachy-omarchy-shell --restart` 가 `quickshell -n -p <경로>` 전체 매칭으로 **자기 인스턴스**를 끄는 것 |
+| hyprlock 은 데몬인가 | 아니다 — 온디맨드 실행. 정지할 상주 프로세스 자체가 없다 |
+
+부수 관측: **이 호스트에는 `~/.config/hypr/hyprlock.conf` 가 없다.** 설치돼
+있지만 설정이 없어 `hyprlock` 은 `Config path error` 로 즉시 종료한다. 아래
+D1/D2 는 샌드박스에 테스트 전용 최소 설정을 두고 잰 것이며, 사용자 설정을
+만들지 않았다.
+
+### 22.2 D1 — 우리 셸이 떠 있는 상태에서 hyprlock 이 잠글 수 있는가
+
+`omarchy.lock` 은 `keepLoaded` 서비스지만 `WlSessionLock { locked: false }` 로
+시작한다. 세션 잠금은 IPC `lock lock` 또는 stranded 복구에서만 잡는다.
+
+| 단계 | 실측 |
+| --- | --- |
+| hyprlock 전 `solitaryBlockedBy` | `["WINDOWED","CANDIDATE"]` |
+| hyprlock 실행 후 | `["LOCK","WINDOWED","CANDIDATE"]`, hyprlock 생존, `PAMPROMPT: Password:` |
+| 그동안 우리 셸 | `locked:false, sessionLocked:false, lastEvent:"init"` — 개입 없음, 크래시 없음 |
+
+**→ §61 잠금 항목 충족.** 우리는 hyprlock 을 제거·정지하지 않으며, 셸이 떠
+있어도 hyprlock 은 평소대로 세션을 잠근다.
+
+### 22.3 D2 — 우리가 먼저 잠근 뒤 hyprlock (역방향)
+
+IPC `lock lock` → `ok`, `locked:true / sessionLocked:true / secure:true`,
+`solitaryBlockedBy` 에 `LOCK`. 그 상태에서 hyprlock 실행:
+
+```text
+DEBUG]: Locking session
+DEBUG]: onLockFinished called. Seems we got yeeten. Is another lockscreen running?
+```
+
+hyprlock 은 **거부당하지만 죽지 않고** 살아 있으며, 우리 잠금은 그대로다.
+mako 때와 같은 구조 — 밀어내기가 아니라 **순서**다(§17.4). 다만 방향이
+반대일 때의 견고성은 대칭이 아니다(§22.4).
+
+### 22.4 결정적 발견 — 거부당했을 때 quickshell 은 죽는다
+
+`Service.qml` 의 `checkStrandedLock()` 은 `omarchy-hyprland-session-locked` 를
+불러 exit 0(=세션 잠김)이고 그 잠금이 우리 것이 아니면 `strandedLock` 으로
+판정하고 `recoverStrandedLock()` → `beginLock()` 으로 세션 잠금을 **가져오려
+한다**. 업스트림 의도는 "클라이언트가 죽어 고아가 된 failsafe 잠금 회수"다.
+
+hyprlock 이 잠금을 쥔 상태에서 이 경로를 태워봤다(헬퍼를 샌드박스 PATH 에
+올려 스테이징된 상태를 흉내):
+
+```text
+omarchy lock ... lock-stranded: recovering
+omarchy lock ... lock-requested
+omarchy lock ... secure=false
+omarchy lock ... session-locked=false
+wl_display#1: error 0: invalid object 70
+WARN: The Wayland connection experienced a fatal error
+→ 셸 프로세스 사망
+```
+
+즉 **ext-session-lock 거부의 결과가 두 클라이언트에서 다르다.** hyprlock 은
+`onLockFinished` 로 우아하게 처리하고 생존, quickshell 은 프로토콜 오류로
+연결이 끊겨 죽는다.
+
+**현재 출고본은 이 경로에 진입하지 않는다** — `omarchy-hyprland-session-locked`
+가 스테이징돼 있지 않아 `bash -c` 가 127 로 끝나고, `onExited(127)` 는
+`strandedLockResolved = true` + `strandedLock = false` 로 조용히 비활성화된다
+(exit 2 만 "미정"으로 재시도). 헬퍼 부재가 우연히 fail-safe 로 작동하고 있다.
+
+| 상태 | hyprlock 잠금 중 셸 재시작 |
+| --- | --- |
+| 현재(헬퍼 미스테이징) | 셸 정상 기동, 개입 없음, hyprlock 유지 — **실측** |
+| 헬퍼 스테이징 시 | 셸이 잠금 탈취 시도 → 거부 → **매번 사망** — **실측** |
+
+`tests/package/test_staged_session_helpers.sh` 가 이 미스테이징을 의도로
+고정한다(주석에 사유). 헬퍼 폐쇄(P08)를 이유로 나중에 올리려면 크래시를 먼저
+막아야 한다.
+
+### 22.5 남은 헬퍼 폐쇄 결함 (lock 경로)
+
+lock 플러그인이 이름으로 부르지만 스테이징되지 않은 것:
+
+| 헬퍼 | 호출 지점 | 현재 결과 |
+| --- | --- | --- |
+| `omarchy-hyprland-session-locked` | `strandedLockCheckProc` | 127 → stranded 복구 비활성 (**의도적 유지**, §22.4) |
+| `omarchy-system-wake` | `runWake()` — 잠금/오타 입력마다 | 127 → 화면 깨우기 없음 |
+| `omarchy-brightness-keyboard` | `runBlank()` | 127 → 키보드 백라이트 안 꺼짐 |
+
+`omarchy-system-wake` / `omarchy-brightness-keyboard` 는 §22.4 같은 위험이
+없고 순수 기능 손실이라 후속 마일스톤에서 verbatim 스테이징 후보다. 셋 다
+`Process` stderr 가 저널로 나오지 않아 **로그에 `command not found` 가 남지
+않는다** — 조용한 실패라는 점을 기록해 둔다.
+
+### 22.6 정리
+
+중첩 컴포지터·격리 셸·hyprlock 을 모두 종료한 뒤 확인: 소켓은 `wayland-1`
+하나, 프로덕션 셸(pid 1252575) 생존, 사용자 `DP-1` 의 `solitaryBlockedBy` 에
+`LOCK` 없음, 프로덕션 `lock isLocked` = `false`.

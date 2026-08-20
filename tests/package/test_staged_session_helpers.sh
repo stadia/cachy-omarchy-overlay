@@ -58,4 +58,17 @@ for h in omarchy-osd omarchy-cmd-present; do
   assert_file_exists "$bin/$h" "기존 stage 의존: $h"
 done
 
+# omarchy-hyprland-session-locked 는 의도적으로 미스테이징이다 (2026-08-20 실측,
+# RUNTIME_STARTUP §22). lock 플러그인의 strandedLockCheckProc 가 이것을 부르고,
+# exit 0(=세션 잠김)이면 recoverStrandedLock() → beginLock() 으로 세션 잠금을
+# 가져오려 한다. ext-session-lock 은 클라이언트 하나만 쥘 수 있어서, hyprlock 이
+# 이미 쥔 상태에서 이 경로가 돌면 컴포지터가 요청을 거부하고 quickshell 이
+# `wl_display error 0: invalid object` 로 **죽는다** (중첩 인스턴스 실측).
+# 헬퍼가 없으면 bash 가 127 로 끝나고 stranded 복구는 조용히 비활성 — fail-safe
+# 방향이다. 헬퍼 폐쇄를 이유로 이걸 올리려면 먼저 그 크래시를 막아야 한다.
+for h in omarchy-hyprland-session-locked; do
+  [[ -e $bin/$h ]] && x=1 || x=0
+  assert_eq "$x" "0" "미스테이징(의도적, R10 공존): $h"
+done
+
 exit "$ASSERT_FAILURES"
