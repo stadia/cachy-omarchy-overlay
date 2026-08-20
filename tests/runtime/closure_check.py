@@ -62,7 +62,19 @@ FUNC_RE = re.compile(
 # Segments must be non-empty so a dynamically built name like
 # `"omarchy-hw-$KIND"` yields no match at all rather than the truncated,
 # unresolvable literal "omarchy-hw-".
-OMARCHY_RE = re.compile(r"\b(omarchy-[a-z0-9]+(?:-[a-z0-9]+)*)")
+#
+# The leading boundary must refuse a `cachy-`-style prefix, not just
+# require *a* boundary. `\b` alone is satisfied between "-" and "o"
+# (a hyphen is a non-word character), so `\bomarchy-` matched inside
+# "cachy-omarchy-launcher" -- our own overlay's command, staged and
+# real -- and silently stripped the "cachy-" off, reporting it as an
+# unstaged upstream helper nobody had written yet. A negative lookbehind
+# for any word character *or* hyphen closes that: real omarchy-* names
+# in these root files are always preceded by something else entirely --
+# a quote, a slash (`"$OMARCHY_PATH/bin/omarchy-clipboard-paste-file"`),
+# a bracket, a backtick, or the start of the line -- never by a hyphen
+# or an alphanumeric that would make it part of a longer identifier.
+OMARCHY_RE = re.compile(r"(?<![A-Za-z0-9_-])(omarchy-[a-z0-9]+(?:-[a-z0-9]+)*)")
 HEREDOC_RE = re.compile(r"<<-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
 # `case` arm labels — `chromium.desktop) echo ...` or
 # `chromium|chrome|brave) ...` — sit in the exact position CMD_RE treats as
