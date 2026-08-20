@@ -599,6 +599,46 @@ def qml_commands(text):
     return {c for c in found if c not in BUILTINS}
 
 
+def extract_bash_array_body(text, name):
+    """Raw text between a `name=( ... )` array literal's own parens.
+
+    A non-greedy `.*?\\)` regex stops at the *first* `)` anywhere in the
+    text, including one sitting inside a quoted description string
+    (`'foot: ... hook (OSC reload)'`) -- not the array's real
+    terminator. That silently truncated `optdepends=(...)` to its first
+    entry here: the parsed set was exactly `{'tmux'}` out of five,
+    so `brightnessctl`/`ddcutil`/... were reported missing while
+    already declared. `depends=(...)` has the same defect but happened
+    to contain no parenthesis, so it parsed correctly by luck, not by
+    construction.
+
+    This scans char by char instead, tracking quote state so a `)`
+    inside `'...'` or `"..."` is never mistaken for the terminator, and
+    tracking paren depth so only the terminator matching this array's
+    own opening `(` ends the scan.
+    """
+    m = re.search(rf"^{re.escape(name)}=\(", text, re.M)
+    if not m:
+        return ""
+    i, n = m.end(), len(text)
+    depth, in_quote, start = 1, None, i
+    while i < n and depth > 0:
+        c = text[i]
+        if in_quote:
+            if c == in_quote:
+                in_quote = None
+        elif c in ("'", '"'):
+            in_quote = c
+        elif c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0:
+                break
+        i += 1
+    return text[start:i]
+
+
 def read_tsv(path, ncols):
     rows = []
     for lineno, raw in enumerate(Path(path).read_text().splitlines(), 1):
@@ -787,12 +827,10 @@ def main():
                 reachable_pkgs[package] = "HARD"
 
     pkgbuild = (repo / "packages/cachy-omarchy-shell/PKGBUILD").read_text()
-    dep_block = re.search(r"^depends=\((.*?)\)", pkgbuild, re.S | re.M)
-    opt_block = re.search(r"^optdepends=\((.*?)\)", pkgbuild, re.S | re.M)
-    depends = set(re.findall(r"'([^']+)'", dep_block.group(1) if dep_block else ""))
+    depends = set(re.findall(r"'([^']+)'", extract_bash_array_body(pkgbuild, "depends")))
     optdeps = {
         s.split(":")[0].strip()
-        for s in re.findall(r"'([^']+)'", opt_block.group(1) if opt_block else "")
+        for s in re.findall(r"'([^']+)'", extract_bash_array_body(pkgbuild, "optdepends"))
     }
     for package, klass in sorted(reachable_pkgs.items()):
         if klass == "HARD" and package not in depends:
