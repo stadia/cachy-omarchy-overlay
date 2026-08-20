@@ -226,6 +226,7 @@ helpers=(
   omarchy-hw-webcam
   omarchy-hw-dell-xps-haptic-touchpad
   # 단독 self-contained: 표준 도구 + 이미 staged helper 만.
+  omarchy-battery-low
   omarchy-menu
   omarchy-menu-timezone
   omarchy-menu-tmux-keybindings

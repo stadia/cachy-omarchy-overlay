@@ -116,7 +116,8 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-system-wake` | idle | DISABLED (idle) / **미스테이징 (lock)** | lock 플러그인의 `runWake()` 도 이름으로 부른다. 미스테이징이라 127 — 순수 기능 손실(잠금 중 화면 깨우기 없음), 위험은 없음. 후속 verbatim 후보 (RUNTIME_STARTUP §22.5) |
 | `omarchy-hyprland-session-locked` | lock | **DISABLED — 공존 위험** | **의도적 미스테이징.** `strandedLockCheckProc` 가 이걸 불러 exit 0 이면 세션 잠금을 회수하려 하는데, hyprlock 이 이미 쥔 상태면 ext-session-lock 거부로 **quickshell 이 죽는다**(실측 §22.4). 헬퍼가 없으면 127 → 복구 경로가 조용히 비활성 = fail-safe. `test_staged_session_helpers.sh` 가 고정 |
 | `omarchy-brightness-keyboard` | lock | 미스테이징 | lock 의 `runBlank()` 가 부른다. 127 — 키보드 백라이트 안 꺼짐. 위험 없음, 후속 verbatim 후보 |
-| `omarchy-battery-low` / `omarchy-powerprofiles-set` | battery | DISABLED | disable plugin |
+| `omarchy-battery-low` | battery | SAFE | package — v0.9. battery 플러그인(기본 활성)이 10% 이하에서 부른다. 체인은 omarchy-notification-send + omarchy-hook 뿐이라 verbatim |
+| `omarchy-powerprofiles-set` | battery | DISABLED | disable plugin |
 | `omarchy-notification-send` | 여러 패널 | SAFE | package — M8 Tier B. `omarchy-reminder` 와 `omarchy-theme-set` 이 부른다(실측). 알림 표시 자체는 셸 플러그인 정책이지 이 helper 의 스테이징 여부와 별개다 |
 | `omarchy-shell osd ...` | AppLibrary 런치 OSD | OPTIONAL | osd 플러그인 정책에 따름 |
 | `omarchy-osd` | osd 패널 | M10: stage | `omarchy-shell -q osd show <jq payload>` 얇은 프런트. volume/mic-mute helper 와 함께 채택. display brightness 체인은 이후 verbatim 확장에서 채택 |
@@ -215,6 +216,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-audio-output-volume` | SAFE | package | M10 OSD audio bridge. pactl/wpctl. debounce 파일은 runtime dir |
 | `omarchy-audio-tuning` | SAFE | package | 노트북 스피커 튜닝. `on` 만 `~/.config/pipewire` + user unit 템플릿을 복사. 데이터는 `$OMARCHY_PATH/default/audio` |
 | `omarchy-bar` | SAFE | package | 메뉴 `style.bar` position/transparent. layer-shell 네임스페이스 `omarchy-bar` 와 동명·별개 |
+| `omarchy-battery-low` | SAFE | package | v0.9. battery 플러그인(기본 활성)이 10% 이하에서 부른다. 체인은 omarchy-notification-send + omarchy-hook 뿐이라 verbatim |
 | `omarchy-brightness-display` | SAFE | package | 포커스 모니터 밝기. 내부 backlight / DDC / Apple 로 분기. 바 `omarchy-monitor-state` 가 부름 |
 | `omarchy-brightness-display-apple` | SAFE | package | brightness-display Apple 분기. `sudo asdcontrol`(부재 시 실패) |
 | `omarchy-brightness-display-ddc` | SAFE | package | brightness-display 외부 모니터 분기. `ddcutil` optdepend |
@@ -376,6 +378,7 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | command | class | action | note |
 | --- | --- | --- | --- |
 | `omarchy-bar` | SAFE | package | 업스트림 `bin/omarchy-bar` (`omarchy bar`). 메뉴 `style.bar` position/transparent. 전이 `omarchy-shell-config` + `omarchy-plugin-catalog`. layer-shell 네임스페이스 `omarchy-bar` 와 동명·별개. 가시성 토글은 `omarchy-toggle-bar` |
+| `omarchy-battery-low` | SAFE | package | v0.9. battery 플러그인(기본 활성)이 10% 이하에서 부른다. 체인은 omarchy-notification-send + omarchy-hook 뿐이라 verbatim. 메뉴에는 없다 |
 | `omarchy-branding-about` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
 | `omarchy-branding-screensaver` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
 | `omarchy-capture-qr` | SAFE | package | 0.8.0 verbatim stage. hyprpicker/slurp/grim + zbarimg(opt) |
