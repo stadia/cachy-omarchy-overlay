@@ -161,7 +161,7 @@ file only.
 - **v0.9 (dependency closure)** — a scanner walks from real roots (keybindings,
   active-plugin QML, the packaged menu) through the staged upstream helpers and
   fails the build on anything reachable but undeclared or unstaged. Done
-  (`v0.9.0`). Promoted eleven packages to `depends` and nineteen to `optdepends`,
+  (`v0.9.0`). Promoted ten packages to `depends` and twenty to `optdepends`,
   staged `omarchy-battery-low`, and shimmed `omarchy-menu-keybindings`. Known
   live gaps: `xdg-terminal-exec` is AUR-only, and `omarchy-battery-status` stays
   unstaged, so the Power panel's battery-detail rows stay hidden.

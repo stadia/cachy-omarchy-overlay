@@ -38,6 +38,49 @@ one context, because a fixture pin's regenerated inventory is expected to
 differ from `docs/RUNTIME_DEPENDENCIES.md`'s checked-in table, which tracks
 the real pin above.
 
+### A real pin move will fail the doc-sync assertion first — that is expected
+
+The skip above is wired only for the fixture (`COO_UPDATE_PIPELINE_NESTED=1`).
+`bin/update-upstream` does not set it, so a **real** candidate run executes the
+closure table's doc-sync assertion against the new pin, and any change in the
+generated table — a helper added upstream, a command that stopped being
+reachable, a package reclassified — makes
+`tests/runtime/test_dependency_closure.sh` fail. This is not a regression and
+must not be worked around in code: an automatic bypass would swallow genuine
+closure regressions along with the expected churn. Moving the pin is a
+supervised task, so the escape hatch is a documented order of operations, not a
+flag.
+
+The table cannot be regenerated ahead of time, because generating it requires
+the new pin to be already staged and built. Unwind it in this order:
+
+1. Run `bin/update-upstream`. It moves `upstream.lock`, the PKGBUILD's
+   `pkgver`/`_commit`, and `tests/data/upstream-helpers.txt` together, then runs
+   the suite. Expect `test_dependency_closure.sh` to fail on the doc-sync
+   assertion; read its diff, since that diff is the pin's dependency delta.
+2. If the same run also reports `UNSTAGED_REACHABLE`, `MISSING_HARD_DEP`,
+   `MISSING_OPT_DEP` or `UNJUSTIFIED_BASE`, fix those first — they are real
+   findings about the new tree, not table churn. Staging, `depends`/`optdepends`
+   and `tests/data/command-packages.tsv` are the levers; the table is downstream
+   of all of them.
+3. With the candidate staged and built, regenerate the table and paste it
+   between the `CLOSURE_BEGIN`/`CLOSURE_END` markers in
+   `docs/RUNTIME_DEPENDENCIES.md`:
+
+   ```
+   python3 tests/runtime/closure_check.py \
+     --tree <extracted-tree> --repo . \
+     --map tests/data/command-packages.tsv \
+     --upstream-helpers tests/data/upstream-helpers.txt \
+     --exceptions tests/data/closure-exceptions.tsv --emit-table
+   ```
+
+   `tests/runtime/test_dependency_closure.sh` shows how the harness extracts
+   that tree (`coo_extract_pkg` / `coo_extract_overlay` into
+   `$COO_TEST_SANDBOX/closure-tree`).
+4. Re-run the suite. The doc-sync assertion should now pass, and the diff you
+   committed in step 3 is the human-readable record of what the pin changed.
+
 ## Components packaged (M1–M5; `pacman -U` 실설치는 2026-08-17 검증됨 — `docs/RUNTIME_STARTUP.md` §12)
 
 두 패키지로 나뉜다. `cachy-omarchy-shell` 은 핀된 업스트림 트리를, `cachy-omarchy-overlay`

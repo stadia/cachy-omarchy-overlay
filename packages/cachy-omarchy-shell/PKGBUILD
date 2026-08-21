@@ -68,6 +68,7 @@ optdepends=(
   # (bin/install-packages:55) depends 에 넣으면 우리 패키지 자체가 설치
   # 불가해진다 — 그래서 HARD 성격이라도 optdepends 에 둔다:
   'xdg-terminal-exec: AUR — 터미널 실행의 구동 기계, omarchy-launch-tui/omarchy-launch-terminal/omarchy-launch-floating-terminal-with-presentation 전부 이것 없이는 실패(HARD 성격이나 리포에 없어 depends 불가)'
+  'desktop-file-utils: omarchy-webapp-remove 뒤 desktop DB 갱신 (v0.9 최종 wave 의 BASE 정당성 검사로 발견 — BASE 로 적혀 있었으나 선언된 depends 의 전이 폐포에도 base/base-devel 에도 없다)'
   'discord: Discord 커뮤니티 실행 메뉴 항목'
   'dropbox-cli: AUR — Dropbox 패널 대상 애플리케이션'
   'ffmpeg: 화면 녹화 인코딩'

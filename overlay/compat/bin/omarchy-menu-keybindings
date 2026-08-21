@@ -9,8 +9,10 @@
 set -euo pipefail
 
 # 다른 compat shim(omarchy-shell)과 같은 간접 호출 관례: 테스트가 가짜
-# 바이너리로 갈아끼울 수 있게, 그리고 정적 클로저 스캐너가 우리 자신의
-# 명령(같은 패키지 소속, /usr/bin 에 늘 존재)을 "미매핑 외부 명령"으로
-# 오탐하지 않게 리터럴 호출 자리 대신 변수를 쓴다.
+# 바이너리로 갈아끼울 수 있게 리터럴 호출 자리 대신 변수를 쓴다.
+#
+# 감사에서 호출 지점이 안 보이게 하는 것은 근거가 아니다. 스캐너가 우리
+# 자신의 명령을 미매핑으로 보는 문제의 올바른 지렛대는
+# tests/data/command-packages.tsv 의 맵 행이다(`list.sh` 선례).
 KEYBINDINGS_BIN=${COO_KEYBINDINGS_BIN:-cachy-omarchy-keybindings}
 exec "$KEYBINDINGS_BIN" "$@"

@@ -895,6 +895,7 @@ def main():
 
     # --- roots -----------------------------------------------------------
     roots = set()
+    menu_suppressed = set()
     for name in ("bindings.conf", "bindings.lua"):
         text = (repo / "overlay/hypr" / name).read_text()
         roots |= set(OMARCHY_RE.findall(text))
@@ -941,7 +942,13 @@ def main():
                 r"\|\s*`(omarchy-[a-z0-9-]+)`\s*\|\s*DISABLED\s*\|", audit
             )
         }
-        roots |= set(OMARCHY_RE.findall(menu.read_text())) - known_bad
+        menu_names = set(OMARCHY_RE.findall(menu.read_text()))
+        # 이 차감은 규모가 큰 억제 통로다 — 예외 파일보다 훨씬 크면서
+        # 사유도, 신선도 검사도, 생성 문서 노출도 없었다. 개수를 세어
+        # --emit-table 이 단언 대상으로 내보내게 한다(산문에 손으로 적은
+        # 숫자는 맵이 바뀌어도 green 인 채로 거짓이 될 수 있다).
+        menu_suppressed |= menu_names & known_bad
+        roots |= menu_names - known_bad
 
     # --- BFS over staged helpers ----------------------------------------
     sourced_funcs_cache = {}
@@ -1120,9 +1127,11 @@ def main():
     # simply narrows what this pass can check; it says nothing else. When
     # the binary *is* present, pacman still has to agree with the mapped
     # package, and a mismatch stays a real violation.
+    # BASE 도 건너뛰지 않는다. 예전에는 건너뛰었고, 그 결과 BASE 는
+    # 이 스캐너의 어떤 검사도 받지 않는 클래스가 됐다 — 하드 의존을
+    # BASE 로 바꾸고 depends 에서 지워도 게이트가 통과했다(리뷰어 재현).
+    # 호스트에 바이너리가 없으면 지금처럼 조용히 넘어간다.
     for cmd, package, klass, _ in table:
-        if klass == "BASE":
-            continue
         which = shutil.which(cmd)
         if which is None:
             continue
@@ -1134,6 +1143,45 @@ def main():
             if actual != package:
                 violations.append(
                     f"UNMAPPED_COMMAND {cmd} (map says {package}, pacman says {actual})"
+                )
+
+    # BASE 는 "부재할 수 없으므로 선언 대상이 아니다" 라는 주장이다. 그
+    # 주장은 검사 가능하다: 선언된 depends 의 전이 폐포, 또는 Arch 의
+    # base/base-devel 폐포, 또는 우리가 직접 빌드하는 패키지 안에 있어야
+    # 한다. 그 셋 중 어디에도 없으면 그것은 기반 패키지가 아니라 그냥
+    # 선언되지 않은 의존이고, BASE 라고 적어 침묵시킨 것이다.
+    #
+    # 이 검사가 없으면 클래스 칼럼 한 글자를 고치는 것만으로 게이트를
+    # 만족시킬 수 있다 — 이 브랜치에서 가장 값싼 부정직 경로였다.
+    #
+    # pactree 가 없는 호스트에서는 검사를 건너뛴다(pacman 교차검증과 같은
+    # 규칙: 호스트가 답을 모르면 판정하지 않는다). 건너뛴 사실은
+    # --emit-table 이 적는다 — 조용히 넘어가지 않는다.
+    base_unverifiable = shutil.which("pactree") is None
+    if not base_unverifiable:
+        guaranteed = set()
+        for seed in sorted(depends) + ["base", "base-devel"]:
+            r = subprocess.run(
+                ["pactree", "-l", "-s", seed], capture_output=True, text=True
+            )
+            if r.returncode != 0:
+                continue
+            for tok in r.stdout.split():
+                guaranteed.add(re.split(r"[<>=]", tok.strip())[0])
+        # 우리 자신이 빌드하는 패키지는 우리가 그 파일을 배포하므로
+        # 정의상 부재할 수 없다(`list.sh` → cachy-omarchy-shell).
+        for pkgdir in sorted((repo / "packages").iterdir()):
+            pkgb = pkgdir / "PKGBUILD"
+            if pkgb.is_file():
+                mm = re.search(r"^pkgname=([A-Za-z0-9_.+-]+)", pkgb.read_text(), re.M)
+                if mm:
+                    guaranteed.add(mm.group(1))
+        for cmd, package, klass, _ in table:
+            if klass == "BASE" and package not in guaranteed:
+                violations.append(
+                    f"UNJUSTIFIED_BASE {package} ({cmd} — 선언된 depends 의 전이 "
+                    f"폐포에도 base/base-devel 에도 없다; BASE 가 아니라 선언되지 "
+                    f"않은 의존이다)"
                 )
 
     for pid in sorted(unmatched_disabled_plugins):
@@ -1151,19 +1199,31 @@ def main():
         print("| command | package | class | 근거 |")
         print("| --- | --- | --- | --- |")
         for cmd, package, klass, rationale in table:
-            if klass == "BASE":
-                continue
             print(f"| `{cmd}` | `{package}` | {klass} | {rationale} |")
         # 개수는 여기서 함께 내보내 표와 같은 단언 대상이 되게 한다 — 산문에
         # 손으로 옮겨 적은 숫자는 맵이 바뀌어도 스위트가 green 인 채로 거짓이
         # 될 수 있다(v0.9 rebaseline fix round 1, I-2).
-        base_count = sum(1 for r in map_rows if r[2] == "BASE")
+        base_count = sum(1 for r in table if r[2] == "BASE")
         print()
         print(
-            "tests/data/command-packages.tsv: 전체 %d행, 그중 BASE %d행은 "
-            "위 표에서 제외(부재할 수 없는 기반 패키지 — declare 대상 아님)"
-            % (len(map_rows), base_count)
+            "tests/data/command-packages.tsv: 전체 %d행, 위 표에는 도달한 %d행이 "
+            "모두 실린다(BASE %d행 포함 — BASE 는 declare 대상이 아닐 뿐 "
+            "검사 대상에서 빠지지 않는다)"
+            % (len(map_rows), len(table), base_count)
         )
+        if base_unverifiable:
+            print(
+                "주의: 이 호스트에 pactree 가 없어 BASE 정당성 검사를 "
+                "건너뛰었다 — 위 BASE 행들은 이번 실행에서 검증되지 않았다"
+            )
+        print()
+        print(
+            "docs/COMMAND_AUDIT.md 의 DISABLED 행으로 메뉴 루트에서 억제된 "
+            "이름: %d개 (의도적으로 미지원인 Omarchy OS 스택 — 예외 파일과 "
+            "달리 사유·신선도 검사가 없는 통로다)" % len(menu_suppressed)
+        )
+        for name in sorted(menu_suppressed):
+            print(f"- `{name}`")
         # 스캐너가 헬퍼로 인정하지 않은 이름을 여기서 드러낸다. 이 목록이
         # 조용하면, 생성된 문서는 도구가 갖지 않은 완전성을 주장하게 된다.
         print()

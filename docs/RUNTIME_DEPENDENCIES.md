@@ -102,51 +102,204 @@
 | command | package | class | 근거 |
 | --- | --- | --- | --- |
 | `asdcontrol` | `asdcontrol` | UNPACKAGED | Apple Studio Display 밝기 제어(하드웨어 한정, omarchy-brightness-display-apple 이 sudo asdcontrol 을 부른다) — 공식 리포에도 AUR 에도 제공자가 없다(AUR RPC info/search 둘 다 0건 실측). 어디에도 선언하지 않는다; 사용자가 직접 빌드해야 하며, 없으면 그 헬퍼 하나만 동작하지 않는다. |
+| `awk` | `gawk` | BASE | 기반 |
+| `base64` | `coreutils` | BASE | 기반 |
+| `basename` | `coreutils` | BASE | 기반 |
+| `bash` | `bash` | BASE | 기반 |
 | `brightnessctl` | `brightnessctl` | OPT | 내장 백라이트 — 이미 optdepends |
+| `busctl` | `systemd` | BASE | 기반 |
+| `cat` | `coreutils` | BASE | 기반 |
 | `checkupdates` | `pacman-contrib` | OPT | 업데이트 확인 메뉴 항목 |
+| `chmod` | `coreutils` | BASE | 기반 |
+| `cmp` | `diffutils` | BASE | 기반(base 그룹) |
+| `cp` | `coreutils` | BASE | 기반 |
+| `curl` | `curl` | BASE | 이미 선언된 의존의 전이 의존(§4.2 개정) |
+| `cut` | `coreutils` | BASE | 기반 |
+| `date` | `coreutils` | BASE | 기반 |
 | `ddcutil` | `ddcutil` | OPT | 외부 모니터 밝기 — 이미 optdepends |
+| `dirname` | `coreutils` | BASE | 기반 |
 | `discord` | `discord` | OPT | Discord 커뮤니티 실행 메뉴 항목 |
 | `dropbox-cli` | `dropbox-cli` | AUR | Dropbox 패널 대상 애플리케이션 — 사용자가 Dropbox 를 가짐으로써 선택하는 능력, C1 4번째 패턴에서 신규 발견. 리포엔 없고 AUR 전용(AUR RPC info 1건 실측). |
+| `env` | `coreutils` | BASE | 기반 |
+| `fc-list` | `fontconfig` | BASE | 이미 선언된 의존의 전이 의존(§4.2 개정) |
+| `fc-match` | `fontconfig` | BASE | 이미 선언된 의존의 전이 의존(§4.2 개정) |
 | `ffmpeg` | `ffmpeg` | OPT | 화면 녹화 인코딩 |
+| `file` | `file` | BASE | 기반(base 그룹) |
+| `find` | `findutils` | BASE | 기반 |
+| `flock` | `util-linux` | BASE | 기반 |
 | `git` | `git` | HARD | 테마 git clone/update 경로 — 기본 경로에서 도달하나 depends 없음 |
 | `gpu-screen-recorder` | `gpu-screen-recorder` | OPT | 화면 녹화 메뉴 항목 |
+| `grep` | `grep` | BASE | 기반 |
 | `grim` | `grim` | HARD | 스크린샷 캡처 행의 구동 기계(§4.2 개정) — grim 없이는 그 메뉴 행 자체가 동작 못 함 |
+| `gsettings` | `glib2` | BASE | hyprland/quickshell/uwsm 이 모두 전이로 끌어온다(pactree 실측) — 이미 선언된 의존의 전이 의존(§4.2 개정). GNOME/GTK 색 구성 테마 훅(omarchy-theme-set-gnome)에서 도달 |
 | `gtk-update-icon-cache` | `gtk-update-icon-cache` | OPT | 웹앱 아이콘 설치 후처리 |
 | `gum` | `gum` | HARD | 테마/온보딩 TUI 프롬프트 — 기본 경로에서 도달하나 depends 없음 |
+| `head` | `coreutils` | BASE | 기반 |
 | `hyprctl` | `hyprland` | HARD | 이미 depends(hyprland) |
 | `hyprpicker` | `hyprpicker` | OPT | 색상 선택 메뉴 항목 |
 | `hyprsunset` | `hyprsunset` | HARD | nightlight 서비스가 기본 활성 — depends 없음 |
+| `install` | `coreutils` | BASE | 기반 |
+| `ip` | `iproute2` | BASE | base 그룹 — 이미 선언된 의존의 전이 의존(§4.2 개정) |
 | `iw` | `iw` | OPT | Wi-Fi 진단 메뉴 항목 |
 | `jq` | `jq` | HARD | 클립보드/리마인더/OSD JSON — 이미 depends |
+| `kill` | `util-linux` | BASE | 기반 |
 | `killall` | `psmisc` | OPT | 터미널/에디터 리로드 시그널 테마 훅 — omarchy-restart-terminal, omarchy-restart-opencode 가 killall -SIGUSR1/2 를 쓴다. 이미 depends(psmisc) |
+| `list.sh` | `cachy-omarchy-shell` | BASE | image-picker 플러그인이 함께 배포하는 번들 스크립트 — Arch 패키지가 아니라 같은 패키지 파일트리 안의 파일이라 항상 존재, C1 4번째 패턴에서 신규 발견 |
+| `ln` | `coreutils` | BASE | 기반 |
+| `ls` | `coreutils` | BASE | 기반 |
+| `md5sum` | `coreutils` | BASE | 기반 |
+| `mkdir` | `coreutils` | BASE | 기반 |
+| `mktemp` | `coreutils` | BASE | 기반 |
+| `modprobe` | `kmod` | BASE | 기반(base 그룹) |
 | `mpv` | `mpv` | OPT | 미디어 미리보기 메뉴 항목 |
+| `mv` | `coreutils` | BASE | 기반 |
 | `nmcli` | `networkmanager` | OPT | 네트워크 관리 메뉴 항목 |
+| `nohup` | `coreutils` | BASE | 기반 |
 | `notify-send` | `libnotify` | HARD | omarchy-notification-send 폴백 경로 |
+| `nproc` | `coreutils` | BASE | 기반 |
 | `pactl` | `libpulse` | HARD | pactl 실소유 패키지는 pipewire-pulse 아닌 libpulse(pacman -Qqo 실측) — depends 는 pipewire-pulse 만 있음, MISSING_HARD_DEP 로 드러나는 진짜 결함 |
 | `perl` | `perl` | HARD | 텍스트 처리 헬퍼 — 기본 경로에서 도달하나 depends 없음 |
 | `pgrep` | `procps-ng` | HARD | 이미 depends |
+| `pkexec` | `polkit` | BASE | 이미 선언된 의존의 전이 의존(§4.2 개정) |
 | `pkill` | `procps-ng` | HARD | 이미 depends |
 | `powerprofilesctl` | `power-profiles-daemon` | OPT | 전원 프로필 메뉴 항목 |
+| `printf` | `coreutils` | BASE | 기반 |
 | `ps` | `procps-ng` | HARD | 이미 depends |
 | `python3` | `python` | OPT | Dropbox 패널의 번들 상태 스크립트(status.py) 실행기 — Dropbox 통합을 선택한 사용자에게만 의미 있음, C1 4번째 패턴에서 신규 발견 |
+| `readlink` | `coreutils` | BASE | 기반 |
+| `realpath` | `coreutils` | BASE | 기반 |
+| `rfkill` | `util-linux` | BASE | 기반 |
+| `rm` | `coreutils` | BASE | 기반 |
+| `rmdir` | `coreutils` | BASE | 기반 |
+| `sed` | `sed` | BASE | 기반 |
+| `setpriv` | `util-linux` | BASE | 기반 |
+| `setsid` | `util-linux` | BASE | 기반 |
+| `sleep` | `coreutils` | BASE | 기반 |
 | `slurp` | `slurp` | HARD | 스크린샷 영역 선택 행의 구동 기계(§4.2 개정) — grim과 짝을 이루는 동일 기능 |
+| `sort` | `coreutils` | BASE | 기반 |
+| `stat` | `coreutils` | BASE | 기반 |
 | `sudo` | `sudo` | HARD | cachy-omarchy-init 이 락스크린 PAM 서비스 설정을 omarchy-apply-lock 에 위임하며 그것이 root 를 요구한다 — 메뉴 행이 아니라 우리 설치 경로에서 도달(컨트롤러 룰링, task-2) |
+| `systemctl` | `systemd` | BASE | 기반 |
+| `systemd-run` | `systemd` | BASE | 기반 |
+| `tac` | `coreutils` | BASE | 기반 |
 | `tailscale` | `tailscale` | OPT | Tailscale 패널 대상 애플리케이션 — QML .js command: 배열에서 도달(C1 수정 후 신규 발견), 사용자가 tailscale 을 가짐으로써 선택하는 능력 |
+| `tee` | `coreutils` | BASE | 기반 |
 | `tensaku-edit` | `tensaku` | AUR | 클립보드/스크린샷 편집기 기본값(omarchy-clipboard-open:33) — 미설치 시 폴백 없음. 바이너리명 tensaku-edit 는 패키지명이 아니다 — 실제 AUR 패키지는 tensaku(AUR RPC info 1건 실측, tensaku-bin/tensaku-git 도 별도 존재). |
 | `tesseract` | `tesseract` | OPT | OCR 메뉴 항목 |
+| `timedatectl` | `systemd` | BASE | 기반 |
+| `timeout` | `coreutils` | BASE | 기반 |
 | `tmux` | `tmux` | OPT | tmux 테마 훅 — 이미 optdepends |
+| `touch` | `coreutils` | BASE | 기반 |
+| `tr` | `coreutils` | BASE | 기반 |
+| `update-desktop-database` | `desktop-file-utils` | OPT | webapp 제거 후 desktop DB 갱신(omarchy-webapp-remove) — 이전에는 BASE 로 적혀 있었으나 선언된 depends 의 전이 폐포에도 base/base-devel 에도 없다(BASE 정당성 검사 실측) |
 | `usbreset` | `usbutils` | OPT | USB 오디오 장치 복구 메뉴 항목 |
 | `uwsm-app` | `uwsm` | HARD | 이미 depends(uwsm) |
 | `v4l2-ctl` | `v4l-utils` | OPT | 웹캠 설정 메뉴 항목 |
 | `which` | `which` | HARD | Tailscale 패널의 존재 확인 구동 기계(C1 4번째 패턴 .command= 에서 신규 발견) — 대상이 아니라 패널 자체가 이 명령 없이는 상태를 못 읽음 |
 | `wl-copy` | `wl-clipboard` | HARD | 이미 depends |
 | `wtype` | `wtype` | HARD | 이미 depends |
+| `xargs` | `findutils` | BASE | 기반 |
 | `xdg-mime` | `xdg-utils` | HARD | 이미 depends |
 | `xdg-settings` | `xdg-utils` | HARD | 이미 depends |
 | `xdg-terminal-exec` | `xdg-terminal-exec` | AUR | 터미널 실행의 구동 기계(HARD 성격) — omarchy-launch-tui/omarchy-launch-terminal/omarchy-launch-floating-terminal-with-presentation 전부 이것 없이는 실패한다. 그럼에도 리포엔 없고 AUR 전용(pacman -Si 0건, AUR RPC info 1건 실측)이라 depends 로 못 두고 optdepends 로 내린다 — pacman -U 는 depends 를 리포/설치된 패키지로만 해결하므로(bin/install-packages:55) AUR 전용을 depends 에 넣으면 우리 패키지 자체가 설치 불가해진다. xdg-utils 는 이 바이너리를 제공하지 않는다(pacman -Ql 실측). |
+| `xkbcli` | `libxkbcommon` | BASE | 이미 선언된 의존의 전이 의존(§4.2 개정) |
 | `zbarimg` | `zbar` | OPT | QR 코드 스캔 메뉴 항목 |
 
-tests/data/command-packages.tsv: 전체 107행, 그중 BASE 63행은 위 표에서 제외(부재할 수 없는 기반 패키지 — declare 대상 아님)
+tests/data/command-packages.tsv: 전체 107행, 위 표에는 도달한 103행이 모두 실린다(BASE 58행 포함 — BASE 는 declare 대상이 아닐 뿐 검사 대상에서 빠지지 않는다)
+
+docs/COMMAND_AUDIT.md 의 DISABLED 행으로 메뉴 루트에서 억제된 이름: 92개 (의도적으로 미지원인 Omarchy OS 스택 — 예외 파일과 달리 사유·신선도 검사가 없는 통로다)
+- `omarchy-branding-about`
+- `omarchy-branding-screensaver`
+- `omarchy-channel-current`
+- `omarchy-channel-set`
+- `omarchy-default-agent`
+- `omarchy-drive-password`
+- `omarchy-emacs`
+- `omarchy-games-retro-install`
+- `omarchy-hw-fingerprint`
+- `omarchy-hw-hybrid-gpu`
+- `omarchy-install-ai-chatgpt`
+- `omarchy-install-and-launch`
+- `omarchy-install-app`
+- `omarchy-install-browser`
+- `omarchy-install-chromium-google-account`
+- `omarchy-install-dev-env`
+- `omarchy-install-docker-dbs`
+- `omarchy-install-editor-emacs`
+- `omarchy-install-editor-helix`
+- `omarchy-install-editor-vscode`
+- `omarchy-install-editor-zed`
+- `omarchy-install-font`
+- `omarchy-install-gaming-battlenet`
+- `omarchy-install-gaming-geforce-now`
+- `omarchy-install-gaming-heroic`
+- `omarchy-install-gaming-lutris`
+- `omarchy-install-gaming-retroarch`
+- `omarchy-install-gaming-steam`
+- `omarchy-install-gaming-xbox-cloud`
+- `omarchy-install-gaming-xbox-controllers`
+- `omarchy-install-preinstalls`
+- `omarchy-install-service-1password`
+- `omarchy-install-service-dropbox`
+- `omarchy-install-service-nordvpn`
+- `omarchy-install-service-once`
+- `omarchy-install-service-signal`
+- `omarchy-install-service-spotify`
+- `omarchy-install-service-tailscale`
+- `omarchy-install-terminal`
+- `omarchy-launch-about`
+- `omarchy-launch-floating-terminal-with-presentation`
+- `omarchy-launch-screensaver`
+- `omarchy-menu-herdr-keybindings`
+- `omarchy-menu-plugin`
+- `omarchy-menu-share`
+- `omarchy-pkg-aur-install`
+- `omarchy-pkg-install`
+- `omarchy-pkg-present`
+- `omarchy-pkg-remove`
+- `omarchy-plugin-add`
+- `omarchy-plymouth-reset`
+- `omarchy-plymouth-set-by-theme`
+- `omarchy-plymouth-switcher`
+- `omarchy-refresh-hyprland`
+- `omarchy-refresh-hyprsunset`
+- `omarchy-refresh-plymouth`
+- `omarchy-refresh-shell`
+- `omarchy-refresh-tmux`
+- `omarchy-remove-browser`
+- `omarchy-remove-dev-env`
+- `omarchy-remove-gaming-battlenet`
+- `omarchy-remove-gaming-geforce-now`
+- `omarchy-remove-gaming-heroic`
+- `omarchy-remove-gaming-lutris`
+- `omarchy-remove-gaming-minecraft`
+- `omarchy-remove-gaming-retroarch`
+- `omarchy-remove-gaming-steam`
+- `omarchy-remove-gaming-xbox-cloud`
+- `omarchy-remove-gaming-xbox-controllers`
+- `omarchy-remove-preinstalls`
+- `omarchy-remove-security-fido2`
+- `omarchy-remove-security-fingerprint`
+- `omarchy-remove-security-sshd`
+- `omarchy-remove-service-dropbox`
+- `omarchy-remove-service-tailscale`
+- `omarchy-restart-hyprsunset`
+- `omarchy-restart-xcompose`
+- `omarchy-setup-direct-boot`
+- `omarchy-setup-security-fido2`
+- `omarchy-setup-security-fingerprint`
+- `omarchy-setup-security-sshd`
+- `omarchy-system-factory-reset`
+- `omarchy-theme-bg-install`
+- `omarchy-toggle-crash-capture`
+- `omarchy-toggle-hybrid-gpu`
+- `omarchy-transcode`
+- `omarchy-update`
+- `omarchy-update-firmware`
+- `omarchy-voxtype-install`
+- `omarchy-voxtype-remove`
+- `omarchy-webapp-handler`
+- `omarchy-windows-vm`
 
 스캐너가 헬퍼로 인정하지 않은 이름: 20개 (핀된 업스트림 bin/ 에 없음 — 파일 이름, 알림 hint 키, grep 패턴, 안내 문구 등 명령이 아닌 문자열)
 - `omarchy-action`
@@ -174,7 +327,7 @@ tests/data/command-packages.tsv: 전체 107행, 그중 BASE 63행은 위 표에�
 ### 스캐너의 알려진 한계 — 이 표가 완전성을 주장하지 않는 이유
 
 이 표는 감사의 상한이 아니라 정적 분석이 잡아낼 수 있는 것의 스냅샷이다. 아래
-세 가지는 코드 주석(`tests/runtime/closure_check.py`)에 이미 있는 한계를 그대로
+네 가지는 코드 주석(`tests/runtime/closure_check.py`)에 이미 있는 한계를 그대로
 옮긴 것이며, 부드럽게 쓰지 않는다.
 
 1. **동적으로 조립되는 이름은 열거할 수 없다.** `"omarchy-installed-service-$service"`
@@ -190,6 +343,22 @@ tests/data/command-packages.tsv: 전체 107행, 그중 BASE 63행은 위 표에�
    디렉터리로 옮기면, 인벤토리 재생성 테스트는 통과하면서도 그 헬퍼는 조용히
    "헬퍼 아님"으로 분류되어 그래프에서 빠진다 — `UNSTAGED_REACHABLE` 로도 잡히지
    않는다.
+
+4. **가장 큰 억제 통로는 이 문서가 아니라 `docs/COMMAND_AUDIT.md` 에 있다.**
+   스캐너는 메뉴 루트(`omarchy-menu.jsonc`)에서 이름을 수확할 때,
+   `docs/COMMAND_AUDIT.md` 에서 `DISABLED` 로 표시된 행을 정규식으로 긁어
+   **차감한다**. 현재 실측 92개다 — `tests/data/closure-exceptions.tsv` 의
+   예외 행보다 훨씬 크다. 차감되는 이름 대부분은 우리가 의도적으로 취하지 않는
+   Omarchy OS 스택(공장 초기화, plymouth, 채널, install-gaming 계열)이므로
+   결정 자체는 정당하다.
+
+   정당하지 않았던 것은 **장부**다. 예외 파일은 사유가 파싱으로 강제되고
+   `STALE_EXCEPTION` 으로 신선도가 검사되며 이 문서에서 논의된다. 반면 이
+   `DISABLED` 통로는 사유가 필수가 아니고, 스테이징되거나 도달 불가가 되어도
+   아무도 알려주지 않으며, 생성 문서에 전혀 나타나지 않았다. 이번 wave 에서
+   개수와 이름을 위 생성 블록이 함께 내보내도록 바꿔 **숫자가 서술이 아니라
+   단언**이 되게 했지만, 사유 강제와 신선도 검사는 여전히 없다. 이 통로를 통해
+   무엇이 사라지는지 알고 싶으면 위 생성 블록의 마지막 목록을 읽어야 한다.
 
 ### `docs/COMMAND_AUDIT.md` 와의 범위 차이
 

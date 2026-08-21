@@ -156,7 +156,7 @@ bin/rollback                 # 이전 핀으로 복귀
 - **v0.9 (의존성 폐쇄 검사)** — 실제 진입점(키바인딩, 활성 플러그인 QML, 패키지된
   메뉴)에서 출발해 스테이징된 업스트림 helper 까지 훑고, 도달하지만 미선언·
   미스테이징인 것이 있으면 빌드를 실패시키는 스캐너를 도입했다. 완료(`v0.9.0`).
-  11개 패키지를 `depends` 로, 19개를 `optdepends` 로 승격했고,
+  10개 패키지를 `depends` 로, 20개를 `optdepends` 로 승격했고,
   `omarchy-battery-low` 를 스테이징했으며 `omarchy-menu-keybindings` 에 호환
   shim 을 달았다. 남은 실측 격차: `xdg-terminal-exec` 는 AUR 전용이고,
   `omarchy-battery-status` 는 여전히 미스테이징이라 Power 패널의 배터리 상세
