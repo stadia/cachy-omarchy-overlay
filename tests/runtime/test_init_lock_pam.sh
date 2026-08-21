@@ -20,6 +20,18 @@ source "$REPO_ROOT/tests/lib/assert.sh"
 [[ ${HOME:-} == "${COO_TEST_SANDBOX:?}" ]] \
   || { echo "FAIL: HOME 이 샌드박스가 아니다 — 중단"; exit 1; }
 
+# 호스트 PAM 경로. 이 테스트가 무엇을 하든 이 파일은 없거나 불변이어야 한다.
+HOST_PAM=/etc/pam.d/omarchy-lock-password
+host_pam_snapshot() {
+  if [[ -e $HOST_PAM ]]; then
+    # device+inode+size+mtime: 내용 읽기 없이 교체/truncate 를 잡는다.
+    stat -c '%d %i %s %Y' "$HOST_PAM"
+  else
+    printf 'absent\n'
+  fi
+}
+HOST_PAM_BEFORE=$(host_pam_snapshot)
+
 INIT="$REPO_ROOT/overlay/bin/cachy-omarchy-init"
 assert_file_exists "$INIT" "init 존재"
 [[ -x $INIT ]] || { echo "FAIL: init 실행 가능"; exit 1; }
@@ -93,19 +105,60 @@ would_line=$(grep '^would:' <<<"$out" | grep -c 'omarchy-apply-lock')
 assert_eq "$would_line" "1" "--dry-run 은 apply-lock 을 하려던 일로 출력한다"
 
 # 5) apply-lock 이 아예 없는 트리에서도 init 은 성립한다.
+#    호스트 helper 를 다시 열면 command -v 가 /usr/bin/omarchy-apply-lock 을
+#    찾고, 그 헬퍼는 COO_PAM_LOCK_FILE 을 무시하고 실 /etc/pam.d 에 sudo tee
+#    한다. PATH 구성 요소는 전부 샌드박스 안이어야 한다.
 : >"$marker"
 bare_bin=$COO_TEST_SANDBOX/bare-bin
-mkdir -p "$bare_bin"
+sysbin=$COO_TEST_SANDBOX/sysbin
+mkdir -p "$bare_bin" "$sysbin"
 cp "$stub_bin/omarchy-theme-set" "$bare_bin/"
+# /usr/bin 과 /bin 을 PATH 에 붙이지 않는다 — Arch 에서 /bin 은 /usr/bin
+# 심링크라 호스트 omarchy-* 가 다시 보인다. dirname/pgrep 등 비-헬퍼만
+# 샌드박스로 심링크한다.
+for dir in /usr/bin /bin; do
+  [[ -d $dir ]] || continue
+  for f in "$dir"/*; do
+    [[ -e $f || -L $f ]] || continue
+    base=${f##*/}
+    [[ $base == omarchy-* ]] && continue
+    [[ -e $sysbin/$base ]] && continue
+    ln -s "$f" "$sysbin/$base"
+  done
+done
 reset_user_state
-out=$(PATH="$bare_bin:/usr/bin:/bin" COO_PAM_LOCK_FILE="$missing" "$INIT" 2>&1); code=$?
-assert_eq "$code" "0" "apply-lock 부재에도 init exit 0"
-assert_eq "$(wc -l <"$marker")" "0" "부재 시 아무것도 부르지 않는다"
-assert_contains "$out" "omarchy-apply-lock" "부재를 조용히 넘기지 않는다"
+case5_path="$bare_bin:$sysbin"
+path_ok=1
+IFS=':' read -r -a case5_parts <<<"$case5_path"
+for part in "${case5_parts[@]}"; do
+  [[ $part == "$COO_TEST_SANDBOX"/* ]] && continue
+  printf 'FAIL: case 5 PATH 구성 요소가 샌드박스 밖이다: %s\n' "$part"
+  ASSERT_FAILURES=$((ASSERT_FAILURES + 1))
+  path_ok=0
+done
+found_apply=$(PATH="$case5_path" command -v omarchy-apply-lock 2>/dev/null || true)
+if [[ -n $found_apply ]]; then
+  printf 'FAIL: case 5 PATH 에서 omarchy-apply-lock 이 보인다: %s\n' "$found_apply"
+  ASSERT_FAILURES=$((ASSERT_FAILURES + 1))
+  path_ok=0
+else
+  printf 'ok:   case 5 PATH 에서 omarchy-apply-lock 부재\n'
+fi
+if (( path_ok )); then
+  out=$(PATH="$case5_path" COO_PAM_LOCK_FILE="$missing" "$INIT" 2>&1); code=$?
+  assert_eq "$code" "0" "apply-lock 부재에도 init exit 0"
+  assert_eq "$(wc -l <"$marker")" "0" "부재 시 아무것도 부르지 않는다"
+  assert_contains "$out" "omarchy-apply-lock" "부재를 조용히 넘기지 않는다"
+else
+  printf 'note: 호스트 helper 탐색이 남아 있어 case 5 init 을 건너뛴다 (/etc/pam.d 보호)\n'
+fi
 
 # 6) 우리 쪽에서 PAM 스탠자를 재구현하지 않는다 — 소유는 업스트림이다.
 #    탐지용 기본 경로 한 줄은 필요하므로 스탠자 모듈만 금지한다.
 if grep -qE 'pam_unix\.so|pam_faillock\.so|pam_systemd_home\.so' "$INIT"; then x=1; else x=0; fi
 assert_eq "$x" "0" "init 은 PAM 스탠자를 복사하지 않는다"
+
+assert_eq "$(host_pam_snapshot)" "$HOST_PAM_BEFORE" \
+  "호스트 $HOST_PAM 을 쓰거나 만들지 않는다"
 
 exit "$ASSERT_FAILURES"
