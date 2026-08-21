@@ -80,10 +80,12 @@ helpers their QML calls and the runtime dependencies they need (`jq`, `wl-clipbo
   the only reachable paths are the explicit CLI and the menu. (The screen-brightness chain
   is out of scope.)
 
-- **Weather** — the bar widget sends a real request to wttr.in. If no location
-  is stored, the first lookup infers the city from the client IP and writes it
-  to `~/.local/state/omarchy/settings/weather.json` (upstream default path).
-  To disable the widget, remove `omarchy.weather` from the shell.json bar layout.
+- **Weather** — the bar widget sends a real request to wttr.in. A saved
+  location is written only by `omarchy-weather-location --set`, into
+  `~/.local/state/omarchy/settings/weather.json` (upstream default path).
+  If that file is absent, every lookup infers the city from the client IP
+  via wttr.in and does not persist it. To disable the widget, remove
+  `omarchy.weather` from the shell.json bar layout.
 
 ## Startup model
 
