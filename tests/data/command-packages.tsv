@@ -36,6 +36,7 @@ systemctl	systemd	BASE	기반
 notify-send	libnotify	HARD	omarchy-notification-send 폴백 경로
 base64	coreutils	BASE	기반
 chmod	coreutils	BASE	기반
+id	coreutils	BASE	기반
 install	coreutils	BASE	기반
 kill	util-linux	BASE	기반
 ls	coreutils	BASE	기반
@@ -63,6 +64,7 @@ hyprctl	hyprland	HARD	이미 depends(hyprland)
 uwsm-app	uwsm	HARD	이미 depends(uwsm)
 wtype	wtype	HARD	이미 depends
 wl-copy	wl-clipboard	HARD	이미 depends
+wpctl	wireplumber	HARD	오디오 입력/싱크 헬퍼 구동 기계 — wireplumber 이미 depends
 xdg-mime	xdg-utils	HARD	이미 depends
 xdg-settings	xdg-utils	HARD	이미 depends
 xdg-terminal-exec	xdg-terminal-exec	AUR	터미널 실행의 구동 기계(HARD 성격) — omarchy-launch-tui/omarchy-launch-terminal/omarchy-launch-floating-terminal-with-presentation 전부 이것 없이는 실패한다. 그럼에도 리포엔 없고 AUR 전용(pacman -Si 0건, AUR RPC info 1건 실측)이라 depends 로 못 두고 optdepends 로 내린다 — pacman -U 는 depends 를 리포/설치된 패키지로만 해결하므로(bin/install-packages:55) AUR 전용을 depends 에 넣으면 우리 패키지 자체가 설치 불가해진다. xdg-utils 는 이 바이너리를 제공하지 않는다(pacman -Ql 실측).

@@ -148,6 +148,11 @@ helpers=(
   omarchy-audio-tuning
   omarchy-hw-match
   omarchy-restart-audio
+  # audio input/sink pair (v0.10.0): Audio 패널 입력 기본값 + 싱크 선택 목록.
+  # input-set-default 는 output-set-default 의 입력측 대칭 (wpctl/pactl).
+  # sink-availability 는 audio-tuning(staged) fronted-sink 만 부른다.
+  omarchy-audio-input-set-default
+  omarchy-audio-sink-availability
   omarchy-brightness-display
   omarchy-brightness-display-ddc
   omarchy-brightness-display-apple

@@ -138,6 +138,7 @@
 | `hyprctl` | `hyprland` | HARD | 이미 depends(hyprland) |
 | `hyprpicker` | `hyprpicker` | OPT | 색상 선택 메뉴 항목 |
 | `hyprsunset` | `hyprsunset` | HARD | nightlight 서비스가 기본 활성 — depends 없음 |
+| `id` | `coreutils` | BASE | 기반 |
 | `install` | `coreutils` | BASE | 기반 |
 | `ip` | `iproute2` | BASE | base 그룹 — 이미 선언된 의존의 전이 의존(§4.2 개정) |
 | `iw` | `iw` | OPT | Wi-Fi 진단 메뉴 항목 |
@@ -199,6 +200,7 @@
 | `v4l2-ctl` | `v4l-utils` | OPT | 웹캠 설정 메뉴 항목 |
 | `which` | `which` | HARD | Tailscale 패널의 존재 확인 구동 기계(C1 4번째 패턴 .command= 에서 신규 발견) — 대상이 아니라 패널 자체가 이 명령 없이는 상태를 못 읽음 |
 | `wl-copy` | `wl-clipboard` | HARD | 이미 depends |
+| `wpctl` | `wireplumber` | HARD | 오디오 입력/싱크 헬퍼 구동 기계 — wireplumber 이미 depends |
 | `wtype` | `wtype` | HARD | 이미 depends |
 | `xargs` | `findutils` | BASE | 기반 |
 | `xdg-mime` | `xdg-utils` | HARD | 이미 depends |
@@ -207,7 +209,7 @@
 | `xkbcli` | `libxkbcommon` | BASE | 이미 선언된 의존의 전이 의존(§4.2 개정) |
 | `zbarimg` | `zbar` | OPT | QR 코드 스캔 메뉴 항목 |
 
-tests/data/command-packages.tsv: 전체 109행, 위 표에는 도달한 105행이 모두 실린다(BASE 58행 포함 — BASE 는 declare 대상이 아닐 뿐 검사 대상에서 빠지지 않는다)
+tests/data/command-packages.tsv: 전체 111행, 위 표에는 도달한 107행이 모두 실린다(BASE 59행 포함 — BASE 는 declare 대상이 아닐 뿐 검사 대상에서 빠지지 않는다)
 
 docs/COMMAND_AUDIT.md 의 DISABLED 행으로 메뉴 루트에서 억제된 이름: 92개 (의도적으로 미지원인 Omarchy OS 스택 — 예외 파일과 달리 사유·신선도 검사가 없는 통로다)
 - `omarchy-branding-about`
