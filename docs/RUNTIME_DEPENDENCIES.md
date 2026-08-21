@@ -19,7 +19,7 @@
 | `shell/shell.qml` | IPC·기동 경로 검사 | 우리 셸 패키지 | REQUIRED | n/a | no | builtin config로 일부 폴백 | NONE — `shell/` 전체 패키징 |
 | `shell/plugins/menu/` | `omarchy.menu` | 우리 셸 패키지 | REQUIRED | n/a | no | 없음 | NONE |
 | `default/omarchy/omarchy-menu.jsonc` | `Menu.qml` `defaultMenuPath` | 공식은 settings가 설치 | REQUIRED | n/a | no | 빈 메뉴(앱 행만) | ENVIRONMENT — 셸 패키지에 파일만 포함. settings 금지 |
-| `config/omarchy/shell.json` | `shell.qml` `defaultsPath` | 공식은 settings | OPTIONAL | n/a | yes | `builtinShellConfig` | ENVIRONMENT — v0.1은 `disabledPlugins`가 있는 최소 json을 패키징하는 편이 안전 |
+| `config/omarchy/shell.json` | `shell.qml` `defaultsPath` | 공식은 settings | OPTIONAL | n/a | yes | `builtinShellConfig` | ENVIRONMENT — **실제 배포본은 `overlay/defaults/shell.json`, `disabledPlugins` 없음 → 전 플러그인 활성**(방향 전환 2026-08-17, `docs/PLUGIN_AUDIT.md` 참고). v0.1 시절 "최소 json이 안전" 판단은 뒤집혔다 |
 | `themes/` | 공식 `omarchy`가 설치. QML에서 경로 문자열 미검출 | 공식 `omarchy` | OPTIONAL | n/a | yes | 셸 내장 Color | NONE initially |
 | `bin/omarchy-launch-shell` | 장기 프로세스 | 공식 `omarchy` | REQUIRED(logic) | n/a | no | systemd ExecStart가 `quickshell` 직접 호출 | WRAPPER — `cachy-omarchy-shell --run` |
 | `bin/omarchy-shell` | IPC. 기동하지 않음 | 공식 `omarchy` | REQUIRED(logic) | n/a | no | `qs ipc` 직접 | WRAPPER — `cachy-omarchy-launcher` 등 |
@@ -29,7 +29,7 @@
 | `xkbcli` | `omarchy-menu-keybindings` `parse_keycodes` — `xkbcli compile-keymap` | CachyOS `libxkbcommon` | OPTIONAL | installed | no(목록 품질 저하) | 하드코딩 code: 폴백 테이블 | NONE — **M4 실측**: 없으면 `code:NNN` bind 가 심볼로 안 풀릴 뿐 스크립트는 동작 |
 | `lua` | `omarchy-menu-keybindings` Lua bind 캐시 (`hyprland.lua` 소스 파서) | CachyOS `lua` | OPTIONAL | 5.5.1-1 | no(목록 품질 저하) | `omarchy-cmd-present lua` 가드가 캐시를 끈다 | NONE — **M4 실측**: `lua` 가 없어도 스크립트 자체는 동작(Lua bind 메타만 빈 캐시) |
 | `uwsm` / `uwsm-app` | `AppLibrary.launch`: `uwsm-app -- gtk-launch <id>.desktop` | Arch `uwsm` 패키지 — `cachy-omarchy-shell` hard depends | REQUIRED | 0.26.6-1 | no | 없음 | NONE — shim 은 삭제됐다. uwsm-app 은 uwsm 패키지가 소유하는 실제 바이너리이며, 어느 레이어도 PATH 를 조작하지 않는다(§45 개정). doctor 가 `pacman -Qqo` 로 소유권을 검사한다 |
-| `inotifywait` / `inotify-tools` | `services/PluginRegistry.qml:638` `localPluginWatcher` 가 `~/.config/omarchy/plugins` 감시 | CachyOS `inotify-tools` | **REQUIRED(정상 기동) / OPTIONAL(기능)** | **미설치(실측)** | no(로그 정상화 시) | 없음 — 없으면 1초마다 WARN 반복 | NONE — **M2 실측으로 신규 추가**. `PKGBUILD depends` 누락. 기능은 정상이나 로그 스팸 → `depends` 에 `inotify-tools` 추가 권장 |
+| `inotifywait` / `inotify-tools` | `services/PluginRegistry.qml:638` `localPluginWatcher` 가 `~/.config/omarchy/plugins` 감시 | CachyOS `inotify-tools` | REQUIRED(정상 기동) | **`PKGBUILD depends`에 있음**(`packages/cachy-omarchy-shell/PKGBUILD`) | no | 없음 — 없으면 1초마다 WARN 반복 | NONE — **M2 실측으로 신규 추가, 이후 depends 에 반영됨**(당시 발견된 누락은 해소됨) |
 | `gtk-launch` | 앱 실행 | `glib2` | REQUIRED for app launch | yes | no | `gio launch` | NONE or WRAPPER |
 | `systemd --user` | 우리 유닛 계획 | systemd | REQUIRED for M2 | yes | no | 수동 기동 | WRAPPER |
 | `omarchy-settings` | 공식 하드 의존 | 공식 | UNSAFE | not installed | must | 필요한 파일만 추출 | NONE — 패키지 자체 금지 |
@@ -45,48 +45,81 @@
 
 이 표는 손으로 고치지 않는다. `tests/runtime/closure_check.py --emit-table` 이
 생성하며, `tests/runtime/test_dependency_closure.sh` 가 파일 내용과 생성 결과가
-일치하는지 검사한다(표를 손으로 고치면 그 테스트가 RED 로 잡는다). 등급 판정
-규칙은 설계 문서 §4.2 에 있다.
+일치하는지 검사한다(표를 손으로 고치면 그 테스트가 RED 로 잡는다). 표 바로
+아래 행수/`BASE` 개수 요약 줄도 같은 생성 출력의 일부다 — 손으로 옮겨 적은
+숫자가 아니라 표와 함께 단언된다.
 
-**이 표는 `BASE` 등급을 뺀다.** `tests/data/command-packages.tsv` 의 전체
-행수와 `BASE` 행수는 세어서 확인한다(하드코딩 금지):
+**이 표는 `BASE` 등급을 뺀다.** `BASE` 는 "기반 시스템 — 부재할 수 없는
+패키지"(`coreutils`, `bash`, `systemd` 등)라서 아예 declare 대상이 아니고,
+그래서 표에서 빠진다. 그중 일부(`gsettings` 등)는 우리가 **직접 호출하는**
+명령이기도 하다 — BASE 라는 등급이 "우리가 안 쓴다"는 뜻이 아니라 "declare 할
+필요가 없다"는 뜻이라는 것을 혼동하지 말 것. 정확한 개수는 표 바로 아래
+생성된 요약 줄을 본다(마커 안이라 맵이 바뀌면 함께 갱신된다).
 
-```console
-$ awk -F'\t' '!/^#/ && NF' tests/data/command-packages.tsv | wc -l
-107
-$ awk -F'\t' '!/^#/ && NF && $3=="BASE"' tests/data/command-packages.tsv | wc -l
-63
-```
+### 등급 규칙 — `BASE` / `HARD` / `OPT` / `AUR` / `UNPACKAGED`
 
-135행이 아니라 107행이며, 그중 63행이 `BASE` 다(2026-08-21 실측 — 위 명령을 다시
-돌리면 갱신된다). `BASE` 는 "기반 시스템 — 부재할 수 없는 패키지"(`coreutils`,
-`bash`, `systemd` 등)라서 아예 declare 대상이 아니고, 그래서 표에서 빠진다. 그중
-일부(`gsettings` 등)는 우리가 **직접 호출하는** 명령이기도 하다 — BASE 라는
-등급이 "우리가 안 쓴다"는 뜻이 아니라 "declare 할 필요가 없다"는 뜻이라는 것을
-혼동하지 말 것.
+실행 중 이 등급 체계가 개정됐다. 아래 표의 근거 열에 붙는 "(§4.2 개정)" 표기가
+가리키는 것이 이 개정이다 — 설계 문서 자체는 `docs/superpowers/`(gitignore 됨)
+아래 있어 저장소를 물려받는 사람은 읽을 수 없으므로, 그 요지를 여기 직접 적는다.
+
+원래는 "메뉴에서 도달하면 HARD"였다. 그 규칙은 성립하지 않았다 — discord/mpv
+처럼 메뉴 항목에서 도달해도 하드 의존으로 볼 수 없는 사례가 나와
+`BASE`/`HARD`/`OPT` 3분기로 개정했다:
+
+- **BASE** — 기반 시스템 패키지(`coreutils`/`bash`/`systemd` 등). 부재할 수
+  없으므로 declare 하지 않는다. 위 표에서 제외된다.
+- **HARD** — 기동/기본 활성 경로에서 도달하는 명령. `depends` 로 선언한다
+  (이미 선언돼 있으면 근거 열에 "이미 depends"로 남는다).
+- **OPT** — 사용자가 그 기능을 명시적으로 선택해야 도달하는 명령(메뉴 항목,
+  패널 대상 애플리케이션 등). `optdepends` 로 선언한다.
+- **AUR** — 실제 Arch 패키지가 존재하지만 공식 리포가 아니라 AUR 에만 있다.
+  `pacman -U` 는 `depends` 를 리포/이미 설치된 패키지로만 해결하므로
+  (`bin/install-packages:55`), AUR 전용 패키지를 `depends` 에 넣으면 우리
+  패키지 자체가 설치 불가해진다 — HARD 성격이라도 `optdepends` 로 내린다
+  (예: `xdg-terminal-exec`).
+- **UNPACKAGED** — 공식 리포에도 AUR 에도 제공자가 없다. 선언할 곳이 없으므로
+  아무 곳에도 선언하지 않고, 이 표에만 기록해 존재를 드러낸다(예: `asdcontrol`).
+
+`AUR`/`UNPACKAGED` 두 클래스가 추가된 이유: 원래 체계는 "모든 외부 명령에 리포
+제공자가 있다"를 암묵 전제했는데, 실행 중 이 전제가 세 번 깨졌다.
+
+위반 접두사는 원래 `UNMAPPED_COMMAND`/`MISSING_HARD_DEP`/`MISSING_OPT_DEP`/
+`STALE_EXCEPTION` 4종이었고, 실행 중 `UNMATCHED_DISABLED_PLUGIN`(존재하지 않는
+플러그인 id 를 `disabledPlugins` 가 가리킴), `AUR_IN_DEPENDS`(AUR 전용 패키지가
+`depends` 에 잘못 들어감) 2종이 늘었다(`STALE_EXCEPTION` 은 처음부터 있었으나
+"예외가 이미 스테이징됐거나 더는 도달 불가"로 판정 기준이 넓어졌다).
+
+판별 근거 자체도 바뀌었다. 원래는 "이름의 모양"(정규식)으로 헬퍼 여부를
+추론했는데, 그 방식이 여섯 라운드에 걸쳐 나온 모든 오탐의 단일 원인이었다
+(QML 네임스페이스, `reloadableId`, 우리 자신의 `cachy-omarchy-*`, 설정 파일
+이름, 알림 hint 키, grep 패턴, echo 안내문). 지금은 핀된 업스트림 `bin/` 목록
+(`tests/data/upstream-helpers.txt`)을 ground truth 로 쓴다 — 이름이 그 목록에
+없으면 헬퍼로 인정하지 않는다(아래 "스캐너가 헬퍼로 인정하지 않은 이름" 목록).
+핀을 옮길 때 이 인벤토리를 함께 재생성해야 하는 이유와 절차는 `UPSTREAM.md`
+"Moving the pin" 절에 있다.
 
 <!-- CLOSURE_BEGIN -->
 | command | package | class | 근거 |
 | --- | --- | --- | --- |
-| `asdcontrol` | `asdcontrol` | UNPACKAGED | Apple Studio Display 밝기 제어(하드웨어 한정, omarchy-brightness-display-apple 이 sudo asdcontrol 을 부른다) — 공식 리포에도 AUR 에도 제공자가 없다(AUR RPC info/search 둘 다 0건 실측). 어디에도 선언하지 않는다; 사용자가 직접 빌드해야 하며, 없으면 그 헬퍼 하나만 동작하지 않는다. (미설치 — 검증 생략) |
-| `brightnessctl` | `brightnessctl` | OPT | 내장 백라이트 — 이미 optdepends (미설치 — 검증 생략) |
+| `asdcontrol` | `asdcontrol` | UNPACKAGED | Apple Studio Display 밝기 제어(하드웨어 한정, omarchy-brightness-display-apple 이 sudo asdcontrol 을 부른다) — 공식 리포에도 AUR 에도 제공자가 없다(AUR RPC info/search 둘 다 0건 실측). 어디에도 선언하지 않는다; 사용자가 직접 빌드해야 하며, 없으면 그 헬퍼 하나만 동작하지 않는다. |
+| `brightnessctl` | `brightnessctl` | OPT | 내장 백라이트 — 이미 optdepends |
 | `checkupdates` | `pacman-contrib` | OPT | 업데이트 확인 메뉴 항목 |
-| `ddcutil` | `ddcutil` | OPT | 외부 모니터 밝기 — 이미 optdepends (미설치 — 검증 생략) |
+| `ddcutil` | `ddcutil` | OPT | 외부 모니터 밝기 — 이미 optdepends |
 | `discord` | `discord` | OPT | Discord 커뮤니티 실행 메뉴 항목 |
-| `dropbox-cli` | `dropbox-cli` | AUR | Dropbox 패널 대상 애플리케이션 — 사용자가 Dropbox 를 가짐으로써 선택하는 능력, C1 4번째 패턴에서 신규 발견. 리포엔 없고 AUR 전용(AUR RPC info 1건 실측). (미설치 — 검증 생략) |
+| `dropbox-cli` | `dropbox-cli` | AUR | Dropbox 패널 대상 애플리케이션 — 사용자가 Dropbox 를 가짐으로써 선택하는 능력, C1 4번째 패턴에서 신규 발견. 리포엔 없고 AUR 전용(AUR RPC info 1건 실측). |
 | `ffmpeg` | `ffmpeg` | OPT | 화면 녹화 인코딩 |
 | `git` | `git` | HARD | 테마 git clone/update 경로 — 기본 경로에서 도달하나 depends 없음 |
-| `gpu-screen-recorder` | `gpu-screen-recorder` | OPT | 화면 녹화 메뉴 항목 (미설치 — 검증 생략) |
+| `gpu-screen-recorder` | `gpu-screen-recorder` | OPT | 화면 녹화 메뉴 항목 |
 | `grim` | `grim` | HARD | 스크린샷 캡처 행의 구동 기계(§4.2 개정) — grim 없이는 그 메뉴 행 자체가 동작 못 함 |
 | `gtk-update-icon-cache` | `gtk-update-icon-cache` | OPT | 웹앱 아이콘 설치 후처리 |
 | `gum` | `gum` | HARD | 테마/온보딩 TUI 프롬프트 — 기본 경로에서 도달하나 depends 없음 |
 | `hyprctl` | `hyprland` | HARD | 이미 depends(hyprland) |
-| `hyprpicker` | `hyprpicker` | OPT | 색상 선택 메뉴 항목 (미설치 — 검증 생략) |
-| `hyprsunset` | `hyprsunset` | HARD | nightlight 서비스가 기본 활성 — depends 없음 (미설치 — 검증 생략) |
+| `hyprpicker` | `hyprpicker` | OPT | 색상 선택 메뉴 항목 |
+| `hyprsunset` | `hyprsunset` | HARD | nightlight 서비스가 기본 활성 — depends 없음 |
 | `iw` | `iw` | OPT | Wi-Fi 진단 메뉴 항목 |
 | `jq` | `jq` | HARD | 클립보드/리마인더/OSD JSON — 이미 depends |
 | `killall` | `psmisc` | OPT | 터미널/에디터 리로드 시그널 테마 훅 — omarchy-restart-terminal, omarchy-restart-opencode 가 killall -SIGUSR1/2 를 쓴다. 이미 depends(psmisc) |
-| `mpv` | `mpv` | OPT | 미디어 미리보기 메뉴 항목 (미설치 — 검증 생략) |
+| `mpv` | `mpv` | OPT | 미디어 미리보기 메뉴 항목 |
 | `nmcli` | `networkmanager` | OPT | 네트워크 관리 메뉴 항목 |
 | `notify-send` | `libnotify` | HARD | omarchy-notification-send 폴백 경로 |
 | `pactl` | `libpulse` | HARD | pactl 실소유 패키지는 pipewire-pulse 아닌 libpulse(pacman -Qqo 실측) — depends 는 pipewire-pulse 만 있음, MISSING_HARD_DEP 로 드러나는 진짜 결함 |
@@ -99,7 +132,7 @@ $ awk -F'\t' '!/^#/ && NF && $3=="BASE"' tests/data/command-packages.tsv | wc -l
 | `slurp` | `slurp` | HARD | 스크린샷 영역 선택 행의 구동 기계(§4.2 개정) — grim과 짝을 이루는 동일 기능 |
 | `sudo` | `sudo` | HARD | cachy-omarchy-init 이 락스크린 PAM 서비스 설정을 omarchy-apply-lock 에 위임하며 그것이 root 를 요구한다 — 메뉴 행이 아니라 우리 설치 경로에서 도달(컨트롤러 룰링, task-2) |
 | `tailscale` | `tailscale` | OPT | Tailscale 패널 대상 애플리케이션 — QML .js command: 배열에서 도달(C1 수정 후 신규 발견), 사용자가 tailscale 을 가짐으로써 선택하는 능력 |
-| `tensaku-edit` | `tensaku` | AUR | 클립보드/스크린샷 편집기 기본값(omarchy-clipboard-open:33) — 미설치 시 폴백 없음. 바이너리명 tensaku-edit 는 패키지명이 아니다 — 실제 AUR 패키지는 tensaku(AUR RPC info 1건 실측, tensaku-bin/tensaku-git 도 별도 존재). (미설치 — 검증 생략) |
+| `tensaku-edit` | `tensaku` | AUR | 클립보드/스크린샷 편집기 기본값(omarchy-clipboard-open:33) — 미설치 시 폴백 없음. 바이너리명 tensaku-edit 는 패키지명이 아니다 — 실제 AUR 패키지는 tensaku(AUR RPC info 1건 실측, tensaku-bin/tensaku-git 도 별도 존재). |
 | `tesseract` | `tesseract` | OPT | OCR 메뉴 항목 |
 | `tmux` | `tmux` | OPT | tmux 테마 훅 — 이미 optdepends |
 | `usbreset` | `usbutils` | OPT | USB 오디오 장치 복구 메뉴 항목 |
@@ -110,8 +143,10 @@ $ awk -F'\t' '!/^#/ && NF && $3=="BASE"' tests/data/command-packages.tsv | wc -l
 | `wtype` | `wtype` | HARD | 이미 depends |
 | `xdg-mime` | `xdg-utils` | HARD | 이미 depends |
 | `xdg-settings` | `xdg-utils` | HARD | 이미 depends |
-| `xdg-terminal-exec` | `xdg-terminal-exec` | AUR | 터미널 실행의 구동 기계(HARD 성격) — omarchy-launch-tui/omarchy-launch-terminal/omarchy-launch-floating-terminal-with-presentation 전부 이것 없이는 실패한다. 그럼에도 리포엔 없고 AUR 전용(pacman -Si 0건, AUR RPC info 1건 실측)이라 depends 로 못 두고 optdepends 로 내린다 — pacman -U 는 depends 를 리포/설치된 패키지로만 해결하므로(bin/install-packages:55) AUR 전용을 depends 에 넣으면 우리 패키지 자체가 설치 불가해진다. xdg-utils 는 이 바이너리를 제공하지 않는다(pacman -Ql 실측). (미설치 — 검증 생략) |
+| `xdg-terminal-exec` | `xdg-terminal-exec` | AUR | 터미널 실행의 구동 기계(HARD 성격) — omarchy-launch-tui/omarchy-launch-terminal/omarchy-launch-floating-terminal-with-presentation 전부 이것 없이는 실패한다. 그럼에도 리포엔 없고 AUR 전용(pacman -Si 0건, AUR RPC info 1건 실측)이라 depends 로 못 두고 optdepends 로 내린다 — pacman -U 는 depends 를 리포/설치된 패키지로만 해결하므로(bin/install-packages:55) AUR 전용을 depends 에 넣으면 우리 패키지 자체가 설치 불가해진다. xdg-utils 는 이 바이너리를 제공하지 않는다(pacman -Ql 실측). |
 | `zbarimg` | `zbar` | OPT | QR 코드 스캔 메뉴 항목 |
+
+tests/data/command-packages.tsv: 전체 107행, 그중 BASE 63행은 위 표에서 제외(부재할 수 없는 기반 패키지 — declare 대상 아님)
 
 스캐너가 헬퍼로 인정하지 않은 이름: 20개 (핀된 업스트림 bin/ 에 없음 — 파일 이름, 알림 hint 키, grep 패턴, 안내 문구 등 명령이 아닌 문자열)
 - `omarchy-action`
@@ -175,6 +210,17 @@ $ awk -F'\t' '!/^#/ && NF {print $1}' tests/data/closure-exceptions.tsv | while 
 않는다. 즉 이 두 문서가 서로 모순되지 않는지는 **기계가 아니라 사람이** 지킨다 —
 이 절의 표가 코드와 동기화된다는 보장은 있어도, `COMMAND_AUDIT.md` 와의 정합은
 그 보장 밖이다.
+
+그 21건 중 실제로 사용자가 체감하는 결함이 하나 있다: `omarchy-battery-status`
+가 미스테이징인데, 스테이징된 업스트림 Power 패널이 `Panel.qml:210` 에서
+`["omarchy-battery-status", "--shell"]` 을 직접 실행해 percentage/state/
+rate/size/time/cycles/threshold 를 파싱한다. 미스테이징이면 127 이
+`Panel.qml:143-148` 의 빈 페이로드 가드에 걸려 `batteryInfo` 가 영원히 `{}` 로
+남고, `Panel.qml:426` 의 `visible: root.batteryInfo.percentage !== undefined`
+가드 때문에 Battery size/Charge cycles/Time/Rate 행이 패널을 열어도 영구히
+숨겨진다(hero percentage 만 "—" 로 폴백). 자세한 사유는
+`tests/data/closure-exceptions.tsv:31` 에 있다 — v0.9는 감사 인프라만 놓는
+마일스톤이라 이번엔 새 헬퍼를 얹지 않는다(추적: milestone 0.10).
 
 ---
 

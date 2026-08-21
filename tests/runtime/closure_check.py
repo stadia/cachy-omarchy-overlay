@@ -858,7 +858,8 @@ def main():
     upstream = tree / "usr/share/cachy-omarchy/upstream"
     binroot = upstream / "bin"
 
-    cmdmap = {r[0]: (r[1], r[2], r[3]) for r in read_tsv(args.map, 4)}
+    map_rows = read_tsv(args.map, 4)
+    cmdmap = {r[0]: (r[1], r[2], r[3]) for r in map_rows}
     exceptions = {r[0]: (r[1], r[2]) for r in read_tsv(args.exceptions, 3)}
     # 핀된 업스트림의 헬퍼 이름 목록 — UNSTAGED_REACHABLE 의 ground truth.
     # 설치 트리만으로는 "업스트림에 그런 헬퍼가 있는가" 를 알 수 없다.
@@ -1110,17 +1111,20 @@ def main():
     # optdepends candidate already be installed here, just to prove the
     # optdepends declaration itself is correct, is self-contradictory and
     # makes a green run impossible on any machine that lacks every
-    # optional tool. So a missing binary is not a violation — it is noted
-    # for --emit-table only. When the binary *is* present, pacman still
-    # has to agree with the mapped package, and a mismatch stays a real
-    # violation.
-    not_installed = set()
+    # optional tool. So a missing binary is not a violation, and — since
+    # v0.9 rebaseline fix round 1 (C-2) — it is not noted anywhere in
+    # --emit-table's output either: which commands happen to be installed
+    # on the machine running this scan is a fact about that machine, not
+    # about this project, and the emitted table is committed and asserted
+    # against verbatim (test_dependency_closure.sh). A missing binary
+    # simply narrows what this pass can check; it says nothing else. When
+    # the binary *is* present, pacman still has to agree with the mapped
+    # package, and a mismatch stays a real violation.
     for cmd, package, klass, _ in table:
         if klass == "BASE":
             continue
         which = shutil.which(cmd)
         if which is None:
-            not_installed.add(cmd)
             continue
         owner = subprocess.run(
             ["pacman", "-Qqo", which], capture_output=True, text=True
@@ -1136,13 +1140,30 @@ def main():
         violations.append(f"UNMATCHED_DISABLED_PLUGIN {pid}")
 
     if args.emit_table:
+        # 이 표는 문서에 커밋되고 --emit-table 재생성 결과와 문자 그대로
+        # 비교된다(test_dependency_closure.sh). 이 스캔을 실행하는 머신에
+        # 무엇이 설치돼 있는지는 그 머신에 대한 사실이지 이 프로젝트에 대한
+        # 사실이 아니다 — 커밋되는 표 안에 넣으면 다른 머신/CI/사용자가
+        # optdepends 하나만 깔아도 손대지 않은 문서가 거짓 RED 를 낸다
+        # (v0.9 rebaseline fix round 1, C-2). 그래서 여기서는 `not_installed`
+        # 를 표에 전혀 찍지 않는다 — 그 정보는 위쪽 실제 위반 판정(있으면
+        # UNMAPPED_COMMAND)에서만 쓰이고, 표 셀에는 클래스와 근거만 남는다.
         print("| command | package | class | 근거 |")
         print("| --- | --- | --- | --- |")
         for cmd, package, klass, rationale in table:
             if klass == "BASE":
                 continue
-            note = " (미설치 — 검증 생략)" if cmd in not_installed else ""
-            print(f"| `{cmd}` | `{package}` | {klass} | {rationale}{note} |")
+            print(f"| `{cmd}` | `{package}` | {klass} | {rationale} |")
+        # 개수는 여기서 함께 내보내 표와 같은 단언 대상이 되게 한다 — 산문에
+        # 손으로 옮겨 적은 숫자는 맵이 바뀌어도 스위트가 green 인 채로 거짓이
+        # 될 수 있다(v0.9 rebaseline fix round 1, I-2).
+        base_count = sum(1 for r in map_rows if r[2] == "BASE")
+        print()
+        print(
+            "tests/data/command-packages.tsv: 전체 %d행, 그중 BASE %d행은 "
+            "위 표에서 제외(부재할 수 없는 기반 패키지 — declare 대상 아님)"
+            % (len(map_rows), base_count)
+        )
         # 스캐너가 헬퍼로 인정하지 않은 이름을 여기서 드러낸다. 이 목록이
         # 조용하면, 생성된 문서는 도구가 갖지 않은 완전성을 주장하게 된다.
         print()

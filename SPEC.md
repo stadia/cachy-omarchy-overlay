@@ -2281,7 +2281,7 @@ and the `omarchy-hyprland-monitor-internal(-mirror)` chain, reasoning that
 CachyOS Hyprland configs do not source `~/.local/state/omarchy/toggles/hypr/`
 and that staging the laptop guard would unhide menu rows whose actions
 cannot persist. That judgment was reversed: both are staged
-(`stage-upstream.sh:184,185,225`) — see `UPSTREAM.md` "Components
+(`stage-upstream.sh:185,186,226`) — see `UPSTREAM.md` "Components
 intentionally excluded" and `docs/RUNTIME_DEPENDENCIES.md`.
 
 - Audio: `omarchy-audio-output-switch` plus

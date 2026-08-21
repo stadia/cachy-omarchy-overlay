@@ -19,6 +19,25 @@
 
 체크아웃 `version` 파일은 `4.0.0.alpha`다. 공식 패키지 `pkgver`와 태그 `v4.0.0`을 권위로 쓴다.
 
+## Moving the pin
+
+`bin/update-upstream` moves `upstream.lock`, `packages/cachy-omarchy-shell/PKGBUILD`
+(`pkgver`/`_commit`), and `tests/data/upstream-helpers.txt` **together, in one
+run** — never move the pin by hand without regenerating the inventory. The
+inventory is the dependency closure scanner's (`tests/runtime/closure_check.py`)
+ground truth for "is this string really an upstream helper", scoped to the
+exact pinned commit; a pin move without a matching inventory regeneration
+would leave the scanner judging the new tree against the old commit's helper
+list. `tests/runtime/test_upstream_helper_inventory.sh` enforces that the
+inventory's `# commit:` header always matches `upstream.lock`'s
+`OMARCHY_COMMIT`. `tests/package/test_update_pipeline.sh`'s nested candidate
+run (`COO_UPDATE_PIPELINE_NESTED=1`) exercises this against a disposable
+fixture pin; the closure table's doc-sync check
+(`tests/runtime/test_dependency_closure.sh`) is deliberately skipped in that
+one context, because a fixture pin's regenerated inventory is expected to
+differ from `docs/RUNTIME_DEPENDENCIES.md`'s checked-in table, which tracks
+the real pin above.
+
 ## Components packaged (M1–M5; `pacman -U` 실설치는 2026-08-17 검증됨 — `docs/RUNTIME_STARTUP.md` §12)
 
 두 패키지로 나뉜다. `cachy-omarchy-shell` 은 핀된 업스트림 트리를, `cachy-omarchy-overlay`
@@ -47,7 +66,7 @@
   `$OMARCHY_PATH/default/audio` + speaker-tuning user unit)과 display
   brightness 체인, touchpad/touchscreen 가드를 verbatim 으로 올렸다.
   `omarchy-hw-laptop` 과 monitor-internal 체인(`omarchy-hyprland-monitor-internal`,
-  `-internal-mirror`)은 **실제로 스테이징된다**(`stage-upstream.sh:184,185,225`) —
+  `-internal-mirror`)은 **실제로 스테이징된다**(`stage-upstream.sh:185,186,226`) —
   래퍼가 필요해서 뺀다는 옛 판단은 M10 D6 시점 것이며 이후 뒤집혔다.
   XF86 media 키는 주입하지 않는다 (SPEC "Milestone 10 — Utility Plugin
   Runtime" 과 이어지는 Helper expansion 절).
@@ -107,12 +126,8 @@ systemd 유저 유닛은 기동 전환(§"Milestone 8 — Shell Autostart", RUNT
 - 공식 `bin/` 전체의 `/usr/bin` 설치
 - 테마 Tier C helper 중 plymouth/browser/keyboard 훅(`omarchy-plymouth-set-by-theme`,
   `omarchy-theme-set-browser`, `omarchy-theme-set-keyboard*`) — no-op compat
-  shim 으로만 대체. **단 `omarchy-theme-install/update/remove` 는 0.8.0 부터
-  스테이징됨**(self-contained 판정, `SPEC.md` "Milestone 9 — Theme Runtime" 절
-  참고) — 옛 "Tier C 전체 제외" 판단은 이 세 helper 에는 더 이상 맞지 않는다
-- XF86 media 키의 자동 주입은 미채택. `omarchy-hw-laptop` 과 monitor-internal
-  체인(`omarchy-hyprland-monitor-internal(-mirror)`)은 **실제로 스테이징된다**
-  (`stage-upstream.sh:184,185,225`) — 래퍼 필요를 이유로 뺐다는 옛 판단은 틀렸다
+  shim 으로만 대체
+- XF86 media 키의 자동 주입 (M10 D6)
 - `omarchy-system-factory-reset` / `-finish` (Omarchy ISO `@factory` 전제)
 - 락/알림의 기본 활성 (OSD 패널은 M10 에서 채택 — direct CLI/audio helper 경로만)
 
@@ -136,6 +151,18 @@ CachyOS에서 `omarchy.menu`를 쓰려면 공식 OS가 아니라 **핀된 런타
   스코프해 회수하지만, **실세션 재시작 누수는 미해결**이다.
 
 ### 역사 기록 (해소됨 — 이 목록에 있었으나 더 이상 제한이 아니다)
+
+> **테마 Tier C `omarchy-theme-install`/`-update`/`-remove` 제외** (M9 원래 판단) —
+> 이 세 helper 도 Tier C("네트워크 설치")로 분류되어 처음엔 제외됐으나, 0.8.0 감사
+> 재실측에서 self-contained(`git clone`/`git pull`/`rm -rf` + 이미 스테이징된
+> `omarchy-theme-set` 호출뿐, channel/pkg/`omarchy-settings` 의존 없음)임이 드러나
+> 스테이징됐다(`SPEC.md` "Milestone 9 — Theme Runtime" 절).
+>
+> **`omarchy-hw-laptop` 과 monitor-internal 체인 제외** (M10 D6 원래 판단) — CachyOS
+> Hyprland 설정이 `~/.local/state/omarchy/toggles/hypr/` 를 source 하지 않아 래퍼가
+> 필요하다고 보고 제외했으나, 이후 판단이 뒤집혀 `omarchy-hw-laptop` /
+> `omarchy-hyprland-monitor-internal` / `-internal-mirror` 모두 verbatim 스테이징됐다
+> (`stage-upstream.sh:185,186,226`).
 
 > **`graphical-session.target` 비활성** (M2·M3) — `uwsm` 부재로 유닛 자동 시작 안 함
 > (§17 미검증). 현재는 uwsm 이 `cachy-omarchy-shell` 의 hard depends 이고, systemd
