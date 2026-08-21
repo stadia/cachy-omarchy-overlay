@@ -9,3 +9,4 @@ vendor/omarchy/
 /build/*.pkg.tar.*
 packages/cachy-omarchy-shell/omarchy/
 docs/superpowers/
+__pycache__/

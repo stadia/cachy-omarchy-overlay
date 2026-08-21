@@ -150,9 +150,10 @@ file only.
   and touchpad/touchscreen guards verbatim. Laptop/monitor-internal stay off
   PATH (need wrappers). Done (`v0.7.0`). Measurements: `docs/RUNTIME_STARTUP.md` §21.1.
 - **v0.8** — stage theme install/update/remove, Hyprland toggles, and hardware
-  helpers verbatim (`v0.8.0`). The keybindings sheet reads the overlay's own
-  binds (`v0.8.1`) and labels them so rows read as names, not commands
-  (`v0.8.2`).
+  helpers verbatim (`v0.8.0`) — this reversed the v0.7 "need wrappers" call on
+  `omarchy-hw-laptop` and the monitor-internal chain; both are staged as of
+  this release. The keybindings sheet reads the overlay's own binds
+  (`v0.8.1`) and labels them so rows read as names, not commands (`v0.8.2`).
 - **Lock coexistence measured** — the last open item in the SPEC §61 acceptance
   checklist closed on 2026-08-20, making it **21/21 measured**. Both directions
   against hyprlock were measured inside a nested, isolated Hyprland.

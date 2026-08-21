@@ -32,10 +32,12 @@
 - `shell/` 전체 (Quickshell 셸 트리) → `/usr/share/cachy-omarchy/upstream/shell/`
 - `themes/` + `default/themed/` (M9) — 테마 런타임. `colors.toml` 과 `*.tpl` 은
   같이 진화하는 한 쌍이라 반드시 셸과 같은 핀 커밋에서 온다.
-- `bin/omarchy-theme-*` + 연쇄 helper (M9) — Tier A(코어 체인)·Tier B(post 훅)만
-  스테이징. Tier C(네트워크 설치·/etc 쓰기·하드웨어 전용)는 제외하고, 그중
-  `omarchy-theme-set-browser`·`-keyboard` 는 오버레이의 no-op compat shim 이
-  대신 메운다(SPEC "Milestone 9 — Theme Runtime").
+- `bin/omarchy-theme-*` + 연쇄 helper (M9) — Tier A(코어 체인)·Tier B(post 훅)를
+  스테이징. Tier C(네트워크 설치·/etc 쓰기·하드웨어 전용) 중 plymouth/browser/
+  keyboard 훅은 제외하고, `omarchy-theme-set-browser`·`-keyboard` 는 오버레이의
+  no-op compat shim 이 대신 메운다. **`omarchy-theme-install/update/remove`는
+  0.8.0 부터 스테이징된다** — self-contained 로 재판정됐다(SPEC "Milestone 9 —
+  Theme Runtime").
 - 유틸리티 플러그인 helper (M10) — clipboard(`omarchy-menu-clipboard`,
   `omarchy-clipboard-{open,paste-text,paste-file}` + launch browser/editor/tui/
   focus-app 전이 closure), emojis(`omarchy-menu-emoji{,-insert}`),
@@ -44,7 +46,9 @@
   `omarchy-audio-output-switch`/`omarchy-audio-tuning`(템플릿은
   `$OMARCHY_PATH/default/audio` + speaker-tuning user unit)과 display
   brightness 체인, touchpad/touchscreen 가드를 verbatim 으로 올렸다.
-  `omarchy-hw-laptop` 과 monitor-internal 체인은 래퍼가 필요해서 넣지 않는다.
+  `omarchy-hw-laptop` 과 monitor-internal 체인(`omarchy-hyprland-monitor-internal`,
+  `-internal-mirror`)은 **실제로 스테이징된다**(`stage-upstream.sh:184,185,225`) —
+  래퍼가 필요해서 뺀다는 옛 판단은 M10 D6 시점 것이며 이후 뒤집혔다.
   XF86 media 키는 주입하지 않는다 (SPEC "Milestone 10 — Utility Plugin
   Runtime" 과 이어지는 Helper expansion 절).
 - 메뉴 `style.bar` + 세션 lock/logout/reboot/shutdown (`omarchy-bar`,
@@ -101,10 +105,14 @@ systemd 유저 유닛은 기동 전환(§"Milestone 8 — Shell Autostart", RUNT
 - `install/`, `migrations/`, libalpm hooks, `/etc/skel` 마커
 - Limine / Snapper / SDDM / Plymouth / `/etc/os-release` 오버라이드
 - 공식 `bin/` 전체의 `/usr/bin` 설치
-- 테마 Tier C helper(`omarchy-theme-install/update/remove`, plymouth/browser/
-  keyboard 훅)의 스테이징 — M9 부터 나머지 테마 워크플로는 채택했다
-- XF86 media 키의 자동 주입, `omarchy-hw-laptop` 과 monitor-internal 체인
-  (CachyOS 가 hypr toggles lua 를 source 하지 않아 래퍼 필요)
+- 테마 Tier C helper 중 plymouth/browser/keyboard 훅(`omarchy-plymouth-set-by-theme`,
+  `omarchy-theme-set-browser`, `omarchy-theme-set-keyboard*`) — no-op compat
+  shim 으로만 대체. **단 `omarchy-theme-install/update/remove` 는 0.8.0 부터
+  스테이징됨**(self-contained 판정, `SPEC.md` "Milestone 9 — Theme Runtime" 절
+  참고) — 옛 "Tier C 전체 제외" 판단은 이 세 helper 에는 더 이상 맞지 않는다
+- XF86 media 키의 자동 주입은 미채택. `omarchy-hw-laptop` 과 monitor-internal
+  체인(`omarchy-hyprland-monitor-internal(-mirror)`)은 **실제로 스테이징된다**
+  (`stage-upstream.sh:184,185,225`) — 래퍼 필요를 이유로 뺐다는 옛 판단은 틀렸다
 - `omarchy-system-factory-reset` / `-finish` (Omarchy ISO `@factory` 전제)
 - 락/알림의 기본 활성 (OSD 패널은 M10 에서 채택 — direct CLI/audio helper 경로만)
 

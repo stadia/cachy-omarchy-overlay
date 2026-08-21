@@ -1,6 +1,8 @@
 # 런타임 의존 감사
 
-범위: 핀된 트리에서 **셸 기동 + `omarchy.menu` 토글 + 일반 데스크톱 앱 실행**. 공식 `omarchy` `depends=()`를 복사하지 않음.
+범위: 이 표는 **셸 기동 + `omarchy.menu` 토글 + 일반 데스크톱 앱 실행**의 최소
+집합만 다룬다(M2 시점 축). `/usr/bin` 에 노출된 helper 전체의 외부 명령 클로저는
+아래 "클로저 전수(생성)" 절이 다루며, 그쪽이 기계 판정이다. 공식 `omarchy` `depends=()`를 복사하지 않음.
 
 분류: `REQUIRED` | `OPTIONAL` | `DISABLE` | `UNSAFE`  
 적응: `NONE` | `ENVIRONMENT` | `WRAPPER` | `PATCH` | `REIMPLEMENT`
@@ -36,6 +38,143 @@
 | `plymouth` | settings depends | 공식 | UNSAFE | — | must | 없음 | NONE |
 | `omarchy-keyring` | 공식 depends | 공식 미러 | OPTIONAL | 20251027-1 pre-existing | yes | 로컬 `makepkg` | NONE — 미러 추가 전제 아니면 불필요 |
 | `ttf-jetbrains-mono-nerd*` | 공식 UI 폰트 | 공식/AUR 계열 | OPTIONAL | 확인 필요 | yes | 시스템 폰트 | ENVIRONMENT |
+
+---
+
+## 클로저 전수 (생성)
+
+이 표는 손으로 고치지 않는다. `tests/runtime/closure_check.py --emit-table` 이
+생성하며, `tests/runtime/test_dependency_closure.sh` 가 파일 내용과 생성 결과가
+일치하는지 검사한다(표를 손으로 고치면 그 테스트가 RED 로 잡는다). 등급 판정
+규칙은 설계 문서 §4.2 에 있다.
+
+**이 표는 `BASE` 등급을 뺀다.** `tests/data/command-packages.tsv` 의 전체
+행수와 `BASE` 행수는 세어서 확인한다(하드코딩 금지):
+
+```console
+$ awk -F'\t' '!/^#/ && NF' tests/data/command-packages.tsv | wc -l
+107
+$ awk -F'\t' '!/^#/ && NF && $3=="BASE"' tests/data/command-packages.tsv | wc -l
+63
+```
+
+135행이 아니라 107행이며, 그중 63행이 `BASE` 다(2026-08-21 실측 — 위 명령을 다시
+돌리면 갱신된다). `BASE` 는 "기반 시스템 — 부재할 수 없는 패키지"(`coreutils`,
+`bash`, `systemd` 등)라서 아예 declare 대상이 아니고, 그래서 표에서 빠진다. 그중
+일부(`gsettings` 등)는 우리가 **직접 호출하는** 명령이기도 하다 — BASE 라는
+등급이 "우리가 안 쓴다"는 뜻이 아니라 "declare 할 필요가 없다"는 뜻이라는 것을
+혼동하지 말 것.
+
+<!-- CLOSURE_BEGIN -->
+| command | package | class | 근거 |
+| --- | --- | --- | --- |
+| `asdcontrol` | `asdcontrol` | UNPACKAGED | Apple Studio Display 밝기 제어(하드웨어 한정, omarchy-brightness-display-apple 이 sudo asdcontrol 을 부른다) — 공식 리포에도 AUR 에도 제공자가 없다(AUR RPC info/search 둘 다 0건 실측). 어디에도 선언하지 않는다; 사용자가 직접 빌드해야 하며, 없으면 그 헬퍼 하나만 동작하지 않는다. (미설치 — 검증 생략) |
+| `brightnessctl` | `brightnessctl` | OPT | 내장 백라이트 — 이미 optdepends (미설치 — 검증 생략) |
+| `checkupdates` | `pacman-contrib` | OPT | 업데이트 확인 메뉴 항목 |
+| `ddcutil` | `ddcutil` | OPT | 외부 모니터 밝기 — 이미 optdepends (미설치 — 검증 생략) |
+| `discord` | `discord` | OPT | Discord 커뮤니티 실행 메뉴 항목 |
+| `dropbox-cli` | `dropbox-cli` | AUR | Dropbox 패널 대상 애플리케이션 — 사용자가 Dropbox 를 가짐으로써 선택하는 능력, C1 4번째 패턴에서 신규 발견. 리포엔 없고 AUR 전용(AUR RPC info 1건 실측). (미설치 — 검증 생략) |
+| `ffmpeg` | `ffmpeg` | OPT | 화면 녹화 인코딩 |
+| `git` | `git` | HARD | 테마 git clone/update 경로 — 기본 경로에서 도달하나 depends 없음 |
+| `gpu-screen-recorder` | `gpu-screen-recorder` | OPT | 화면 녹화 메뉴 항목 (미설치 — 검증 생략) |
+| `grim` | `grim` | HARD | 스크린샷 캡처 행의 구동 기계(§4.2 개정) — grim 없이는 그 메뉴 행 자체가 동작 못 함 |
+| `gtk-update-icon-cache` | `gtk-update-icon-cache` | OPT | 웹앱 아이콘 설치 후처리 |
+| `gum` | `gum` | HARD | 테마/온보딩 TUI 프롬프트 — 기본 경로에서 도달하나 depends 없음 |
+| `hyprctl` | `hyprland` | HARD | 이미 depends(hyprland) |
+| `hyprpicker` | `hyprpicker` | OPT | 색상 선택 메뉴 항목 (미설치 — 검증 생략) |
+| `hyprsunset` | `hyprsunset` | HARD | nightlight 서비스가 기본 활성 — depends 없음 (미설치 — 검증 생략) |
+| `iw` | `iw` | OPT | Wi-Fi 진단 메뉴 항목 |
+| `jq` | `jq` | HARD | 클립보드/리마인더/OSD JSON — 이미 depends |
+| `killall` | `psmisc` | OPT | 터미널/에디터 리로드 시그널 테마 훅 — omarchy-restart-terminal, omarchy-restart-opencode 가 killall -SIGUSR1/2 를 쓴다. 이미 depends(psmisc) |
+| `mpv` | `mpv` | OPT | 미디어 미리보기 메뉴 항목 (미설치 — 검증 생략) |
+| `nmcli` | `networkmanager` | OPT | 네트워크 관리 메뉴 항목 |
+| `notify-send` | `libnotify` | HARD | omarchy-notification-send 폴백 경로 |
+| `pactl` | `libpulse` | HARD | pactl 실소유 패키지는 pipewire-pulse 아닌 libpulse(pacman -Qqo 실측) — depends 는 pipewire-pulse 만 있음, MISSING_HARD_DEP 로 드러나는 진짜 결함 |
+| `perl` | `perl` | HARD | 텍스트 처리 헬퍼 — 기본 경로에서 도달하나 depends 없음 |
+| `pgrep` | `procps-ng` | HARD | 이미 depends |
+| `pkill` | `procps-ng` | HARD | 이미 depends |
+| `powerprofilesctl` | `power-profiles-daemon` | OPT | 전원 프로필 메뉴 항목 |
+| `ps` | `procps-ng` | HARD | 이미 depends |
+| `python3` | `python` | OPT | Dropbox 패널의 번들 상태 스크립트(status.py) 실행기 — Dropbox 통합을 선택한 사용자에게만 의미 있음, C1 4번째 패턴에서 신규 발견 |
+| `slurp` | `slurp` | HARD | 스크린샷 영역 선택 행의 구동 기계(§4.2 개정) — grim과 짝을 이루는 동일 기능 |
+| `sudo` | `sudo` | HARD | cachy-omarchy-init 이 락스크린 PAM 서비스 설정을 omarchy-apply-lock 에 위임하며 그것이 root 를 요구한다 — 메뉴 행이 아니라 우리 설치 경로에서 도달(컨트롤러 룰링, task-2) |
+| `tailscale` | `tailscale` | OPT | Tailscale 패널 대상 애플리케이션 — QML .js command: 배열에서 도달(C1 수정 후 신규 발견), 사용자가 tailscale 을 가짐으로써 선택하는 능력 |
+| `tensaku-edit` | `tensaku` | AUR | 클립보드/스크린샷 편집기 기본값(omarchy-clipboard-open:33) — 미설치 시 폴백 없음. 바이너리명 tensaku-edit 는 패키지명이 아니다 — 실제 AUR 패키지는 tensaku(AUR RPC info 1건 실측, tensaku-bin/tensaku-git 도 별도 존재). (미설치 — 검증 생략) |
+| `tesseract` | `tesseract` | OPT | OCR 메뉴 항목 |
+| `tmux` | `tmux` | OPT | tmux 테마 훅 — 이미 optdepends |
+| `usbreset` | `usbutils` | OPT | USB 오디오 장치 복구 메뉴 항목 |
+| `uwsm-app` | `uwsm` | HARD | 이미 depends(uwsm) |
+| `v4l2-ctl` | `v4l-utils` | OPT | 웹캠 설정 메뉴 항목 |
+| `which` | `which` | HARD | Tailscale 패널의 존재 확인 구동 기계(C1 4번째 패턴 .command= 에서 신규 발견) — 대상이 아니라 패널 자체가 이 명령 없이는 상태를 못 읽음 |
+| `wl-copy` | `wl-clipboard` | HARD | 이미 depends |
+| `wtype` | `wtype` | HARD | 이미 depends |
+| `xdg-mime` | `xdg-utils` | HARD | 이미 depends |
+| `xdg-settings` | `xdg-utils` | HARD | 이미 depends |
+| `xdg-terminal-exec` | `xdg-terminal-exec` | AUR | 터미널 실행의 구동 기계(HARD 성격) — omarchy-launch-tui/omarchy-launch-terminal/omarchy-launch-floating-terminal-with-presentation 전부 이것 없이는 실패한다. 그럼에도 리포엔 없고 AUR 전용(pacman -Si 0건, AUR RPC info 1건 실측)이라 depends 로 못 두고 optdepends 로 내린다 — pacman -U 는 depends 를 리포/설치된 패키지로만 해결하므로(bin/install-packages:55) AUR 전용을 depends 에 넣으면 우리 패키지 자체가 설치 불가해진다. xdg-utils 는 이 바이너리를 제공하지 않는다(pacman -Ql 실측). (미설치 — 검증 생략) |
+| `zbarimg` | `zbar` | OPT | QR 코드 스캔 메뉴 항목 |
+
+스캐너가 헬퍼로 인정하지 않은 이름: 20개 (핀된 업스트림 bin/ 에 없음 — 파일 이름, 알림 hint 키, grep 패턴, 안내 문구 등 명령이 아닌 문자열)
+- `omarchy-action`
+- `omarchy-agent-usage`
+- `omarchy-background`
+- `omarchy-bar-drag-ghost`
+- `omarchy-bar-move-ghost`
+- `omarchy-battery`
+- `omarchy-clipboard`
+- `omarchy-emojis`
+- `omarchy-exec`
+- `omarchy-glyph`
+- `omarchy-image-selector`
+- `omarchy-lock-fingerprint`
+- `omarchy-lock-password`
+- `omarchy-lock-preview`
+- `omarchy-notifications`
+- `omarchy-polkit`
+- `omarchy-reminders`
+- `omarchy-system`
+- `omarchy-theme`
+- `omarchy-webapp-handler`
+<!-- CLOSURE_END -->
+
+### 스캐너의 알려진 한계 — 이 표가 완전성을 주장하지 않는 이유
+
+이 표는 감사의 상한이 아니라 정적 분석이 잡아낼 수 있는 것의 스냅샷이다. 아래
+세 가지는 코드 주석(`tests/runtime/closure_check.py`)에 이미 있는 한계를 그대로
+옮긴 것이며, 부드럽게 쓰지 않는다.
+
+1. **동적으로 조립되는 이름은 열거할 수 없다.** `"omarchy-installed-service-$service"`
+   같은 문자열 연결/변수 보간 계열은 정적 분석으로 값 집합을 알 수 없다.
+   `omarchy-bar:165` 가 실제로 이 형태로 헬퍼를 호출한다 — 그 호출은 이 표에
+   나타나지 않는다.
+2. **QML/JS 는 문자열 리터럴만 읽는다.** `"omarchy-" + kind` 같은 문자열 연결이나
+   템플릿 리터럴로 조립되는 이름은 수확기가 보지 못한다. 현재 핀 트리에는 이
+   용법이 0건이다(grep 확인, 2026-08-21) — 업스트림이 이 형태를 도입하면 조용히
+   빠진다.
+3. **인벤토리는 업스트림 `bin/` 만 덮는다.** `tests/data/upstream-helpers.txt` 는
+   핀된 업스트림 커밋의 `bin/` 디렉터리를 스냅샷한 것이다. 업스트림이 헬퍼를 다른
+   디렉터리로 옮기면, 인벤토리 재생성 테스트는 통과하면서도 그 헬퍼는 조용히
+   "헬퍼 아님"으로 분류되어 그래프에서 빠진다 — `UNSTAGED_REACHABLE` 로도 잡히지
+   않는다.
+
+### `docs/COMMAND_AUDIT.md` 와의 범위 차이
+
+`docs/COMMAND_AUDIT.md` 는 메뉴/셸이 도달하는 헬퍼를 감사 대상으로 삼고, 이 절의
+클로저 스캐너는 다른 도달성 정의(BFS 루트 + 인벤토리)를 쓴다. 그래서
+`tests/data/closure-exceptions.tsv` 의 예외 31건 중 21건은 `COMMAND_AUDIT.md` 에
+자기 행이 아예 없다(측정 명령 아래). 이것은 결함이 아니라 **범위 차이**이며, 다음
+사람이 21건을 "감사 누락"으로 오해하지 않도록 여기에 명시한다.
+
+```console
+$ awk -F'\t' '!/^#/ && NF {print $1}' tests/data/closure-exceptions.tsv | while read -r name; do
+    grep -qE "^\| \`$name\` \|" docs/COMMAND_AUDIT.md || echo "$name"
+  done | wc -l
+21
+```
+
+또한 `tests/runtime/test_command_audit.sh` 는 `closure-exceptions.tsv` 를 읽지
+않는다. 즉 이 두 문서가 서로 모순되지 않는지는 **기계가 아니라 사람이** 지킨다 —
+이 절의 표가 코드와 동기화된다는 보장은 있어도, `COMMAND_AUDIT.md` 와의 정합은
+그 보장 밖이다.
 
 ---
 

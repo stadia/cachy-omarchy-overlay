@@ -2274,11 +2274,15 @@ record lives in the private development tree
 *(번호 없는 절 — M8–M10 과 같은 방식.)*
 
 Stage the remaining verbatim closures that M10 classified as Tier C, plus the
-menu `when` guards for touchpad and touchscreen. No wrappers. Things that
-need an adapted wrapper stay out: `omarchy-hw-laptop` and the
-`omarchy-hyprland-monitor-internal(-mirror)` chain, because CachyOS Hyprland
-configs do not source `~/.local/state/omarchy/toggles/hypr/`. Staging the
-laptop guard would unhide menu rows whose actions cannot persist.
+menu `when` guards for touchpad and touchscreen. No wrappers.
+
+*v0.9 rebaseline:* the paragraph originally here excluded `omarchy-hw-laptop`
+and the `omarchy-hyprland-monitor-internal(-mirror)` chain, reasoning that
+CachyOS Hyprland configs do not source `~/.local/state/omarchy/toggles/hypr/`
+and that staging the laptop guard would unhide menu rows whose actions
+cannot persist. That judgment was reversed: both are staged
+(`stage-upstream.sh:184,185,225`) — see `UPSTREAM.md` "Components
+intentionally excluded" and `docs/RUNTIME_DEPENDENCIES.md`.
 
 - Audio: `omarchy-audio-output-switch` plus
   `omarchy-audio-output-set-default`, `omarchy-audio-tuning`,

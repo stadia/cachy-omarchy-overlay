@@ -55,9 +55,10 @@ cp -a "$src/default/hypr/toggles" \
 # 가드 helper — audio-input-mute 가 무조건 부르므로 빼면 command not found 가
 # 샌다 (D7). 이후 확장에서 audio-output-switch/audio-tuning 과
 # brightness-display 체인, touchpad/touchscreen 가드를 verbatim 으로 올렸다.
-# omarchy-hw-laptop 과 monitor-internal 체인은 CachyOS 가 toggles/hypr 를
-# source 하지 않아 래퍼가 필요하므로 넣지 않는다. XF86 키는 여전히 주입하지
-# 않는다 (M10 D6).
+# omarchy-hw-laptop 과 monitor-internal 체인은 실제로 아래에 스테이징된다
+# (hw-laptop 은 hw-laptop 가드 절 참고) — M10 D6 이 배제를 결정했으나 이후
+# 개정에서 뒤집혔다(v0.9 rebaseline, UPSTREAM.md/SPEC.md 정정과 함께).
+# XF86 키는 여전히 주입하지 않는다.
 # 노출 집합 = 스테이징 집합 (SPEC §45). 이 배열이 단일 정의다 — 아래 두 루프가
 # 같은 배열을 돌기 때문에 스테이징 목록과 /usr/bin 노출 목록이 갈라질 수 없다.
 # tests/package/test_usr_bin_helpers.sh 가 `helpers=(` 로 이 블록을 파싱한다.
