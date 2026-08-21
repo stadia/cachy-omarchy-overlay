@@ -40,7 +40,36 @@ assert_eq "$(sha256sum "$u02_shell_fixture" | awk '{print $1}')" "$(sha256sum "$
 assert_eq "$(sha256sum "$u02_overlay_fixture" | awk '{print $1}')" "$(sha256sum "$required_overlay_artifact" | awk '{print $1}')" \
   "U02 snapshots the required overlay package artifact"
 
+# Task 5c: bin/update-upstream regenerates tests/data/upstream-helpers.txt
+# by fetching the new pin's real tree (fix round 2). A synthetic sha with no
+# real git object anywhere cannot exercise that honestly -- trusting
+# $fake/git's exit code for that fetch, with no real repository behind it,
+# is exactly the "verifies nothing" failure mode this project treats as its
+# worst (fix round 2 caught itself doing this). So the v4.0.1 target here is
+# a real commit in a real, small, disposable local repository, not a magic
+# hex string. $fake/git below fakes only the one call a test cannot ask a
+# real remote to answer honestly -- `ls-remote --tags`, i.e. what a live
+# service currently advertises -- and passes every other subcommand
+# straight through to the real system git, so the fetch this test exercises
+# is a real fetch against real objects.
+fixture_upstream=$COO_TEST_SANDBOX/upstream-fixture
+mkdir -p "$fixture_upstream/bin"
+for helper in omarchy omarchy-menu omarchy-theme-set omarchy-battery-status omarchy-weather-status; do
+  printf '#!/usr/bin/env bash\n# fixture helper: %s\n' "$helper" >"$fixture_upstream/bin/$helper"
+done
+git init -q "$fixture_upstream"
+git -C "$fixture_upstream" -c user.email=fixture@example.invalid -c user.name=fixture -c commit.gpgsign=false \
+  add -A
+git -C "$fixture_upstream" -c user.email=fixture@example.invalid -c user.name=fixture -c commit.gpgsign=false \
+  commit -q -m 'v4.0.1 fixture'
+fixture_commit=$(git -C "$fixture_upstream" rev-parse HEAD)
+fixture_repo_url="file://$fixture_upstream"
+
 cp -a "$REPO_ROOT/upstream.lock" "$REPO_ROOT/UPSTREAM.md" "$root/"
+# The real repository URL would make a real fetch of $fixture_commit fail
+# (that commit exists only in the disposable repo above); point the pin at
+# the repo that actually has it.
+sed -i "s#^OMARCHY_REPOSITORY=.*#OMARCHY_REPOSITORY=$fixture_repo_url#" "$root/upstream.lock"
 while IFS= read -r -d '' path; do
   mkdir -p "$root/$(dirname "$path")"
   cp -a "$REPO_ROOT/$path" "$root/$path"
@@ -82,28 +111,41 @@ log=$COO_TEST_SANDBOX/tools.log
 
 cat >"$fake/git" <<'EOF'
 #!/usr/bin/env bash
-# v4.0.1 is annotated: direct ref is tag object, peeled ref is commit.
-if [[ ${COO_FAKE_NO_UPDATE:-0} == 1 ]]; then
+# Only ls-remote --tags is faked -- the one call a test cannot ask a real
+# remote to answer honestly, since it's a live "what do you advertise right
+# now" question. Every other subcommand (init/fetch/ls-tree/cat-file/...)
+# passes straight through to the real system git, so a real fetch of the
+# fixture repository below does real work against real objects.
+if [[ ${1:-} == ls-remote && ${2:-} == --tags ]]; then
+  # v4.0.1 is annotated: direct ref is tag object, peeled ref is commit.
+  if [[ ${COO_FAKE_NO_UPDATE:-0} == 1 ]]; then
+    printf '%s\n' 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa refs/tags/v4.0.0'
+    printf '%s\n' 'f0020448ca87329199de7cb12f2015ebc4a3e5e7 refs/tags/v4.0.0^{}'
+    exit 0
+  fi
+  if [[ ${COO_FAKE_LIGHTWEIGHT:-0} == 1 ]]; then
+    printf '%s\n' 'f0020448ca87329199de7cb12f2015ebc4a3e5e7 refs/tags/v4.0.0'
+    printf '%s\n' '4444444444444444444444444444444444444444 refs/tags/v4.0.1'
+    exit 0
+  fi
   printf '%s\n' 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa refs/tags/v4.0.0'
   printf '%s\n' 'f0020448ca87329199de7cb12f2015ebc4a3e5e7 refs/tags/v4.0.0^{}'
+  printf '%s\n' '1111111111111111111111111111111111111111 refs/tags/v4.0.1'
+  printf '%s\n' '__FIXTURE_COMMIT__ refs/tags/v4.0.1^{}'
+  printf '%s\n' '3333333333333333333333333333333333333333 refs/tags/v3.9.9'
   exit 0
 fi
-if [[ ${COO_FAKE_LIGHTWEIGHT:-0} == 1 ]]; then
-  printf '%s\n' 'f0020448ca87329199de7cb12f2015ebc4a3e5e7 refs/tags/v4.0.0'
-  printf '%s\n' '4444444444444444444444444444444444444444 refs/tags/v4.0.1'
-  exit 0
-fi
-printf '%s\n' 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa refs/tags/v4.0.0'
-printf '%s\n' 'f0020448ca87329199de7cb12f2015ebc4a3e5e7 refs/tags/v4.0.0^{}'
-printf '%s\n' '1111111111111111111111111111111111111111 refs/tags/v4.0.1'
-printf '%s\n' '2222222222222222222222222222222222222222 refs/tags/v4.0.1^{}'
-printf '%s\n' '3333333333333333333333333333333333333333 refs/tags/v3.9.9'
+exec /usr/bin/git "$@"
 EOF
+sed -i "s/__FIXTURE_COMMIT__/$fixture_commit/" "$fake/git"
 cat >"$fake/makepkg" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 printf '%s\n' "$(basename "$PWD")" >>"$COO_TOOL_LOG"
-[[ ${COO_FAKE_BUILD_FAIL:-0} != 1 ]] || exit 7
+if [[ ${COO_FAKE_BUILD_FAIL:-0} == 1 ]]; then
+  echo 'fake-makepkg: forced build failure (COO_FAKE_BUILD_FAIL)' >&2
+  exit 7
+fi
 mkdir -p "$PKGDEST"
 if [[ $PWD == *cachy-omarchy-shell ]]; then
   ver=$(grep -m1 '^pkgver=' PKGBUILD | cut -d= -f2 | tr -d "'\"")
@@ -250,7 +292,7 @@ pkg_before=$(sha256sum "$root/packages/cachy-omarchy-shell/PKGBUILD")
 out=$(COO_REPO_ROOT="$root" COO_GIT_BIN="$fake/git" "$root/bin/check-upstream" 2>&1); code=$?
 assert_eq "$code" "0" "U01 no-update exits cleanly"
 assert_contains "$out" "update available" "U01 reports available update"
-assert_contains "$out" "2222222222222222222222222222222222222222" "U01 uses annotated tag peeled commit"
+assert_contains "$out" "$fixture_commit" "U01 uses annotated tag peeled commit"
 assert_eq "$(sha256sum "$root/upstream.lock")" "$lock_before" "U01 lock is unchanged"
 assert_eq "$(sha256sum "$root/packages/cachy-omarchy-shell/PKGBUILD")" "$pkg_before" "U01 PKGBUILD is unchanged"
 out=$(COO_FAKE_LIGHTWEIGHT=1 COO_REPO_ROOT="$root" COO_GIT_BIN="$fake/git" "$root/bin/check-upstream" 2>&1); code=$?
@@ -591,11 +633,11 @@ assert_contains "$out" "PASS tests/package/test_package_files.sh" "candidate def
 updated_lock=$(cat "$root/upstream.lock")
 updated_pkg=$(cat "$root/packages/cachy-omarchy-shell/PKGBUILD")
 assert_contains "$updated_lock" "OMARCHY_VERSION=4.0.1" "U02 lock version updates"
-assert_contains "$updated_lock" "OMARCHY_COMMIT=2222222222222222222222222222222222222222" "U02 lock uses peeled commit"
+assert_contains "$updated_lock" "OMARCHY_COMMIT=$fixture_commit" "U02 lock uses peeled commit"
 assert_contains "$updated_lock" "OMARCHY_TAG=v4.0.1" "U02 lock tag updates"
 assert_contains "$updated_pkg" "pkgver=4.0.1" "U03 shell pkgver updates"
 assert_contains "$updated_pkg" "pkgrel=1" "U03 pkgrel resets to one"
-assert_contains "$updated_pkg" "_commit='2222222222222222222222222222222222222222'" "U02 shell commit updates"
+assert_contains "$updated_pkg" "_commit='$fixture_commit'" "U02 shell commit updates"
 assert_eq "$(grep -m1 '^pkgver=' "$root/packages/cachy-omarchy-overlay/PKGBUILD")" "$overlay_pkgver_before_update" "U02 overlay version is independent"
 assert_eq "$(wc -l <"$pac_update")" "0" "U02 update never invokes pacman"
 assert_contains "$out" "UPSTREAM.md requires human" "UPSTREAM.md deferred with explicit reason"
@@ -624,22 +666,34 @@ for mode in patch build audit test; do
   cp -a "$root" "$failroot"
   # U02 changed root to 4.0.1; each failure fixture must start at the prior pin
   # so update-upstream actually enters its patch/build/audit/test stage.
-  sed -i 's/OMARCHY_VERSION=4\.0\.1/OMARCHY_VERSION=4.0.0/; s/OMARCHY_COMMIT=2222222222222222222222222222222222222222/OMARCHY_COMMIT=f0020448ca87329199de7cb12f2015ebc4a3e5e7/; s/OMARCHY_TAG=v4\.0\.1/OMARCHY_TAG=v4.0.0/' "$failroot/upstream.lock"
-  sed -i "s/pkgver=4.0.1/pkgver=4.0.0/; s/pkgrel=2/pkgrel=1/; s/_commit='2222222222222222222222222222222222222222'/_commit='f0020448ca87329199de7cb12f2015ebc4a3e5e7'/" "$failroot/packages/cachy-omarchy-shell/PKGBUILD"
+  sed -i "s/OMARCHY_VERSION=4\.0\.1/OMARCHY_VERSION=4.0.0/; s/OMARCHY_COMMIT=$fixture_commit/OMARCHY_COMMIT=f0020448ca87329199de7cb12f2015ebc4a3e5e7/; s/OMARCHY_TAG=v4\.0\.1/OMARCHY_TAG=v4.0.0/" "$failroot/upstream.lock"
+  sed -i "s/pkgver=4.0.1/pkgver=4.0.0/; s/pkgrel=2/pkgrel=1/; s/_commit='$fixture_commit'/_commit='f0020448ca87329199de7cb12f2015ebc4a3e5e7'/" "$failroot/packages/cachy-omarchy-shell/PKGBUILD"
   before_lock=$(sha256sum "$failroot/upstream.lock")
   before_pkg=$(sha256sum "$failroot/packages/cachy-omarchy-shell/PKGBUILD")
   fail_pac=$COO_TEST_SANDBOX/fail-$mode-pacman.log
   : >"$fail_pac"
   envs=(COO_REPO_ROOT="$failroot" COO_GIT_BIN="$fake/git" COO_STATE_DIR="$COO_TEST_SANDBOX/fail-$mode-state" COO_BUILD_DIR="$COO_TEST_SANDBOX/fail-$mode-build" COO_TOOL_LOG="$log" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_TEST_RUNNER="$fake/test-runner" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$fail_pac")
+  # Exit code alone is not proof of *which* stage failed -- fix round 2 found
+  # this file trusting a bare "exit 1" from three different stages at once,
+  # passing even when the earlier inventory-fetch step aborted before ever
+  # reaching patch/audit/test. Each mode also gets a text marker that only
+  # its own real failure path can produce, so a regression that short-circuits
+  # earlier (same exit code, wrong reason) fails this line instead of hiding
+  # behind the coincidence.
   case $mode in
-    patch) envs+=(COO_PATCH_FAIL=1); update_id=U05; expected_code=1 ;;
-    build) envs+=(COO_FAKE_BUILD_FAIL=1); update_id=U06; expected_code=7 ;;
-    audit) envs+=(COO_FAKE_AUDIT_FAIL=1); update_id=U07; expected_code=1 ;;
-    test) envs+=(COO_FAKE_TEST_MODE=skip); update_id=U08; expected_code=1 ;;
+    patch) envs+=(COO_PATCH_FAIL=1); update_id=U05; expected_code=1
+      expected_evidence='patch application failed' ;;
+    build) envs+=(COO_FAKE_BUILD_FAIL=1); update_id=U06; expected_code=7
+      expected_evidence='fake-makepkg: forced build failure' ;;
+    audit) envs+=(COO_FAKE_AUDIT_FAIL=1); update_id=U07; expected_code=1
+      expected_evidence='archive audit failed' ;;
+    test) envs+=(COO_FAKE_TEST_MODE=skip); update_id=U08; expected_code=1
+      expected_evidence='test runner skipped required coverage' ;;
   esac
   code=0
   out=$(env "${envs[@]}" "$failroot/bin/update-upstream" 2>&1) || code=$?
   assert_eq "$code" "$expected_code" "$update_id $mode failure blocks publish"
+  assert_contains "$out" "$expected_evidence" "$update_id $mode failure fails at its own stage, not earlier"
   assert_eq "$(sha256sum "$failroot/upstream.lock")" "$before_lock" "U$mode failure preserves lock"
   assert_eq "$(sha256sum "$failroot/packages/cachy-omarchy-shell/PKGBUILD")" "$before_pkg" "U$mode failure preserves PKGBUILD"
   assert_eq "$(wc -l <"$fail_pac")" "0" "U$mode failure invokes no pacman"
@@ -649,8 +703,8 @@ done
 # leave both tracked inputs and the old authoritative pointer/release intact.
 pubroot=$COO_TEST_SANDBOX/metadata-publish-repo
 cp -a "$root" "$pubroot"
-sed -i 's/OMARCHY_VERSION=4\.0\.1/OMARCHY_VERSION=4.0.0/; s/OMARCHY_COMMIT=2222222222222222222222222222222222222222/OMARCHY_COMMIT=f0020448ca87329199de7cb12f2015ebc4a3e5e7/; s/OMARCHY_TAG=v4\.0\.1/OMARCHY_TAG=v4.0.0/' "$pubroot/upstream.lock"
-sed -i "s/pkgver=4.0.1/pkgver=4.0.0/; s/pkgrel=2/pkgrel=1/; s/_commit='2222222222222222222222222222222222222222'/_commit='f0020448ca87329199de7cb12f2015ebc4a3e5e7'/" "$pubroot/packages/cachy-omarchy-shell/PKGBUILD"
+sed -i "s/OMARCHY_VERSION=4\.0\.1/OMARCHY_VERSION=4.0.0/; s/OMARCHY_COMMIT=$fixture_commit/OMARCHY_COMMIT=f0020448ca87329199de7cb12f2015ebc4a3e5e7/; s/OMARCHY_TAG=v4\.0\.1/OMARCHY_TAG=v4.0.0/" "$pubroot/upstream.lock"
+sed -i "s/pkgver=4.0.1/pkgver=4.0.0/; s/pkgrel=2/pkgrel=1/; s/_commit='$fixture_commit'/_commit='f0020448ca87329199de7cb12f2015ebc4a3e5e7'/" "$pubroot/packages/cachy-omarchy-shell/PKGBUILD"
 pub_state=$COO_TEST_SANDBOX/metadata-publish-state
 cp -a "$COO_TEST_SANDBOX/state" "$pub_state"
 pub_lock_before=$(sha256sum "$pubroot/upstream.lock")
@@ -660,6 +714,10 @@ pub_old_release=$(awk -F= '$1 == "RELEASE" { print $2; exit }' "$pub_state/valid
 code=0
 out=$(COO_REPO_ROOT="$pubroot" COO_GIT_BIN="$fake/git" COO_STATE_DIR="$pub_state" COO_BUILD_DIR="$COO_TEST_SANDBOX/metadata-publish-build" COO_TOOL_LOG="$log" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_TEST_RUNNER="$fake/test-runner" COO_MV_BIN="$fake/mv" COO_FAKE_METADATA_PKG_MV_FAIL=1 "$pubroot/bin/update-upstream" 2>&1) || code=$?
 assert_eq "$code" "1" "metadata second rename failure aborts update"
+# Same reasoning as the U05-U08 loop: exit 1 alone does not distinguish this
+# from an earlier, unrelated abort (e.g. the inventory fetch failing first).
+assert_contains "$out" "could not publish shell PKGBUILD; upstream.lock restored" \
+  "metadata second rename failure fails at its own stage, not earlier"
 assert_eq "$(sha256sum "$pubroot/upstream.lock")" "$pub_lock_before" "metadata failure restores lock"
 assert_eq "$(sha256sum "$pubroot/packages/cachy-omarchy-shell/PKGBUILD")" "$pub_pkg_before" "metadata failure preserves PKGBUILD"
 assert_eq "$(cat "$pub_state/validated-build.manifest")" "$pub_pointer_before" "metadata failure preserves old manifest pointer"
@@ -669,13 +727,13 @@ assert_file_exists "$pub_state/$pub_old_release/artifacts/$shell_artifact_v400" 
 # a new install nor rollback may trust the stale installed pointer afterwards.
 postroot=$COO_TEST_SANDBOX/post-pacman-repo
 cp -a "$root" "$postroot"
-sed -i 's/OMARCHY_VERSION=4\.0\.1/OMARCHY_VERSION=4.0.0/; s/OMARCHY_COMMIT=2222222222222222222222222222222222222222/OMARCHY_COMMIT=f0020448ca87329199de7cb12f2015ebc4a3e5e7/; s/OMARCHY_TAG=v4\.0\.1/OMARCHY_TAG=v4.0.0/' "$postroot/upstream.lock"
+sed -i "s/OMARCHY_VERSION=4\.0\.1/OMARCHY_VERSION=4.0.0/; s/OMARCHY_COMMIT=$fixture_commit/OMARCHY_COMMIT=f0020448ca87329199de7cb12f2015ebc4a3e5e7/; s/OMARCHY_TAG=v4\.0\.1/OMARCHY_TAG=v4.0.0/" "$postroot/upstream.lock"
 # poststate below still carries the never-touched original validated
 # manifest from the very first build (pinned to shell_pkgrel_pin), so
 # postroot's checkout must reconstruct that exact pin -- a hardcoded "1"
 # here would silently diverge from it and break install-packages'
 # cross-check between the manifest and this checkout.
-sed -i "s/pkgver=4.0.1/pkgver=4.0.0/; s/pkgrel=2/pkgrel=${shell_pkgrel_pin}/; s/_commit='2222222222222222222222222222222222222222'/_commit='f0020448ca87329199de7cb12f2015ebc4a3e5e7'/" "$postroot/packages/cachy-omarchy-shell/PKGBUILD"
+sed -i "s/pkgver=4.0.1/pkgver=4.0.0/; s/pkgrel=2/pkgrel=${shell_pkgrel_pin}/; s/_commit='$fixture_commit'/_commit='f0020448ca87329199de7cb12f2015ebc4a3e5e7'/" "$postroot/packages/cachy-omarchy-shell/PKGBUILD"
 poststate=$COO_TEST_SANDBOX/post-pacman-state
 cp -a "$COO_TEST_SANDBOX/state" "$poststate"
 : >"$paclog"
