@@ -82,6 +82,88 @@ FUNC_RE = re.compile(
 OMARCHY_RE = re.compile(
     r"(?<![A-Za-z0-9_])(?<![A-Za-z0-9_]-)(omarchy-[a-z0-9]+(?:-[a-z0-9]+)*)"
 )
+# 원문에서 omarchy-* 를 수확할 때만 필요한 가드.
+#
+# OMARCHY_RE 의 세그먼트는 non-empty 라서 `"omarchy-hw-$KIND"` 는
+# `omarchy-hw` 라는 **잘린 리터럴**로 매치된다. 전처리된 텍스트에서는
+# 따옴표 블랭킹이 이 줄을 통째로 지워 문제가 드러나지 않았지만, 원문을
+# 읽는 순간 그 잘린 이름이 루트 큐에 들어가 실재하지 않는
+# UNSTAGED_REACHABLE 을 만든다. 매치 바로 뒤가 `-` + 확장 시작
+# (`$`, `{`)이면 그 이름은 동적 조립의 접두사일 뿐이므로 버린다.
+DYNAMIC_TAIL_RE = re.compile(r"-\$|-\{")
+# 매치 바로 뒤가 확장자면 명령이 아니라 **파일 이름**이다
+# (`omarchy-color-theme.json`, `omarchy-screenrecord.log`,
+# `omarchy-1password-lock.lock`). 라운드 5 의 lookbehind 가 왼쪽에서 하는
+# 판정(`90-omarchy-...` 은 파일)의 오른쪽 대칭이다. 실행 가능한 이름이
+# 점 뒤 확장자를 달고 명령 위치에 오는 경우는 없다.
+FILENAME_TAIL_RE = re.compile(r"\.[A-Za-z0-9]")
+# 매치가 속한 경로 토큰이 런타임 데이터 디렉터리를 가리키면 그것은 마커
+# 파일/디렉터리 이름이지 실행 파일이 아니다
+# (`"${XDG_RUNTIME_DIR:-/tmp}/omarchy-capture-region-window"`).
+# `"$OMARCHY_PATH/bin/omarchy-clipboard-paste-file"` 처럼 실행 파일을
+# 가리키는 경로와 구분하려면 슬래시만으로는 부족하고 경로의 뿌리를 봐야
+# 한다. 토큰 경계는 공백·따옴표·`$(`·백틱·`=` 로 잡는다.
+RUNTIME_PATH_ROOTS = ("/tmp/", "XDG_RUNTIME_DIR", "XDG_CACHE_HOME", "/var/tmp/")
+PATH_TOKEN_BREAK = set(" \t\n\"'`=(){}[],;|&<>")
+
+
+def _path_token_before(text, start):
+    """매치 시작점 앞의 경로 토큰을 되짚어 돌려준다."""
+    i = start
+    while i > 0 and text[i - 1] not in PATH_TOKEN_BREAK:
+        i -= 1
+    # `${XDG_RUNTIME_DIR:-/tmp}/...` 는 `}` 에서 끊기므로 한 칸 더 넓혀
+    # 파라미터 확장 본문까지 함께 본다.
+    j = i
+    if j > 0 and text[j - 1] == "}":
+        depth = 0
+        while j > 0:
+            j -= 1
+            if text[j] == "}":
+                depth += 1
+            elif text[j] == "{":
+                depth -= 1
+                if depth == 0:
+                    break
+    return text[j:start]
+
+
+def omarchy_harvest_text(raw_text):
+    """omarchy-* 루트 수확 전용 전처리 — 따옴표는 남기고 주석/heredoc 만 지운다.
+
+    preprocess_bash() 를 그대로 쓰면 strip_quoted_noise() 가 큰따옴표
+    payload 를 지워, 큰따옴표 안에서만 불리는 헬퍼가 그래프에서 사라진다
+    (실측: 스테이징 헬퍼 137개 중 53개에 걸쳐 81개 이름). 반대로 원문을
+    통째로 쓰면 주석 산문이 명령으로 새어 든다 — 실측된 최악의 예는 우리
+    자신의 compat 스크립트 주석에 있는 `omarchy-dev` 로, 존재하지 않는
+    명령에 대한 예외 행을 쓸 뻔했다.
+
+    주석과 heredoc 은 정의상 명령 텍스트가 아니므로 지우고, 따옴표는
+    남긴다. 줄 끝 주석은 지우지 않는다 — 따옴표를 블랭킹하지 않은
+    상태에서 `#` 은 문자열 안 문자와 구분되지 않기 때문이다.
+    """
+    text = LINE_CONT_RE.sub(" ", raw_text)
+    text = strip_comment_lines(text)
+    text = strip_heredocs(text)
+    return text
+
+
+def omarchy_names(raw_text):
+    """bash 원문에서 omarchy-* 루트를 수확한다."""
+    text = omarchy_harvest_text(raw_text)
+    out = set()
+    for m in OMARCHY_RE.finditer(text):
+        if DYNAMIC_TAIL_RE.match(text, m.end()):
+            continue
+        if FILENAME_TAIL_RE.match(text, m.end()):
+            continue
+        before = _path_token_before(text, m.start())
+        if "/" in before and any(r in before for r in RUNTIME_PATH_ROOTS):
+            continue
+        out.add(m.group(1))
+    return out
+
+
 HEREDOC_RE = re.compile(r"<<-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
 # `case` arm labels — `chromium.desktop) echo ...` or
 # `chromium|chrome|brave) ...` — sit in the exact position CMD_RE treats as
@@ -812,7 +894,26 @@ def main():
             if is_omarchy_name(name):
                 unstaged.add(name)
             continue
-        text = preprocess_bash(path.read_text(errors="replace"))
+        # 두 층을 서로 다른 텍스트로 읽는다.
+        #
+        # 외부 명령 추출(scan_commands)은 preprocess_bash() 를 거친 텍스트를
+        # 써야 한다 — 주석·heredoc·따옴표 안 산문이 전부 "명령" 으로 새기
+        # 때문이다. 반면 omarchy-* 루트 수확은 **원문**을 써야 한다.
+        # strip_quoted_noise() 가 큰따옴표 payload 를 지우므로, 큰따옴표
+        # 안에서만 불리는 헬퍼는 그래프에서 통째로 사라진다 — 실측으로
+        # 스테이징된 헬퍼 137개 중 53개에 걸쳐 81개 이름이 이 층에서
+        # 사라졌고, 그중 30개는 다른 어떤 헬퍼 본문에서도 회수되지 않는
+        # 진짜 명령이었다(`omarchy-menu`, `omarchy-clipboard-paste-file`,
+        # `omarchy-theme-set-*` 계열 등).
+        #
+        # 원문 수확이 이제 와서 안전한 이유: 따옴표 블랭킹이 막으려던
+        # 파일 이름 오탐(`20-omarchy-dns.conf`, `90-omarchy-speaker-tuning.conf`,
+        # `99-omarchy-nopasswd-$USER`)은 OMARCHY_RE 의 두 lookbehind 가
+        # 이미 거부한다. 동적 조립 이름(`"omarchy-hw-$KIND"`)이 잘린
+        # 리터럴로 남는 문제는 omarchy_names() 의 DYNAMIC_TAIL_RE 가 막고,
+        # 주석 산문은 omarchy_harvest_text() 가 걷어낸다.
+        raw = path.read_text(errors="replace")
+        text = preprocess_bash(raw)
         extra_defined = set()
         for src_name in SOURCE_RE.findall(text):
             src_path = staged.get(src_name)
@@ -829,7 +930,7 @@ def main():
                 queue.append(c)
             else:
                 external.add(c)
-        for c in OMARCHY_RE.findall(text):
+        for c in omarchy_names(raw):
             queue.append(c)
 
     reachable_pkgs, violations, table = {}, [], []
