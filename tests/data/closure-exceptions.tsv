@@ -29,8 +29,6 @@ omarchy-system-wake	자체 체인은 omarchy-brightness-display·omarchy-hyprlan
 omarchy-agent	AI 코딩 에이전트(opencode/gemini/copilot/crush/claude/grok/codex/omp/pi) 9종을 각자의 "묻지 않고 진행" 플래그(--yolo, --dangerously-bypass-approvals-and-sandbox 등)로 무인 실행하는 런처. 105줄 자체는 분기문 나열이라 작지만, 사용자 mise 로 설치된 임의 에이전트 바이너리를 승인 없이 실행하는 새 기능 표면이라 v0.9의 감사 전용 성격과 맞지 않는다 — 감사 인프라를 놓는 마일스톤에 새 헬퍼를 얹지 않는다	backlog
 omarchy-default-agent	omarchy-agent 의 짝. `mise use -g`로 에이전트 패키지를 설치하고 `~/.config/omarchy/defaults/agent` 에 기록한다. omarchy-agent 와 같은 새 기능 표면이라 같이 미룬다	backlog
 omarchy-bar-text-color	125줄, 이미 스테이징된 `omarchy-cmd-present` 하나만 부르지만 `magick`(ImageMagick) 을 새 optdepend 로 요구한다 — 배경 이미지를 크롭·리사이즈해 바 텍스트 대비색을 계산하는 로직 자체는 자체완결적이나, PKGBUILD 의존성 선언까지 함께 검토해야 해서 이번 등록 태스크의 스코프를 넘는다	0.11.0
-omarchy-bluetooth-device	52줄, `omarchy-bluetooth-power`(같은 표의 짝) 하나만 부른다. pair/connect/disconnect/forget 을 bluetoothctl 로 감싼 자체완결 헬퍼 쌍 중 절반이며, 짝과 함께 다룬다	0.10.0
-omarchy-bluetooth-power	89줄, 외부 omarchy 의존 0(rfkill/bluetoothctl만). rfkill 소프트 블록으로 재부팅 후에도 상태를 유지시키는 로직까지 자체완결적이지만, 블루투스 전원 제어라는 새 기능 표면을 v0.9에 얹지 않는다	0.10.0
 omarchy-brightness-keyboard	58줄, 이미 스테이징된 `omarchy-osd` 하나만 부른다. lock 플러그인의 runBlank() 가 부르는데 127이면 키보드 백라이트만 안 꺼질 뿐 위험은 없다. 후속 verbatim 후보(docs/COMMAND_AUDIT.md 셸 인프라 표에 이미 기록)	0.11.0
 omarchy-disk-speedtest	232줄, 외부 omarchy 의존 0. NOCOW 처리·병렬 dd 워커·/sys/class/block 카운터 샘플링까지 자체완결적으로 크지만 새 패키지 의존은 없다(dd/findmnt/lsblk 는 base). 진단 도구 한 쌍(omarchy-network-speedtest)으로 같이 미룬다 — 사용자 디스크에 실제 쓰기 부하를 주는 도구라 스테이징 여부를 가볍게 결정하지 않는다	backlog
 omarchy-network-speedtest	130줄, 이미 스테이징된 `omarchy-cmd-present` 만 부른다. fast.com(Netflix) API 로 실제 외부 트래픽을 발생시켜 대역폭을 측정하는 진단 도구로, omarchy-disk-speedtest 와 같은 "진단 스피드테스트 쌍"이다. 외부 서비스로 실 트래픽을 쏘는 도구를 감사 없이 조용히 올리지 않는다	backlog

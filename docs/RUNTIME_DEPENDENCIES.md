@@ -106,6 +106,7 @@
 | `base64` | `coreutils` | BASE | 기반 |
 | `basename` | `coreutils` | BASE | 기반 |
 | `bash` | `bash` | BASE | 기반 |
+| `bluetoothctl` | `bluez-utils` | OPT | 블루투스 컨트롤러 부재 환경(데스크톱) 존재 — 위젯은 가드로 숨는다 |
 | `brightnessctl` | `brightnessctl` | OPT | 내장 백라이트 — 이미 optdepends |
 | `busctl` | `systemd` | BASE | 기반 |
 | `cat` | `coreutils` | BASE | 기반 |
@@ -209,7 +210,7 @@
 | `xkbcli` | `libxkbcommon` | BASE | 이미 선언된 의존의 전이 의존(§4.2 개정) |
 | `zbarimg` | `zbar` | OPT | QR 코드 스캔 메뉴 항목 |
 
-tests/data/command-packages.tsv: 전체 111행, 위 표에는 도달한 107행이 모두 실린다(BASE 59행 포함 — BASE 는 declare 대상이 아닐 뿐 검사 대상에서 빠지지 않는다)
+tests/data/command-packages.tsv: 전체 112행, 위 표에는 도달한 108행이 모두 실린다(BASE 59행 포함 — BASE 는 declare 대상이 아닐 뿐 검사 대상에서 빠지지 않는다)
 
 docs/COMMAND_AUDIT.md 의 DISABLED 행으로 메뉴 루트에서 억제된 이름: 92개 (의도적으로 미지원인 Omarchy OS 스택 — 예외 파일과 달리 사유·신선도 검사가 없는 통로다)
 - `omarchy-branding-about`

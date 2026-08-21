@@ -78,6 +78,7 @@ git	git	HARD	테마 git clone/update 경로 — 기본 경로에서 도달하나
 perl	perl	HARD	텍스트 처리 헬퍼 — 기본 경로에서 도달하나 depends 없음
 hyprsunset	hyprsunset	HARD	nightlight 서비스가 기본 활성 — depends 없음
 asdcontrol	asdcontrol	UNPACKAGED	Apple Studio Display 밝기 제어(하드웨어 한정, omarchy-brightness-display-apple 이 sudo asdcontrol 을 부른다) — 공식 리포에도 AUR 에도 제공자가 없다(AUR RPC info/search 둘 다 0건 실측). 어디에도 선언하지 않는다; 사용자가 직접 빌드해야 하며, 없으면 그 헬퍼 하나만 동작하지 않는다.
+bluetoothctl	bluez-utils	OPT	블루투스 컨트롤러 부재 환경(데스크톱) 존재 — 위젯은 가드로 숨는다
 brightnessctl	brightnessctl	OPT	내장 백라이트 — 이미 optdepends
 checkupdates	pacman-contrib	OPT	업데이트 확인 메뉴 항목
 curl	curl	BASE	이미 선언된 의존의 전이 의존(§4.2 개정)

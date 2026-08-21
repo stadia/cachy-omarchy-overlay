@@ -253,6 +253,10 @@ helpers=(
   # theme-refresh: 현재 테마 재적용 9줄 래퍼. omarchy-theme-set(staged)만
   # 호출하는 체인 깊이 1 (감사 실측, closure-exceptions 0.10.0 행 회수).
   omarchy-theme-refresh
+  # bluetooth power/device pair (v0.10.0): 바 Bluetooth 위젯 기본 배치,
+  # rfkill/bluetoothctl만. power 는 외부 omarchy 의존 0, device 는 power 만 부른다.
+  omarchy-bluetooth-power
+  omarchy-bluetooth-device
   omarchy-sudo-passwordless
   # 테마 사용자 설치/갱신/삭제: git clone/pull + rm -rf ~/.config/omarchy/themes.
   # SPEC §44 Tier C "network installs" 제외에서 회수 — 스크립트는 self-contained
