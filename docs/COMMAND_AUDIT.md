@@ -114,7 +114,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-launch-screensaver` | idle | DISABLED | disable plugin. `tests/data/closure-exceptions.tsv` 에 사유·체인 등록(v0.9, 추적 0.10) |
 | `omarchy-system-lock` | idle | DISABLED | disable plugin |
 | `omarchy-system-wake` | idle | DISABLED (idle) / **미스테이징 (lock)** | lock 플러그인의 `runWake()` 도 이름으로 부른다. 미스테이징이라 127 — 순수 기능 손실(잠금 중 화면 깨우기 없음), 위험은 없음. 후속 verbatim 후보 (RUNTIME_STARTUP §22.5). `tests/data/closure-exceptions.tsv` 등록(v0.9, 추적 0.10) |
-| `omarchy-hyprland-session-locked` | lock | **DISABLED — 공존 위험** | **의도적 미스테이징.** `strandedLockCheckProc` 가 이걸 불러 exit 0 이면 세션 잠금을 회수하려 하는데, hyprlock 이 이미 쥔 상태면 ext-session-lock 거부로 **quickshell 이 죽는다**(실측 §22.4). 헬퍼가 없으면 127 → 복구 경로가 조용히 비활성 = fail-safe. `test_staged_session_helpers.sh` 가 고정. `tests/data/closure-exceptions.tsv` 에도 등록(v0.9, milestone=never — 크기가 아니라 스테이징 자체가 실측된 crash 를 만들기 때문) |
+| `omarchy-hyprland-session-locked` | lock | **DISABLED — 공존 위험** | **의도적 미스테이징.** `strandedLockCheckProc` 가 이걸 불러 exit 0 이면 세션 잠금을 회수하려 하는데, hyprlock 이 이미 쥔 상태면 ext-session-lock 거부로 **quickshell 이 죽는다**(실측 §22.4). 헬퍼가 없으면 127 → 복구 경로가 조용히 비활성 = fail-safe. `test_staged_session_helpers.sh` 가 고정. `tests/data/closure-exceptions.tsv` 에도 등록(v0.9, milestone=blocked — 크기가 아니라 스테이징 자체가 실측된 크래시를 만들기 때문. `never` 는 미래 작업이 다시 안 볼 표시라 부정확 — 해제 조건: ext-session-lock 거부가 quickshell 을 죽이지 않게 되기 전까지) |
 | `omarchy-brightness-keyboard` | lock | 미스테이징 | lock 의 `runBlank()` 가 부른다. 127 — 키보드 백라이트 안 꺼짐. 위험 없음, 후속 verbatim 후보. `tests/data/closure-exceptions.tsv` 등록(v0.9, 추적 0.10) |
 | `omarchy-battery-low` | battery | SAFE | package — v0.9. battery 플러그인(기본 활성)이 10% 이하에서 부른다. 체인은 omarchy-notification-send + omarchy-hook 뿐이라 verbatim |
 | `omarchy-powerprofiles-set` | battery | DISABLED | disable plugin |
@@ -398,7 +398,7 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-emacs` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-font-current` | SAFE | package | 0.8.0 verbatim stage. fc-match |
 | `omarchy-font-list` | SAFE | package | 0.8.0 verbatim stage. fc-list |
-| `omarchy-font-set` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-font-set` | DISABLED | disable | 터미널 설정 파일(alacritty/kitty/ghostty/foot) 을 직접 sed 로 고쳐 쓰는 헬퍼. `omarchy-display-text-size` 와 같은 패턴이라 짝으로 묶어 검토한다. `tests/data/closure-exceptions.tsv` 등록(v0.9, 추적 0.10) — "공식 omarchy 전체 OS 가정" 은 이 행에 붙어 있던 낡은 문구였다 |
 | `omarchy-games-retro-install` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-hibernation-available` | SAFE | package | 0.8.0 verbatim stage. /proc/swaps·/sys 읽기 전용 프로브. omarchy_resume.conf 부재 시 exit 1 로 행 숨김(기능 caveat: CachyOS resume 이 다른 경로면 행이 계속 숨음) |
 | `omarchy-hw-dell-xps-haptic-touchpad` | SAFE | package | 0.8.0 verbatim stage. omarchy-hw-match + /sys/bus/i2c. 행 action 은 cmd-present dell-xps-touchpad-haptics opt-in |

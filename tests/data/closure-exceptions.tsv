@@ -3,22 +3,32 @@
 # 사유 없는 행은 파싱 단계에서 거부된다.
 #
 # milestone=never 는 "언젠가 스테이징한다"가 아니라 "이 오버레이의 성격상 절대
-# 올리지 않는다"는 뜻이다 — 공식 omarchy 패키지/업데이트/채널 체계 자체이거나,
-# 스테이징 자체가 실제 위험(quickshell 크래시)을 만드는 경우.
+# 올리지 않는다"는 뜻이다 — 공식 omarchy 패키지/업데이트/채널 체계 자체를 취하지
+# 않기로 한 경계 결정인 경우.
+# milestone=blocked 는 "지금은 절대 안 되지만, 특정 조건이 해소되면 다시 검토
+# 대상"이라는 뜻이다 — 스테이징 자체가 실측된 위험(예: quickshell 크래시)을
+# 만드는 경우. never 와 달리 사유 열에 해제 조건을 반드시 적는다: 미래 작업이
+# "이건 그냥 영원히 안 되는 거다"라고 다시 들여다보지 않고 넘기면 안 된다.
 # milestone=0.10 은 v0.10 이 이 태스크의 실측(줄 수·체인)을 입력으로 받는
 # 후보라는 뜻이며, 확정된 일정 약속은 아니다.
-omarchy	업스트림 공식 `omarchy` CLI 멀티플렉서 그 자체(1090줄). `omarchy <group> <name>` 형태로 bin/ 의 모든 omarchy-* 하위 명령으로 분기하는 진입점이라, 이걸 스테이징하면 update/channel/plymouth/factory-reset/install-* 등 UPSTREAM.md 가 이미 "공식 omarchy/omarchy-settings 패키지 자체"로 명시 제외한 하위 명령까지 사용자 PATH 에 노출된다. 우리는 개별 헬퍼를 골라 스테이징하고 `cachy-omarchy-*` 로 우리 진입점을 따로 두므로, 이 멀티플렉서 자체를 올릴 이유가 없다	never
-omarchy-channel-current	`omarchy`/`omarchy-settings`/`omarchy-dev`/`omarchy-settings-dev` pacman 패키지의 존재와 `omarchy-version-channel` 미러 구분을 전제로 stable/rc/edge 를 판별한다. 이 패키지들을 설치하지 않는 것이 SPEC 의 경계 결정이므로(UPSTREAM.md "Components intentionally excluded") 이 헬퍼는 정의상 항상 unknown 만 반환한다 — 스테이징해도 기능이 아니라 죽은 코드가 된다	never
+#
+# STALE_EXCEPTION: closure_check.py 가 매 실행마다 이 파일의 모든 행을
+# 검사해, 이미 스테이징됐거나 더는 도달 불가능한 행을 위반으로 보고한다
+# (milestone 값 자체는 스캐너가 읽지 않는 사람용 주석이다). 헬퍼가 스테이징된
+# 뒤에도 행이 남아 조용히 거짓말이 되는 것을 막는다 — 이 행을 지우는 커밋이
+# 그 헬퍼를 스테이징하는 커밋과 같이 가야 한다.
+omarchy	업스트림 공식 `omarchy` CLI 멀티플렉서 그 자체(1090줄). `omarchy <group> <name>` 형태로 bin/ 하위 명령에 분기하는 진입점이지만, `OMARCHY_BIN_DIR`을 자기 자신이 위치한 디렉터리로 잡아(build/omarchy/bin/omarchy:5, 라우팅은 :315·:334·:344·:399·:954) 그 디렉터리 안에서만 하위 명령을 찾는다 — 스테이징해도 우리가 실제로 올린 137개 헬퍼로만 분기하지, update/channel/plymouth 등 미스테이징 명령으로 새지 않는다(첫 버전의 "PATH 에 노출된다"는 틀렸다). 그래도 올리지 않는 이유는 유출이 아니라 진입점 경계다: 이 오버레이는 `cachy-omarchy-*`를 사용자 진입점으로 쓰기로 했고, 공식 CLI 멀티플렉서를 나란히 두는 것은 UPSTREAM.md 가 명시한 "공식 omarchy/omarchy-settings 패키지 자체" 제외 경계와 맞지 않는다	never
+omarchy-channel-current	OMARCHY_PATH 가 `/usr/share/omarchy` 와 같을 때만 pacman 분기(edge/stable/rc/unknown)에 닿는다(omarchy-channel-current:11-14). `cachy-omarchy-shell:9-10` 이 `OMARCHY_PATH=/usr/share/cachy-omarchy/upstream` 을 잡으므로, 스테이징해도 이 헬퍼는 그 분기에 전혀 도달하지 못하고 항상 `dev` 만 반환한다 — "정의상 항상 unknown" 은 틀렸고, 실제로는 `dev` 라는 더 오해를 부르는 출력이다(진짜 소스 체크아웃이 아닌데 dev 라고 말한다). 채널 판별 자체가 omarchy/omarchy-settings pacman 패키지 체계를 전제하며, 그 체계를 취하지 않기로 한 경계 결정이 여전히 미스테이징 사유다(UPSTREAM.md "Components intentionally excluded")	never
 omarchy-update	omarchy-hook/-migrate/-snapshot 과 omarchy-update-{analyze-logs,aur-pkgs,confirm,dev,keyring,lock,mise,orphan-pkgs,pkg-prune,requires-free-space,restart,status,stay-awake,system-pkgs} 16개 헬퍼 전부가 미스테이징인 keystone. 이건 "체인이 커서 다음 마일스톤에 미룬다"가 아니라 Omarchy 패키지/채널/업데이트 시스템 자체이며, 이 오버레이는 CachyOS 자체 pacman/AUR 파이프라인을 쓰고 이 체계를 애초에 취하지 않기로 한 경계 결정이다(UPSTREAM.md, omarchy-channel-current 와 동일 경계)	never
-omarchy-hyprland-session-locked	의도적 영구 미스테이징. `strandedLockCheckProc` 가 이 헬퍼로 "고아 락"을 판별해 exit 0 이면 세션 잠금을 스스로 회수하려 하는데, hyprlock 이 이미 세션을 쥔 상태에서 회수를 시도하면 ext-session-lock 거부로 quickshell 프로세스가 죽는다(docs/RUNTIME_STARTUP.md §22.4 실측). 헬퍼가 없으면 127 로 그 복구 경로 자체가 조용히 비활성화되는데, 이는 버그가 아니라 fail-safe다. `tests/package/test_staged_session_helpers.sh` 가 미스테이징을 고정한다. 세 가지 사유 유형 중 어느 것과도 정확히 맞지 않는 네 번째 경우 — "크기 때문에 미룸"도 "우리가 취하지 않는 경계"도 아니라 "스테이징 자체가 실측된 크래시를 만들기 때문에 절대 올리지 않는다"	never
+omarchy-hyprland-session-locked	의도적 미스테이징. `strandedLockCheckProc` 가 이 헬퍼로 "고아 락"을 판별해 exit 0 이면 세션 잠금을 스스로 회수하려 하는데, hyprlock 이 이미 세션을 쥔 상태에서 회수를 시도하면 ext-session-lock 거부로 quickshell 프로세스가 죽는다(docs/RUNTIME_STARTUP.md §22.4 실측). 헬퍼가 없으면 127 로 그 복구 경로 자체가 조용히 비활성화되는데, 이는 버그가 아니라 fail-safe다. `tests/package/test_staged_session_helpers.sh` 가 미스테이징을 고정한다. 세 가지 사유 유형 중 어느 것과도 정확히 맞지 않는 네 번째 경우 — "크기 때문에 미룸"도 "우리가 취하지 않는 경계"도 아니라 "스테이징 자체가 실측된 크래시를 만들기 때문". milestone=never 는 미래 작업이 다시 들여다볼 필요가 없다는 표시라 부정확하다 — §22.4 실측은 "크래시를 먼저 막아야 한다"로 끝난다. 해제 조건: ext-session-lock 거부가 quickshell 을 죽이지 않게 되기 전까지(그 경합이 실측으로 반증되거나 quickshell 자체가 안전하게 처리하게 되기 전까지) 이 미스테이징을 유지한다	blocked
 omarchy-launch-screensaver	ttfx, socat, omarchy-screensaver, 터미널별(Alacritty/Ghostty/foot/kitty) screensaver 설정 파일, 그리고 모니터별 hyprctl 이벤트 대기까지 딸린 별도 클로저(77줄이지만 외부 의존이 5개 갈래). v0.9(감사 인프라 도입)의 성격과 크기가 맞지 않아 의도적으로 연다	0.10
-omarchy-system-wake	자체 체인은 omarchy-brightness-display(스테이징됨)·omarchy-hyprland-monitor-clamshell(스테이징됨)·omarchy-brightness-keyboard(같은 표의 다른 미스테이징 행) 셋뿐으로 10줄에 불과하지만, idle 플러그인의 screensaver 종료 경로와 lock 플러그인의 runWake() 양쪽에서 불린다. brightness-keyboard 가 먼저 스테이징되지 않으면 이 헬퍼만 올려도 절반은 여전히 127이라 두 헬퍼를 함께 다룬다	0.10
+omarchy-system-wake	자체 체인은 omarchy-brightness-display·omarchy-hyprland-monitor-clamshell·omarchy-brightness-keyboard(같은 표의 다른 미스테이징 행) 셋뿐으로 10줄에 불과하다. 그중 스테이징된 것은 brightness-display 하나뿐이다 — hyprland-monitor-clamshell 도 helpers=() 에 없고 추출 트리에도 없다("스테이징됨"은 이전 버전의 오기; 다만 이 헬퍼 자신의 호출은 `|| true` 로 감싸 있어 127이어도 무해하다). idle 플러그인의 screensaver 종료 경로와 lock 플러그인의 runWake() 양쪽에서 불린다. brightness-keyboard 가 먼저 스테이징되지 않으면 이 헬퍼만 올려도 절반은 여전히 127이라 두 헬퍼를 함께 다룬다	0.10
 omarchy-agent	AI 코딩 에이전트(opencode/gemini/copilot/crush/claude/grok/codex/omp/pi) 9종을 각자의 "묻지 않고 진행" 플래그(--yolo, --dangerously-bypass-approvals-and-sandbox 등)로 무인 실행하는 런처. 105줄 자체는 분기문 나열이라 작지만, 사용자 mise 로 설치된 임의 에이전트 바이너리를 승인 없이 실행하는 새 기능 표면이라 v0.9의 감사 전용 성격과 맞지 않는다 — 감사 인프라를 놓는 마일스톤에 새 헬퍼를 얹지 않는다	0.10
 omarchy-default-agent	omarchy-agent 의 짝. `mise use -g`로 에이전트 패키지를 설치하고 `~/.config/omarchy/defaults/agent` 에 기록한다. omarchy-agent 와 같은 새 기능 표면이라 같이 미룬다	0.10
 omarchy-audio-input-set-default	20줄, 외부 omarchy 체인 없음(wpctl/pactl만). 이미 스테이징된 `omarchy-audio-output-switch`/`-set-default`의 입력측 대칭 짝이지만, 이번 마일스톤은 새 헬퍼를 추가하지 않고 감사 인프라만 놓는다 — 작고 그럴듯하지만 이번 스코프가 아니다	0.10
 omarchy-audio-sink-availability	54줄, 이미 스테이징된 `omarchy-audio-tuning` 하나만 부른다. 셸 UI 의 싱크 선택 목록을 채우는 헬퍼로 체인은 얕지만, v0.9는 감사 인프라를 놓는 마일스톤이지 새 헬퍼를 스테이징하는 마일스톤이 아니다	0.10
 omarchy-bar-text-color	125줄, 이미 스테이징된 `omarchy-cmd-present` 하나만 부르지만 `magick`(ImageMagick) 을 새 optdepend 로 요구한다 — 배경 이미지를 크롭·리사이즈해 바 텍스트 대비색을 계산하는 로직 자체는 자체완결적이나, PKGBUILD 의존성 선언까지 함께 검토해야 해서 이번 등록 태스크의 스코프를 넘는다	0.10
-omarchy-battery-status	137줄, 외부 omarchy 의존 0(upower + sysfs만). 자체완결적이고 작아 보이지만 표시 문자열 포맷(퍼센트/전력/충전 유지 상태)이 우리 배터리 플러그인이 이미 구현한 문자열과 겹칠 수 있어 확인 없이 올리지 않는다 — 작고 그럴듯하지만 이번 스코프가 아니다	0.10
+omarchy-battery-status	137줄, 외부 omarchy 의존 0(upower + sysfs만). 실측: 우리가 그대로 스테이징하는 업스트림 Power 패널이 `Panel.qml:210` 에서 `["omarchy-battery-status", "--shell"]` 을 Process 로 직접 실행해 percentage/state/rate/size/time/cycles/threshold 를 key-value 로 파싱한다(Model.js parseKeyValue → Panel.qml:144,372,426-446). 미스테이징이면 127 → `updateKeyValue` 의 빈 페이로드 가드(`Object.keys(next).length === 0` 면 조기 return)에 걸려 `batteryInfo` 가 영원히 `{}` 로 남고, `visible: root.batteryInfo.percentage !== undefined` 가드 때문에 배터리 크기·충전 사이클·남은 시간·충전 상태 Row 전체가 패널을 열어도 영구히 숨겨진다(hero percentage 줄만 "—" 폴백으로 보인다). "우리 배터리 플러그인 문자열과 겹칠 수 있다" 는 이전 버전의 추측은 검증하지 않은 채였다 — 실제로는 겹침 문제가 아니라 이미 스테이징된 Power 패널의 눈에 보이는 결손이다. 그럼에도 v0.9는 감사 인프라만 놓는 마일스톤이라 이번엔 새 헬퍼를 얹지 않는다	0.10
 omarchy-bluetooth-device	52줄, `omarchy-bluetooth-power`(같은 표의 짝) 하나만 부른다. pair/connect/disconnect/forget 을 bluetoothctl 로 감싼 자체완결 헬퍼 쌍 중 절반이며, 짝과 함께 다룬다	0.10
 omarchy-bluetooth-power	89줄, 외부 omarchy 의존 0(rfkill/bluetoothctl만). rfkill 소프트 블록으로 재부팅 후에도 상태를 유지시키는 로직까지 자체완결적이지만, 블루투스 전원 제어라는 새 기능 표면을 v0.9에 얹지 않는다	0.10
 omarchy-brightness-keyboard	58줄, 이미 스테이징된 `omarchy-osd` 하나만 부른다. lock 플러그인의 runBlank() 가 부르는데 127이면 키보드 백라이트만 안 꺼질 뿐 위험은 없다. 후속 verbatim 후보(docs/COMMAND_AUDIT.md 셸 인프라 표에 이미 기록)	0.10
@@ -30,11 +40,11 @@ omarchy-hw-laptop-closed	11줄, /proc/acpi 읽기뿐인 순수 프로브. 사소
 omarchy-launch-floating-terminal-with-presentation	13줄 자체는 작지만, `omarchy-restart-gum`/`omarchy-show-logo`/`omarchy-show-done` — gum 테마 프레젠테이션 레이어 전체가 미스테이징이다. 이 레이어를 스테이징하는 것이 진짜 작업이고 이 헬퍼 자체는 그 얇은 앞단일 뿐이다. 이미 알려진 실제 결손: 메뉴 `update.hardware.audio` 행이 이 런처 뒤에 붙어 있어 부재 시 그 행 실행이 실패한다(docs/COMMAND_AUDIT.md)	0.10
 omarchy-network-password	34줄, 외부 omarchy 의존 0. 활성 Wi-Fi 연결의 평문 비밀번호를 nmcli 로 읽어 stdout 에 낸다 — `omarchy-network-qr`(같은 표의 짝) 과 함께 "저장된 Wi-Fi 자격증명을 로컬 프로세스에 노출하는" 기능 쌍이라 같이 검토한다	0.10
 omarchy-network-qr	95줄, 외부 omarchy 의존 0. Wi-Fi 자격증명을 QR 코드 매트릭스로 인코딩한다 — omarchy-network-password 와 같은 자격증명 노출 쌍	0.10
-omarchy-restart-shell	94줄, `omarchy-hyprland-session-locked`(never 등록)·`omarchy-launch-shell`·미스테이징 `omarchy-shell`(ADAPTED, wrapper 미구현)·`omarchy-system-sleep-lock` 을 부른다. quickshell 인스턴스를 kill 하고 재기동하며 세션 락 상태를 폴링해 재확보하는 로직까지 있어, verbatim 스테이징이 아니라 `cachy-omarchy-reload` 래퍼 구현이 필요하다(docs/COMMAND_AUDIT.md 기동·IPC 표에 이미 "later" 로 기록). 그 구현이 이번 마일스톤 스코프 밖이라 예외로 등록한다	0.10
+omarchy-restart-shell	94줄, `omarchy-hyprland-session-locked`(blocked 등록)·미스테이징 `omarchy-launch-shell`·미스테이징 `omarchy-system-sleep-lock` 을 부른다. `omarchy-shell` 은 미스테이징이 아니다 — `overlay/compat/bin/omarchy-shell` 로 출하되고 `/usr/bin/omarchy-shell` 심링크가 추출 트리에 실재한다(UPSTREAM.md `cachy-omarchy-overlay` 절; 이전 버전은 이걸 미스테이징이라 잘못 적었다). quickshell 인스턴스를 kill 하고 재기동하며 세션 락 상태를 폴링해 재확보하는 로직까지 있어, verbatim 스테이징이 아니라 `cachy-omarchy-reload` 래퍼 구현이 필요하다는 결론은 launch-shell·system-sleep-lock 미스테이징만으로 이미 유지된다(docs/COMMAND_AUDIT.md 기동·IPC 표에 이미 "later" 로 기록). 그 구현이 이번 마일스톤 스코프 밖이라 예외로 등록한다	0.10
 omarchy-system-stats	59줄, 외부 omarchy 의존 0(/proc 읽기 + top 뿐). 바 위젯용 CPU/메모리/로드 통계, 사소하고 자체완결적이라 그럴듯한 다음 후보지만 이번엔 새 헬퍼를 얹지 않는다	0.10
 omarchy-tailscale-send	50줄, `omarchy-file-select`·이미 스테이징된 `omarchy-notification-send` 를 부른다. tailscale CLI(선택 의존) 로 Taildrop 전송을 감싼 기능으로, tailscale 관련 install/remove 헬퍼들이 이미 "패키지/설치 경로"로 DISABLED 인 것과 인접한 영역이라 이번엔 같이 미룬다	0.10
 omarchy-theme-refresh	9줄, 이미 스테이징된 `omarchy-theme-set` 하나만 부른다. 현재 테마 이름 파일을 읽어 재적용하는 얇은 래퍼로 31개 중 가장 유력한 다음 후보(체인 깊이 1, 완전히 스테이징된 의존)지만, v0.9는 감사 인프라만 놓는다	0.10
 omarchy-voxtype-config	8줄, 미스테이징 `omarchy-launch-floating-terminal-with-presentation`(같은 표의 다른 행)과 미스테이징 `omarchy-restart-shell`(같은 표의 다른 행)을 부른다 — 이 두 gap 이 먼저 해소되지 않으면 이 헬퍼만 올려도 127 두 번을 거친다. voxtype 딕테이션 기능 자체가 아직 채택 대상이 아니라 status 짝과 함께 미룬다	0.10
-omarchy-voxtype-status	13줄, 이미 스테이징된 `omarchy-cmd-missing` 만 부른다(voxtype 부재 시 idle JSON 을 내고 exit 0 — 자체적으로 안전). voxtype 딕테이션 기능 채택 여부가 아직 결정되지 않아 config 짝과 함께 미룬다	0.10
+omarchy-voxtype-status	13줄, 가드로 `omarchy-cmd-missing` 을 부른다 — 그런데 그 가드 자신이 미스테이징(helpers=() 배열에도 추출 트리에도 없음)이다. 스테이징해도 가드 호출이 127로 실패하고, bash `if` 에서 비영 종료는 거짓이므로 "voxtype 부재 시 idle JSON" 분기를 타지 못한 채 그대로 `exec setpriv --pdeathsig TERM voxtype status --follow ...` 로 떨어진다 — voxtype 이 실제로 없으면 이 exec 자체가 실패해 바 위젯 프로세스가 죽는다. "자체적으로 안전" 은 틀렸다: `omarchy-cmd-missing` 이 먼저 스테이징돼야 이 헬퍼의 안전장치가 실제로 작동한다. voxtype 딕테이션 기능 채택 여부가 아직 결정되지 않아 config 짝과 함께 미룬다	0.10
 omarchy-weather-location	46줄, 외부 omarchy 의존 0. 저장된 위치 파일이 없으면 wttr.in 으로 IP 기반 도시명을 조회한다 — 날씨 패널을 도입할 때 `omarchy-weather-status`(같은 표의 짝)와 함께 다뤄야 하는 한 쌍	0.10
 omarchy-weather-status	24줄, `omarchy-weather-location`(같은 표의 짝) 하나만 부른다. wttr.in 으로 실 외부 요청을 보내는 바 위젯 후보라, 위치 헬퍼와 짝으로 같이 검토한다	0.10

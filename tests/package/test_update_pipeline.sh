@@ -638,6 +638,18 @@ assert_contains "$updated_lock" "OMARCHY_TAG=v4.0.1" "U02 lock tag updates"
 assert_contains "$updated_pkg" "pkgver=4.0.1" "U03 shell pkgver updates"
 assert_contains "$updated_pkg" "pkgrel=1" "U03 pkgrel resets to one"
 assert_contains "$updated_pkg" "_commit='$fixture_commit'" "U02 shell commit updates"
+# The happy path alone only proves regeneration ran, not that it published
+# what it actually read from the pinned tree -- the one thing the
+# implementer's own comment (bin/update-upstream) calls the step's single
+# forbidden failure mode: publishing a list that was not read from the
+# pinned commit. Assert both the header and the exact name set against the
+# fixture repository's real bin/ contents.
+updated_inventory=$(cat "$root/tests/data/upstream-helpers.txt")
+assert_contains "$updated_inventory" "# commit: $fixture_commit" "U02 inventory header moves to the new pin"
+inventory_names_actual=$(grep -v '^#' "$root/tests/data/upstream-helpers.txt" | grep -v '^[[:space:]]*$')
+expected_fixture_names=$(printf '%s
+' omarchy omarchy-battery-status omarchy-menu omarchy-theme-set omarchy-weather-status | LC_ALL=C sort)
+assert_eq "$inventory_names_actual" "$expected_fixture_names" "U02 inventory content is exactly the fixture repository's real bin/ tree"
 assert_eq "$(grep -m1 '^pkgver=' "$root/packages/cachy-omarchy-overlay/PKGBUILD")" "$overlay_pkgver_before_update" "U02 overlay version is independent"
 assert_eq "$(wc -l <"$pac_update")" "0" "U02 update never invokes pacman"
 assert_contains "$out" "UPSTREAM.md requires human" "UPSTREAM.md deferred with explicit reason"
