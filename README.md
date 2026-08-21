@@ -20,8 +20,8 @@ Two Arch packages are produced.
 
 | Package | Version | Role |
 |---|---|---|
-| `cachy-omarchy-shell` | 4.0.0-10 | The pinned Omarchy Quattro shell runtime (Quickshell tree, `omarchy-settings` excluded) |
-| `cachy-omarchy-overlay` | 0.8.2-1 | The CachyOS integration layer (wrapper commands, Hyprland bindings, defaults) |
+| `cachy-omarchy-shell` | 4.0.0-12 | The pinned Omarchy Quattro shell runtime (Quickshell tree, `omarchy-settings` excluded) |
+| `cachy-omarchy-overlay` | 0.9.0-1 | The CachyOS integration layer (wrapper commands, Hyprland bindings, defaults) |
 
 The upstream pin is managed by `upstream.lock` (currently `basecamp/omarchy @ v4.0.0`,
 `f0020448`).
@@ -158,6 +158,13 @@ file only.
   checklist closed on 2026-08-20, making it **21/21 measured**. Both directions
   against hyprlock were measured inside a nested, isolated Hyprland.
   Measurements: `docs/RUNTIME_STARTUP.md` §22.
+- **v0.9 (dependency closure)** — a scanner walks from real roots (keybindings,
+  active-plugin QML, the packaged menu) through the staged upstream helpers and
+  fails the build on anything reachable but undeclared or unstaged. Done
+  (`v0.9.0`). Promoted eleven packages to `depends` and nineteen to `optdepends`,
+  staged `omarchy-battery-low`, and shimmed `omarchy-menu-keybindings`. Known
+  live gaps: `xdg-terminal-exec` is AUR-only, and `omarchy-battery-status` stays
+  unstaged, so the Power panel's battery-detail rows stay hidden.
 
 ## License
 

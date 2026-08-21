@@ -19,8 +19,8 @@ SUPER + K      →  Omarchy 스타일 키바인딩 뷰어
 
 | 패키지 | 버전 | 역할 |
 |---|---|---|
-| `cachy-omarchy-shell` | 4.0.0-10 | 핀된 Omarchy Quattro 셸 런타임 (Quickshell 트리, `omarchy-settings` 제외) |
-| `cachy-omarchy-overlay` | 0.8.2-1 | CachyOS 통합 계층 (래퍼 명령, Hyprland 바인딩, 기본값) |
+| `cachy-omarchy-shell` | 4.0.0-12 | 핀된 Omarchy Quattro 셸 런타임 (Quickshell 트리, `omarchy-settings` 제외) |
+| `cachy-omarchy-overlay` | 0.9.0-1 | CachyOS 통합 계층 (래퍼 명령, Hyprland 바인딩, 기본값) |
 
 업스트림 핀은 `upstream.lock`이 관리한다 (현재 `basecamp/omarchy @ v4.0.0`,
 `f0020448`).
@@ -153,6 +153,14 @@ bin/rollback                 # 이전 핀으로 복귀
 - **잠금 공존 실측** — SPEC §61 인수 기준의 마지막 항목이 2026-08-20 에 닫혀
   **21/21 측정됨**이 됐다. 중첩 Hyprland 격리에서 hyprlock 과 양방향으로 쟀다.
   실측: `docs/RUNTIME_STARTUP.md` §22.
+- **v0.9 (의존성 폐쇄 검사)** — 실제 진입점(키바인딩, 활성 플러그인 QML, 패키지된
+  메뉴)에서 출발해 스테이징된 업스트림 helper 까지 훑고, 도달하지만 미선언·
+  미스테이징인 것이 있으면 빌드를 실패시키는 스캐너를 도입했다. 완료(`v0.9.0`).
+  11개 패키지를 `depends` 로, 19개를 `optdepends` 로 승격했고,
+  `omarchy-battery-low` 를 스테이징했으며 `omarchy-menu-keybindings` 에 호환
+  shim 을 달았다. 남은 실측 격차: `xdg-terminal-exec` 는 AUR 전용이고,
+  `omarchy-battery-status` 는 여전히 미스테이징이라 Power 패널의 배터리 상세
+  행이 계속 숨어 있다.
 
 ## 라이선스
 
