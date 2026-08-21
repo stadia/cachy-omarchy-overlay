@@ -327,10 +327,11 @@ fail-closed 되므로 그 뒤 bind가 누락될 수 있다.
 
 패키지 upstream tree에는 필요한 두 원본만 stage한다:
 `upstream/bin/omarchy-menu-select`, `upstream/bin/omarchy-cmd-present`.
-`overlay/compat/bin/omarchy-shell`은 `cachy-omarchy-shell --ipc`로 전달한다. compat에
-`omarchy-menu-keybindings` **동명 shim**은 두지 않았으므로, upstream 메뉴의
-`learn.keybindings` action은 여전히 범위 밖이며 실패한다. 범위는 SUPER+K / 공개 명령만이다.
-공식 omarchy를 설치하거나 대량의 가짜 `omarchy-*`를 `/usr/bin`에 설치하지 않았다.
+`overlay/compat/bin/omarchy-shell`은 `cachy-omarchy-shell --ipc`로 전달한다. v0.9에서
+compat에 `omarchy-menu-keybindings` **동명 shim**(`overlay/compat/bin/omarchy-menu-keybindings`)을
+추가했다 — `cachy-omarchy-keybindings`로 인자 그대로(`"$@"`) 넘기는 얇은 wrapper라, upstream
+메뉴의 `learn.keybindings` action도 SUPER+K와 같은 구현으로 수렴한다. 공식 omarchy를 설치하거나
+대량의 가짜 `omarchy-*`를 `/usr/bin`에 설치하지 않았다.
 
 ### 라이브 샌드박스 실측
 

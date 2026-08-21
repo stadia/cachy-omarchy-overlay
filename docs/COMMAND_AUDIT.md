@@ -50,7 +50,7 @@ omarchy-branding-* / omarchy-theme-bg-install / omarchy-plymouth-*
 
 | command | called from | purpose | class | action |
 | --- | --- | --- | --- | --- |
-| `omarchy-menu-keybindings` | 메뉴 `learn.keybindings` | `hyprctl binds` + Lua 캐시 + 검색 메뉴 | ADAPTED | **SUPER+K / `cachy-omarchy-keybindings` 전용** wrapper — 적응 카피 + compat `omarchy-shell` + 스테이징 `omarchy-menu-select`/`omarchy-cmd-present`. 메뉴의 동명 action 은 compat shim 이 없어 여전히 실패(전수 표 참조). **M4 실측 완료**(아래). 데이터 수집만 CachyOS Hyprland 설정에 맞춘다 |
+| `omarchy-menu-keybindings` | 메뉴 `learn.keybindings` | `hyprctl binds` + Lua 캐시 + 검색 메뉴 | ADAPTED | SUPER+K / `cachy-omarchy-keybindings` wrapper — 적응 카피 + compat `omarchy-shell` + 스테이징 `omarchy-menu-select`/`omarchy-cmd-present`. v0.9 에서 compat 동명 shim(`overlay/compat/bin/omarchy-menu-keybindings`)을 추가해 메뉴의 동명 action 도 같은 구현으로 수렴한다(전수 표 참조). **M4 실측 완료**(아래). 데이터 수집만 CachyOS Hyprland 설정에 맞춘다 |
 | `omarchy-menu-tmux-keybindings` | 메뉴 | Tmux 전용 | SAFE | package — 0.8.0 verbatim stage. tmux(opt) 바인딩 검색. config/tmux 폴백 미출시지만 사용자 설정 없으면 exit 1 로 degrade |
 | `omarchy-menu-herdr-keybindings` | 메뉴 | Herdr 전용 | DISABLED | disable |
 
@@ -451,7 +451,7 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-menu` | SAFE | package | 0.8.0 verbatim stage. 순수 IPC 래퍼 — omarchy-shell toggle/summon/hide/call |
 | `omarchy-menu-emoji` | SAFE | package | M10: verbatim stage (`shell toggle omarchy.emojis`) + `omarchy-menu-emoji-insert` closure. wtype/wl-copy 는 hard depends |
 | `omarchy-menu-herdr-keybindings` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-menu-keybindings` | ADAPTED | wrapper | M4 SUPER+K → `cachy-omarchy-keybindings`. compat 에 같은 이름의 shim 을 두지 않으므로 메뉴 행 실행은 여전히 실패(범위는 SUPER+K 만) |
+| `omarchy-menu-keybindings` | ADAPTED | wrapper | M4 SUPER+K → `cachy-omarchy-keybindings`. v0.9 에서 compat 동명 shim(`overlay/compat/bin/omarchy-menu-keybindings`)을 추가해 메뉴 Learn > Keybindings 행도 같은 구현으로 수렴한다 |
 | `omarchy-menu-plugin` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-menu-share` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-menu-timezone` | SAFE | package | 0.8.0 verbatim stage. timedatectl + menu-select + 대화형 sudo set-timezone |

@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# compat: upstream 메뉴의 learn.keybindings action 이 이 이름을 부른다.
+# SUPER+K 와 같은 구현으로 수렴시킨다 — 데이터 수집을 CachyOS Hyprland
+# 설정(hyprland.lua)에 맞춘 적응 카피가 cachy-omarchy-keybindings 다.
+#
+# 인자 그대로 전달한다: 업스트림은 $1 로 --print/-p 만 받고, 우리 적응 카피도
+# 같은 플래그(--print/-p, 추가로 --help)를 받는다 — 표면이 갈리지 않으므로
+# 스왈로하지 않고 넘긴다.
+set -euo pipefail
+
+# 다른 compat shim(omarchy-shell)과 같은 간접 호출 관례: 테스트가 가짜
+# 바이너리로 갈아끼울 수 있게, 그리고 정적 클로저 스캐너가 우리 자신의
+# 명령(같은 패키지 소속, /usr/bin 에 늘 존재)을 "미매핑 외부 명령"으로
+# 오탐하지 않게 리터럴 호출 자리 대신 변수를 쓴다.
+KEYBINDINGS_BIN=${COO_KEYBINDINGS_BIN:-cachy-omarchy-keybindings}
+exec "$KEYBINDINGS_BIN" "$@"

@@ -16,7 +16,8 @@ done
 install -d "$dest/usr/lib/cachy-omarchy/compat/bin"
 install -d "$dest/usr/bin"
 for c in omarchy-shell omarchy-update-available \
-         omarchy-theme-set-browser omarchy-theme-set-keyboard; do
+         omarchy-theme-set-browser omarchy-theme-set-keyboard \
+         omarchy-menu-keybindings; do
   install -D -m755 "$src/compat/bin/$c" "$dest/usr/lib/cachy-omarchy/compat/bin/$c"
   ln -sf "../lib/cachy-omarchy/compat/bin/$c" "$dest/usr/bin/$c"
 done
