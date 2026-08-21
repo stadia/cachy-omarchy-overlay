@@ -193,6 +193,7 @@
 | `touch` | `coreutils` | BASE | 기반 |
 | `tr` | `coreutils` | BASE | 기반 |
 | `update-desktop-database` | `desktop-file-utils` | OPT | webapp 제거 후 desktop DB 갱신(omarchy-webapp-remove) — 이전에는 BASE 로 적혀 있었으나 선언된 depends 의 전이 폐포에도 base/base-devel 에도 없다(BASE 정당성 검사 실측) |
+| `upower` | `upower` | HARD | Power 패널 구동 기계 — Panel.qml:210이 omarchy-battery-status --shell을 무조건 실행 |
 | `usbreset` | `usbutils` | OPT | USB 오디오 장치 복구 메뉴 항목 |
 | `uwsm-app` | `uwsm` | HARD | 이미 depends(uwsm) |
 | `v4l2-ctl` | `v4l-utils` | OPT | 웹캠 설정 메뉴 항목 |
@@ -206,7 +207,7 @@
 | `xkbcli` | `libxkbcommon` | BASE | 이미 선언된 의존의 전이 의존(§4.2 개정) |
 | `zbarimg` | `zbar` | OPT | QR 코드 스캔 메뉴 항목 |
 
-tests/data/command-packages.tsv: 전체 108행, 위 표에는 도달한 104행이 모두 실린다(BASE 58행 포함 — BASE 는 declare 대상이 아닐 뿐 검사 대상에서 빠지지 않는다)
+tests/data/command-packages.tsv: 전체 109행, 위 표에는 도달한 105행이 모두 실린다(BASE 58행 포함 — BASE 는 declare 대상이 아닐 뿐 검사 대상에서 빠지지 않는다)
 
 docs/COMMAND_AUDIT.md 의 DISABLED 행으로 메뉴 루트에서 억제된 이름: 92개 (의도적으로 미지원인 Omarchy OS 스택 — 예외 파일과 달리 사유·신선도 검사가 없는 통로다)
 - `omarchy-branding-about`

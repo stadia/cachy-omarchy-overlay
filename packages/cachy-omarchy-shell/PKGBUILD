@@ -1,7 +1,7 @@
 # Maintainer: Cachy Omarchy Overlay
 pkgname=cachy-omarchy-shell
 pkgver=4.0.0
-pkgrel=13
+pkgrel=14
 pkgdesc='Pinned Omarchy Quattro shell runtime for CachyOS (no omarchy-settings)'
 arch=('any')
 url='https://github.com/basecamp/omarchy'
@@ -40,10 +40,12 @@ license=('MIT')
 #   (xdg-terminal-exec 도 §4.2 성격의 구동 기계지만 리포엔 없고 AUR 전용이라
 #     depends 에 못 둔다 — fix round 1 에서 optdepends AUR class 로 재배치.
 #     아래 optdepends 블록 참고.)
+#   upower (v0.10.0): omarchy-battery-status 의 구동 기계 — Power 패널이
+#     Panel.qml:210 에서 무조건 호출(docs/CLOSURE_PRIORITY.md).
 depends=('quickshell' 'hyprland' 'uwsm' 'inotify-tools' 'libvips' 'procps-ng'
          'psmisc' 'jq' 'wl-clipboard' 'wtype' 'wireplumber' 'pipewire-pulse'
          'xdg-utils' 'git' 'grim' 'gum' 'hyprsunset' 'libnotify' 'libpulse'
-         'perl' 'slurp' 'sudo' 'which')
+         'perl' 'slurp' 'sudo' 'upower' 'which')
 # /usr/bin/omarchy-* 를 공식 omarchy 패키지와 같은 이름으로 소유한다. 상호
 # 배타가 의도다. provides 는 하지 않는다 — Omarchy 전체를 제공하지 않는다.
 conflicts=('omarchy')

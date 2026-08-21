@@ -217,6 +217,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-audio-tuning` | SAFE | package | 노트북 스피커 튜닝. `on` 만 `~/.config/pipewire` + user unit 템플릿을 복사. 데이터는 `$OMARCHY_PATH/default/audio` |
 | `omarchy-bar` | SAFE | package | 메뉴 `style.bar` position/transparent. layer-shell 네임스페이스 `omarchy-bar` 와 동명·별개 |
 | `omarchy-battery-low` | SAFE | package | v0.9. battery 플러그인(기본 활성)이 10% 이하에서 부른다. 체인은 omarchy-notification-send + omarchy-hook 뿐이라 verbatim |
+| `omarchy-battery-status` | SAFE | package | 0.10.0. Power 패널 구동 기계. Panel.qml:210 이 --shell 을 무조건 호출. 외부 omarchy 의존 0(upower + sysfs) |
 | `omarchy-brightness-display` | SAFE | package | 포커스 모니터 밝기. 내부 backlight / DDC / Apple 로 분기. 바 `omarchy-monitor-state` 가 부름 |
 | `omarchy-brightness-display-apple` | SAFE | package | brightness-display Apple 분기. `sudo asdcontrol`(부재 시 실패) |
 | `omarchy-brightness-display-ddc` | SAFE | package | brightness-display 외부 모니터 분기. `ddcutil` optdepend |

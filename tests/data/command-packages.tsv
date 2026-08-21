@@ -100,6 +100,7 @@ tensaku-edit	tensaku	AUR	클립보드/스크린샷 편집기 기본값(omarchy-c
 tesseract	tesseract	OPT	OCR 메뉴 항목
 tmux	tmux	OPT	tmux 테마 훅 — 이미 optdepends
 update-desktop-database	desktop-file-utils	OPT	webapp 제거 후 desktop DB 갱신(omarchy-webapp-remove) — 이전에는 BASE 로 적혀 있었으나 선언된 depends 의 전이 폐포에도 base/base-devel 에도 없다(BASE 정당성 검사 실측)
+upower	upower	HARD	Power 패널 구동 기계 — Panel.qml:210이 omarchy-battery-status --shell을 무조건 실행
 usbreset	usbutils	OPT	USB 오디오 장치 복구 메뉴 항목
 v4l2-ctl	v4l-utils	OPT	웹캠 설정 메뉴 항목
 xkbcli	libxkbcommon	BASE	이미 선언된 의존의 전이 의존(§4.2 개정)

@@ -240,6 +240,8 @@ helpers=(
   omarchy-restart-wifi
   omarchy-restart-trackpad
   omarchy-update-time
+  # battery-status: Power 패널 Panel.qml:210 직접 호출, 외부 omarchy 의존 0.
+  omarchy-battery-status
   # system-stats: 바 monitor 위젯 구동 기계. /proc 읽기 + top 뿐, 외부
   # omarchy 의존 0 (감사 실측, closure-exceptions 0.10.0 행 회수).
   omarchy-system-stats
