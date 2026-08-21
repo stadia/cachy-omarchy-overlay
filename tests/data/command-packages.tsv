@@ -69,6 +69,7 @@ xdg-terminal-exec	xdg-terminal-exec	AUR	터미널 실행의 구동 기계(HARD �
 pgrep	procps-ng	HARD	이미 depends
 pkill	procps-ng	HARD	이미 depends
 ps	procps-ng	HARD	이미 depends
+top	procps-ng	HARD	procps-ng 가 제공(pacman -Ql 실측) — omarchy-system-stats CPU 통계 경로. procps-ng 는 이미 depends
 pactl	libpulse	HARD	pactl 실소유 패키지는 pipewire-pulse 아닌 libpulse(pacman -Qqo 실측) — depends 는 pipewire-pulse 만 있음, MISSING_HARD_DEP 로 드러나는 진짜 결함
 gum	gum	HARD	테마/온보딩 TUI 프롬프트 — 기본 경로에서 도달하나 depends 없음
 git	git	HARD	테마 git clone/update 경로 — 기본 경로에서 도달하나 depends 없음

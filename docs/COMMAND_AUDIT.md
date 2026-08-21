@@ -303,6 +303,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-system-logout` | SAFE | package | 메뉴 `system.logout`. `uwsm stop` + osd/close-all 전이 |
 | `omarchy-system-reboot` | SAFE | package | 메뉴 `system.reboot`. osd/state/close-all 전이 |
 | `omarchy-system-shutdown` | SAFE | package | 메뉴 `system.shutdown`. osd/state/close-all 전이 |
+| `omarchy-system-stats` | SAFE | package | 0.10.0. 바 monitor 위젯 구동 기계. /proc 읽기 + top(procps-ng)뿐, 외부 omarchy 의존 0 |
 | `omarchy-theme-bg-cache` | SAFE | package | M9 배경 묶음 (theme-set 이 부름) |
 | `omarchy-theme-bg-current` | SAFE | package | M9 배경 묶음 |
 | `omarchy-theme-bg-next` | SAFE | package | M9 배경 묶음 |
@@ -314,6 +315,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-theme-install` | SAFE | package | 0.8.0. git clone + omarchy-theme-set. SPEC §44 Tier C 에서 회수 — channel/pkg 인프라 미사용 |
 | `omarchy-theme-list` | SAFE | package | M9 테마 코어 |
 | `omarchy-theme-osc` | SAFE | package | M9 테마 코어 |
+| `omarchy-theme-refresh` | SAFE | package | 0.10.0. 현재 테마 재적용 9줄 래퍼. `omarchy-theme-set`(staged)만 호출하는 체인 깊이 1 |
 | `omarchy-theme-remove` | SAFE | package | 0.8.0. ~/.config/omarchy/themes rm -rf + menu-select. SPEC §44 Tier C 에서 회수 |
 | `omarchy-theme-set` | SAFE | package | M9 테마 코어. $OMARCHY_PATH/themes + default/themed 참조 |
 | `omarchy-theme-set-claude` | SAFE | package | M9 앱별 테마 적용 |

@@ -240,6 +240,12 @@ helpers=(
   omarchy-restart-wifi
   omarchy-restart-trackpad
   omarchy-update-time
+  # system-stats: 바 monitor 위젯 구동 기계. /proc 읽기 + top 뿐, 외부
+  # omarchy 의존 0 (감사 실측, closure-exceptions 0.10.0 행 회수).
+  omarchy-system-stats
+  # theme-refresh: 현재 테마 재적용 9줄 래퍼. omarchy-theme-set(staged)만
+  # 호출하는 체인 깊이 1 (감사 실측, closure-exceptions 0.10.0 행 회수).
+  omarchy-theme-refresh
   omarchy-sudo-passwordless
   # 테마 사용자 설치/갱신/삭제: git clone/pull + rm -rf ~/.config/omarchy/themes.
   # SPEC §44 Tier C "network installs" 제외에서 회수 — 스크립트는 self-contained
