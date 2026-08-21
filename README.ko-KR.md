@@ -79,9 +79,10 @@ helper 와 런타임 의존성(`jq`, `wl-clipboard`, `wtype`, `wireplumber`,
 
 ## Weather 위젯
 
-바 weather 위젯이 wttr.in 에 실 외부 요청을 보낸다. 저장된 위치는
-`omarchy-weather-location --set` 만이
-`~/.local/state/omarchy/settings/weather.json`(업스트림 기본 경로)에 쓴다.
+바 weather 위젯과 패널은 **wttr.in**(IP 도시 조회·현재 날씨)과
+**Open-Meteo**(`api.open-meteo.com` 예보, `geocoding-api.open-meteo.com` 도시
+검색)에 실 외부 요청을 보낸다. 저장된 위치는 `omarchy-weather-location --set`
+만이 `~/.local/state/omarchy/settings/weather.json`(업스트림 기본 경로)에 쓴다.
 파일이 없으면 조회마다 IP 기반으로 도시를 추정하며 그 결과는 기록하지
 않는다. 위젯을 끄려면 `~/.config/omarchy/shell.json` bar layout 에서
 `omarchy.weather` 를 제거한다. 그 파일을 만들면 딥머지가 없다 — 패키지

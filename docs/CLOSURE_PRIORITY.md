@@ -17,8 +17,10 @@ omarchy-audio-input-set-default, omarchy-audio-sink-availability,
 omarchy-bluetooth-power, omarchy-bluetooth-device, omarchy-weather-location,
 omarchy-weather-status, omarchy-theme-refresh.
 
-프라이버시: weather 짝을 올리면 기본 bar 위젯이 wttr.in 에 실 외부 요청을
-보낸다. 저장된 위치는 `omarchy-weather-location --set` 만이
+프라이버시: weather 짝을 올리면 기본 bar 위젯·패널이 **wttr.in**(IP 도시
+조회·현재 날씨)과 **Open-Meteo**(예보 `api.open-meteo.com`, 지오코딩
+`geocoding-api.open-meteo.com`)에 실 외부 요청을 보낸다. 저장된 위치는
+`omarchy-weather-location --set` 만이
 `~/.local/state/omarchy/settings/weather.json`(업스트림 기본 경로)에 쓴다.
 파일이 없으면 조회마다 IP 기반으로 도시를 추정하며 그 결과는 기록하지
 않는다. 위젯을 끄려면 `~/.config/omarchy/shell.json` bar layout 에서

@@ -82,7 +82,9 @@ helpers their QML calls and the runtime dependencies they need (`jq`, `wl-clipbo
 
 ## Weather widget
 
-The bar weather widget sends a real request to wttr.in. A saved location is
+The bar weather widget and its panel send real requests to **wttr.in** (IP city
+lookup and current conditions) and to **Open-Meteo** (`api.open-meteo.com`
+forecast and `geocoding-api.open-meteo.com` city search). A saved location is
 written only by `omarchy-weather-location --set`, into
 `~/.local/state/omarchy/settings/weather.json` (upstream default path). If that
 file is absent, every lookup infers the city from the client IP via wttr.in and

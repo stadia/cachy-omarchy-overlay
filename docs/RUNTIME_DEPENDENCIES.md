@@ -388,9 +388,11 @@ $ awk -F'\t' '!/^#/ && NF {print $1}' tests/data/closure-exceptions.tsv | while 
 그 보장 밖이다.
 
 v0.10.0 이 `omarchy-battery-status` 를 포함한 가시 UI 헬퍼 9개를 스테이징하면서,
-이전에 여기 적혀 있던 Power 패널 배터리 상세 행 결손은 닫혔다. 남은 사용자가
-체감하는 격차는 `xdg-terminal-exec` 가 AUR 전용이라는 점이며, 방향 결정은
-v0.11 선행 과제다(`docs/CLOSURE_PRIORITY.md`).
+이전에 여기 적혀 있던 Power 패널 배터리 상세 행 결손은 닫혔다. weather 위젯의
+외부 요청(wttr.in IP 조회는 비저장, 패널은 Open-Meteo 예보/지오코딩도 사용)은
+스테이징 결손이 아니라 문서화된 표면이다(`docs/CLOSURE_PRIORITY.md`). 남은
+사용자가 체감하는 격차는 `xdg-terminal-exec` 가 AUR 전용이라는 점이며, 방향
+결정은 v0.11 선행 과제다.
 
 ---
 
