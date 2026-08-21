@@ -57,6 +57,30 @@ print(harvested('ln -sfn "$g" "$d/themes/omarchy-color-theme.json"\n'))
 print(harvested('MARKER="${XDG_RUNTIME_DIR:-/tmp}/omarchy-capture-region-window"\n'))
 # 반대로 bin/ 아래 실행 파일 경로는 살아남아야 한다.
 print(harvested('"$OMARCHY_PATH/bin/omarchy-clipboard-paste-file"\n'))
+
+# --- QML/JS: 모든 문자열 리터럴에서 넓게 수확 --------------------------
+# idle 서비스의 자체 정의 runProcess(process, label, command) — 좁은 다섯
+# 형태 중 어느 것도 잡지 못했고, omarchy-launch-screensaver 가 감사에서
+# 통째로 빠져 있었다.
+idle = (
+    'runProcess(screensaverProcess, "screensaver", '
+    '"[[ $(omarchy-shell lock isLocked) == true ]] || omarchy-launch-screensaver")'
+)
+print("|".join(sorted(m.qml_commands(idle))))
+print("|".join(sorted(m.qml_omarchy_names(idle))))
+
+# 식별자 문자열도 넓은 수확에는 걸린다 — 그것을 거르는 것은 이제 정규식이
+# 아니라 인벤토리(ground truth)의 몫이다.
+print("|".join(sorted(m.qml_omarchy_names('reloadableId: "omarchy-battery"'))))
+
+# 문자열 리터럴은 개행을 넘지 않는다: 영어 산문의 아포스트로피 두 개가
+# 짝지어져 주석 여러 줄을 문자열로 삼키면 안 된다.
+prose = "// an empty commit returns to auto.\n// mirrors omarchy-weather-icon's map.\n"
+print("|".join(sorted(m.qml_omarchy_names(prose))))
+
+# 함수 정의는 호출이 아니다 — MenuModel.js 가 생성 스크립트 서두에 인라인
+# 정의하는 이름들이 업스트림 bin/ 에도 실재해 인벤토리를 통과한다.
+print("|".join(sorted(m.omarchy_names("omarchy-pkg-present() { local p; return 0; }"))))
 PY
 )
 
@@ -83,5 +107,16 @@ assert_eq "$(line 12)" "" "확장자 달린 파일 이름은 수확하지 않는
 assert_eq "$(line 13)" "" "런타임 데이터 경로의 마커 이름은 수확하지 않는다"
 assert_eq "$(line 14)" "omarchy-clipboard-paste-file" \
   "bin/ 아래 실행 파일 경로는 그대로 수확한다"
+
+assert_eq "$(line 15)" "" \
+  "좁은 다섯 형태는 자체 정의 runProcess 호출을 잡지 못한다(결함 재현)"
+assert_eq "$(line 16)" "omarchy-launch-screensaver|omarchy-shell" \
+  "넓은 수확은 runProcess 셸 문자열 속 헬퍼를 본다"
+assert_eq "$(line 17)" "omarchy-battery" \
+  "식별자 문자열도 넓게 잡고, 거르는 일은 인벤토리에 맡긴다"
+assert_eq "$(line 18)" "" \
+  "문자열 리터럴은 개행을 넘지 않는다(주석 아포스트로피 짝짓기 방지)"
+assert_eq "$(line 19)" "" \
+  "bash 함수 정의는 호출이 아니다"
 
 exit $((ASSERT_FAILURES > 0))

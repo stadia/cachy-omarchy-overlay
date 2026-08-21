@@ -97,6 +97,12 @@ DYNAMIC_TAIL_RE = re.compile(r"-\$|-\{")
 # 판정(`90-omarchy-...` 은 파일)의 오른쪽 대칭이다. 실행 가능한 이름이
 # 점 뒤 확장자를 달고 명령 위치에 오는 경우는 없다.
 FILENAME_TAIL_RE = re.compile(r"\.[A-Za-z0-9]")
+# `omarchy-foo()` 는 **정의**이지 호출이 아니다(bash 함수 정의 문법).
+# menu/MenuModel.js 는 생성 스크립트 서두에 `omarchy-pkg-present() { ... }`
+# 같은 함수를 인라인으로 정의하는데, 그 이름들이 업스트림 bin/ 에도 실재해
+# 인벤토리 필터를 통과한다 — 그러나 스크립트가 스스로 정의하므로 스테이징
+# 결함이 아니다. 정의는 호출이 아니라는 사실 하나로 갈라낸다.
+FUNC_DEF_TAIL_RE = re.compile(r"\s*\(\s*\)")
 # 매치가 속한 경로 토큰이 런타임 데이터 디렉터리를 가리키면 그것은 마커
 # 파일/디렉터리 이름이지 실행 파일이 아니다
 # (`"${XDG_RUNTIME_DIR:-/tmp}/omarchy-capture-region-window"`).
@@ -156,6 +162,8 @@ def omarchy_names(raw_text):
         if DYNAMIC_TAIL_RE.match(text, m.end()):
             continue
         if FILENAME_TAIL_RE.match(text, m.end()):
+            continue
+        if FUNC_DEF_TAIL_RE.match(text, m.end()):
             continue
         before = _path_token_before(text, m.start())
         if "/" in before and any(r in before for r in RUNTIME_PATH_ROOTS):
@@ -670,19 +678,64 @@ def _argv0_or_shell(body):
     return {head}
 
 
+# QML/JS 문자열 리터럴 — 큰따옴표와 작은따옴표 둘 다. JS 쪽은 작은따옴표를
+# 흔히 쓰고, QML 도 작은따옴표를 허용한다.
+# 개행을 넘지 않는다. QML/JS 의 문자열 리터럴은 원시 개행을 담지 못하므로,
+# 개행을 허용하면 영어 산문 속 아포스트로피 두 개가 짝지어져 주석 여러 줄을
+# 통째로 "문자열" 로 삼킨다 — 실측으로 `omarchy-weather-icon` 이 그렇게
+# 잡혔다(Panel.qml 주석의 "…entry." + "…icon's" 사이 구간).
+QML_ANY_STR_RE = re.compile(r"\"((?:[^\"\\\n]|\\.)*)\"|'((?:[^'\\\n]|\\.)*)'")
+
+
+def qml_omarchy_names(text):
+    """QML/JS 의 **모든** 문자열 리터럴에서 omarchy-* 이름을 수확한다.
+
+    아래 qml_commands() 의 좁은 다섯 형태는 실제 호출 자리만 본다. 그것이
+    필요했던 이유는, 예전 스캐너가 이름의 *모양*만으로 헬퍼 여부를 판정해서
+    `WlrLayershell.namespace: "omarchy-background"`, `reloadableId:
+    "omarchy-battery"` 같은 식별자 문자열이 전부 UNSTAGED_REACHABLE 로
+    올라왔기 때문이다.
+
+    1c 에서 핀된 업스트림 `bin/` 인벤토리가 ground truth 가 되면서 그 위험이
+    사라졌다 — 저 식별자들은 인벤토리에 없으므로 헬퍼로 인정되지 않는다.
+    그래서 이제는 넓게 훑고 인벤토리가 거르게 둔다.
+
+    이 함수가 필요한 구체적 사례: `plugins/services/idle/Service.qml:54` 는
+    스스로 `runProcess(process, label, command)` 를 정의하고 셸 문자열을 세
+    번째 인자로 넘긴다. 좁은 다섯 형태 중 어느 것도 "바 identifier 호출 +
+    문자열 payload" 를 잡지 못해, idle 서비스가 기본 150초마다 부르는
+    `omarchy-launch-screensaver` 가 감사에서 통째로 빠져 있었다.
+
+    반환값은 omarchy-* 이름 **뿐이다**. 외부 명령은 여기서 뽑지 않는다 —
+    임의의 문자열에서 외부 명령을 뽑으면 UNMAPPED_COMMAND 가 쏟아지고,
+    인벤토리 같은 ground truth 도 없다. 외부 명령은 계속 qml_commands() 의
+    좁은 형태가 담당한다. 그래서 좁은 형태들은 없앨 수 없다.
+    """
+    found = set()
+    for m in QML_ANY_STR_RE.finditer(text):
+        payload = m.group(1) if m.group(1) is not None else m.group(2)
+        if not payload:
+            continue
+        found |= omarchy_names(payload)
+    return found
+
+
 def qml_commands(text):
     """Commands referenced from actual invocation call sites only.
 
-    Scanning a QML file's full text for anything shaped like
-    `omarchy-[a-z-]+` also matches non-command identifier strings that
-    merely look like one — `reloadableId: "omarchy-battery"`,
-    `WlrLayershell.namespace: "omarchy-background"` — which invoke
-    nothing and have no staged file to ever satisfy. Restricting the
-    scan to the five shapes Quickshell/JS actually use to run a process
-    (a `command:` array, `Quickshell.execDetached([...])`, `<Bar>.run(...)`,
-    `X.command = [...]`, and `return [...]`) avoids manufacturing
-    UNSTAGED_REACHABLE findings for strings that were never reachable as
-    commands, while still catching every real one.
+    이 좁은 다섯 형태(`command:` 배열, `Quickshell.execDetached([...])`,
+    `<Bar>.run(...)`, `X.command = [...]`, `return [...]`)는 원래
+    `reloadableId: "omarchy-battery"` 같은 식별자 문자열이
+    UNSTAGED_REACHABLE 로 올라오는 것을 막으려고 도입됐다. omarchy-* 쪽에서는
+    그 역할이 끝났다 — 1c 의 인벤토리가 판정하고, 넓은 수확을 담당하는
+    qml_omarchy_names() 가 이 함수가 잡는 omarchy-* 를 **전부** 포함한다
+    (실측: narrow 43개 ⊂ broad 81개, narrow 단독 0개).
+
+    그럼에도 없앨 수 없다. 이 함수는 QML/JS 에서 **외부 명령**을 뽑는 유일한
+    경로이기 때문이다 — curl, hyprctl, pkexec, pgrep, pkill, tailscale,
+    xdg-terminal-exec, xkbcli 등 17개가 오직 여기서만 나온다. 외부 명령에는
+    인벤토리 같은 ground truth 가 없으므로 임의의 문자열에서 뽑을 수 없다.
+    즉 역할이 갈렸다: omarchy-* 는 넓게+인벤토리, 외부 명령은 좁은 형태.
     """
     found = set()
     for body in QML_ARRAY_RE.findall(text):
@@ -866,6 +919,12 @@ def main():
             # are identifiers, not commands, and were manufacturing
             # UNSTAGED_REACHABLE findings for names nothing ever runs).
             qml_seed |= qml_commands(text)
+            # 그리고 모든 문자열 리터럴에서 omarchy-* 를 따로 훑는다.
+            # 인벤토리가 무엇이 헬퍼인지 판정하므로 넓게 훑어도 안전하다.
+            # qml_seed 와 섞지 않는 이유: qml_seed 의 non-omarchy 이름은
+            # external(외부 명령)로 흘러가는데, 여기서 나온 것은 전부
+            # omarchy-* 이고 BFS 루트로만 쓰여야 한다.
+            roots |= qml_omarchy_names(text)
     roots |= qml_seed
     # A non-empty disabledPlugins that matches no plugin id at all is a
     # silent typo/rot risk (this repo's least-forgivable failure mode),
@@ -943,8 +1002,15 @@ def main():
         # 진짜 호출이지만 `$service`/`$KIND` 가 취할 수 있는 값 집합은
         # 소스만 읽어서는 알 수 없다. 잘린 접두사(`omarchy-installed-service`)
         # 를 넣는 쪽이 더 나쁘다 — 존재하지 않는 명령에 대한 예외 행이
-        # 생긴다. 그래서 버린다. 결과적으로 **이 그래프는 완전하지 않으며,
-        # 이 도구를 근거로 완전성을 주장하는 문서를 써서는 안 된다.**
+        # 생긴다. 그래서 버린다.
+        #
+        # QML/JS 쪽도 같은 한계를 공유한다. qml_omarchy_names() 는 문자열
+        # **리터럴**만 읽으므로 `"omarchy-" + kind` 같은 연결이나 템플릿
+        # 리터럴로 조립되는 이름은 보이지 않는다. 핀된 트리에는 그런 용례가
+        # 지금 없지만(실측), 업스트림이 도입하면 조용히 빠진다.
+        #
+        # 결과적으로 **이 그래프는 완전하지 않으며, 이 도구를 근거로
+        # 완전성을 주장하는 문서를 써서는 안 된다.**
         raw = path.read_text(errors="replace")
         text = preprocess_bash(raw)
         extra_defined = set()
