@@ -23,6 +23,7 @@ fi
 out=$(python3 "$REPO_ROOT/tests/runtime/closure_check.py" \
   --tree "$tree" --repo "$REPO_ROOT" \
   --map "$REPO_ROOT/tests/data/command-packages.tsv" \
+  --upstream-helpers "$REPO_ROOT/tests/data/upstream-helpers.txt" \
   --exceptions "$REPO_ROOT/tests/data/closure-exceptions.tsv" 2>&1)
 code=$?
 [[ -n $out ]] && printf '%s\n' "$out"

@@ -797,6 +797,7 @@ def main():
     ap.add_argument("--repo", required=True)
     ap.add_argument("--map", required=True)
     ap.add_argument("--exceptions", required=True)
+    ap.add_argument("--upstream-helpers", required=True)
     ap.add_argument("--emit-table", action="store_true")
     args = ap.parse_args()
 
@@ -806,6 +807,19 @@ def main():
 
     cmdmap = {r[0]: (r[1], r[2], r[3]) for r in read_tsv(args.map, 4)}
     exceptions = {r[0]: (r[1], r[2]) for r in read_tsv(args.exceptions, 3)}
+    # 핀된 업스트림의 헬퍼 이름 목록 — UNSTAGED_REACHABLE 의 ground truth.
+    # 설치 트리만으로는 "업스트림에 그런 헬퍼가 있는가" 를 알 수 없다.
+    # 설치 트리에는 우리가 스테이징한 것만 들어 있기 때문이다. 그래서 이
+    # 스캐너는 여섯 라운드 동안 이름의 **모양**으로 헬퍼 여부를 추론했고,
+    # 그 추론이 지금까지 나온 모든 오탐 부류의 단일 원인이었다 —
+    # QML layershell namespace, reloadableId, 우리 자신의 cachy-omarchy-*,
+    # 설정 파일 이름, 알림 hint 키, grep 패턴, echo 안내 문구. 모양은
+    # 업스트림에 대한 사실이 아니다. 사실은 핀에 있고, 그것이 이 파일이다.
+    upstream_helpers = {
+        line.strip()
+        for line in Path(args.upstream_helpers).read_text().splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
 
     staged = {p.name: p for p in binroot.iterdir() if p.is_file()} if binroot.is_dir() else {}
     # coo_extract_overlay refuses to share a dest with coo_extract_pkg (it
@@ -872,6 +886,7 @@ def main():
     # --- BFS over staged helpers ----------------------------------------
     sourced_funcs_cache = {}
     seen, queue, unstaged = set(), sorted(roots), set()
+    not_upstream_helpers = set()
     # omarchy-* names from qml_commands() are folded into `roots` above
     # (`roots |= qml_seed`) and belong in the BFS so their staged/unstaged
     # status is checked, not dumped straight into `external` where they'd
@@ -891,8 +906,17 @@ def main():
         seen.add(name)
         path = staged.get(name)
         if path is None:
-            if is_omarchy_name(name):
+            if not is_omarchy_name(name):
+                continue
+            if name in upstream_helpers:
+                # 업스트림에 실재하는데 우리가 안 깔았다 — 진짜 결함.
                 unstaged.add(name)
+            else:
+                # 업스트림에 그런 헬퍼가 없다 = 헬퍼가 아니다. 그래프에서
+                # 빼되 조용히 빼지 않는다 — --emit-table 이 개수와 이름을
+                # 함께 찍어, 생성된 문서를 읽는 사람이 스캐너가 무엇을
+                # 헬퍼로 인정하지 않았는지 보게 한다.
+                not_upstream_helpers.add(name)
             continue
         # 두 층을 서로 다른 텍스트로 읽는다.
         #
@@ -912,6 +936,15 @@ def main():
         # 이미 거부한다. 동적 조립 이름(`"omarchy-hw-$KIND"`)이 잘린
         # 리터럴로 남는 문제는 omarchy_names() 의 DYNAMIC_TAIL_RE 가 막고,
         # 주석 산문은 omarchy_harvest_text() 가 걷어낸다.
+        #
+        # 정적 분석이 여기서 볼 수 없는 것 — 런타임에 조립되는 헬퍼 이름.
+        # `omarchy-bar:165` 의 `if "omarchy-installed-service-$service"`,
+        # `"omarchy-hw-$KIND"`, `"omarchy-theme-set-${name}"` 은 전부
+        # 진짜 호출이지만 `$service`/`$KIND` 가 취할 수 있는 값 집합은
+        # 소스만 읽어서는 알 수 없다. 잘린 접두사(`omarchy-installed-service`)
+        # 를 넣는 쪽이 더 나쁘다 — 존재하지 않는 명령에 대한 예외 행이
+        # 생긴다. 그래서 버린다. 결과적으로 **이 그래프는 완전하지 않으며,
+        # 이 도구를 근거로 완전성을 주장하는 문서를 써서는 안 된다.**
         raw = path.read_text(errors="replace")
         text = preprocess_bash(raw)
         extra_defined = set()
@@ -1019,6 +1052,17 @@ def main():
                 continue
             note = " (미설치 — 검증 생략)" if cmd in not_installed else ""
             print(f"| `{cmd}` | `{package}` | {klass} | {rationale}{note} |")
+        # 스캐너가 헬퍼로 인정하지 않은 이름을 여기서 드러낸다. 이 목록이
+        # 조용하면, 생성된 문서는 도구가 갖지 않은 완전성을 주장하게 된다.
+        print()
+        print(
+            "스캐너가 헬퍼로 인정하지 않은 이름: %d개 "
+            "(핀된 업스트림 bin/ 에 없음 — 파일 이름, 알림 hint 키, "
+            "grep 패턴, 안내 문구 등 명령이 아닌 문자열)"
+            % len(not_upstream_helpers)
+        )
+        for name in sorted(not_upstream_helpers):
+            print(f"- `{name}`")
         return 0
 
     for v in violations:
