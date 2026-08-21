@@ -89,6 +89,51 @@ while IFS= read -r -d '' patch; do
   ( cd "$candidate" && "$patch_bin" apply "$patch" ) || fail "patch application failed: ${patch##*/}"
 done < <(find "$candidate/packages" -path '*/patches/*.patch' -type f -print0 | sort -z)
 
+# tests/data/upstream-helpers.txt and upstream.lock's OMARCHY_COMMIT are one
+# fact in two files: the inventory is the closure scanner's ground truth for
+# "is this really an upstream helper", scoped to the exact commit named
+# above. tests/runtime/test_upstream_helper_inventory.sh enforces that they
+# agree, unconditionally -- including inside the candidate's own nested test
+# run below, which is what first catches a stale inventory. So the pin and
+# the inventory move together, here, before that nested run sees either one.
+#
+# The new commit's tree, not whatever build/omarchy happens to have checked
+# out: the pin just moved, and nothing yet guarantees a local checkout at
+# this exact commit exists. A disposable shallow fetch (through $git_bin, so
+# it is mockable exactly like the ls-remote call above) is the only source
+# that is guaranteed current.
+inventory=$repo_root/tests/data/upstream-helpers.txt
+candidate_inventory=$candidate/tests/data/upstream-helpers.txt
+inventory_clone=$(mktemp -d "${TMPDIR:-/tmp}/coo-update-inventory-XXXXXX")
+inventory_names=""
+# $git_bin (mockable) does the network fetch; the object-existence check and
+# ls-tree below deliberately use the real system git, not $git_bin, to read
+# back what actually landed in $inventory_clone/.git. A tool override that
+# reports success without doing real work (as this repo's own test fixtures
+# do for $git_bin ls-remote) still leaves no such commit object on disk, so
+# `cat-file -e` genuinely fails instead of trusting a fake "success" -- the
+# one thing this step must never do is publish a bin/ list that was not
+# actually read from the pinned commit's tree.
+if "$git_bin" init -q "$inventory_clone" &&
+   "$git_bin" -C "$inventory_clone" fetch -q --depth 1 "$OMARCHY_REPOSITORY" "$commit" 2>/dev/null &&
+   git -C "$inventory_clone" cat-file -e "$commit^{commit}" 2>/dev/null &&
+   inventory_tree=$(git -C "$inventory_clone" ls-tree --name-only "$commit" -- bin/ 2>/dev/null); then
+  inventory_names=$(sed 's|^bin/||' <<<"$inventory_tree" | LC_ALL=C sort)
+fi
+rm -rf "$inventory_clone"
+[[ -n $inventory_names ]] || fail "could not fetch upstream bin/ tree for $commit to regenerate tests/data/upstream-helpers.txt"
+inventory_short=${commit:0:12}
+{
+  awk -v commit="$commit" -v short="$inventory_short" '
+    /^# commit: / { print "# commit: " commit; next }
+    /^# regenerate: / { print "# regenerate: git -C build/omarchy ls-tree --name-only " short " bin/ | sed \"s|^bin/||\" | LC_ALL=C sort"; next }
+    /^#/ { print; next }
+    { exit }
+  ' "$inventory"
+  printf '%s\n' "$inventory_names"
+} >"$candidate_inventory.new"
+"$mv_bin" "$candidate_inventory.new" "$candidate_inventory"
+
 # Candidate commands see only candidate metadata. Tool overrides are inherited
 # deliberately so U06–U08 can use fake makepkg/audit/test tools without network.
 candidate_state=$candidate/state
@@ -127,10 +172,12 @@ pointer_tmp=$(mktemp "$state_dir/.validated-build.manifest-update-XXXXXX")
 cp "$candidate_manifest" "$pointer_tmp"
 lock_backup=$(mktemp "${lock%/*}/.upstream.lock-backup-XXXXXX")
 pkg_backup=$(mktemp "${shell_pkg%/*}/.PKGBUILD-backup-XXXXXX")
+inventory_backup=$(mktemp "${inventory%/*}/.upstream-helpers-backup-XXXXXX")
 lock_new=$(mktemp "${lock%/*}/.upstream.lock-new-XXXXXX")
 pkg_new=$(mktemp "${shell_pkg%/*}/.PKGBUILD-new-XXXXXX")
-cp "$lock" "$lock_backup"; cp "$shell_pkg" "$pkg_backup"
-cp "$candidate_lock" "$lock_new"; cp "$candidate_pkg" "$pkg_new"
+inventory_new=$(mktemp "${inventory%/*}/.upstream-helpers-new-XXXXXX")
+cp "$lock" "$lock_backup"; cp "$shell_pkg" "$pkg_backup"; cp "$inventory" "$inventory_backup"
+cp "$candidate_lock" "$lock_new"; cp "$candidate_pkg" "$pkg_new"; cp "$candidate_inventory" "$inventory_new"
 if ! COO_UPDATE_METADATA_PUBLISH=lock "$mv_bin" "$lock_new" "$lock"; then
   fail 'could not publish upstream.lock'
 fi
@@ -138,12 +185,18 @@ if ! COO_UPDATE_METADATA_PUBLISH=pkg "$mv_bin" "$pkg_new" "$shell_pkg"; then
   "$mv_bin" "$lock_backup" "$lock" || fail 'could not restore upstream.lock after PKGBUILD failure'
   fail 'could not publish shell PKGBUILD; upstream.lock restored'
 fi
+if ! COO_UPDATE_METADATA_PUBLISH=inventory "$mv_bin" "$inventory_new" "$inventory"; then
+  "$mv_bin" "$pkg_backup" "$shell_pkg" || fail 'could not restore shell PKGBUILD after inventory failure'
+  "$mv_bin" "$lock_backup" "$lock" || fail 'could not restore upstream.lock after inventory failure'
+  fail 'could not publish upstream-helpers.txt inventory; PKGBUILD and upstream.lock restored'
+fi
 if ! "$mv_bin" "$pointer_tmp" "$state_dir/validated-build.manifest"; then
+  "$mv_bin" "$inventory_backup" "$inventory" || fail 'could not restore upstream-helpers.txt after manifest failure'
   "$mv_bin" "$pkg_backup" "$shell_pkg" || fail 'could not restore shell PKGBUILD after manifest failure'
   "$mv_bin" "$lock_backup" "$lock" || fail 'could not restore upstream.lock after manifest failure'
   fail 'could not publish validated manifest; metadata restored'
 fi
-rm -f "$lock_backup" "$pkg_backup"
+rm -f "$lock_backup" "$pkg_backup" "$inventory_backup"
 
 # UPSTREAM.md includes a human-tested environment and release date. Those facts
 # cannot be inferred from a git tag, so this command deliberately leaves it
