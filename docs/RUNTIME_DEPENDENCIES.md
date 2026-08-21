@@ -369,15 +369,17 @@ docs/COMMAND_AUDIT.md 의 DISABLED 행으로 메뉴 루트에서 억제된 이�
 
 `docs/COMMAND_AUDIT.md` 는 메뉴/셸이 도달하는 헬퍼를 감사 대상으로 삼고, 이 절의
 클로저 스캐너는 다른 도달성 정의(BFS 루트 + 인벤토리)를 쓴다. 그래서
-`tests/data/closure-exceptions.tsv` 의 예외 31건 중 21건은 `COMMAND_AUDIT.md` 에
+`tests/data/closure-exceptions.tsv` 의 잔여 예외 22건 중 12건은 `COMMAND_AUDIT.md` 에
 자기 행이 아예 없다(측정 명령 아래). 이것은 결함이 아니라 **범위 차이**이며, 다음
-사람이 21건을 "감사 누락"으로 오해하지 않도록 여기에 명시한다.
+사람이 12건을 "감사 누락"으로 오해하지 않도록 여기에 명시한다. 행 수는 주석을
+제외한 `closure-exceptions.tsv` 데이터 행이다(v0.9 의 31건에서 가시 UI 9개를
+스테이징하며 22건이 남았다).
 
 ```console
 $ awk -F'\t' '!/^#/ && NF {print $1}' tests/data/closure-exceptions.tsv | while read -r name; do
     grep -qE "^\| \`$name\` \|" docs/COMMAND_AUDIT.md || echo "$name"
   done | wc -l
-21
+12
 ```
 
 또한 `tests/runtime/test_command_audit.sh` 는 `closure-exceptions.tsv` 를 읽지
@@ -385,16 +387,10 @@ $ awk -F'\t' '!/^#/ && NF {print $1}' tests/data/closure-exceptions.tsv | while 
 이 절의 표가 코드와 동기화된다는 보장은 있어도, `COMMAND_AUDIT.md` 와의 정합은
 그 보장 밖이다.
 
-그 21건 중 실제로 사용자가 체감하는 결함이 하나 있다: `omarchy-battery-status`
-가 미스테이징인데, 스테이징된 업스트림 Power 패널이 `Panel.qml:210` 에서
-`["omarchy-battery-status", "--shell"]` 을 직접 실행해 percentage/state/
-rate/size/time/cycles/threshold 를 파싱한다. 미스테이징이면 127 이
-`Panel.qml:143-148` 의 빈 페이로드 가드에 걸려 `batteryInfo` 가 영원히 `{}` 로
-남고, `Panel.qml:426` 의 `visible: root.batteryInfo.percentage !== undefined`
-가드 때문에 Battery size/Charge cycles/Time/Rate 행이 패널을 열어도 영구히
-숨겨진다(hero percentage 만 "—" 로 폴백). 자세한 사유는
-`tests/data/closure-exceptions.tsv:31` 에 있다 — v0.9는 감사 인프라만 놓는
-마일스톤이라 이번엔 새 헬퍼를 얹지 않는다(추적: milestone 0.10).
+v0.10.0 이 `omarchy-battery-status` 를 포함한 가시 UI 헬퍼 9개를 스테이징하면서,
+이전에 여기 적혀 있던 Power 패널 배터리 상세 행 결손은 닫혔다. 남은 사용자가
+체감하는 격차는 `xdg-terminal-exec` 가 AUR 전용이라는 점이며, 방향 결정은
+v0.11 선행 과제다(`docs/CLOSURE_PRIORITY.md`).
 
 ---
 

@@ -111,11 +111,11 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 
 | command | plugin | class | action |
 | --- | --- | --- | --- |
-| `omarchy-launch-screensaver` | idle | DISABLED | disable plugin. `tests/data/closure-exceptions.tsv` 에 사유·체인 등록(v0.9, 추적 0.10) |
+| `omarchy-launch-screensaver` | idle | DISABLED | disable plugin. `tests/data/closure-exceptions.tsv` 에 사유·체인 등록(v0.9, 추적 0.11.0) |
 | `omarchy-system-lock` | idle | DISABLED | disable plugin |
-| `omarchy-system-wake` | idle | DISABLED (idle) / **미스테이징 (lock)** | lock 플러그인의 `runWake()` 도 이름으로 부른다. 미스테이징이라 127 — 순수 기능 손실(잠금 중 화면 깨우기 없음), 위험은 없음. 후속 verbatim 후보 (RUNTIME_STARTUP §22.5). `tests/data/closure-exceptions.tsv` 등록(v0.9, 추적 0.10) |
+| `omarchy-system-wake` | idle | DISABLED (idle) / **미스테이징 (lock)** | lock 플러그인의 `runWake()` 도 이름으로 부른다. 미스테이징이라 127 — 순수 기능 손실(잠금 중 화면 깨우기 없음), 위험은 없음. 후속 verbatim 후보 (RUNTIME_STARTUP §22.5). `tests/data/closure-exceptions.tsv` 등록(v0.9, 추적 0.11.0) |
 | `omarchy-hyprland-session-locked` | lock | **DISABLED — 공존 위험** | **의도적 미스테이징.** `strandedLockCheckProc` 가 이걸 불러 exit 0 이면 세션 잠금을 회수하려 하는데, hyprlock 이 이미 쥔 상태면 ext-session-lock 거부로 **quickshell 이 죽는다**(실측 §22.4). 헬퍼가 없으면 127 → 복구 경로가 조용히 비활성 = fail-safe. `test_staged_session_helpers.sh` 가 고정. `tests/data/closure-exceptions.tsv` 에도 등록(v0.9, milestone=blocked — 크기가 아니라 스테이징 자체가 실측된 크래시를 만들기 때문. `never` 는 미래 작업이 다시 안 볼 표시라 부정확 — 해제 조건: ext-session-lock 거부가 quickshell 을 죽이지 않게 되기 전까지) |
-| `omarchy-brightness-keyboard` | lock | 미스테이징 | lock 의 `runBlank()` 가 부른다. 127 — 키보드 백라이트 안 꺼짐. 위험 없음, 후속 verbatim 후보. `tests/data/closure-exceptions.tsv` 등록(v0.9, 추적 0.10) |
+| `omarchy-brightness-keyboard` | lock | 미스테이징 | lock 의 `runBlank()` 가 부른다. 127 — 키보드 백라이트 안 꺼짐. 위험 없음, 후속 verbatim 후보. `tests/data/closure-exceptions.tsv` 등록(v0.9, 추적 0.11.0) |
 | `omarchy-battery-low` | battery | SAFE | package — v0.9. battery 플러그인(기본 활성)이 10% 이하에서 부른다. 체인은 omarchy-notification-send + omarchy-hook 뿐이라 verbatim |
 | `omarchy-powerprofiles-set` | battery | DISABLED | disable plugin |
 | `omarchy-notification-send` | 여러 패널 | SAFE | package — M8 Tier B. `omarchy-reminder` 와 `omarchy-theme-set` 이 부른다(실측). 알림 표시 자체는 셸 플러그인 정책이지 이 helper 의 스테이징 여부와 별개다 |
@@ -398,7 +398,7 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-channel-current` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치. `tests/data/closure-exceptions.tsv` 등록(v0.9, milestone=never — omarchy/omarchy-settings pacman 패키지 자체를 취하지 않는 경계 결정) |
 | `omarchy-channel-set` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-cmd-present` | SAFE | package | `command -v` 루프뿐인 가드. M9·M10 체인과 메뉴 `when` 이 함께 쓰므로 스테이징한다 (스테이징 전수 참조) |
-| `omarchy-default-agent` | DISABLED | disable | AI 코딩 에이전트 런처(omarchy-agent) 의 짝. 무인 승인-우회 실행이라는 새 기능 표면이라 v0.9 감사 인프라 마일스톤엔 얹지 않는다 — "공식 omarchy 전체 OS 가정"이 아니라 새 기능 스코프 보류(`tests/data/closure-exceptions.tsv`, v0.9, 추적 0.10) |
+| `omarchy-default-agent` | DISABLED | disable | AI 코딩 에이전트 런처(omarchy-agent) 의 짝. 무인 승인-우회 실행이라는 새 기능 표면이라 v0.9 감사 인프라 마일스톤엔 얹지 않는다 — "공식 omarchy 전체 OS 가정"이 아니라 새 기능 스코프 보류(`tests/data/closure-exceptions.tsv`, v0.9, 추적 backlog) |
 | `omarchy-default-browser` | SAFE | package | 0.8.0 verbatim stage. xdg-settings default-web-browser |
 | `omarchy-default-editor` | SAFE | package | 0.8.0 verbatim stage. ~/.local/state/omarchy/defaults/editor 사용자 상태 |
 | `omarchy-default-terminal` | SAFE | package | 0.8.0 verbatim stage. xdg-terminal-exec + xdg-terminals.list |
@@ -407,7 +407,7 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-emacs` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-font-current` | SAFE | package | 0.8.0 verbatim stage. fc-match |
 | `omarchy-font-list` | SAFE | package | 0.8.0 verbatim stage. fc-list |
-| `omarchy-font-set` | DISABLED | disable | 터미널 설정 파일(alacritty/kitty/ghostty/foot) 을 직접 sed 로 고쳐 쓰는 헬퍼. `omarchy-display-text-size` 와 같은 패턴이라 짝으로 묶어 검토한다. `tests/data/closure-exceptions.tsv` 등록(v0.9, 추적 0.10) — "공식 omarchy 전체 OS 가정" 은 이 행에 붙어 있던 낡은 문구였다 |
+| `omarchy-font-set` | DISABLED | disable | 터미널 설정 파일(alacritty/kitty/ghostty/foot) 을 직접 sed 로 고쳐 쓰는 헬퍼. `omarchy-display-text-size` 와 같은 패턴이라 짝으로 묶어 검토한다. `tests/data/closure-exceptions.tsv` 등록(v0.9, 추적 backlog) — "공식 omarchy 전체 OS 가정" 은 이 행에 붙어 있던 낡은 문구였다 |
 | `omarchy-games-retro-install` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-hibernation-available` | SAFE | package | 0.8.0 verbatim stage. /proc/swaps·/sys 읽기 전용 프로브. omarchy_resume.conf 부재 시 exit 1 로 행 숨김(기능 caveat: CachyOS resume 이 다른 경로면 행이 계속 숨음) |
 | `omarchy-hw-dell-xps-haptic-touchpad` | SAFE | package | 0.8.0 verbatim stage. omarchy-hw-match + /sys/bus/i2c. 행 action 은 cmd-present dell-xps-touchpad-haptics opt-in |
@@ -454,8 +454,8 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-launch-about` | DISABLED | disable | 공식 런처/웹앱/플로팅 터미널 |
 | `omarchy-launch-config-editor` | SAFE | package | 0.8.0 verbatim stage. launch-editor(staged) 3행 래퍼 |
 | `omarchy-launch-discord-community` | SAFE | package | 0.8.0 verbatim stage. cmd-present discord 후 launch-webapp 전이 |
-| `omarchy-launch-floating-terminal-with-presentation` | DISABLED | disable | gum 프레젠테이션 레이어(`omarchy-restart-gum`/`-show-logo`/`-show-done`) 전체가 미스테이징이라 이 얇은 앞단만 올려도 죽는다. `update.hardware.audio` 메뉴 행이 이 뒤에 붙어 있어 부재 시 실패(위 `omarchy-restart-audio` 행 참조). `tests/data/closure-exceptions.tsv` 등록(v0.9, 추적 0.10) |
-| `omarchy-launch-screensaver` | DISABLED | disable | ttfx/socat/omarchy-screensaver/터미널별 설정까지 딸린 별도 클로저라 크기로 미룬다(공식 런처 전체를 배제한다는 뜻이 아니다). `tests/data/closure-exceptions.tsv` 등록(v0.9, 추적 0.10) |
+| `omarchy-launch-floating-terminal-with-presentation` | DISABLED | disable | gum 프레젠테이션 레이어(`omarchy-restart-gum`/`-show-logo`/`-show-done`) 전체가 미스테이징이라 이 얇은 앞단만 올려도 죽는다. `update.hardware.audio` 메뉴 행이 이 뒤에 붙어 있어 부재 시 실패(위 `omarchy-restart-audio` 행 참조). `tests/data/closure-exceptions.tsv` 등록(v0.9, 추적 0.11.0) |
+| `omarchy-launch-screensaver` | DISABLED | disable | ttfx/socat/omarchy-screensaver/터미널별 설정까지 딸린 별도 클로저라 크기로 미룬다(공식 런처 전체를 배제한다는 뜻이 아니다). `tests/data/closure-exceptions.tsv` 등록(v0.9, 추적 0.11.0) |
 | `omarchy-launch-webapp` | SAFE | package | 0.8.0 verbatim stage. .desktop Exec 추출 → uwsm-app --app=$url. keystone |
 | `omarchy-menu` | SAFE | package | 0.8.0 verbatim stage. 순수 IPC 래퍼 — omarchy-shell toggle/summon/hide/call |
 | `omarchy-menu-emoji` | SAFE | package | M10: verbatim stage (`shell toggle omarchy.emojis`) + `omarchy-menu-emoji-insert` closure. wtype/wl-copy 는 hard depends |
@@ -502,7 +502,7 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-restart-audio` | SAFE | package | audio-tuning 전이. 메뉴 `update.hardware.audio` 는 여전히 `omarchy-launch-floating-terminal-with-presentation` 뒤에 붙어 그 런처가 없으면 행 실행은 실패 |
 | `omarchy-restart-bluetooth` | SAFE | package | 0.8.0 verbatim stage. rfkill unblock/list bluetooth |
 | `omarchy-restart-hyprsunset` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-restart-shell` | ADAPTED | wrapper | later `cachy-omarchy-reload`. M3 미구현. `tests/data/closure-exceptions.tsv` 등록(v0.9, 추적 0.10) — quickshell kill/재기동 + 세션 락 재확보 폴링까지 있어 verbatim 이 아니라 래퍼 구현이 필요 |
+| `omarchy-restart-shell` | ADAPTED | wrapper | later `cachy-omarchy-reload`. M3 미구현. `tests/data/closure-exceptions.tsv` 등록(v0.9, 추적 0.11.0) — quickshell kill/재기동 + 세션 락 재확보 폴링까지 있어 verbatim 이 아니라 래퍼 구현이 필요 |
 | `omarchy-restart-trackpad` | SAFE | package | 0.8.0 verbatim stage. i2c_hid_acpi 언바인드/바인드 + modprobe |
 | `omarchy-restart-wifi` | SAFE | package | 0.8.0 verbatim stage. rfkill + nmcli radio |
 | `omarchy-restart-xcompose` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |

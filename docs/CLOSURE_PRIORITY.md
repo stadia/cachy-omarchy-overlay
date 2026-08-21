@@ -1,6 +1,7 @@
 # 클로저 예외 우선순위 (2026-08-21 확정)
 
-`tests/data/closure-exceptions.tsv` 31행의 포기(prioritization) 결정. milestone
+`tests/data/closure-exceptions.tsv` 잔여 22행의 포기(prioritization) 결정
+(원래 31행; v0.10.0 이 가시 UI 9개를 스테이징하며 행을 지웠다). milestone
 열은 스캐너가 읽지 않는 사람용 주석이다 — 이 문서가 그 해석의 근거다.
 
 ## 기준
@@ -11,7 +12,7 @@
 ## v0.10.0 — Visible Quattro Completeness (9)
 
 현재 켜져 있는 UI(bar weather/monitor/audio/bluetooth/power 위젯·패널)의
-결손을 닫는다: omarchy-battery-status, omarchy-system-stats,
+결손을 닫았다: omarchy-battery-status, omarchy-system-stats,
 omarchy-audio-input-set-default, omarchy-audio-sink-availability,
 omarchy-bluetooth-power, omarchy-bluetooth-device, omarchy-weather-location,
 omarchy-weather-status, omarchy-theme-refresh.

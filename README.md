@@ -20,8 +20,8 @@ Two Arch packages are produced.
 
 | Package | Version | Role |
 |---|---|---|
-| `cachy-omarchy-shell` | 4.0.0-12 | The pinned Omarchy Quattro shell runtime (Quickshell tree, `omarchy-settings` excluded) |
-| `cachy-omarchy-overlay` | 0.9.0-1 | The CachyOS integration layer (wrapper commands, Hyprland bindings, defaults) |
+| `cachy-omarchy-shell` | 4.0.0-17 | The pinned Omarchy Quattro shell runtime (Quickshell tree, `omarchy-settings` excluded) |
+| `cachy-omarchy-overlay` | 0.10.0-1 | The CachyOS integration layer (wrapper commands, Hyprland bindings, defaults) |
 
 The upstream pin is managed by `upstream.lock` (currently `basecamp/omarchy @ v4.0.0`,
 `f0020448`).
@@ -170,8 +170,18 @@ file only.
   fails the build on anything reachable but undeclared or unstaged. Done
   (`v0.9.0`). Promoted ten packages to `depends` and twenty to `optdepends`,
   staged `omarchy-battery-low`, and shimmed `omarchy-menu-keybindings`. Known
-  live gaps: `xdg-terminal-exec` is AUR-only, and `omarchy-battery-status` stays
-  unstaged, so the Power panel's battery-detail rows stay hidden.
+  live gaps at that cut: `xdg-terminal-exec` is AUR-only, and
+  `omarchy-battery-status` was still unstaged, so the Power panel's
+  battery-detail rows stayed hidden.
+- **v0.10 (visible Quattro completeness)** — staged the nine helpers the
+  default bar and panels already call: `omarchy-battery-status`,
+  `omarchy-system-stats`, `omarchy-theme-refresh`,
+  `omarchy-audio-input-set-default`, `omarchy-audio-sink-availability`,
+  `omarchy-bluetooth-power`, `omarchy-bluetooth-device`,
+  `omarchy-weather-location`, `omarchy-weather-status`. Power-panel battery
+  detail rows and the bar monitor/audio/bluetooth/weather widgets no longer
+  127. Remaining live gap: `xdg-terminal-exec` is still AUR-only (direction
+  deferred to v0.11).
 
 ## License
 

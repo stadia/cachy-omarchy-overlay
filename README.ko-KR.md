@@ -19,8 +19,8 @@ SUPER + K      →  Omarchy 스타일 키바인딩 뷰어
 
 | 패키지 | 버전 | 역할 |
 |---|---|---|
-| `cachy-omarchy-shell` | 4.0.0-12 | 핀된 Omarchy Quattro 셸 런타임 (Quickshell 트리, `omarchy-settings` 제외) |
-| `cachy-omarchy-overlay` | 0.9.0-1 | CachyOS 통합 계층 (래퍼 명령, Hyprland 바인딩, 기본값) |
+| `cachy-omarchy-shell` | 4.0.0-17 | 핀된 Omarchy Quattro 셸 런타임 (Quickshell 트리, `omarchy-settings` 제외) |
+| `cachy-omarchy-overlay` | 0.10.0-1 | CachyOS 통합 계층 (래퍼 명령, Hyprland 바인딩, 기본값) |
 
 업스트림 핀은 `upstream.lock`이 관리한다 (현재 `basecamp/omarchy @ v4.0.0`,
 `f0020448`).
@@ -165,9 +165,17 @@ bin/rollback                 # 이전 핀으로 복귀
   미스테이징인 것이 있으면 빌드를 실패시키는 스캐너를 도입했다. 완료(`v0.9.0`).
   10개 패키지를 `depends` 로, 20개를 `optdepends` 로 승격했고,
   `omarchy-battery-low` 를 스테이징했으며 `omarchy-menu-keybindings` 에 호환
-  shim 을 달았다. 남은 실측 격차: `xdg-terminal-exec` 는 AUR 전용이고,
-  `omarchy-battery-status` 는 여전히 미스테이징이라 Power 패널의 배터리 상세
-  행이 계속 숨어 있다.
+  shim 을 달았다. 그 컷의 실측 격차: `xdg-terminal-exec` 는 AUR 전용이고,
+  `omarchy-battery-status` 는 아직 미스테이징이라 Power 패널의 배터리 상세
+  행이 숨어 있었다.
+- **v0.10 (가시 Quattro 완성)** — 기본 bar/패널이 이미 호출하던 헬퍼 9개를
+  스테이징했다: `omarchy-battery-status`, `omarchy-system-stats`,
+  `omarchy-theme-refresh`, `omarchy-audio-input-set-default`,
+  `omarchy-audio-sink-availability`, `omarchy-bluetooth-power`,
+  `omarchy-bluetooth-device`, `omarchy-weather-location`,
+  `omarchy-weather-status`. Power 패널 배터리 상세 행과 bar
+  monitor/audio/bluetooth/weather 위젯이 더 이상 127 로 죽지 않는다. 남은
+  실측 격차: `xdg-terminal-exec` 는 여전히 AUR 전용(방향은 v0.11 선행).
 
 ## 라이선스
 
