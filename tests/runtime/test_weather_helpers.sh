@@ -77,11 +77,18 @@ assert_contains "$panel" "https://geocoding-api.open-meteo.com/v1/search" \
   "패널은 Open-Meteo geocoding 을 요청한다"
 assert_contains "$panel" "https://wttr.in/" "패널은 wttr.in 도 요청한다"
 
-for doc in "$REPO_ROOT/README.md" "$REPO_ROOT/README.ko-KR.md" \
-           "$REPO_ROOT/docs/CLOSURE_PRIORITY.md"; do
-  body=$(cat "$doc")
-  assert_contains "$body" "Open-Meteo" "$doc 가 Open-Meteo 를 명시한다"
-  assert_contains "$body" "wttr.in" "$doc 가 wttr.in 을 명시한다"
-done
+# 업데이트 파이프라인 중첩 픽스처는 overlay README 를 복사하지 않는다.
+# 헬퍼/QML 단언은 그 픽스처에서도 유효하고, 문서 단언만 실제 저장소에서 한다.
+if [[ -n ${COO_UPDATE_PIPELINE_NESTED:-} ]]; then
+  printf 'note: 중첩 업데이트 픽스처 — README Open-Meteo 단언 생략\n'
+else
+  for doc in "$REPO_ROOT/README.md" "$REPO_ROOT/README.ko-KR.md" \
+             "$REPO_ROOT/docs/CLOSURE_PRIORITY.md"; do
+    assert_file_exists "$doc" "$doc 존재"
+    body=$(cat "$doc")
+    assert_contains "$body" "Open-Meteo" "$doc 가 Open-Meteo 를 명시한다"
+    assert_contains "$body" "wttr.in" "$doc 가 wttr.in 을 명시한다"
+  done
+fi
 
 exit "$ASSERT_FAILURES"
