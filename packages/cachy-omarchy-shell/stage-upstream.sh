@@ -257,6 +257,10 @@ helpers=(
   # rfkill/bluetoothctl만. power 는 외부 omarchy 의존 0, device 는 power 만 부른다.
   omarchy-bluetooth-power
   omarchy-bluetooth-device
+  # weather location/status pair (v0.10.0): bar weather 위젯 기본 배치,
+  # curl+BASE. location 은 외부 omarchy 의존 0, status 는 location 만 부른다.
+  omarchy-weather-location
+  omarchy-weather-status
   omarchy-sudo-passwordless
   # 테마 사용자 설치/갱신/삭제: git clone/pull + rm -rf ~/.config/omarchy/themes.
   # SPEC §44 Tier C "network installs" 제외에서 회수 — 스크립트는 self-contained

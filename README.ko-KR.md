@@ -77,6 +77,11 @@ helper 와 런타임 의존성(`jq`, `wl-clipboard`, `wtype`, `wireplumber`,
   동작하려면 그래픽 uwsm 세션이 공급하는 `OMARCHY_PATH`가 필요하다. XF86 미디어 키 바인딩은 주입하지 않는다 — 도달 경로는
   명시적 CLI/메뉴뿐이다 (화면 밝기 체인은 범위 밖).
 
+- **Weather** — bar 위젯이 wttr.in 에 실 외부 요청을 보낸다. 저장된 위치가
+  없으면 첫 조회가 IP 기반으로 도시를 추정해
+  `~/.local/state/omarchy/settings/weather.json`(업스트림 기본 경로)에 기록한다.
+  위젯을 끄려면 shell.json bar layout 에서 `omarchy.weather` 를 제거한다.
+
 ## 기동 모델
 
 셸은 systemd 유닛이 아니라 **Hyprland autostart**로 뜬다 — 업스트림 omarchy와 같은

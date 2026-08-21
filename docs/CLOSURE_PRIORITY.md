@@ -16,6 +16,11 @@ omarchy-audio-input-set-default, omarchy-audio-sink-availability,
 omarchy-bluetooth-power, omarchy-bluetooth-device, omarchy-weather-location,
 omarchy-weather-status, omarchy-theme-refresh.
 
+프라이버시: weather 짝을 올리면 기본 bar 위젯이 wttr.in 에 실 외부 요청을
+보낸다. 저장된 위치가 없으면 첫 조회가 IP 기반으로 도시를 추정해
+`~/.local/state/omarchy/settings/weather.json`(업스트림 기본 경로)에 기록한다.
+위젯을 끄려면 `shell.json` bar layout 에서 `omarchy.weather` 를 제거한다.
+
 ## v0.11.0 — Session Lifecycle Parity (후보 7)
 
 omarchy-brightness-keyboard, omarchy-system-wake,

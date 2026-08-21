@@ -348,6 +348,8 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-update-time` | SAFE | package | 0.8.0. sudo systemctl restart systemd-timesyncd |
 | `omarchy-webapp-install` | SAFE | package | 0.8.0. ~/.local/share/applications webapp .desktop + 아이콘. launch-webapp 가 Exec |
 | `omarchy-webapp-remove` | SAFE | package | 0.8.0. launch-webapp Exec .desktop 스캔/삭제. menu-select + update-desktop-database |
+| `omarchy-weather-location` | SAFE | package | 0.10.0. 바 weather 위젯 위치. 외부 omarchy 의존 0. 저장된 위치가 없으면 wttr.in 으로 IP 기반 도시명 조회. `~/.local/state/omarchy/settings/weather.json` |
+| `omarchy-weather-status` | SAFE | package | 0.10.0. 바 weather 위젯. `omarchy-weather-location`(staged)만 호출. wttr.in 실 외부 요청 |
 <!-- STAGED_AUDIT_END -->
 
 ---

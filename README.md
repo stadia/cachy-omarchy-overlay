@@ -80,6 +80,11 @@ helpers their QML calls and the runtime dependencies they need (`jq`, `wl-clipbo
   the only reachable paths are the explicit CLI and the menu. (The screen-brightness chain
   is out of scope.)
 
+- **Weather** — the bar widget sends a real request to wttr.in. If no location
+  is stored, the first lookup infers the city from the client IP and writes it
+  to `~/.local/state/omarchy/settings/weather.json` (upstream default path).
+  To disable the widget, remove `omarchy.weather` from the shell.json bar layout.
+
 ## Startup model
 
 The shell starts from **Hyprland autostart**, not from a systemd unit — the same model
