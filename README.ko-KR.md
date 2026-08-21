@@ -77,12 +77,16 @@ helper 와 런타임 의존성(`jq`, `wl-clipboard`, `wtype`, `wireplumber`,
   동작하려면 그래픽 uwsm 세션이 공급하는 `OMARCHY_PATH`가 필요하다. XF86 미디어 키 바인딩은 주입하지 않는다 — 도달 경로는
   명시적 CLI/메뉴뿐이다 (화면 밝기 체인은 범위 밖).
 
-- **Weather** — bar 위젯이 wttr.in 에 실 외부 요청을 보낸다. 저장된 위치는
-  `omarchy-weather-location --set` 만이
-  `~/.local/state/omarchy/settings/weather.json`(업스트림 기본 경로)에 쓴다.
-  파일이 없으면 조회마다 IP 기반으로 도시를 추정하며 그 결과는 기록하지
-  않는다. 위젯을 끄려면 shell.json bar layout 에서 `omarchy.weather` 를
-  제거한다.
+## Weather 위젯
+
+바 weather 위젯이 wttr.in 에 실 외부 요청을 보낸다. 저장된 위치는
+`omarchy-weather-location --set` 만이
+`~/.local/state/omarchy/settings/weather.json`(업스트림 기본 경로)에 쓴다.
+파일이 없으면 조회마다 IP 기반으로 도시를 추정하며 그 결과는 기록하지
+않는다. 위젯을 끄려면 `~/.config/omarchy/shell.json` bar layout 에서
+`omarchy.weather` 를 제거한다. 그 파일을 만들면 딥머지가 없다 — 패키지
+기본값이 통째로 무시되고, `cachy-omarchy-doctor` 가 존재 시 WARN 한다
+(`docs/RUNTIME_STARTUP.md`, `docs/RC_GAP_INVENTORY.md`).
 
 ## 기동 모델
 
@@ -174,7 +178,7 @@ bin/rollback                 # 이전 핀으로 복귀
   `omarchy-audio-sink-availability`, `omarchy-bluetooth-power`,
   `omarchy-bluetooth-device`, `omarchy-weather-location`,
   `omarchy-weather-status`. Power 패널 배터리 상세 행과 bar
-  monitor/audio/bluetooth/weather 위젯이 더 이상 127 로 죽지 않는다. 남은
+  monitor/audio/bluetooth/weather 위젯이 더 이상 exit 127 로 죽지 않는다. 남은
   실측 격차: `xdg-terminal-exec` 는 여전히 AUR 전용(방향은 v0.11 선행).
 
 ## 라이선스

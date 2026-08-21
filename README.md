@@ -80,12 +80,16 @@ helpers their QML calls and the runtime dependencies they need (`jq`, `wl-clipbo
   the only reachable paths are the explicit CLI and the menu. (The screen-brightness chain
   is out of scope.)
 
-- **Weather** — the bar widget sends a real request to wttr.in. A saved
-  location is written only by `omarchy-weather-location --set`, into
-  `~/.local/state/omarchy/settings/weather.json` (upstream default path).
-  If that file is absent, every lookup infers the city from the client IP
-  via wttr.in and does not persist it. To disable the widget, remove
-  `omarchy.weather` from the shell.json bar layout.
+## Weather widget
+
+The bar weather widget sends a real request to wttr.in. A saved location is
+written only by `omarchy-weather-location --set`, into
+`~/.local/state/omarchy/settings/weather.json` (upstream default path). If that
+file is absent, every lookup infers the city from the client IP via wttr.in and
+does not persist it. To disable the widget, remove `omarchy.weather` from the
+bar layout in `~/.config/omarchy/shell.json`. Creating that file does not
+deep-merge: package defaults are ignored wholesale, and `cachy-omarchy-doctor`
+WARNs on its existence (`docs/RUNTIME_STARTUP.md`, `docs/RC_GAP_INVENTORY.md`).
 
 ## Startup model
 
@@ -180,7 +184,7 @@ file only.
   `omarchy-bluetooth-power`, `omarchy-bluetooth-device`,
   `omarchy-weather-location`, `omarchy-weather-status`. Power-panel battery
   detail rows and the bar monitor/audio/bluetooth/weather widgets no longer
-  127. Remaining live gap: `xdg-terminal-exec` is still AUR-only (direction
+  exit 127. Remaining live gap: `xdg-terminal-exec` is still AUR-only (direction
   deferred to v0.11).
 
 ## License

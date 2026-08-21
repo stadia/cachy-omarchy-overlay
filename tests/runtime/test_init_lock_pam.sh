@@ -111,21 +111,15 @@ assert_eq "$would_line" "1" "--dry-run 은 apply-lock 을 하려던 일로 출�
 : >"$marker"
 bare_bin=$COO_TEST_SANDBOX/bare-bin
 sysbin=$COO_TEST_SANDBOX/sysbin
-mkdir -p "$bare_bin" "$sysbin"
+mkdir -p "$bare_bin"
 cp "$stub_bin/omarchy-theme-set" "$bare_bin/"
 # /usr/bin 과 /bin 을 PATH 에 붙이지 않는다 — Arch 에서 /bin 은 /usr/bin
 # 심링크라 호스트 omarchy-* 가 다시 보인다. dirname/pgrep 등 비-헬퍼만
-# 샌드박스로 심링크한다.
-for dir in /usr/bin /bin; do
-  [[ -d $dir ]] || continue
-  for f in "$dir"/*; do
-    [[ -e $f || -L $f ]] || continue
-    base=${f##*/}
-    [[ $base == omarchy-* ]] && continue
-    [[ -e $sysbin/$base ]] && continue
-    ln -s "$f" "$sysbin/$base"
-  done
-done
+# 샌드박스로 심링크한다. cp -as 는 /usr/bin 의 심링크 숲을 sysbin 에 만들고,
+# 호스트 omarchy-* 와 cachy-omarchy-* 는 지운다 (구 루프는 omarchy-* 만 건너뛰어
+# 호스트 cachy-omarchy-* 가 PATH 에 남을 수 있었다).
+cp -as /usr/bin "$sysbin"
+rm -f "$sysbin"/omarchy-* "$sysbin"/*omarchy-*
 reset_user_state
 case5_path="$bare_bin:$sysbin"
 path_ok=1

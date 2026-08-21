@@ -21,13 +21,18 @@ omarchy-weather-status, omarchy-theme-refresh.
 보낸다. 저장된 위치는 `omarchy-weather-location --set` 만이
 `~/.local/state/omarchy/settings/weather.json`(업스트림 기본 경로)에 쓴다.
 파일이 없으면 조회마다 IP 기반으로 도시를 추정하며 그 결과는 기록하지
-않는다. 위젯을 끄려면 `shell.json` bar layout 에서 `omarchy.weather` 를
-제거한다.
+않는다. 위젯을 끄려면 `~/.config/omarchy/shell.json` bar layout 에서
+`omarchy.weather` 를 제거한다. 그 파일을 만들면 딥머지가 없다 — 패키지
+기본값이 통째로 무시되고, `cachy-omarchy-doctor` 가 존재 시 WARN 한다
+(`docs/RUNTIME_STARTUP.md`, `docs/RC_GAP_INVENTORY.md`).
 
 ## v0.11.0 — Session Lifecycle Parity (후보 7)
 
+예외 표 7행 + `omarchy-hyprland-monitor-clamshell`(신규 — 예외 행 없음,
+system-wake 체인):
+
 omarchy-brightness-keyboard, omarchy-system-wake,
-omarchy-hyprland-monitor-clamshell(신규 — system-wake 체인),
+omarchy-hyprland-monitor-clamshell,
 omarchy-hw-laptop-closed, omarchy-launch-screensaver(+별도 클로저),
 omarchy-restart-shell(ADAPT — cachy-omarchy-shell --restart 경유 어댑터,
 verbatim 금지), omarchy-launch-floating-terminal-with-presentation(+gum
