@@ -29,3 +29,27 @@ do
     pcall(dofile, theme_hypr)
   end
 end
+
+-- Omarchy toggles seam (v0.11): 업스트림 config/hypr/hyprland.lua 의
+-- require("default.hypr.toggles") 가 하던 일을 우리 관리 블록 안에서 한다.
+-- omarchy-hyprland-monitor-clamshell / -internal / -internal-mirror 이
+-- ~/.local/state/omarchy/toggles/hypr/*.lua 를 쓰고 hyprctl reload 하는데,
+-- 그것을 읽는 쪽이 없으면 아무도 안 보는 dead file 만 남는다.
+-- 업스트림의 require 체인(default.hypr.paths / require_all)은 끌어오지 않는다
+-- — 관리 블록은 pcall(dofile) 로 진입하므로 그 package.path 루트가 성립하지
+-- 않는다. dofile 은 모듈 캐시가 없어 업스트림 { reload = true } 의 의미가
+-- 그대로 따라온다. 디렉터리 부재는 정상 경로다.
+do
+  local dir = os.getenv("HOME") .. "/.local/state/omarchy/toggles/hypr"
+  local quoted = "'" .. dir:gsub("'", "'\\''") .. "'"
+  local pipe = io.popen(
+    "find " .. quoted .. " -maxdepth 1 -type f -name '*.lua' 2>/dev/null | sort"
+  )
+  if pipe then
+    for path in pipe:lines() do
+      -- toggle 파일 하나가 깨져도 사용자 설정 전체가 죽지 않는다(SPEC §5.1).
+      pcall(dofile, path)
+    end
+    pipe:close()
+  end
+end

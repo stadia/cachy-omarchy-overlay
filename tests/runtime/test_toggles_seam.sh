@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# toggles seam (v0.11): overlay/hypr/bindings.lua 가
+# ~/.local/state/omarchy/toggles/hypr/*.lua 를 정렬 순서로 pcall(dofile) 한다.
+# 업스트림 config/hypr/hyprland.lua:26 의 require("default.hypr.toggles") 자리를
+# 우리 관리 블록 안에서 채우는 것이다. 이것이 없으면
+# omarchy-hyprland-monitor-clamshell 의 disable_internal() 이 아무도 읽지 않는
+# 파일만 쓰고 hyprctl reload 한다(dead file — v0.7 shell.json 과 같은 실패 형태).
+set -uo pipefail
+REPO_ROOT="${REPO_ROOT:?}"
+source "$REPO_ROOT/tests/lib/assert.sh"
+
+LUA_TPL="$REPO_ROOT/overlay/hypr/bindings.lua"
+src=$(<"$LUA_TPL")
+assert_contains "$src" "toggles/hypr" "sweep 이 toggles 디렉터리를 본다"
+assert_contains "$src" "pcall(dofile" "toggle 로드는 pcall 가드"
+
+# hl 스텁: bindings.lua 의 최상위 hl.* 호출을 전부 흡수하는 permissive 테이블.
+harness=$COO_TEST_SANDBOX/harness.lua
+cat > "$harness" <<'LUA'
+local function stub()
+  return setmetatable({}, {
+    __index = function() return stub() end,
+    __call = function() return stub() end,
+  })
+end
+hl = stub()
+dofile(os.getenv("COO_BINDINGS_LUA"))
+LUA
+
+run_harness() {
+  HOME="$1" COO_BINDINGS_LUA="$LUA_TPL" lua "$harness" >/dev/null 2>&1
+}
+
+# 경우 1: toggle 파일이 로드된다.
+h1=$COO_TEST_SANDBOX/h1
+mkdir -p "$h1/.local/state/omarchy/toggles/hypr"
+cat > "$h1/.local/state/omarchy/toggles/hypr/10-ok.lua" <<LUA
+local f = io.open("$h1/loaded", "w")
+f:write("yes")
+f:close()
+LUA
+run_harness "$h1"
+assert_file_exists "$h1/loaded" "toggle 파일이 실제로 실행됐다"
+
+# 경우 2: 디렉터리 부재는 정상 경로다 — 조용히 지나간다.
+h2=$COO_TEST_SANDBOX/h2
+mkdir -p "$h2"
+run_harness "$h2"; rc=$?
+assert_eq "$rc" "0" "toggles 디렉터리 부재는 오류가 아니다"
+
+# 경우 3: 깨진 toggle 은 격리되고, 정렬상 뒤의 정상 toggle 은 그대로 로드된다.
+h3=$COO_TEST_SANDBOX/h3
+mkdir -p "$h3/.local/state/omarchy/toggles/hypr"
+printf 'this is not lua ((((\n' > "$h3/.local/state/omarchy/toggles/hypr/00-broken.lua"
+cat > "$h3/.local/state/omarchy/toggles/hypr/10-ok.lua" <<LUA
+local f = io.open("$h3/loaded", "w")
+f:write("yes")
+f:close()
+LUA
+run_harness "$h3"; rc=$?
+assert_eq "$rc" "0" "깨진 toggle 이 설정 전체를 죽이지 않는다"
+assert_file_exists "$h3/loaded" "깨진 toggle 뒤의 정상 toggle 이 로드된다"
+
+exit "$ASSERT_FAILURES"
