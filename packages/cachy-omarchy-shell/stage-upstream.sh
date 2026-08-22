@@ -194,6 +194,12 @@ helpers=(
   omarchy-hyprland-toggle-disabled
   omarchy-hyprland-monitor-laptop
   omarchy-hyprland-monitor-external-active
+  # 뚜껑 닫기(switch:off:Lid Switch, default/hypr/bindings/utilities.lua:35).
+  # disable_internal() 이 ~/.local/state/omarchy/toggles/hypr/*.lua 를 쓰고
+  # hyprctl reload 하므로, overlay/hypr/bindings.lua 의 toggles sweep 블록이
+  # 먼저 있어야 한다(v0.11 seam). 우리가 hyprctl reload 를 추가하지는
+  # 않는다 — 뚜껑 스위치라는 명시적 하드웨어 동작에 대한 업스트림 설계다.
+  omarchy-hyprland-monitor-clamshell
   # 가시성/잠금화면 토글: 본체가 `omarchy-toggle <flag>-off` 디스패처를 부른다.
   # omarchy-toggle 은 ~/.local/state/omarchy/toggles/<flag> 파일을 뒤집는 순수
   # 사용자 상태 플리퍼(omarchy-toggle-enabled 와 동일 티어). crash-capture 는

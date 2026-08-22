@@ -259,6 +259,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-hw-touchscreen` | SAFE | package | `hyprctl devices -j` + jq. 메뉴 `when` 과 toggle-input-device 가 부름 |
 | `omarchy-hw-webcam` | SAFE | package | 0.8.0 hw 가드. capture-webcam-list 전이 1행 |
 | `omarchy-hyprland-focus-app` | SAFE | package | M10 clipboard 전이 closure |
+| `omarchy-hyprland-monitor-clamshell` | SAFE | package | 0.11.0. 뚜껑 닫기(switch:off:Lid Switch). disable_internal() 이 toggles/hypr/*.lua 를 쓰고 hyprctl reload. v0.11 toggles seam 위에 선다 |
 | `omarchy-hyprland-monitor-external-active` | SAFE | package | 0.8.0 하이프랜드 토글 전이. hyprctl monitors -j 외부 활성 검사 |
 | `omarchy-hyprland-monitor-focused` | SAFE | package | brightness-display 가 포커스 모니터 이름을 얻을 때 부름 |
 | `omarchy-hyprland-monitor-focused-apple` | SAFE | package | brightness-display Apple 분기 가드 |

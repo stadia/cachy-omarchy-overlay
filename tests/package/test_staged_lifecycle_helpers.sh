@@ -40,4 +40,23 @@ for h in omarchy-brightness-keyboard; do
   assert_eq "$x" "0" "verbatim: $h 는 업스트림과 바이트 동일"
 done
 
+# Task 5: 뚜껑 닫기. seam(overlay/hypr/bindings.lua) 이 열려 있어야 의미가
+# 있다 — disable_internal() 이 toggles/hypr/*.lua 를 쓰고 hyprctl reload 한다.
+for h in omarchy-hyprland-monitor-clamshell; do
+  assert_file_exists "$bin/$h" "lifecycle 스테이징: $h"
+  if cmp -s "$src/bin/$h" "$bin/$h"; then x=0; else x=1; fi
+  assert_eq "$x" "0" "verbatim: $h 는 업스트림과 바이트 동일"
+done
+
+# 전이 의존이 전부 서 있다. 하나라도 빠지면 clamshell 은 절반만 동작한다.
+for h in omarchy-hyprland-monitor-laptop omarchy-hyprland-monitor-internal \
+         omarchy-hyprland-monitor-internal-mirror \
+         omarchy-hyprland-monitor-external-active omarchy-hw-clamshell; do
+  assert_file_exists "$bin/$h" "clamshell 전이 의존: $h"
+done
+
+# seam 이 실제로 있다 — 이 단언이 깨지면 clamshell 은 dead file 만 쓴다.
+assert_contains "$(<"$REPO_ROOT/overlay/hypr/bindings.lua")" "toggles/hypr" \
+  "clamshell 이 쓰는 toggles 를 읽는 seam 이 있다"
+
 exit "$ASSERT_FAILURES"
