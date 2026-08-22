@@ -95,10 +95,17 @@ WARNs on its existence (`docs/RUNTIME_STARTUP.md`, `docs/RC_GAP_INVENTORY.md`).
 
 ## Session lifecycle (v0.11)
 
-The idle → screensaver → lock → wake chain and laptop-lid clamshell handling are
-packaged: idle timeout dims the keyboard backlight and locks the screen, an explicit
-lock request launches the terminal screensaver, and closing the lid with an external
-monitor connected disables the internal display instead of suspending.
+The idle → screensaver → lock → wake chain is packaged: idle timeout dims the
+keyboard backlight (`off`) and locks the screen, an explicit lock request
+launches the terminal screensaver, and waking restores the keyboard backlight.
+There is no laptop-lid trigger in this product — upstream's lid-switch
+keybinding (`default/hypr/bindings/utilities.lua`) is never staged, so closing
+the lid does not run `omarchy-hyprland-monitor-clamshell` here. That helper is
+still shipped and still reachable, just transitively, through the same
+`omarchy-system-wake` call the idle/lock chain already makes. Likewise, only
+`omarchy-brightness-keyboard`'s `off`/`restore` subcommands are wired up;
+`up`/`down`/`cycle` are upstream media-key (XF86Kbd*) bindings this overlay
+does not ship.
 
 Optional: install `ttfx` (AUR) for the idle screensaver and `socat` for its
 multi-monitor placement. Without them the screensaver simply does not start;

@@ -222,7 +222,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-battery-status` | SAFE | package | 0.10.0. Power 패널 구동 기계. Panel.qml:210 이 --shell 을 무조건 호출. 외부 omarchy 의존 0(upower + sysfs) |
 | `omarchy-bluetooth-device` | SAFE | package | 0.10.0. 바 Bluetooth 위젯 pair/connect/disconnect/forget. `omarchy-bluetooth-power`(staged)만 호출. bluetoothctl(opt) |
 | `omarchy-bluetooth-power` | SAFE | package | 0.10.0. 바 Bluetooth 위젯 전원 제어. 외부 omarchy 의존 0(rfkill/bluetoothctl만). rfkill 소프트 블록으로 재부팅 후에도 상태 유지 |
-| `omarchy-brightness-keyboard` | SAFE | package | 0.11.0. lock 플러그인 `runBlank()` + XF86Kbd* 바인딩이 부른다. `omarchy-osd`(staged)만 호출, brightnessctl(OPT) |
+| `omarchy-brightness-keyboard` | SAFE | package | 0.11.0. `off`/`restore` 만 실제로 닿는다 — lock 플러그인 `runBlank()`(off, `Service.qml:411`)와 `omarchy-system-wake`(restore)가 부른다. `up`/`down`/`cycle` 은 업스트림 `default/hypr/bindings/media.lua`의 XF86Kbd* 바인딩 전용인데, 이 오버레이는 `default/hypr/bindings/`를 스테이징하지 않으므로(`stage-upstream.sh`는 `default/hypr/toggles`만 올린다) 트리거가 없다. `omarchy-osd`(staged)만 호출, brightnessctl(OPT) |
 | `omarchy-brightness-display` | SAFE | package | 포커스 모니터 밝기. 내부 backlight / DDC / Apple 로 분기. 바 `omarchy-monitor-state` 가 부름 |
 | `omarchy-brightness-display-apple` | SAFE | package | brightness-display Apple 분기. `sudo asdcontrol`(부재 시 실패) |
 | `omarchy-brightness-display-ddc` | SAFE | package | brightness-display 외부 모니터 분기. `ddcutil` optdepend |

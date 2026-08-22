@@ -91,10 +91,17 @@ helper 와 런타임 의존성(`jq`, `wl-clipboard`, `wtype`, `wireplumber`,
 
 ## 세션 생명주기 (v0.11)
 
-idle → screensaver → lock → wake 체인과 노트북 뚜껑 닫기(clamshell) 처리가
-패키징돼 있다: idle 타임아웃은 키보드 백라이트를 끄고 화면을 잠그며, 명시적
-lock 요청은 터미널 스크린세이버를 띄우고, 외부 모니터가 연결된 상태로 뚜껑을
-닫으면 서스펜드 대신 내장 디스플레이만 끈다.
+idle → screensaver → lock → wake 체인이 패키징돼 있다: idle 타임아웃은 키보드
+백라이트를 끄고(`off`) 화면을 잠그며, 명시적 lock 요청은 터미널
+스크린세이버를 띄우고, 깨어날 때 키보드 백라이트를 복원한다(`restore`). 이
+제품에는 노트북 뚜껑 트리거가 없다 — 업스트림 뚜껑 스위치 바인딩
+(`default/hypr/bindings/utilities.lua`)은 전혀 스테이징되지 않으므로, 이
+빌드에서는 뚜껑을 닫아도 `omarchy-hyprland-monitor-clamshell`이 불리지
+않는다. 이 헬퍼는 여전히 출하되고 여전히 닿기는 하지만, idle/lock 체인이
+이미 부르는 `omarchy-system-wake` 경로를 통한 간접 도달일 뿐이다. 마찬가지로
+`omarchy-brightness-keyboard`도 `off`/`restore`만 실제로 연결돼 있고,
+`up`/`down`/`cycle`은 이 오버레이가 스테이징하지 않는 업스트림 미디어 키
+(XF86Kbd*) 바인딩 전용이다.
 
 선택: idle 스크린세이버는 `ttfx`(AUR), 다중 모니터 배치는 `socat` 이 있어야
 한다. 없으면 스크린세이버만 조용히 뜨지 않으며 다른 기능에는 영향이 없다. 이
