@@ -8,6 +8,17 @@ set -uo pipefail
 REPO_ROOT="${REPO_ROOT:?}"
 source "$REPO_ROOT/tests/lib/assert.sh"
 
+# 업데이트 파이프라인 중첩 픽스처(bin/update-upstream 이 후보 트리에서 이 스위트를
+# 돌린다)는 src/omarchy/bin 을 새 핀에서 재생성하는데, 그 픽스처 저장소에는 헬퍼가
+# 5개뿐이라 이 파일이 존재하지 않는다. 이 테스트는 통째로 그 한 파일에 대한
+# 특성화 테스트이므로 중첩 픽스처에서는 잴 것이 없다 — test_weather_helpers.sh 와
+# 같은 가드를 쓴다. 파일 부재가 아니라 중첩 플래그를 조건으로 삼는 것이 중요하다:
+# 부재를 조건으로 하면 실제 스테이징 회귀까지 조용히 통과시킨다.
+if [[ -n ${COO_UPDATE_PIPELINE_NESTED:-} ]]; then
+  printf 'note: 중첩 업데이트 픽스처 — 업스트림 헬퍼 원본 없음, 분기 단언 생략\n'
+  exit 0
+fi
+
 helper=$REPO_ROOT/packages/cachy-omarchy-shell/src/omarchy/bin/omarchy-brightness-keyboard
 assert_file_exists "$helper" "업스트림 소스가 있다"
 
