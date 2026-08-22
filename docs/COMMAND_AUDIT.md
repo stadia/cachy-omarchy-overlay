@@ -237,6 +237,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-clipboard-open` | SAFE | package | M10 clipboard. URL→browser, text→editor, image→`tensaku-edit`(부재 시 127) |
 | `omarchy-clipboard-paste-file` | SAFE | package | M10 clipboard. 선택 시에만 `wl-copy`/`wtype` (D4) |
 | `omarchy-clipboard-paste-text` | SAFE | package | M10 clipboard. 선택 시에만 `wl-copy`/`wtype` (D4) |
+| `omarchy-cmd-missing` | SAFE | package | 0.11.0. `command -v` 부재 가드(cmd-present 의 반대). 화면보호기 런처 첫 줄의 ttfx 가드가 부른다 — 없으면 127 로 끝나 bash `if` 가 거짓으로 읽고 가드를 통과해 버린다(fail-safe 붕괴) |
 | `omarchy-cmd-present` | SAFE | package | `command -v` 루프뿐인 가드. 여러 helper 와 메뉴 `when` 이 부른다 |
 | `omarchy-default-browser` | SAFE | package | 0.8.0 기본 앱. xdg-settings default-web-browser. omarchy-* 의존 0 |
 | `omarchy-default-editor` | SAFE | package | 0.8.0 기본 앱. ~/.local/state/omarchy/defaults/editor 사용자 상태 |
@@ -246,9 +247,12 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-font-list` | SAFE | package | 0.8.0. fc-list 단일 호출 |
 | `omarchy-hibernation-available` | SAFE | package | 0.8.0. /proc/swaps + /sys 읽기 전용 프로브. omarchy_resume.conf 부재 시 exit 1 |
 | `omarchy-hook` | SAFE | package | M9 theme-set post 훅 디스패처 (실측: theme-set 이 부름) |
+| `omarchy-hw-clamshell` | SAFE | package | 0.11.0. 클램셸(뚜껑 닫힘 + 외부 모니터) 판정. `omarchy-hw-laptop-closed` + `omarchy-hw-external-monitors`(둘 다 staged) 만 부르는 순수 조합 프로브 |
 | `omarchy-hw-dell-xps-haptic-touchpad` | SAFE | package | 0.8.0 hw 가드. omarchy-hw-match + /sys/bus/i2c. 행 action 은 cmd-present opt-in |
 | `omarchy-hw-display` | SAFE | package | `/sys/class/backlight` 에서 패널 장치 이름. brightness-display 내부 경로 |
+| `omarchy-hw-external-monitors` | SAFE | package | 0.11.0. `hyprctl monitors -j` 로 외부 모니터 연결 여부만 읽는 순수 프로브. 외부 의존 0 |
 | `omarchy-hw-laptop` | SAFE | package | 0.8.0 hw 가드. /proc/acpi + DMI sysfs. laptop-display/mirror 행 action 은 monitor-internal 스크립트(스테이징됨) |
+| `omarchy-hw-laptop-closed` | SAFE | package | 0.11.0. `/proc/acpi` 읽기뿐인 순수 프로브. 뚜껑 닫힘 판정 |
 | `omarchy-hw-match` | SAFE | package | DMI product name/family 부분 일치. audio-tuning match 가 부름 |
 | `omarchy-hw-touchpad` | SAFE | package | `hyprctl devices -j` + jq. 메뉴 `when` 과 toggle-input-device 가 부름 |
 | `omarchy-hw-touchscreen` | SAFE | package | `hyprctl devices -j` + jq. 메뉴 `when` 과 toggle-input-device 가 부름 |

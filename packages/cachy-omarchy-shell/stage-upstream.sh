@@ -268,6 +268,16 @@ helpers=(
   omarchy-theme-install
   omarchy-theme-remove
   omarchy-theme-update
+  # v0.11.0 Session Lifecycle Parity — 가드와 프로브.
+  # omarchy-cmd-missing: 화면보호기 런처(idle→screensaver 체인의 별도 스크립트)
+  #   첫 줄의 ttfx 가드. 없으면 127 로 끝나 bash if 가 거짓으로 읽고 가드를
+  #   통과해 버린다(fail-safe 붕괴).
+  # hw-laptop-closed / hw-external-monitors / hw-clamshell: 뚜껑+외부모니터
+  #   판정 체인. 전부 /proc·/sys 읽기뿐인 순수 프로브로 외부 의존이 없다.
+  omarchy-cmd-missing
+  omarchy-hw-laptop-closed
+  omarchy-hw-external-monitors
+  omarchy-hw-clamshell
 )
 
 for helper in "${helpers[@]}"; do
