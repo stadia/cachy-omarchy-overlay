@@ -372,6 +372,17 @@ if [[ -s $OMARCHY_STATE_DIR/current/theme.name && -f $HYPR_DIR/hyprland.conf ]] 
     warn "theme hyprland.lua not sourced — run: cachy-omarchy-bindings --force"
   fi
 fi
+
+# v0.11: the toggles seam only holds for lua configs (2026-08-23 nested
+# Hyprland measurement — a .conf source of a *.lua glob parses without error,
+# but only because the parser treats each line as a generic config keyword;
+# it never executes the Lua, so hl.monitor() calls are silently no-ops). A
+# conf user who enables the clamshell/monitor toggle would just pile up
+# unread files, so this stays loud rather than quiet.
+if [[ -f $HYPR_DIR/hyprland.conf && ! -f $HYPR_DIR/hyprland.lua ]] \
+  && compgen -G "$OMARCHY_STATE_DIR/toggles/hypr/*.lua" >/dev/null; then
+  warn "hyprland.conf setup: omarchy hypr toggles are not applied: $OMARCHY_STATE_DIR/toggles/hypr/*.lua (clamshell/monitor toggles are ignored — switch to a hyprland.lua config to make them take effect)"
+fi
 # M10: jq 는 hard depends 로 승격됐다 (clipboard history, reminders timer JSON,
 # OSD payload). pacman 이 강제하지만 깨진 설치는 여기서 드러나야 한다.
 if command -v jq >/dev/null 2>&1; then

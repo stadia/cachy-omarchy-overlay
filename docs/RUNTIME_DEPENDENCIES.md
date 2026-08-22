@@ -178,8 +178,10 @@
 | `setsid` | `util-linux` | BASE | 기반 |
 | `sleep` | `coreutils` | BASE | 기반 |
 | `slurp` | `slurp` | HARD | 스크린샷 영역 선택 행의 구동 기계(§4.2 개정) — grim과 짝을 이루는 동일 기능 |
+| `socat` | `socat` | OPT | omarchy-launch-screensaver 가 Hyprland .socket2 이벤트 스트림을 읽어 모니터별 창 매핑을 기다린다 — 스크린세이버는 idle 진입이나 메뉴 선택으로만 도달하는 OPT 경로다 |
 | `sort` | `coreutils` | BASE | 기반 |
 | `stat` | `coreutils` | BASE | 기반 |
+| `stty` | `coreutils` | BASE | omarchy-screensaver 가 터미널 리사이즈를 기다리며 stty size 로 폭·높이를 폴링한다 — ttfx 를 80x24 기본 크기로 먼저 그리는 것을 막는 가드 |
 | `sudo` | `sudo` | HARD | cachy-omarchy-init 이 락스크린 PAM 서비스 설정을 omarchy-apply-lock 에 위임하며 그것이 root 를 요구한다 — 메뉴 행이 아니라 우리 설치 경로에서 도달(컨트롤러 룰링, task-2) |
 | `systemctl` | `systemd` | BASE | 기반 |
 | `systemd-run` | `systemd` | BASE | 기반 |
@@ -194,6 +196,8 @@
 | `top` | `procps-ng` | HARD | procps-ng 가 제공(pacman -Ql 실측) — omarchy-system-stats CPU 통계 경로. procps-ng 는 이미 depends |
 | `touch` | `coreutils` | BASE | 기반 |
 | `tr` | `coreutils` | BASE | 기반 |
+| `ttfx` | `ttfx` | AUR | 스크린세이버 효과 렌더러(omarchy-screensaver 가 exec 한다). 리포 무결과(pacman -Ss ttfx 0건, 2026-08-23 실측)로 AUR 전용 — depends 에 두면 pacman -U 가 해결하지 못해 우리 패키지 자체가 설치 불가해진다(bin/install-packages:55). 부재는 omarchy-launch-screensaver 첫 줄의 omarchy-cmd-missing 가드가 exit 1 로 흡수한다 |
+| `tty` | `coreutils` | BASE | omarchy-screensaver 가 pty 리사이즈를 기다리기 전에 자기 tty 를 확인한다 |
 | `update-desktop-database` | `desktop-file-utils` | OPT | webapp 제거 후 desktop DB 갱신(omarchy-webapp-remove) — 이전에는 BASE 로 적혀 있었으나 선언된 depends 의 전이 폐포에도 base/base-devel 에도 없다(BASE 정당성 검사 실측) |
 | `upower` | `upower` | HARD | Power 패널 구동 기계 — Panel.qml:210이 omarchy-battery-status --shell을 무조건 실행 |
 | `usbreset` | `usbutils` | OPT | USB 오디오 장치 복구 메뉴 항목 |
@@ -210,9 +214,9 @@
 | `xkbcli` | `libxkbcommon` | BASE | 이미 선언된 의존의 전이 의존(§4.2 개정) |
 | `zbarimg` | `zbar` | OPT | QR 코드 스캔 메뉴 항목 |
 
-tests/data/command-packages.tsv: 전체 112행, 위 표에는 도달한 108행이 모두 실린다(BASE 59행 포함 — BASE 는 declare 대상이 아닐 뿐 검사 대상에서 빠지지 않는다)
+tests/data/command-packages.tsv: 전체 116행, 위 표에는 도달한 112행이 모두 실린다(BASE 61행 포함 — BASE 는 declare 대상이 아닐 뿐 검사 대상에서 빠지지 않는다)
 
-docs/COMMAND_AUDIT.md 의 DISABLED 행으로 메뉴 루트에서 억제된 이름: 92개 (의도적으로 미지원인 Omarchy OS 스택 — 예외 파일과 달리 사유·신선도 검사가 없는 통로다)
+docs/COMMAND_AUDIT.md 의 DISABLED 행으로 메뉴 루트에서 억제된 이름: 91개 (의도적으로 미지원인 Omarchy OS 스택 — 예외 파일과 달리 사유·신선도 검사가 없는 통로다)
 - `omarchy-branding-about`
 - `omarchy-branding-screensaver`
 - `omarchy-channel-current`
@@ -254,7 +258,6 @@ docs/COMMAND_AUDIT.md 의 DISABLED 행으로 메뉴 루트에서 억제된 이�
 - `omarchy-install-terminal`
 - `omarchy-launch-about`
 - `omarchy-launch-floating-terminal-with-presentation`
-- `omarchy-launch-screensaver`
 - `omarchy-menu-herdr-keybindings`
 - `omarchy-menu-plugin`
 - `omarchy-menu-share`

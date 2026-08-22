@@ -89,6 +89,26 @@ helper 와 런타임 의존성(`jq`, `wl-clipboard`, `wtype`, `wireplumber`,
 기본값이 통째로 무시되고, `cachy-omarchy-doctor` 가 존재 시 WARN 한다
 (`docs/RUNTIME_STARTUP.md`, `docs/RC_GAP_INVENTORY.md`).
 
+## 세션 생명주기 (v0.11)
+
+idle → screensaver → lock → wake 체인이 패키징돼 있다: idle 타임아웃은 키보드
+백라이트를 끄고(`off`) 화면을 잠그며, 명시적 lock 요청은 터미널
+스크린세이버를 띄우고, 깨어날 때 키보드 백라이트를 복원한다(`restore`). 이
+제품에는 노트북 뚜껑 트리거가 없다 — 업스트림 뚜껑 스위치 바인딩
+(`default/hypr/bindings/utilities.lua`)은 전혀 스테이징되지 않으므로, 이
+빌드에서는 뚜껑을 닫아도 `omarchy-hyprland-monitor-clamshell`이 불리지
+않는다. 이 헬퍼는 여전히 출하되고 여전히 닿기는 하지만, idle/lock 체인이
+이미 부르는 `omarchy-system-wake` 경로를 통한 간접 도달일 뿐이다. 마찬가지로
+`omarchy-brightness-keyboard`도 `off`/`restore`만 실제로 연결돼 있고,
+`up`/`down`/`cycle`은 이 오버레이가 스테이징하지 않는 업스트림 미디어 키
+(XF86Kbd*) 바인딩 전용이다.
+
+선택: idle 스크린세이버는 `ttfx`(AUR), 다중 모니터 배치는 `socat` 이 있어야
+한다. 없으면 스크린세이버만 조용히 뜨지 않으며 다른 기능에는 영향이 없다. 이
+체인이 쓰는 clamshell/toggle seam 은 `hyprland.lua` 설정에서만 동작한다 —
+`hyprland.conf` 사용자는 toggle 파일이 있으면 `cachy-omarchy-doctor` 가
+WARN 한다(`docs/RUNTIME_STARTUP.md` 참고).
+
 ## 기동 모델
 
 셸은 systemd 유닛이 아니라 **Hyprland autostart**로 뜬다 — 업스트림 omarchy와 같은
@@ -181,6 +201,18 @@ bin/rollback                 # 이전 핀으로 복귀
   `omarchy-weather-status`. Power 패널 배터리 상세 행과 bar
   monitor/audio/bluetooth/weather 위젯이 더 이상 exit 127 로 죽지 않는다. 남은
   실측 격차: `xdg-terminal-exec` 는 여전히 AUR 전용(방향은 v0.11 선행).
+- **v0.11 (세션 생명주기 parity)** — idle → screensaver → lock → wake 체인을
+  닫았다. 계획 당시 후보는 7이었으나 클로저를 열어보니 예외 표에 행조차
+  없던 미스테이징 4개가 더 있어 실제 출하 집합은 9다: `omarchy-cmd-missing`,
+  `omarchy-hw-laptop-closed`, `omarchy-hw-external-monitors`,
+  `omarchy-hw-clamshell`, `omarchy-brightness-keyboard`,
+  `omarchy-hyprland-monitor-clamshell`, `omarchy-system-wake`,
+  `omarchy-screensaver`, `omarchy-launch-screensaver` — 그리고 터미널
+  screensaver 설정 3개. `overlay/hypr/bindings.lua` 에 새 `pcall(dofile)`
+  sweep 블록을 놓아 clamshell(그리고 이미 스테이징돼 있던
+  `omarchy-hyprland-monitor-internal(-mirror)`)이 필요로 하는
+  `hyprland.lua` 전용 toggle seam 을 열었다. `xdg-terminal-exec` 는 여전히
+  AUR optdepend — fallback 어댑터는 만들지 않는다.
 
 ## 라이선스
 

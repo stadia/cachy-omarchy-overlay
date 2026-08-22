@@ -31,6 +31,15 @@ install -D -m644 "$src/default/systemd/user/omarchy-speaker-tuning.service" \
 install -d "$dest/usr/share/cachy-omarchy/upstream/default/hypr"
 cp -a "$src/default/hypr/toggles" \
   "$dest/usr/share/cachy-omarchy/upstream/default/hypr/toggles"
+# 스크린세이버 터미널 설정 (v0.11). omarchy-launch-screensaver 가
+# $OMARCHY_PATH/default/{alacritty,foot,ghostty}/screensaver* 를 --config 로
+# 넘긴다. kitty 는 --override 인자만 쓰므로 설정 파일이 없다.
+install -D -m644 "$src/default/alacritty/screensaver.toml" \
+  "$dest/usr/share/cachy-omarchy/upstream/default/alacritty/screensaver.toml"
+install -D -m644 "$src/default/foot/screensaver.ini" \
+  "$dest/usr/share/cachy-omarchy/upstream/default/foot/screensaver.ini"
+install -D -m644 "$src/default/ghostty/screensaver" \
+  "$dest/usr/share/cachy-omarchy/upstream/default/ghostty/screensaver"
 # 바·패널 위젯이 bare name 으로 부르는 업스트림 helper 를 verbatim 으로
 # 스테이징한다 (셸 래퍼가 $OMARCHY_PATH/bin 을 셸 프로세스 PATH 에 붙인다).
 # 목록은 위젯 실측에서 나왔다 — M8 평가 문서 "helper 처리 방침" Tier A·B.
@@ -194,6 +203,12 @@ helpers=(
   omarchy-hyprland-toggle-disabled
   omarchy-hyprland-monitor-laptop
   omarchy-hyprland-monitor-external-active
+  # 뚜껑 닫기(switch:off:Lid Switch, default/hypr/bindings/utilities.lua:35).
+  # disable_internal() 이 ~/.local/state/omarchy/toggles/hypr/*.lua 를 쓰고
+  # hyprctl reload 하므로, overlay/hypr/bindings.lua 의 toggles sweep 블록이
+  # 먼저 있어야 한다(v0.11 seam). 우리가 hyprctl reload 를 추가하지는
+  # 않는다 — 뚜껑 스위치라는 명시적 하드웨어 동작에 대한 업스트림 설계다.
+  omarchy-hyprland-monitor-clamshell
   # 가시성/잠금화면 토글: 본체가 `omarchy-toggle <flag>-off` 디스패처를 부른다.
   # omarchy-toggle 은 ~/.local/state/omarchy/toggles/<flag> 파일을 뒤집는 순수
   # 사용자 상태 플리퍼(omarchy-toggle-enabled 와 동일 티어). crash-capture 는
@@ -268,6 +283,28 @@ helpers=(
   omarchy-theme-install
   omarchy-theme-remove
   omarchy-theme-update
+  # v0.11.0 Session Lifecycle Parity — 가드와 프로브.
+  # omarchy-cmd-missing: 화면보호기 런처(idle→screensaver 체인의 별도 스크립트)
+  #   첫 줄의 ttfx 가드. 없으면 127 로 끝나 bash if 가 거짓으로 읽고 가드를
+  #   통과해 버린다(fail-safe 붕괴).
+  # hw-laptop-closed / hw-external-monitors / hw-clamshell: 뚜껑+외부모니터
+  #   판정 체인. 전부 /proc·/sys 읽기뿐인 순수 프로브로 외부 의존이 없다.
+  omarchy-cmd-missing
+  omarchy-hw-laptop-closed
+  omarchy-hw-external-monitors
+  omarchy-hw-clamshell
+  # 키보드 백라이트. lock 플러그인 runBlank() 와 XF86Kbd* 바인딩이 부른다.
+  # brightnessctl(OPT) 은 이미 optdepends, omarchy-osd 는 이미 스테이징.
+  omarchy-brightness-keyboard
+  # wake 끝단: idle/Service.qml:106 과 lock/Service.qml:406(runWake) 이 부른다.
+  # 자체 체인은 brightness-display(기존) + brightness-keyboard + clamshell 셋뿐.
+  omarchy-system-wake
+  # 스크린세이버 짝. idle/Service.qml:68 과 메뉴 system.screensaver 가
+  # launch 를 부르고, launch 가 터미널 안에서 본체를 exec 한다 — 짝으로 온다.
+  # ttfx 는 리포에 없다(AUR). 부재는 crash 가 아니라 launch 첫 줄의
+  # `omarchy-cmd-missing ttfx && exit 1` 로 흡수된다 — 그 가드가 Task 1 이다.
+  omarchy-screensaver
+  omarchy-launch-screensaver
 )
 
 for helper in "${helpers[@]}"; do

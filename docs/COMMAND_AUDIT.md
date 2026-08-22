@@ -111,11 +111,11 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 
 | command | plugin | class | action |
 | --- | --- | --- | --- |
-| `omarchy-launch-screensaver` | idle | DISABLED | disable plugin. `tests/data/closure-exceptions.tsv` 에 사유·체인 등록(v0.9, 추적 0.11.0) |
+| `omarchy-launch-screensaver` | idle | SAFE | package (0.11.0). 짝 헬퍼 `omarchy-screensaver` 와 함께 스테이징 — 하나만 올리면 창이 뜨고 본체가 127 로 즉시 죽는다. `tests/data/closure-exceptions.tsv` 예외 행 회수 |
 | `omarchy-system-lock` | idle | DISABLED | disable plugin |
-| `omarchy-system-wake` | idle | DISABLED (idle) / **미스테이징 (lock)** | lock 플러그인의 `runWake()` 도 이름으로 부른다. 미스테이징이라 127 — 순수 기능 손실(잠금 중 화면 깨우기 없음), 위험은 없음. 후속 verbatim 후보 (RUNTIME_STARTUP §22.5). `tests/data/closure-exceptions.tsv` 등록(v0.9, 추적 0.11.0) |
+| `omarchy-system-wake` | idle / lock | SAFE | package (0.11.0). idle 플러그인 종료 경로와 lock 플러그인의 `runWake()` 양쪽이 부른다. 자체 체인(brightness-display/brightness-keyboard/hyprland-monitor-clamshell) 전부 staged |
 | `omarchy-hyprland-session-locked` | lock | **DISABLED — 공존 위험** | **의도적 미스테이징.** `strandedLockCheckProc` 가 이걸 불러 exit 0 이면 세션 잠금을 회수하려 하는데, hyprlock 이 이미 쥔 상태면 ext-session-lock 거부로 **quickshell 이 죽는다**(실측 §22.4). 헬퍼가 없으면 127 → 복구 경로가 조용히 비활성 = fail-safe. `test_staged_session_helpers.sh` 가 고정. `tests/data/closure-exceptions.tsv` 에도 등록(v0.9, milestone=blocked — 크기가 아니라 스테이징 자체가 실측된 크래시를 만들기 때문. `never` 는 미래 작업이 다시 안 볼 표시라 부정확 — 해제 조건: ext-session-lock 거부가 quickshell 을 죽이지 않게 되기 전까지) |
-| `omarchy-brightness-keyboard` | lock | 미스테이징 | lock 의 `runBlank()` 가 부른다. 127 — 키보드 백라이트 안 꺼짐. 위험 없음, 후속 verbatim 후보. `tests/data/closure-exceptions.tsv` 등록(v0.9, 추적 0.11.0) |
+| `omarchy-brightness-keyboard` | lock | SAFE | package (0.11.0). lock 의 `runBlank()` 가 부른다. `omarchy-osd`(staged)만 호출 |
 | `omarchy-battery-low` | battery | SAFE | package — v0.9. battery 플러그인(기본 활성)이 10% 이하에서 부른다. 체인은 omarchy-notification-send + omarchy-hook 뿐이라 verbatim |
 | `omarchy-powerprofiles-set` | battery | DISABLED | disable plugin |
 | `omarchy-notification-send` | 여러 패널 | SAFE | package — M8 Tier B. `omarchy-reminder` 와 `omarchy-theme-set` 이 부른다(실측). 알림 표시 자체는 셸 플러그인 정책이지 이 helper 의 스테이징 여부와 별개다 |
@@ -222,6 +222,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-battery-status` | SAFE | package | 0.10.0. Power 패널 구동 기계. Panel.qml:210 이 --shell 을 무조건 호출. 외부 omarchy 의존 0(upower + sysfs) |
 | `omarchy-bluetooth-device` | SAFE | package | 0.10.0. 바 Bluetooth 위젯 pair/connect/disconnect/forget. `omarchy-bluetooth-power`(staged)만 호출. bluetoothctl(opt) |
 | `omarchy-bluetooth-power` | SAFE | package | 0.10.0. 바 Bluetooth 위젯 전원 제어. 외부 omarchy 의존 0(rfkill/bluetoothctl만). rfkill 소프트 블록으로 재부팅 후에도 상태 유지 |
+| `omarchy-brightness-keyboard` | SAFE | package | 0.11.0. `off`/`restore` 만 실제로 닿는다 — lock 플러그인 `runBlank()`(off, `Service.qml:411`)와 `omarchy-system-wake`(restore)가 부른다. `up`/`down`/`cycle` 은 업스트림 `default/hypr/bindings/media.lua`의 XF86Kbd* 바인딩 전용인데, 이 오버레이는 `default/hypr/bindings/`를 스테이징하지 않으므로(`stage-upstream.sh`는 `default/hypr/toggles`만 올린다) 트리거가 없다. `omarchy-osd`(staged)만 호출, brightnessctl(OPT) |
 | `omarchy-brightness-display` | SAFE | package | 포커스 모니터 밝기. 내부 backlight / DDC / Apple 로 분기. 바 `omarchy-monitor-state` 가 부름 |
 | `omarchy-brightness-display-apple` | SAFE | package | brightness-display Apple 분기. `sudo asdcontrol`(부재 시 실패) |
 | `omarchy-brightness-display-ddc` | SAFE | package | brightness-display 외부 모니터 분기. `ddcutil` optdepend |
@@ -237,6 +238,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-clipboard-open` | SAFE | package | M10 clipboard. URL→browser, text→editor, image→`tensaku-edit`(부재 시 127) |
 | `omarchy-clipboard-paste-file` | SAFE | package | M10 clipboard. 선택 시에만 `wl-copy`/`wtype` (D4) |
 | `omarchy-clipboard-paste-text` | SAFE | package | M10 clipboard. 선택 시에만 `wl-copy`/`wtype` (D4) |
+| `omarchy-cmd-missing` | SAFE | package | 0.11.0. `command -v` 부재 가드(cmd-present 의 반대). 화면보호기 런처 첫 줄의 ttfx 가드가 부른다 — 없으면 127 로 끝나 bash `if` 가 거짓으로 읽고 가드를 통과해 버린다(fail-safe 붕괴) |
 | `omarchy-cmd-present` | SAFE | package | `command -v` 루프뿐인 가드. 여러 helper 와 메뉴 `when` 이 부른다 |
 | `omarchy-default-browser` | SAFE | package | 0.8.0 기본 앱. xdg-settings default-web-browser. omarchy-* 의존 0 |
 | `omarchy-default-editor` | SAFE | package | 0.8.0 기본 앱. ~/.local/state/omarchy/defaults/editor 사용자 상태 |
@@ -246,14 +248,18 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-font-list` | SAFE | package | 0.8.0. fc-list 단일 호출 |
 | `omarchy-hibernation-available` | SAFE | package | 0.8.0. /proc/swaps + /sys 읽기 전용 프로브. omarchy_resume.conf 부재 시 exit 1 |
 | `omarchy-hook` | SAFE | package | M9 theme-set post 훅 디스패처 (실측: theme-set 이 부름) |
+| `omarchy-hw-clamshell` | SAFE | package | 0.11.0. 클램셸(뚜껑 닫힘 + 외부 모니터) 판정. `omarchy-hw-laptop-closed` + `omarchy-hw-external-monitors`(둘 다 staged) 만 부르는 순수 조합 프로브 |
 | `omarchy-hw-dell-xps-haptic-touchpad` | SAFE | package | 0.8.0 hw 가드. omarchy-hw-match + /sys/bus/i2c. 행 action 은 cmd-present opt-in |
 | `omarchy-hw-display` | SAFE | package | `/sys/class/backlight` 에서 패널 장치 이름. brightness-display 내부 경로 |
+| `omarchy-hw-external-monitors` | SAFE | package | 0.11.0. `hyprctl monitors -j` 로 외부 모니터 연결 여부만 읽는 순수 프로브. 외부 의존 0 |
 | `omarchy-hw-laptop` | SAFE | package | 0.8.0 hw 가드. /proc/acpi + DMI sysfs. laptop-display/mirror 행 action 은 monitor-internal 스크립트(스테이징됨) |
+| `omarchy-hw-laptop-closed` | SAFE | package | 0.11.0. `/proc/acpi` 읽기뿐인 순수 프로브. 뚜껑 닫힘 판정 |
 | `omarchy-hw-match` | SAFE | package | DMI product name/family 부분 일치. audio-tuning match 가 부름 |
 | `omarchy-hw-touchpad` | SAFE | package | `hyprctl devices -j` + jq. 메뉴 `when` 과 toggle-input-device 가 부름 |
 | `omarchy-hw-touchscreen` | SAFE | package | `hyprctl devices -j` + jq. 메뉴 `when` 과 toggle-input-device 가 부름 |
 | `omarchy-hw-webcam` | SAFE | package | 0.8.0 hw 가드. capture-webcam-list 전이 1행 |
 | `omarchy-hyprland-focus-app` | SAFE | package | M10 clipboard 전이 closure |
+| `omarchy-hyprland-monitor-clamshell` | SAFE | package | 0.11.0. 뚜껑 닫기(switch:off:Lid Switch). disable_internal() 이 toggles/hypr/*.lua 를 쓰고 hyprctl reload. v0.11 toggles seam 위에 선다 |
 | `omarchy-hyprland-monitor-external-active` | SAFE | package | 0.8.0 하이프랜드 토글 전이. hyprctl monitors -j 외부 활성 검사 |
 | `omarchy-hyprland-monitor-focused` | SAFE | package | brightness-display 가 포커스 모니터 이름을 얻을 때 부름 |
 | `omarchy-hyprland-monitor-focused-apple` | SAFE | package | brightness-display Apple 분기 가드 |
@@ -272,6 +278,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-launch-config-editor` | SAFE | package | 0.8.0 런처. launch-editor(staged) 3행 래퍼 |
 | `omarchy-launch-discord-community` | SAFE | package | 0.8.0 런처. cmd-present discord 가드 후 launch-webapp 전이 |
 | `omarchy-launch-editor` | SAFE | package | M10 clipboard 전이 closure |
+| `omarchy-launch-screensaver` | SAFE | package | 0.11.0. 짝 헬퍼 `omarchy-screensaver` 와 함께 스테이징 — 하나만 올리면 창이 뜨고 본체가 127 로 즉시 죽는다. `tests/data/closure-exceptions.tsv` 예외 행 회수 |
 | `omarchy-launch-tui` | SAFE | package | M10 clipboard 전이 closure |
 | `omarchy-launch-webapp` | SAFE | package | 0.8.0 런처 keystone. .desktop Exec 추출 → uwsm-app --app=$url. omarchy-* 의존 0 |
 | `omarchy-menu` | SAFE | package | 0.8.0. 순수 IPC 래퍼 — omarchy-shell shell toggle/summon/hide/call 만 호출 |
@@ -301,6 +308,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-restart-terminal` | SAFE | package | M9 theme-set post 훅 — 새 팔레트 반영 |
 | `omarchy-restart-trackpad` | SAFE | package | 0.8.0. i2c_hid_acpi 언바인드/바인드 + modprobe. 표준 sysfs/sudo |
 | `omarchy-restart-wifi` | SAFE | package | 0.8.0. rfkill unblock wifi + nmcli radio. 표준 도구 |
+| `omarchy-screensaver` | SAFE | package | 0.11.0. 스크린세이버 본체 — `omarchy-launch-screensaver` 가 터미널 안에서 exec 한다. ttfx(AUR)로 효과를 그린다 |
 | `omarchy-shell-config` | SAFE | package | `omarchy-bar` 가 source 하는 설정 헬퍼 |
 | `omarchy-state` | SAFE | package | reboot/shutdown 전이 |
 | `omarchy-sudo-passwordless` | SAFE | package | 0.8.0. /etc/sudoers.d/99-omarchy-nopasswd-$USER 작성 + systemd-run 자동 만료. self-contained |
@@ -309,6 +317,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-system-reboot` | SAFE | package | 메뉴 `system.reboot`. osd/state/close-all 전이 |
 | `omarchy-system-shutdown` | SAFE | package | 메뉴 `system.shutdown`. osd/state/close-all 전이 |
 | `omarchy-system-stats` | SAFE | package | 0.10.0. 바 monitor 위젯 구동 기계. /proc 읽기 + top(procps-ng)뿐, 외부 omarchy 의존 0 |
+| `omarchy-system-wake` | SAFE | package | 0.11.0. idle 플러그인 종료 경로 + lock 플러그인 `runWake()` 가 부른다. 자체 체인은 brightness-display/brightness-keyboard/hyprland-monitor-clamshell(전부 staged) 셋뿐인 10줄 |
 | `omarchy-theme-bg-cache` | SAFE | package | M9 배경 묶음 (theme-set 이 부름) |
 | `omarchy-theme-bg-current` | SAFE | package | M9 배경 묶음 |
 | `omarchy-theme-bg-next` | SAFE | package | M9 배경 묶음 |
@@ -455,7 +464,7 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-launch-config-editor` | SAFE | package | 0.8.0 verbatim stage. launch-editor(staged) 3행 래퍼 |
 | `omarchy-launch-discord-community` | SAFE | package | 0.8.0 verbatim stage. cmd-present discord 후 launch-webapp 전이 |
 | `omarchy-launch-floating-terminal-with-presentation` | DISABLED | disable | gum 프레젠테이션 레이어(`omarchy-restart-gum`/`-show-logo`/`-show-done`) 전체가 미스테이징이라 이 얇은 앞단만 올려도 죽는다. `update.hardware.audio` 메뉴 행이 이 뒤에 붙어 있어 부재 시 실패(위 `omarchy-restart-audio` 행 참조). `tests/data/closure-exceptions.tsv` 등록(v0.9, 추적 0.11.0) |
-| `omarchy-launch-screensaver` | DISABLED | disable | ttfx/socat/omarchy-screensaver/터미널별 설정까지 딸린 별도 클로저라 크기로 미룬다(공식 런처 전체를 배제한다는 뜻이 아니다). `tests/data/closure-exceptions.tsv` 등록(v0.9, 추적 0.11.0) |
+| `omarchy-launch-screensaver` | SAFE | package | 0.11.0 verbatim stage. 짝 헬퍼 `omarchy-screensaver` 와 함께 올린다 — 하나만 올리면 창이 뜨고 본체가 127 로 즉시 죽는다. `tests/data/closure-exceptions.tsv` 예외 행 회수 |
 | `omarchy-launch-webapp` | SAFE | package | 0.8.0 verbatim stage. .desktop Exec 추출 → uwsm-app --app=$url. keystone |
 | `omarchy-menu` | SAFE | package | 0.8.0 verbatim stage. 순수 IPC 래퍼 — omarchy-shell toggle/summon/hide/call |
 | `omarchy-menu-emoji` | SAFE | package | M10: verbatim stage (`shell toggle omarchy.emojis`) + `omarchy-menu-emoji-insert` closure. wtype/wl-copy 는 hard depends |
