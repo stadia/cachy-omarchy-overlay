@@ -93,6 +93,19 @@ bar layout in `~/.config/omarchy/shell.json`. Creating that file does not
 deep-merge: package defaults are ignored wholesale, and `cachy-omarchy-doctor`
 WARNs on its existence (`docs/RUNTIME_STARTUP.md`, `docs/RC_GAP_INVENTORY.md`).
 
+## Session lifecycle (v0.11)
+
+The idle → screensaver → lock → wake chain and laptop-lid clamshell handling are
+packaged: idle timeout dims the keyboard backlight and locks the screen, an explicit
+lock request launches the terminal screensaver, and closing the lid with an external
+monitor connected disables the internal display instead of suspending.
+
+Optional: install `ttfx` (AUR) for the idle screensaver and `socat` for its
+multi-monitor placement. Without them the screensaver simply does not start;
+nothing else is affected. The clamshell/toggle seam that this chain uses only
+runs for `hyprland.lua` configs — `hyprland.conf` users are WARNed by
+`cachy-omarchy-doctor` if they have toggle files (see `docs/RUNTIME_STARTUP.md`).
+
 ## Startup model
 
 The shell starts from **Hyprland autostart**, not from a systemd unit — the same model
@@ -188,6 +201,17 @@ file only.
   detail rows and the bar monitor/audio/bluetooth/weather widgets no longer
   exit 127. Remaining live gap: `xdg-terminal-exec` is still AUR-only (direction
   deferred to v0.11).
+- **v0.11 (session lifecycle parity)** — closed the idle → screensaver → lock →
+  wake chain. Planning expected seven candidates; opening the closure found
+  four more with no exception row at all, so the actual ship set is nine:
+  `omarchy-cmd-missing`, `omarchy-hw-laptop-closed`, `omarchy-hw-external-monitors`,
+  `omarchy-hw-clamshell`, `omarchy-brightness-keyboard`,
+  `omarchy-hyprland-monitor-clamshell`, `omarchy-system-wake`,
+  `omarchy-screensaver`, `omarchy-launch-screensaver`, plus the three terminal
+  screensaver configs. A new `pcall(dofile)` sweep block in
+  `overlay/hypr/bindings.lua` opens the `hyprland.lua`-only toggles seam that
+  clamshell (and the already-staged `omarchy-hyprland-monitor-internal(-mirror)`)
+  needs. `xdg-terminal-exec` stays an AUR optdepend — no fallback adapter.
 
 ## License
 

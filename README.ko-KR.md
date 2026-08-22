@@ -89,6 +89,19 @@ helper 와 런타임 의존성(`jq`, `wl-clipboard`, `wtype`, `wireplumber`,
 기본값이 통째로 무시되고, `cachy-omarchy-doctor` 가 존재 시 WARN 한다
 (`docs/RUNTIME_STARTUP.md`, `docs/RC_GAP_INVENTORY.md`).
 
+## 세션 생명주기 (v0.11)
+
+idle → screensaver → lock → wake 체인과 노트북 뚜껑 닫기(clamshell) 처리가
+패키징돼 있다: idle 타임아웃은 키보드 백라이트를 끄고 화면을 잠그며, 명시적
+lock 요청은 터미널 스크린세이버를 띄우고, 외부 모니터가 연결된 상태로 뚜껑을
+닫으면 서스펜드 대신 내장 디스플레이만 끈다.
+
+선택: idle 스크린세이버는 `ttfx`(AUR), 다중 모니터 배치는 `socat` 이 있어야
+한다. 없으면 스크린세이버만 조용히 뜨지 않으며 다른 기능에는 영향이 없다. 이
+체인이 쓰는 clamshell/toggle seam 은 `hyprland.lua` 설정에서만 동작한다 —
+`hyprland.conf` 사용자는 toggle 파일이 있으면 `cachy-omarchy-doctor` 가
+WARN 한다(`docs/RUNTIME_STARTUP.md` 참고).
+
 ## 기동 모델
 
 셸은 systemd 유닛이 아니라 **Hyprland autostart**로 뜬다 — 업스트림 omarchy와 같은
@@ -181,6 +194,18 @@ bin/rollback                 # 이전 핀으로 복귀
   `omarchy-weather-status`. Power 패널 배터리 상세 행과 bar
   monitor/audio/bluetooth/weather 위젯이 더 이상 exit 127 로 죽지 않는다. 남은
   실측 격차: `xdg-terminal-exec` 는 여전히 AUR 전용(방향은 v0.11 선행).
+- **v0.11 (세션 생명주기 parity)** — idle → screensaver → lock → wake 체인을
+  닫았다. 계획 당시 후보는 7이었으나 클로저를 열어보니 예외 표에 행조차
+  없던 미스테이징 4개가 더 있어 실제 출하 집합은 9다: `omarchy-cmd-missing`,
+  `omarchy-hw-laptop-closed`, `omarchy-hw-external-monitors`,
+  `omarchy-hw-clamshell`, `omarchy-brightness-keyboard`,
+  `omarchy-hyprland-monitor-clamshell`, `omarchy-system-wake`,
+  `omarchy-screensaver`, `omarchy-launch-screensaver` — 그리고 터미널
+  screensaver 설정 3개. `overlay/hypr/bindings.lua` 에 새 `pcall(dofile)`
+  sweep 블록을 놓아 clamshell(그리고 이미 스테이징돼 있던
+  `omarchy-hyprland-monitor-internal(-mirror)`)이 필요로 하는
+  `hyprland.lua` 전용 toggle seam 을 열었다. `xdg-terminal-exec` 는 여전히
+  AUR optdepend — fallback 어댑터는 만들지 않는다.
 
 ## 라이선스
 
