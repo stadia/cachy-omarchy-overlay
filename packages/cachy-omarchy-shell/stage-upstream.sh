@@ -31,6 +31,15 @@ install -D -m644 "$src/default/systemd/user/omarchy-speaker-tuning.service" \
 install -d "$dest/usr/share/cachy-omarchy/upstream/default/hypr"
 cp -a "$src/default/hypr/toggles" \
   "$dest/usr/share/cachy-omarchy/upstream/default/hypr/toggles"
+# 스크린세이버 터미널 설정 (v0.11). omarchy-launch-screensaver 가
+# $OMARCHY_PATH/default/{alacritty,foot,ghostty}/screensaver* 를 --config 로
+# 넘긴다. kitty 는 --override 인자만 쓰므로 설정 파일이 없다.
+install -D -m644 "$src/default/alacritty/screensaver.toml" \
+  "$dest/usr/share/cachy-omarchy/upstream/default/alacritty/screensaver.toml"
+install -D -m644 "$src/default/foot/screensaver.ini" \
+  "$dest/usr/share/cachy-omarchy/upstream/default/foot/screensaver.ini"
+install -D -m644 "$src/default/ghostty/screensaver" \
+  "$dest/usr/share/cachy-omarchy/upstream/default/ghostty/screensaver"
 # 바·패널 위젯이 bare name 으로 부르는 업스트림 helper 를 verbatim 으로
 # 스테이징한다 (셸 래퍼가 $OMARCHY_PATH/bin 을 셸 프로세스 PATH 에 붙인다).
 # 목록은 위젯 실측에서 나왔다 — M8 평가 문서 "helper 처리 방침" Tier A·B.
@@ -290,6 +299,12 @@ helpers=(
   # wake 끝단: idle/Service.qml:106 과 lock/Service.qml:406(runWake) 이 부른다.
   # 자체 체인은 brightness-display(기존) + brightness-keyboard + clamshell 셋뿐.
   omarchy-system-wake
+  # 스크린세이버 짝. idle/Service.qml:68 과 메뉴 system.screensaver 가
+  # launch 를 부르고, launch 가 터미널 안에서 본체를 exec 한다 — 짝으로 온다.
+  # ttfx 는 리포에 없다(AUR). 부재는 crash 가 아니라 launch 첫 줄의
+  # `omarchy-cmd-missing ttfx && exit 1` 로 흡수된다 — 그 가드가 Task 1 이다.
+  omarchy-screensaver
+  omarchy-launch-screensaver
 )
 
 for helper in "${helpers[@]}"; do

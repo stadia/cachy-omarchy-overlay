@@ -70,4 +70,33 @@ for h in omarchy-brightness-display omarchy-brightness-keyboard \
   assert_file_exists "$bin/$h" "system-wake 자체 체인: $h"
 done
 
+# Task 7: 스크린세이버 짝. launch 만 올리면 본체가 127 이라 창이 즉시 죽는다.
+for h in omarchy-screensaver omarchy-launch-screensaver; do
+  assert_file_exists "$bin/$h" "lifecycle 스테이징: $h"
+  if cmp -s "$src/bin/$h" "$bin/$h"; then x=0; else x=1; fi
+  assert_eq "$x" "0" "verbatim: $h 는 업스트림과 바이트 동일"
+done
+
+# 터미널별 screensaver 설정. launch 가 $OMARCHY_PATH/default/... 로 참조한다.
+# kitty 는 --override 인자만 쓰므로 설정 파일이 없다 — 부재가 결손이 아니다.
+share=$stage/usr/share/cachy-omarchy/upstream
+for f in default/alacritty/screensaver.toml default/foot/screensaver.ini \
+         default/ghostty/screensaver; do
+  assert_file_exists "$share/$f" "screensaver 설정 스테이징: $f"
+  if cmp -s "$src/$f" "$share/$f"; then x=0; else x=1; fi
+  assert_eq "$x" "0" "verbatim: $f"
+done
+[[ -e $share/default/kitty/screensaver ]] && x=1 || x=0
+assert_eq "$x" "0" "kitty 설정은 업스트림에 없다 — 만들지 않는다"
+
+# ttfx 가드의 fail-safe 전제. 이것이 없으면 가드가 127 로 끝나 통과해 버린다.
+assert_file_exists "$bin/omarchy-cmd-missing" "ttfx 가드의 전제가 서 있다"
+
+# 새 의존 선언: socat(extra) 과 ttfx(AUR) 는 optdepends 로만 선언한다.
+pkgbuild=$(<"$REPO_ROOT/packages/cachy-omarchy-shell/PKGBUILD")
+assert_contains "$pkgbuild" "socat:" "socat 이 optdepends 에 선언됐다"
+assert_contains "$pkgbuild" "ttfx:" "ttfx 가 optdepends 에 선언됐다"
+grep -qP "^\s*'?ttfx'?\s*$" <<<"$pkgbuild" && x=1 || x=0
+assert_eq "$x" "0" "ttfx 는 depends 에 없다(AUR 전용 — pacman -U 가 해결 못 한다)"
+
 exit "$ASSERT_FAILURES"

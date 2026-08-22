@@ -70,6 +70,14 @@ optdepends=(
   # (bin/install-packages:55) depends 에 넣으면 우리 패키지 자체가 설치
   # 불가해진다 — 그래서 HARD 성격이라도 optdepends 에 둔다:
   'xdg-terminal-exec: AUR — 터미널 실행의 구동 기계, omarchy-launch-tui/omarchy-launch-terminal/omarchy-launch-floating-terminal-with-presentation 전부 이것 없이는 실패(HARD 성격이나 리포에 없어 depends 불가)'
+  # v0.11.0 스크린세이버. socat 은 extra 리포에 있으나 OPT 다 — 스크린세이버는
+  # 사용자가 idle 로 진입하거나 메뉴에서 고를 때만 도달한다.
+  'socat: omarchy-launch-screensaver 의 Hyprland .socket2 이벤트 대기(부재 시 모니터별 순차 배치가 깨진다)'
+  # ttfx 는 리포 무결과(pacman -Ss ttfx 0건, 2026-08-23 실측) — AUR 전용이라
+  # xdg-terminal-exec 과 같은 이유로 depends 에 둘 수 없다. 부재는 crash 가
+  # 아니다: omarchy-launch-screensaver 첫 줄의 omarchy-cmd-missing 가드가
+  # exit 1 로 흡수한다.
+  'ttfx: AUR — 스크린세이버 효과 렌더러(omarchy-screensaver 본체). 없으면 스크린세이버만 조용히 뜨지 않는다'
   # v0.10.0: 바 Bluetooth 위젯. OPT — 컨트롤러 없는 데스크톱에 bluez-utils 를
   # 강제하지 않는다. rfkill 은 이미 util-linux BASE.
   'bluez-utils: Bluetooth 패널/위젯 (omarchy-bluetooth-power/-device)'

@@ -111,7 +111,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 
 | command | plugin | class | action |
 | --- | --- | --- | --- |
-| `omarchy-launch-screensaver` | idle | DISABLED | disable plugin. `tests/data/closure-exceptions.tsv` 에 사유·체인 등록(v0.9, 추적 0.11.0) |
+| `omarchy-launch-screensaver` | idle | SAFE | package (0.11.0). 짝 헬퍼 `omarchy-screensaver` 와 함께 스테이징 — 하나만 올리면 창이 뜨고 본체가 127 로 즉시 죽는다. `tests/data/closure-exceptions.tsv` 예외 행 회수 |
 | `omarchy-system-lock` | idle | DISABLED | disable plugin |
 | `omarchy-system-wake` | idle / lock | SAFE | package (0.11.0). idle 플러그인 종료 경로와 lock 플러그인의 `runWake()` 양쪽이 부른다. 자체 체인(brightness-display/brightness-keyboard/hyprland-monitor-clamshell) 전부 staged |
 | `omarchy-hyprland-session-locked` | lock | **DISABLED — 공존 위험** | **의도적 미스테이징.** `strandedLockCheckProc` 가 이걸 불러 exit 0 이면 세션 잠금을 회수하려 하는데, hyprlock 이 이미 쥔 상태면 ext-session-lock 거부로 **quickshell 이 죽는다**(실측 §22.4). 헬퍼가 없으면 127 → 복구 경로가 조용히 비활성 = fail-safe. `test_staged_session_helpers.sh` 가 고정. `tests/data/closure-exceptions.tsv` 에도 등록(v0.9, milestone=blocked — 크기가 아니라 스테이징 자체가 실측된 크래시를 만들기 때문. `never` 는 미래 작업이 다시 안 볼 표시라 부정확 — 해제 조건: ext-session-lock 거부가 quickshell 을 죽이지 않게 되기 전까지) |
@@ -278,6 +278,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-launch-config-editor` | SAFE | package | 0.8.0 런처. launch-editor(staged) 3행 래퍼 |
 | `omarchy-launch-discord-community` | SAFE | package | 0.8.0 런처. cmd-present discord 가드 후 launch-webapp 전이 |
 | `omarchy-launch-editor` | SAFE | package | M10 clipboard 전이 closure |
+| `omarchy-launch-screensaver` | SAFE | package | 0.11.0. 짝 헬퍼 `omarchy-screensaver` 와 함께 스테이징 — 하나만 올리면 창이 뜨고 본체가 127 로 즉시 죽는다. `tests/data/closure-exceptions.tsv` 예외 행 회수 |
 | `omarchy-launch-tui` | SAFE | package | M10 clipboard 전이 closure |
 | `omarchy-launch-webapp` | SAFE | package | 0.8.0 런처 keystone. .desktop Exec 추출 → uwsm-app --app=$url. omarchy-* 의존 0 |
 | `omarchy-menu` | SAFE | package | 0.8.0. 순수 IPC 래퍼 — omarchy-shell shell toggle/summon/hide/call 만 호출 |
@@ -307,6 +308,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-restart-terminal` | SAFE | package | M9 theme-set post 훅 — 새 팔레트 반영 |
 | `omarchy-restart-trackpad` | SAFE | package | 0.8.0. i2c_hid_acpi 언바인드/바인드 + modprobe. 표준 sysfs/sudo |
 | `omarchy-restart-wifi` | SAFE | package | 0.8.0. rfkill unblock wifi + nmcli radio. 표준 도구 |
+| `omarchy-screensaver` | SAFE | package | 0.11.0. 스크린세이버 본체 — `omarchy-launch-screensaver` 가 터미널 안에서 exec 한다. ttfx(AUR)로 효과를 그린다 |
 | `omarchy-shell-config` | SAFE | package | `omarchy-bar` 가 source 하는 설정 헬퍼 |
 | `omarchy-state` | SAFE | package | reboot/shutdown 전이 |
 | `omarchy-sudo-passwordless` | SAFE | package | 0.8.0. /etc/sudoers.d/99-omarchy-nopasswd-$USER 작성 + systemd-run 자동 만료. self-contained |
@@ -462,7 +464,7 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-launch-config-editor` | SAFE | package | 0.8.0 verbatim stage. launch-editor(staged) 3행 래퍼 |
 | `omarchy-launch-discord-community` | SAFE | package | 0.8.0 verbatim stage. cmd-present discord 후 launch-webapp 전이 |
 | `omarchy-launch-floating-terminal-with-presentation` | DISABLED | disable | gum 프레젠테이션 레이어(`omarchy-restart-gum`/`-show-logo`/`-show-done`) 전체가 미스테이징이라 이 얇은 앞단만 올려도 죽는다. `update.hardware.audio` 메뉴 행이 이 뒤에 붙어 있어 부재 시 실패(위 `omarchy-restart-audio` 행 참조). `tests/data/closure-exceptions.tsv` 등록(v0.9, 추적 0.11.0) |
-| `omarchy-launch-screensaver` | DISABLED | disable | ttfx/socat/omarchy-screensaver/터미널별 설정까지 딸린 별도 클로저라 크기로 미룬다(공식 런처 전체를 배제한다는 뜻이 아니다). `tests/data/closure-exceptions.tsv` 등록(v0.9, 추적 0.11.0) |
+| `omarchy-launch-screensaver` | SAFE | package | 0.11.0 verbatim stage. 짝 헬퍼 `omarchy-screensaver` 와 함께 올린다 — 하나만 올리면 창이 뜨고 본체가 127 로 즉시 죽는다. `tests/data/closure-exceptions.tsv` 예외 행 회수 |
 | `omarchy-launch-webapp` | SAFE | package | 0.8.0 verbatim stage. .desktop Exec 추출 → uwsm-app --app=$url. keystone |
 | `omarchy-menu` | SAFE | package | 0.8.0 verbatim stage. 순수 IPC 래퍼 — omarchy-shell toggle/summon/hide/call |
 | `omarchy-menu-emoji` | SAFE | package | M10: verbatim stage (`shell toggle omarchy.emojis`) + `omarchy-menu-emoji-insert` closure. wtype/wl-copy 는 hard depends |
