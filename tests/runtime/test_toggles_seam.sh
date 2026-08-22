@@ -61,4 +61,14 @@ run_harness "$h3"; rc=$?
 assert_eq "$rc" "0" "깨진 toggle 이 설정 전체를 죽이지 않는다"
 assert_file_exists "$h3/loaded" "깨진 toggle 뒤의 정상 toggle 이 로드된다"
 
+# conf 경로: .lua 글롭을 받지 않는다(2026-08-23 중첩 Hyprland 실측 —
+# source = <dir>/*.lua 자체는 파싱 오류를 내지 않지만, 그 안의 Lua 는
+# 실행되지 않고 일반 config 키워드 줄로 취급돼 조용히 버려진다). 관리
+# 블록에 글롭 source 를 넣지 않는 것이 확정 동작이며, 대신 doctor 가 WARN.
+src_bindings=$(<"$REPO_ROOT/overlay/bin/cachy-omarchy-bindings")
+grep -q "toggles/hypr" <<<"$src_bindings" && x=1 || x=0
+assert_eq "$x" "0" "conf 스니펫은 toggles 글롭을 넣지 않는다"
+src_doctor=$(<"$REPO_ROOT/overlay/bin/cachy-omarchy-doctor")
+assert_contains "$src_doctor" "toggles/hypr" "doctor 가 conf 사용자에게 WARN 한다"
+
 exit "$ASSERT_FAILURES"

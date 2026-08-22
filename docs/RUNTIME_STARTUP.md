@@ -1841,3 +1841,51 @@ lock 플러그인이 이름으로 부르지만 스테이징되지 않은 것:
 중첩 컴포지터·격리 셸·hyprlock 을 모두 종료한 뒤 확인: 소켓은 `wayland-1`
 하나, 프로덕션 셸(pid 1252575) 생존, 사용자 `DP-1` 의 `solitaryBlockedBy` 에
 `LOCK` 없음, 프로덕션 `lock isLocked` = `false`.
+
+## §23 omarchy hypr toggles seam (v0.11, 2026-08-23 실측)
+
+`omarchy-hyprland-monitor-clamshell` / `-internal` / `-internal-mirror` 는
+`~/.local/state/omarchy/toggles/hypr/*.lua` 에 hl.monitor 규칙을 쓰고
+`hyprctl reload` 한다. 업스트림에서 그것을 읽는 쪽은
+`config/hypr/hyprland.lua:26` 의 `require("default.hypr.toggles")` 다.
+
+우리 오버레이는 `overlay/hypr/bindings.lua` 끝의 sweep 블록으로 같은 자리를
+채운다 — 정렬된 `*.lua` 를 각각 `pcall(dofile)`. `dofile` 은 모듈 캐시가 없어
+업스트림 `{ reload = true }` 의 의미가 그대로 성립한다.
+
+**conf 경로 실측:** 중첩 Hyprland(0.56.2, `env -u HYPRLAND_INSTANCE_SIGNATURE
+Hyprland -c <tmp>/hyprland.conf --verify-config`, 사용자 세션 무관)로 세 번
+쟀다.
+
+1. `source = <dir>/*.lua` 에 실제 toggle 파일(`hl.monitor({ output =
+   "HEADLESS-1", disabled = true })`, 한 줄)을 물렸을 때 — 로그는
+   `config ok` 뿐, 오류 없음.
+2. 그러나 `.lua` 확장자가 붙어도 conf 소스는 그 내용을 **Lua 로 실행하지
+   않는다** — 일반 Hyprland conf 문법(줄마다 `keyword = value`)으로만
+   파싱한다. 검증: `this_is_not_a_real_hypr_keyword = 123` 을 같은 방식으로
+   sourcing 했을 때도 `config ok` 였다 — 즉 등호가 있는 줄은 미지의 keyword
+   라도 조용히 버려진다(에러 없음). 대조로 등호가 없는 줄
+   (`this is not valid lua at all !!! ###`)은 다음처럼 실패한다:
+
+   ```
+   Config error in file <tmp>/toggles/probe.lua at line 1: Invalid config line
+   Config error in file <tmp>/hyprland.conf at line 2: Config error in file <tmp>/toggles/probe.lua at line 1: Invalid config line
+   ```
+
+   즉 `hl.monitor({ output = "HEADLESS-1", disabled = true })` 가 오류 없이
+   통과한 것은 그 줄이 우연히 `keyword = value` 모양을 갖춰 "미지의 keyword"
+   로 조용히 무시됐기 때문이지, Lua 로 실행돼 monitor 규칙이 적용된 것이
+   아니다. glob 자체는 실제로 파일을 찾아 매칭한다는 것도 대조군으로 확인
+   했다 — 존재하지 않는 디렉터리를 source 하면 `source= globbing error:
+   found no match` 로 명확히 실패한다.
+3. 실제 compositor(WLR_BACKENDS=headless)로 적용 여부까지 재확인하려 했으나
+   이 환경엔 사용 가능한 headless DRM/GPU 백엔드가 없어(`CBackend::create()
+   failed`) 기동 자체가 실패했다. 이 3번째 단계는 **측정하지 못했다** — 다만
+   1·2번의 파싱 단계 증거만으로 브리프의 판정 기준("오류 없고 toggle 이
+   반영되면 결말 A")을 결말 B 로 결정하기에 충분하다: 반영되지 않는다는
+   근거(Lua 미실행)가 이미 확보됐다.
+
+**결론(결말 B):** conf 의 `source =` 는 `.lua` 글롭을 문법적으로만 받아들일
+뿐 그 안의 Lua 를 실행하지 않으므로, seam 은 `hyprland.lua` 설정에서만
+성립한다. 관리 블록(`conf_snippet()`)에는 toggles glob source 줄을 넣지
+않는다. conf 사용자에게는 `cachy-omarchy-doctor` 가 WARN 한다.
