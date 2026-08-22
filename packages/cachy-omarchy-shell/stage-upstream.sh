@@ -287,6 +287,9 @@ helpers=(
   # 키보드 백라이트. lock 플러그인 runBlank() 와 XF86Kbd* 바인딩이 부른다.
   # brightnessctl(OPT) 은 이미 optdepends, omarchy-osd 는 이미 스테이징.
   omarchy-brightness-keyboard
+  # wake 끝단: idle/Service.qml:106 과 lock/Service.qml:406(runWake) 이 부른다.
+  # 자체 체인은 brightness-display(기존) + brightness-keyboard + clamshell 셋뿐.
+  omarchy-system-wake
 )
 
 for helper in "${helpers[@]}"; do

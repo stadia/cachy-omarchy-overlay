@@ -59,4 +59,15 @@ done
 assert_contains "$(<"$REPO_ROOT/overlay/hypr/bindings.lua")" "toggles/hypr" \
   "clamshell 이 쓰는 toggles 를 읽는 seam 이 있다"
 
+# Task 6: wake 끝단. 자체 체인 3개가 전부 서 있어야 절반 127 이 아니다.
+for h in omarchy-system-wake; do
+  assert_file_exists "$bin/$h" "lifecycle 스테이징: $h"
+  if cmp -s "$src/bin/$h" "$bin/$h"; then x=0; else x=1; fi
+  assert_eq "$x" "0" "verbatim: $h 는 업스트림과 바이트 동일"
+done
+for h in omarchy-brightness-display omarchy-brightness-keyboard \
+         omarchy-hyprland-monitor-clamshell; do
+  assert_file_exists "$bin/$h" "system-wake 자체 체인: $h"
+done
+
 exit "$ASSERT_FAILURES"
