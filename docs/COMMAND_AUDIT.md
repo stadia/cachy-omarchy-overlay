@@ -115,7 +115,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-system-lock` | idle | DISABLED | disable plugin |
 | `omarchy-system-wake` | idle | DISABLED (idle) / **미스테이징 (lock)** | lock 플러그인의 `runWake()` 도 이름으로 부른다. 미스테이징이라 127 — 순수 기능 손실(잠금 중 화면 깨우기 없음), 위험은 없음. 후속 verbatim 후보 (RUNTIME_STARTUP §22.5). `tests/data/closure-exceptions.tsv` 등록(v0.9, 추적 0.11.0) |
 | `omarchy-hyprland-session-locked` | lock | **DISABLED — 공존 위험** | **의도적 미스테이징.** `strandedLockCheckProc` 가 이걸 불러 exit 0 이면 세션 잠금을 회수하려 하는데, hyprlock 이 이미 쥔 상태면 ext-session-lock 거부로 **quickshell 이 죽는다**(실측 §22.4). 헬퍼가 없으면 127 → 복구 경로가 조용히 비활성 = fail-safe. `test_staged_session_helpers.sh` 가 고정. `tests/data/closure-exceptions.tsv` 에도 등록(v0.9, milestone=blocked — 크기가 아니라 스테이징 자체가 실측된 크래시를 만들기 때문. `never` 는 미래 작업이 다시 안 볼 표시라 부정확 — 해제 조건: ext-session-lock 거부가 quickshell 을 죽이지 않게 되기 전까지) |
-| `omarchy-brightness-keyboard` | lock | 미스테이징 | lock 의 `runBlank()` 가 부른다. 127 — 키보드 백라이트 안 꺼짐. 위험 없음, 후속 verbatim 후보. `tests/data/closure-exceptions.tsv` 등록(v0.9, 추적 0.11.0) |
+| `omarchy-brightness-keyboard` | lock | SAFE | package (0.11.0). lock 의 `runBlank()` 가 부른다. `omarchy-osd`(staged)만 호출 |
 | `omarchy-battery-low` | battery | SAFE | package — v0.9. battery 플러그인(기본 활성)이 10% 이하에서 부른다. 체인은 omarchy-notification-send + omarchy-hook 뿐이라 verbatim |
 | `omarchy-powerprofiles-set` | battery | DISABLED | disable plugin |
 | `omarchy-notification-send` | 여러 패널 | SAFE | package — M8 Tier B. `omarchy-reminder` 와 `omarchy-theme-set` 이 부른다(실측). 알림 표시 자체는 셸 플러그인 정책이지 이 helper 의 스테이징 여부와 별개다 |
@@ -222,6 +222,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-battery-status` | SAFE | package | 0.10.0. Power 패널 구동 기계. Panel.qml:210 이 --shell 을 무조건 호출. 외부 omarchy 의존 0(upower + sysfs) |
 | `omarchy-bluetooth-device` | SAFE | package | 0.10.0. 바 Bluetooth 위젯 pair/connect/disconnect/forget. `omarchy-bluetooth-power`(staged)만 호출. bluetoothctl(opt) |
 | `omarchy-bluetooth-power` | SAFE | package | 0.10.0. 바 Bluetooth 위젯 전원 제어. 외부 omarchy 의존 0(rfkill/bluetoothctl만). rfkill 소프트 블록으로 재부팅 후에도 상태 유지 |
+| `omarchy-brightness-keyboard` | SAFE | package | 0.11.0. lock 플러그인 `runBlank()` + XF86Kbd* 바인딩이 부른다. `omarchy-osd`(staged)만 호출, brightnessctl(OPT) |
 | `omarchy-brightness-display` | SAFE | package | 포커스 모니터 밝기. 내부 backlight / DDC / Apple 로 분기. 바 `omarchy-monitor-state` 가 부름 |
 | `omarchy-brightness-display-apple` | SAFE | package | brightness-display Apple 분기. `sudo asdcontrol`(부재 시 실패) |
 | `omarchy-brightness-display-ddc` | SAFE | package | brightness-display 외부 모니터 분기. `ddcutil` optdepend |

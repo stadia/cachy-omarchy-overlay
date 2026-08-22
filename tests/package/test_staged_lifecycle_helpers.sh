@@ -32,4 +32,12 @@ for h in "${probes[@]}"; do
   assert_eq "$x" "0" "verbatim: $h 는 업스트림과 바이트 동일"
 done
 
+# Task 2: 키보드 백라이트. brightnessctl 은 이미 optdepends(OPT) 이고
+# omarchy-osd 는 이미 스테이징돼 있다 — 새 의존 선언이 필요 없다.
+for h in omarchy-brightness-keyboard; do
+  assert_file_exists "$bin/$h" "lifecycle 스테이징: $h"
+  if cmp -s "$src/bin/$h" "$bin/$h"; then x=0; else x=1; fi
+  assert_eq "$x" "0" "verbatim: $h 는 업스트림과 바이트 동일"
+done
+
 exit "$ASSERT_FAILURES"
