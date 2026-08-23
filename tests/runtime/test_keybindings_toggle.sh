@@ -140,7 +140,7 @@ cache_count=0
 if [[ -n $cache_file && -f $cache_file ]]; then
   cache_count=$(wc -l <"$cache_file" | tr -d ' ')
 fi
-assert_eq "$cache_count" "48" "실사용 CachyOS Lua 바인드 48개가 모두 수집됐다"
+assert_eq "$cache_count" "49" "실사용 CachyOS Lua 바인드 49개가 모두 수집됐다"
 printf '      FINDING: keybindings cache records = %s\n' "$cache_count"
 
 # Allow the select menu to receive exclusive focus, then cancel only.

@@ -47,6 +47,9 @@ function fail(message) {
 function valid_lane(lane) {
   return lane == "container" || lane == "auto-live" || lane == "vm" || lane == "host"
 }
+function valid_status(status) {
+  return status == "측정됨" || status == "추론됨" || status == "미검증"
+}
 function count_occurrences(line, needle, start, offset) {
   start = 1
   while ((offset = index(substr(line, start), needle)) != 0) {
@@ -65,17 +68,22 @@ function parse_row(kind, line, fields, count, item, grade, lane, status) {
   grade = trim(fields[3])
   lane = trim(fields[4])
   status = trim(fields[5])
+  evidence = trim(fields[6])
   if (item == "") fail(kind " 표 항목 열이 비어 있다")
   if (!valid_lane(lane)) fail(kind " 표 lane 열이 유효하지 않다")
+  if (status == "측정됨" && (evidence !~ /20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/ || evidence !~ /PASS/)) {
+    fail(kind " 표 측정됨 행에는 날짜와 PASS 증거가 필요하다")
+  }
+  if (status == "추론됨" && evidence == "") fail(kind " 표 추론됨 행에는 근거가 필요하다")
 
   if (kind == "핵심") {
     if (grade != "핵심") fail("핵심 표 등급 열이 핵심이 아니다")
-    if (status != "미검증") fail("핵심 표 상태 열이 미검증이 아니다")
+    if (!valid_status(status)) fail("핵심 표 상태 열이 증거 등급 어휘가 아니다")
     core_items[item]++
     if (item == "polkit (아래 §polkit)") core_polkit++
   } else {
     if (grade != "주변") fail("주변 표 등급 열이 주변이 아니다")
-    if (status != "미검증") fail("주변 표 상태 열이 미검증이 아니다")
+    if (!valid_status(status)) fail("주변 표 상태 열이 증거 등급 어휘가 아니다")
     peripheral_items[item]++
   }
 }
