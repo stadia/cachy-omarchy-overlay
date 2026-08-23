@@ -94,33 +94,51 @@ jobs:
         run: bin/ci-resolve-install
 
       # 빈 HOME 에는 Hyprland 설정이 없어 bindings 가 의도적으로 실패한다.
-      # 이 lane 의 성공 정의는 두 갈래다. (a) 정말 빈 HOME 에서 init 이
-      # bindings 단계까지 도달해 명확한 설정-부재 오류로 끝나는가, (b) 최소
-      # conf 스텁을 둔 HOME 에서 init 이 완주하는가. 그래서 "빈 HOME 에서
-      # 사용자 설정을 만든다"는 거짓 주장을 하지 않는다.
-      - name: 헤드리스 init — 빈 HOME 실패 경로
+      # 세 로그를 먼저 모두 수집한 뒤, 두 init 결과만 마지막에 판정한다.
+      # doctor 는 헤드리스 WARN 을 허용하는 비게이트 증거다.
+      - name: 헤드리스 init / doctor 증거 수집
         run: |
-          useradd -m emptyuser
+          : > /tmp/init-empty.log
+          : > /tmp/init.log
+          : > /tmp/doctor.log
           set +e
+
+          useradd -m emptyuser
           sudo -u emptyuser bash -lc 'cachy-omarchy-init' 2>&1 | tee /tmp/init-empty.log
-          code=${PIPESTATUS[0]}
-          set -e
-          test "$code" -ne 0
-          grep -F 'Hyprland 설정을 찾을 수 없다' /tmp/init-empty.log
+          empty_init_status=${PIPESTATUS[0]}
 
-      - name: 헤드리스 init — 최소 conf 구성 완주
-        run: |
           useradd -m enduser
-          install -d -o enduser -g enduser /home/enduser/.config/hypr
-          printf 'monitor=,preferred,auto,1\n' > /home/enduser/.config/hypr/hyprland.conf
-          chown enduser:enduser /home/enduser/.config/hypr/hyprland.conf
+          sudo -u enduser bash -lc '
+            install -d "$HOME/.config/hypr"
+            printf "monitor=,preferred,auto,1\\n" > "$HOME/.config/hypr/hyprland.conf"
+          '
+          conf_setup_status=$?
           sudo -u enduser bash -lc 'cachy-omarchy-init' 2>&1 | tee /tmp/init.log
+          init_status=${PIPESTATUS[0]}
 
-      # doctor 는 게이트가 아니다. 헤드리스 컨테이너에서는 WARN 이 정상이라
-      # 게이트로 두면 무의미한 빨강이 된다. 크래시하지 않는 것만 본다.
-      - name: 헤드리스 doctor (비게이트)
-        run: |
-          sudo -u enduser bash -lc 'cachy-omarchy-doctor' 2>&1 | tee /tmp/doctor.log || true
+          sudo -u enduser bash -lc 'cachy-omarchy-doctor' 2>&1 | tee /tmp/doctor.log
+          doctor_status=${PIPESTATUS[0]}
+          set -e
+
+          failed=0
+          if test "$empty_init_status" -eq 0; then
+            echo '빈 HOME init 이 성공했다' >&2
+            failed=1
+          fi
+          if ! grep -F 'Hyprland 설정을 찾을 수 없다' /tmp/init-empty.log; then
+            echo '빈 HOME init 에 bindings 설정-부재 오류가 없다' >&2
+            failed=1
+          fi
+          if test "$conf_setup_status" -ne 0; then
+            echo '최소 Hyprland conf 구성에 실패했다' >&2
+            failed=1
+          fi
+          if test "$init_status" -ne 0; then
+            echo '최소 conf init 이 실패했다' >&2
+            failed=1
+          fi
+          # doctor_status 는 의도적으로 판정하지 않는다.
+          exit "$failed"
 
       - uses: actions/upload-artifact@v4
         if: always()
