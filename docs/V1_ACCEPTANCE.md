@@ -51,10 +51,10 @@ SPEC §61 의 역사적 기록으로 남으며, 이 문서가 그보다 넓은 �
 | 공식 omarchy 부재 | 핵심 | container | 미검증 | |
 | 폐쇄 스캐너 (실설치 트리) | 핵심 | container | 미검증 | |
 | init 헤드리스 완주 | 핵심 | container | 미검증 | |
-| 런처 토글 | 핵심 | auto-live | 미검증 | 2026-08-23 `COO_RUN_LIVE=1 ./tests/test.sh test_launcher_toggle`: `skip: build/*.pkg.tar.zst 없음`; live gate USABLE, 호출 후 shell alive, `inotifywait` 1→1; 런타임 단언 미실행. |
-| 키바인딩 토글 | 핵심 | auto-live | 미검증 | 2026-08-23 `COO_RUN_LIVE=1 ./tests/test.sh test_keybindings_toggle`: `skip: build/*.pkg.tar.zst 없음`; live gate USABLE, 호출 후 shell alive, `inotifywait` 1→1; 런타임 단언 미실행. |
-| 앱 실행 | 핵심 | auto-live | 미검증 | 2026-08-23 `COO_RUN_LIVE=1 ./tests/test.sh test_app_launch`: `coo_pkg_artifact` gate가 `build/*.pkg.tar.zst` 부재로 실패(별도 skip 출력 없음); live gate USABLE, 호출 후 shell alive, `inotifywait` 1→1; 런타임 단언 미실행. |
-| 앱 스코프 격리 | 핵심 | auto-live | 미검증 | 2026-08-23 `COO_RUN_LIVE=1 ./tests/test.sh test_app_scope`: `skip: 셸 아티팩트 없음`; live gate USABLE, 호출 후 shell alive, `inotifywait` 1→1; 런타임 단언 미실행. |
+| 런처 토글 | 핵심 | auto-live | 미검증 | 2026-08-23 `COO_RUN_LIVE=1 ./tests/test.sh test_launcher_toggle` FAIL: Escape 뒤 `omarchy-menu` layer가 남음(기대 0, 실제 1); live gate USABLE, 호출 후 shell alive, `inotifywait` 1→1. |
+| 키바인딩 토글 | 핵심 | auto-live | 미검증 | 2026-08-23 런처 토글 실패 후 중단하여 `test_keybindings_toggle` 미실행; live gate USABLE, shell alive, `inotifywait` 1→1. |
+| 앱 실행 | 핵심 | auto-live | 미검증 | 2026-08-23 런처 토글 실패 후 중단하여 `test_app_launch` 미실행; live gate USABLE, shell alive, `inotifywait` 1→1. |
+| 앱 스코프 격리 | 핵심 | auto-live | 미검증 | 2026-08-23 런처 토글 실패 후 중단하여 `test_app_scope` 미실행; live gate USABLE, shell alive, `inotifywait` 1→1. |
 | init → UWSM 로그인 | 핵심 | vm | 미검증 | |
 | 패키지 업그레이드 | 핵심 | vm | 미검증 | |
 | 롤백 | 핵심 | vm | 미검증 | |
