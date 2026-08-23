@@ -9,6 +9,7 @@ PREFIX_ROOT=${COO_PREFIX_ROOT:-/usr/share/cachy-omarchy}
 CONFIG_DIR=${COO_CONFIG_DIR:-$HOME/.config/cachy-omarchy}
 STATE_DIR=${COO_STATE_DIR:-$HOME/.local/state/omarchy}
 TOGGLES_DIR=$STATE_DIR/toggles
+HYPR_DIR=${COO_HYPR_DIR:-$HOME/.config/hypr}
 DRY=0
 
 fail() { printf 'error: %s\n' "$1" >&2; exit 1; }
@@ -127,6 +128,15 @@ else
   note "잠금 화면 PAM 설정을 만든다: $PAM_LOCK_FILE (root 권한이 필요해 sudo 암호를 물을 수 있다)"
   "$APPLY_LOCK" \
     || note "note: 잠금 화면 PAM 설정 실패 — 나중에 omarchy-apply-lock 을 직접 실행할 수 있다"
+fi
+
+# 2.7) A-2 지원 계약 고지 (SPEC "지원 계약").
+#    conf 사용자는 토글을 실제로 써본 뒤에야 — 기능이 조용히 안 먹은 다음에야
+#    — 지원 범위 밖임을 알게 된다. doctor WARN 은 toggles 파일이 생긴 뒤에만
+#    뜨기 때문이다. 여기서 설치 시점에 알린다. 설치를 막지는 않는다.
+#    lua 가 하나라도 있으면 토글이 동작하므로 고지하지 않는다.
+if [[ -f $HYPR_DIR/hyprland.conf && ! -f $HYPR_DIR/hyprland.lua ]]; then
+  note "참고: Lua toggle 파일은 hyprland.lua 설정에서만 적용된다. hyprland.conf 에서는 toggle 파일이 적용되지 않지만 설치는 정상 진행됩니다."
 fi
 
 # 3) Hyprland 바인딩. 충돌 감지와 --force 정책을 재구현하지 않고 위임한다
