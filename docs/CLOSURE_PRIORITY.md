@@ -62,14 +62,52 @@ OPT) 과 `ttfx`(AUR — 리포 무결과) 를 optdepends 로 선언했고, `stty
 선례대로 AUR optdepend 를 유지한다(fallback 어댑터를 만들지 않는다 — 만들면
 이미 출하된 omarchy-launch-tui 와 동작이 갈린다).
 
-## v0.12.0 — 후보 3
+## v0.12.0 — Presentation & Runtime Polish (2026-08-23 확정)
 
-omarchy-bar-text-color(ImageMagick optdep 선행),
-omarchy-restart-shell(ADAPT — `cachy-omarchy-reload` 어댑터, verbatim 금지),
-omarchy-launch-floating-terminal-with-presentation(+gum 프레젠테이션 레이어
-`omarchy-restart-gum`/`-show-logo`/`-show-done`).
+네 갈래로 묶는다. A 는 v0.11 출고 직후 이미 닫혔다.
 
-## 이후
+**A. correctness — newline-safe Hypr toggle sweep** ✅ 완료(`12bb343`)
+`overlay/hypr/bindings.lua` 의 sweep 이 `find | sort` 를 줄 단위로 읽어, 파일명에
+개행이 들어가면 경로가 잘려 그 toggle 이 조용히 로드되지 않았다. `-print0` + NUL
+분리 + `table.sort` 로 교체했다. 위험도는 낮았다 — `pcall` 이 설정 전체를 지키고
+omarchy 헬퍼는 고정된 이름만 쓴다 — 그래서 v0.12 로 넘겼으나 착수 비용이 낮아
+먼저 닫았다.
+
+**B. visual parity — omarchy-bar-text-color**
+125줄 verbatim + `imagemagick` optdepend 선언. 배경 이미지에서 바 텍스트 대비색을
+계산한다. 새 외부 의존 하나뿐이라 자체완결적이다.
+
+**C. safe shell lifecycle**
+- lock-aware restart
+- `cachy-omarchy-reload`
+- `omarchy-restart-shell` compat
+
+verbatim 금지 — 업스트림 원본은 quickshell 을 kill·재기동하며 세션 락 상태를
+폴링해 재확보한다. 어댑터로 감싼다.
+
+**※ stranded-lock recovery 는 제외한다.** `omarchy-hyprland-session-locked` 는
+`milestone=blocked` 이며, 스테이징하면 hyprlock 이 세션을 쥔 상태에서 ext-session-lock
+거부로 quickshell 이 죽는다(`docs/RUNTIME_STARTUP.md` §22.4 실측). 어댑터는 그
+헬퍼 없이 성립하므로 경계를 여기서 긋는다.
+
+**D. presentation layer**
+- `omarchy-launch-floating-terminal-with-presentation`
+- `omarchy-restart-gum`
+- `omarchy-show-logo`
+- `omarchy-show-done`
+- `logo.txt`
+
+얇은 앞단이 아니라 gum 테마 프레젠테이션 레이어 전체가 진짜 작업이다. 알려진
+실제 결손: 메뉴 `update.hardware.audio` 행이 이 런처 뒤에 붙어 있어 부재 시
+그 행 실행이 실패한다.
+
+## 이후 — backlog 를 v0.12 로 끌어오지 않는 이유
+
+경계는 기준 ① 에 있다. v0.9~v0.12 는 전부 "현재 Quattro desktop 의 결손을
+닫는다" 였는데, 아래 항목들은 "새 기능 표면을 채택한다" 로 성격이 바뀐다 —
+없어서 무언가 깨진 것이 아니라, 지금 없는 능력을 새로 들이는 일이다. 채택
+여부는 그 자체로 결정할 문제이지 마일스톤에 얹을 일이 아니다.
+
 
 - P2 선택 기능: network-password+network-qr(자격증명 노출 실측 선행),
   network-speedtest·disk-speedtest(외부 트래픽/디스크 쓰기),
