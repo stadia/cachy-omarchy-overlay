@@ -65,15 +65,26 @@ if [[ $optdeps == *"'jq:"* ]]; then
   printf 'FAIL: jq 가 optdepends 에 잔존 (M10 에서 hard depends 로 승격)\n'
   ASSERT_FAILURES=$((ASSERT_FAILURES + 1))
 fi
-for bad in tensaku brightnessctl ddcutil; do
+# AUR class 는 depends 에 들어가면 안 된다 — pacman -U 는 리포/설치된 패키지로만
+# 의존을 해결하므로(bin/install-packages) 우리 패키지 자체가 설치 불가해진다.
+for bad in tensaku ttfx xdg-terminal-exec dropbox-cli; do
   if [[ $deps == *"$bad"* ]]; then
-    printf 'FAIL: optional-only dependency %s in depends\n' "$bad"
+    printf 'FAIL: AUR-only dependency %s in depends\n' "$bad"
     ASSERT_FAILURES=$((ASSERT_FAILURES + 1))
   fi
 done
-assert_contains "$optdeps" "brightnessctl" "optdepends brightnessctl (internal backlight)"
-assert_contains "$optdeps" "ddcutil" "optdepends ddcutil (DDC brightness)"
-assert_contains "$optdeps" "lsp-plugins-lv2" "optdepends lsp-plugins-lv2 (speaker tuning limiter)"
+# v0.12.1 정책 전환: 리포에 있는 메뉴/패널·하드웨어 제어 의존은 hard depends 다.
+# 도달성 분류(OPT)는 그대로이고 바뀐 것은 선언 정책이다 — 큐레이팅된 데스크톱이
+# 설치 직후 동작해야 한다. 승격된 것이 optdepends 에 잔존하면 안 된다.
+for promoted in tmux foot brightnessctl ddcutil lsp-plugins-lv2 socat \
+                bluez-utils desktop-file-utils gtk-update-icon-cache hyprpicker \
+                iw mpv networkmanager pacman-contrib power-profiles-daemon usbutils; do
+  assert_contains "$deps" "$promoted" "depends $promoted (v0.12.1 승격)"
+  if [[ $optdeps == *"'$promoted:"* ]]; then
+    printf 'FAIL: %s 가 optdepends 에 잔존 (v0.12.1 에서 hard depends 로 승격)\n' "$promoted"
+    ASSERT_FAILURES=$((ASSERT_FAILURES + 1))
+  fi
+done
 printf 'ok:   P02-P04 unsafe deps absent (if no FAIL above)\n'
 
 [[ $ASSERT_FAILURES -eq 0 ]]

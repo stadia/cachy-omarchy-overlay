@@ -71,7 +71,13 @@
 - **HARD** — 기동/기본 활성 경로에서 도달하는 명령. `depends` 로 선언한다
   (이미 선언돼 있으면 근거 열에 "이미 depends"로 남는다).
 - **OPT** — 사용자가 그 기능을 명시적으로 선택해야 도달하는 명령(메뉴 항목,
-  패널 대상 애플리케이션 등). `optdepends` 로 선언한다.
+  패널 대상 애플리케이션 등). **v0.12.1 정책 전환**: 공식 리포에 있는 OPT 는
+  `depends` 로 선언한다 — 이 오버레이는 큐레이팅된 데스크톱을 출하하며 메뉴·패널
+  항목이 설치 직후 동작하지 않는 상태를 기본값으로 두지 않는다. 분류 자체는
+  도달성 사실이라 그대로 OPT 이고, 바뀐 것은 선언 위치다. 스캐너는 OPT 를
+  `depends`·`optdepends` 어느 쪽으로도 만족시킨다(`closure_check.py`). 리포에
+  없는 것(AUR)과 기본 데스크톱과 무관한 개별 애플리케이션(discord·tailscale·
+  tesseract 등)은 계속 `optdepends` 다.
 - **AUR** — 실제 Arch 패키지가 존재하지만 공식 리포가 아니라 AUR 에만 있다.
   `pacman -U` 는 `depends` 를 리포/이미 설치된 패키지로만 해결하므로
   (`bin/install-packages:55`), AUR 전용 패키지를 `depends` 에 넣으면 우리
@@ -107,7 +113,7 @@
 | `basename` | `coreutils` | BASE | 기반 |
 | `bash` | `bash` | BASE | 기반 |
 | `bluetoothctl` | `bluez-utils` | OPT | 블루투스 컨트롤러 부재 환경(데스크톱) 존재 — 위젯은 가드로 숨는다 |
-| `brightnessctl` | `brightnessctl` | OPT | 내장 백라이트 — 이미 optdepends |
+| `brightnessctl` | `brightnessctl` | OPT | 내장 백라이트 — v0.12.1 에서 depends 로 승격 |
 | `busctl` | `systemd` | BASE | 기반 |
 | `cat` | `coreutils` | BASE | 기반 |
 | `checkupdates` | `pacman-contrib` | OPT | 업데이트 확인 메뉴 항목 |
@@ -118,7 +124,7 @@
 | `curl` | `curl` | BASE | 이미 선언된 의존의 전이 의존(§4.2 개정) |
 | `cut` | `coreutils` | BASE | 기반 |
 | `date` | `coreutils` | BASE | 기반 |
-| `ddcutil` | `ddcutil` | OPT | 외부 모니터 밝기 — 이미 optdepends |
+| `ddcutil` | `ddcutil` | OPT | 외부 모니터 밝기 — v0.12.1 에서 depends 로 승격 |
 | `dirname` | `coreutils` | BASE | 기반 |
 | `discord` | `discord` | OPT | Discord 커뮤니티 실행 메뉴 항목 |
 | `dropbox-cli` | `dropbox-cli` | AUR | Dropbox 패널 대상 애플리케이션 — 사용자가 Dropbox 를 가짐으로써 선택하는 능력, C1 4번째 패턴에서 신규 발견. 리포엔 없고 AUR 전용(AUR RPC info 1건 실측). |
@@ -194,7 +200,7 @@
 | `tesseract` | `tesseract` | OPT | OCR 메뉴 항목 |
 | `timedatectl` | `systemd` | BASE | 기반 |
 | `timeout` | `coreutils` | BASE | 기반 |
-| `tmux` | `tmux` | OPT | tmux 테마 훅 — 이미 optdepends |
+| `tmux` | `tmux` | OPT | tmux 테마 훅 — v0.12.1 에서 depends 로 승격 |
 | `top` | `procps-ng` | HARD | procps-ng 가 제공(pacman -Ql 실측) — omarchy-system-stats CPU 통계 경로. procps-ng 는 이미 depends |
 | `touch` | `coreutils` | BASE | 기반 |
 | `tr` | `coreutils` | BASE | 기반 |
