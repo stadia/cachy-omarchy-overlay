@@ -65,7 +65,8 @@ git -C "$fixture_upstream" -c user.email=fixture@example.invalid -c user.name=fi
 fixture_commit=$(git -C "$fixture_upstream" rev-parse HEAD)
 fixture_repo_url="file://$fixture_upstream"
 
-cp -a "$REPO_ROOT/upstream.lock" "$REPO_ROOT/UPSTREAM.md" "$root/"
+cp -a "$REPO_ROOT/upstream.lock" "$REPO_ROOT/UPSTREAM.md" "$REPO_ROOT/SPEC.md" \
+  "$REPO_ROOT/README.md" "$REPO_ROOT/README.ko-KR.md" "$root/"
 # The real repository URL would make a real fetch of $fixture_commit fail
 # (that commit exists only in the disposable repo above); point the pin at
 # the repo that actually has it.
@@ -100,10 +101,13 @@ overlay_pkgver_pin=$(grep -m1 '^pkgver=' "$root/packages/cachy-omarchy-overlay/P
 overlay_pkgrel_pin=$(grep -m1 '^pkgrel=' "$root/packages/cachy-omarchy-overlay/PKGBUILD" | cut -d= -f2 | tr -d "'\"")
 overlay_artifact_pin="cachy-omarchy-overlay-${overlay_pkgver_pin}-${overlay_pkgrel_pin}-any.pkg.tar.zst"
 
-cp -a "$REPO_ROOT/bin/check-upstream" "$REPO_ROOT/bin/build-packages" \
-  "$REPO_ROOT/bin/validated-build.sh" "$REPO_ROOT/bin/test-packages" \
-  "$REPO_ROOT/bin/install-packages" "$REPO_ROOT/bin/rollback" \
-  "$REPO_ROOT/bin/update-upstream" "$REPO_ROOT/bin/bump-pkgrel" "$root/bin/"
+# The candidate invokes the repository's default test runner. Copy every
+# tracked executable input rather than maintaining a hand-picked list: a new
+# script referenced by a new default test must reach the candidate too.
+while IFS= read -r -d '' path; do
+  mkdir -p "$root/$(dirname "$path")"
+  cp -a "$REPO_ROOT/$path" "$root/$path"
+done < <(git -C "$REPO_ROOT" ls-files -z bin)
 chmod +x "$root/bin"/*
 fake=$COO_TEST_SANDBOX/fake
 mkdir -p "$fake"
@@ -630,6 +634,7 @@ out=$(WAYLAND_DISPLAY= COO_UPDATE_PIPELINE_NESTED=1 COO_REPO_ROOT="$root" COO_GI
 assert_eq "$code" "0" "U02 update validates and publishes candidate"
 assert_contains "$out" "PASS tests/runtime/test_m3_docs.sh" "candidate default suite runs M3 docs test"
 assert_contains "$out" "PASS tests/package/test_package_files.sh" "candidate default suite reaches package files test"
+assert_contains "$out" "PASS tests/runtime/test_support_contract.sh" "candidate default suite reaches support contract test"
 updated_lock=$(cat "$root/upstream.lock")
 updated_pkg=$(cat "$root/packages/cachy-omarchy-shell/PKGBUILD")
 assert_contains "$updated_lock" "OMARCHY_VERSION=4.0.1" "U02 lock version updates"

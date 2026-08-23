@@ -53,7 +53,7 @@ copy_tree() {
 for item in bin packages overlay tests lib docs; do
   copy_tree "$item"
 done
-for item in upstream.lock UPSTREAM.md; do
+for item in upstream.lock UPSTREAM.md SPEC.md README.md README.ko-KR.md; do
   [[ -f $repo_root/$item ]] && cp -a "$repo_root/$item" "$candidate/$item"
 done
 mkdir -p "$candidate/build"
