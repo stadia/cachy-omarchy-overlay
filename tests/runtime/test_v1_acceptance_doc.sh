@@ -85,10 +85,21 @@ function parse_row(kind, line, fields, count, item, grade, lane, status) {
   count_occurrences($0, "플로팅 프레젠테이션 터미널")
 }
 $0 == "## 핵심 — 측정됨 필수" {
+  core_heading_count++
+  if (core_heading_count != 1 || phase != "") {
+    fail("핵심 게이트 섹션이 중복되었거나 순서가 잘못됐다")
+    next
+  }
   phase = "core-before-header"
   next
 }
 $0 == "## 주변 — 미검증 문서화 허용" {
+  peripheral_heading_count++
+  if (peripheral_heading_count != 1 || phase != "core-rows" || !core_header || core_rows == 0) {
+    fail("주변 게이트 섹션이 중복되었거나 핵심 표보다 먼저 나왔다")
+    next
+  }
+  core_done = 1
   phase = "peripheral-before-header"
   next
 }
@@ -147,7 +158,10 @@ phase == "peripheral-rows" {
   next
 }
 END {
-  if (!core_header || core_rows == 0) fail("핵심 표를 찾지 못했다")
+  if (core_heading_count != 1) fail("핵심 게이트 섹션은 정확히 한 번이어야 한다")
+  if (peripheral_heading_count != 1) fail("주변 게이트 섹션은 정확히 한 번이어야 한다")
+  if (!core_done || !core_header || core_rows == 0) fail("핵심 표가 주변 표 전에 완주하지 않았다")
+  if (!peripheral_header || peripheral_rows == 0 || phase != "after-peripheral") fail("주변 표가 완주하지 않았다")
   if (core_polkit != 1) fail("polkit 핵심 항목은 정확히 한 행이어야 한다")
   if (!peripheral_header || peripheral_rows == 0) fail("주변 표를 찾지 못했다")
   if (peripheral_items["QR 스캔 / OCR"] != 1 || occurrences["QR 스캔 / OCR"] != 1) fail("QR 스캔 / OCR 은 주변 표에만 한 번 있어야 한다")
