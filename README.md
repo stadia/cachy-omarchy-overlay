@@ -26,7 +26,7 @@ Two Arch packages are produced.
 The upstream pin is managed by `upstream.lock` (currently `basecamp/omarchy @ v4.0.0`,
 `f0020448`).
 
-Seven public commands are installed into `/usr/bin`:
+Eight public commands are installed into `/usr/bin`:
 
 - `cachy-omarchy-shell` — start the shell (`--run`), talk to it (`--ipc`), restart it manually (`--restart`)
 - `cachy-omarchy-launcher` — toggle the launcher (SUPER + SPACE)
@@ -34,6 +34,7 @@ Seven public commands are installed into `/usr/bin`:
 - `cachy-omarchy-bindings` — inject/remove the managed source block in your Hyprland config
 - `cachy-omarchy-init` — one-time user setup (never overwrites existing files)
 - `cachy-omarchy-doctor` — read-only diagnostics (including theme state)
+- `cachy-omarchy-reload` — lock-aware front for `cachy-omarchy-shell --restart`
 - `omarchy-theme-set` — apply a theme from the audited upstream helper set
 
 ## Session requirement

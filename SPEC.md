@@ -642,6 +642,7 @@ must be an explicit architecture decision.
 /usr/bin/cachy-omarchy-launcher
 /usr/bin/cachy-omarchy-keybindings
 /usr/bin/cachy-omarchy-doctor
+/usr/bin/cachy-omarchy-reload
 /usr/bin/cachy-omarchy-build
 /usr/bin/cachy-omarchy-update
 ```
@@ -766,7 +767,8 @@ cachy-omarchy-overlay/
 │   │   ├── cachy-omarchy-shell
 │   │   ├── cachy-omarchy-launcher
 │   │   ├── cachy-omarchy-keybindings
-│   │   └── cachy-omarchy-doctor
+│   │   ├── cachy-omarchy-doctor
+│   │   └── cachy-omarchy-reload
 │   │
 │   ├── defaults/
 │   └── hypr/

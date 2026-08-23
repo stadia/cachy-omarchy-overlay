@@ -25,7 +25,7 @@ SUPER + K      →  Omarchy 스타일 키바인딩 뷰어
 업스트림 핀은 `upstream.lock`이 관리한다 (현재 `basecamp/omarchy @ v4.0.0`,
 `f0020448`).
 
-설치되는 공개 명령 7개 (`/usr/bin`):
+설치되는 공개 명령 8개 (`/usr/bin`):
 
 - `cachy-omarchy-shell` — 셸 기동(`--run`)·IPC(`--ipc`)·수동 재기동(`--restart`)
 - `cachy-omarchy-launcher` — 런처 토글 (SUPER + SPACE)
@@ -33,6 +33,7 @@ SUPER + K      →  Omarchy 스타일 키바인딩 뷰어
 - `cachy-omarchy-bindings` — 사용자 Hyprland 설정에 관리 source 블록 주입/제거
 - `cachy-omarchy-init` — 최초 1회 사용자 설정 생성 (기존 파일 덮어쓰지 않음)
 - `cachy-omarchy-doctor` — 읽기 전용 진단 (테마 상태 포함)
+- `cachy-omarchy-reload` — `cachy-omarchy-shell --restart` 의 락 인지 앞단
 - `omarchy-theme-set` — 감사된 업스트림 helper 집합으로 테마 적용
 
 ## 세션 요구사항

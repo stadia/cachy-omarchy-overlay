@@ -18,6 +18,7 @@ for p in \
   usr/bin/cachy-omarchy-bindings \
   usr/bin/cachy-omarchy-init \
   usr/bin/cachy-omarchy-doctor \
+  usr/bin/cachy-omarchy-reload \
   usr/lib/cachy-omarchy/compat/bin/omarchy-shell \
   usr/lib/cachy-omarchy/compat/bin/omarchy-update-available \
   usr/lib/cachy-omarchy/compat/bin/omarchy-theme-set-browser \
@@ -34,7 +35,7 @@ for p in \
 done
 
 # 공개 명령은 실행 가능해야 한다.
-for b in shell launcher keybindings bindings init doctor; do
+for b in shell launcher keybindings bindings init doctor reload; do
   [[ -x "$dest/usr/bin/cachy-omarchy-$b" ]] && x=0 || x=1
   assert_eq "$x" "0" "실행 가능: cachy-omarchy-$b"
 done
