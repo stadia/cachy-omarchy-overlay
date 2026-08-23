@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# compat shim: 업스트림 헬퍼/메뉴가 부르는 `omarchy-restart-shell` 을
+# 우리 락 인지 재시작 프런트 cachy-omarchy-reload 로 연결한다 (SPEC 44).
+#
+# 업스트림 원본은 미스테이징 헬퍼 3개(omarchy-hyprland-session-locked —
+# 의도적 milestone=blocked, omarchy-launch-shell, omarchy-system-sleep-lock)
+# 를 전제하고, `quickshell kill` 이 종료까지 블록하는 빌드를 가정한다. 이
+# 환경에 고정된 quickshell 0.3.0 은 kill 이 즉시 반환해 그 전제가 레이스가
+# 된다. 그래서 verbatim 을 올리지 않고, 락 조회·kill·재기동 로직이 이미 있는
+# cachy-omarchy-shell --restart(를 감싸는 cachy-omarchy-reload)로 위임한다.
+# 여기서 kill/재시작을 이중화하지 않는다 — 락 상태 판단도 하지 않는다.
+set -uo pipefail
+
+RELOAD_BIN=${COO_RELOAD_BIN:-cachy-omarchy-reload}
+exec "$RELOAD_BIN" "$@"

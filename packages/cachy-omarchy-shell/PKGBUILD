@@ -1,7 +1,7 @@
 # Maintainer: Cachy Omarchy Overlay
 pkgname=cachy-omarchy-shell
 pkgver=4.0.0
-pkgrel=18
+pkgrel=19
 pkgdesc='Pinned Omarchy Quattro shell runtime for CachyOS (no omarchy-settings)'
 arch=('any')
 url='https://github.com/basecamp/omarchy'
@@ -88,6 +88,9 @@ optdepends=(
   'gpu-screen-recorder: 화면 녹화 메뉴 항목'
   'gtk-update-icon-cache: 웹앱 아이콘 설치 후처리'
   'hyprpicker: 색상 선택 메뉴 항목'
+  # v0.12.0 Track B: 바 투명 모드 텍스트 대비색(omarchy-bar-text-color).
+  # 부재 시 헬퍼가 테마 전경색으로 폴백한다.
+  'imagemagick: omarchy-bar-text-color 의 배경 대비 계산(투명 바 텍스트색). 부재 시 헬퍼가 테마 전경색으로 폴백한다'
   'iw: Wi-Fi 진단 메뉴 항목'
   'mpv: 미디어 미리보기 메뉴 항목'
   'networkmanager: 네트워크 상태/제어 패널 대상 애플리케이션'

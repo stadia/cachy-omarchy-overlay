@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# 락 인지 재시작을 이름으로 드러내는 얇은 앞단. 실제 로직(락 조회 →
+# 안전할 때만 kill+재기동)은 cachy-omarchy-shell --restart 에 있다 —
+# 여기서 이중화하지 않는다.
+set -uo pipefail
+
+usage() {
+  cat <<'USAGE'
+사용법: cachy-omarchy-reload
+
+실행 중인 셸을 락 인지 방식으로 재시작한다(cachy-omarchy-shell --restart
+와 동일). 세션이 잠겨 있으면 거부한다.
+
+환경:
+  COO_SHELL_BIN   cachy-omarchy-shell 바이너리 override (기본: cachy-omarchy-shell)
+USAGE
+}
+
+case ${1:-} in
+  --help) usage; exit 0 ;;
+  "") : ;;
+  *) printf 'error: 알 수 없는 인자: %s\n' "$1" >&2; usage >&2; exit 1 ;;
+esac
+
+SHELL_BIN=${COO_SHELL_BIN:-cachy-omarchy-shell}
+exec "$SHELL_BIN" --restart

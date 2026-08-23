@@ -25,9 +25,10 @@ user-invocable: false
 - `commit.gpgsign` 꺼져 있음 — 다시 켜지 말 것.
 
 ## 현재 아키텍처 (경로/명령)
-- 공개 명령 6개, 모두 `overlay/bin/`에 있고 설치되면 `/usr/bin/`으로 간다:
+- 공개 명령 7개, 모두 `overlay/bin/`에 있고 설치되면 `/usr/bin/`으로 간다:
   `cachy-omarchy-shell`, `cachy-omarchy-launcher`, `cachy-omarchy-keybindings`,
-  `cachy-omarchy-bindings`, `cachy-omarchy-init`, `cachy-omarchy-doctor`.
+  `cachy-omarchy-bindings`, `cachy-omarchy-init`, `cachy-omarchy-doctor`,
+  `cachy-omarchy-reload`.
 - 사용자 라이브 설정: `~/.config/cachy-omarchy/`(hypr/bindings.{conf,lua}). `shell.json` 은
   셸이 읽지 않는 dead file 이므로 init 가 만들지 않는다.
 - 패키지 정본/기본값: `/usr/share/cachy-omarchy/`(defaults/shell.json, hypr/bindings.{conf,lua}).

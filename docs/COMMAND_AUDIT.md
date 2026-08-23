@@ -17,7 +17,7 @@
 | --- | --- | --- | --- | --- | --- |
 | `omarchy-launch-shell` | 세션/유닛 | `quickshell -n -p $OMARCHY_PATH/shell` + journal + hyprctl 재시도 | quickshell, hyprctl, systemd-cat | ADAPTED | wrapper — `cachy-omarchy-shell --run`. 로직 재사용 가능, 이름/경로만 우리 것 |
 | `omarchy-shell` | 핫키, 메뉴, 플러그인 | 기동하지 않음. `qs ipc` 전달 | OMARCHY_PATH, qs, timeout | ADAPTED | wrapper — `cachy-omarchy-launcher`가 `shell toggle omarchy.menu` 호출 |
-| `omarchy-restart-shell` | 업데이트/디버그 | 기존 qs 인스턴스 kill 후 재기동 | quickshell kill | ADAPTED | wrapper later (`cachy-omarchy-reload`). M0에서 구현 없음 |
+| `omarchy-restart-shell` | 업데이트/디버그 | 기존 qs 인스턴스 kill 후 재기동 | quickshell kill | ADAPTED | wrapper — `overlay/compat/bin/omarchy-restart-shell` 이 `cachy-omarchy-reload` 로 위임한다 (v0.12.0) |
 | `quickshell` / `qs` | 위 두 명령 | 엔진 | CachyOS 패키지 | SAFE | package (의존) |
 
 ---
@@ -218,6 +218,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-audio-sink-availability` | SAFE | package | 0.10.0. Audio 패널 싱크 선택 목록. `omarchy-audio-tuning`(staged) fronted-sink 만 호출 |
 | `omarchy-audio-tuning` | SAFE | package | 노트북 스피커 튜닝. `on` 만 `~/.config/pipewire` + user unit 템플릿을 복사. 데이터는 `$OMARCHY_PATH/default/audio` |
 | `omarchy-bar` | SAFE | package | 메뉴 `style.bar` position/transparent. layer-shell 네임스페이스 `omarchy-bar` 와 동명·별개 |
+| `omarchy-bar-text-color` | SAFE | package | v0.12.0. `Bar.qml:834` 가 `requestedTransparent` 일 때만 부른다. 이미 스테이징된 `omarchy-cmd-present` 만 부르는 self-contained 스크립트. `magick`(ImageMagick, OPT) 부재 시 fallback() 으로 테마 전경색을 반환한다 |
 | `omarchy-battery-low` | SAFE | package | v0.9. battery 플러그인(기본 활성)이 10% 이하에서 부른다. 체인은 omarchy-notification-send + omarchy-hook 뿐이라 verbatim |
 | `omarchy-battery-status` | SAFE | package | 0.10.0. Power 패널 구동 기계. Panel.qml:210 이 --shell 을 무조건 호출. 외부 omarchy 의존 0(upower + sysfs) |
 | `omarchy-bluetooth-device` | SAFE | package | 0.10.0. 바 Bluetooth 위젯 pair/connect/disconnect/forget. `omarchy-bluetooth-power`(staged)만 호출. bluetoothctl(opt) |
@@ -278,6 +279,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-launch-config-editor` | SAFE | package | 0.8.0 런처. launch-editor(staged) 3행 래퍼 |
 | `omarchy-launch-discord-community` | SAFE | package | 0.8.0 런처. cmd-present discord 가드 후 launch-webapp 전이 |
 | `omarchy-launch-editor` | SAFE | package | M10 clipboard 전이 closure |
+| `omarchy-launch-floating-terminal-with-presentation` | SAFE | package | v0.12.0. 메뉴의 audio restart/passwordless sudo/custom DNS 명령을 gum 프레젠테이션으로 감싸는 런처. restart-gum/show-logo/show-done 과 logo.txt 를 기능 단위로 함께 올린다 |
 | `omarchy-launch-screensaver` | SAFE | package | 0.11.0. 짝 헬퍼 `omarchy-screensaver` 와 함께 스테이징 — 하나만 올리면 창이 뜨고 본체가 127 로 즉시 죽는다. `tests/data/closure-exceptions.tsv` 예외 행 회수 |
 | `omarchy-launch-tui` | SAFE | package | M10 clipboard 전이 closure |
 | `omarchy-launch-webapp` | SAFE | package | 0.8.0 런처 keystone. .desktop Exec 추출 → uwsm-app --app=$url. omarchy-* 의존 0 |
@@ -302,6 +304,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-restart-audio` | SAFE | package | audio-tuning stale daemon drop-in 제거 경로. pipewire/wireplumber user 서비스. USB 복구는 `usbreset` 가드 |
 | `omarchy-restart-bluetooth` | SAFE | package | 0.8.0. rfkill unblock/list bluetooth. Omarchy 의존 0 |
 | `omarchy-restart-btop` | SAFE | package | M9 theme-set post 훅 |
+| `omarchy-restart-gum` | SAFE | package | v0.12.0. 현재 테마의 gum 환경을 source 하는 프레젠테이션 전제. 외부 omarchy 의존 0 |
 | `omarchy-restart-helix` | SAFE | package | M9 theme-set post 훅 |
 | `omarchy-restart-hyprctl` | SAFE | package | M9 theme-set post 훅 |
 | `omarchy-restart-opencode` | SAFE | package | M9 theme-set post 훅 |
@@ -310,6 +313,8 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-restart-wifi` | SAFE | package | 0.8.0. rfkill unblock wifi + nmcli radio. 표준 도구 |
 | `omarchy-screensaver` | SAFE | package | 0.11.0. 스크린세이버 본체 — `omarchy-launch-screensaver` 가 터미널 안에서 exec 한다. ttfx(AUR)로 효과를 그린다 |
 | `omarchy-shell-config` | SAFE | package | `omarchy-bar` 가 source 하는 설정 헬퍼 |
+| `omarchy-show-done` | SAFE | package | v0.12.0. 프레젠테이션 명령 종료 뒤 gum spinner와 키 입력 대기. gum 은 hard depends |
+| `omarchy-show-logo` | SAFE | package | v0.12.0. `$OMARCHY_PATH/logo.txt` 를 터미널에 출력. logo.txt 를 같은 업스트림 루트에 verbatim 설치 |
 | `omarchy-state` | SAFE | package | reboot/shutdown 전이 |
 | `omarchy-sudo-passwordless` | SAFE | package | 0.8.0. /etc/sudoers.d/99-omarchy-nopasswd-$USER 작성 + systemd-run 자동 만료. self-contained |
 | `omarchy-system-lock` | SAFE | package | 메뉴 `system.lock`. `omarchy-shell lock lock`. `omarchy-apply-lock` 이 만든 PAM 서비스가 있어야 실제로 잠긴다 |
@@ -463,7 +468,7 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-launch-about` | DISABLED | disable | 공식 런처/웹앱/플로팅 터미널 |
 | `omarchy-launch-config-editor` | SAFE | package | 0.8.0 verbatim stage. launch-editor(staged) 3행 래퍼 |
 | `omarchy-launch-discord-community` | SAFE | package | 0.8.0 verbatim stage. cmd-present discord 후 launch-webapp 전이 |
-| `omarchy-launch-floating-terminal-with-presentation` | DISABLED | disable | gum 프레젠테이션 레이어(`omarchy-restart-gum`/`-show-logo`/`-show-done`) 전체가 미스테이징이라 이 얇은 앞단만 올려도 죽는다. `update.hardware.audio` 메뉴 행이 이 뒤에 붙어 있어 부재 시 실패(위 `omarchy-restart-audio` 행 참조). `tests/data/closure-exceptions.tsv` 등록(v0.9, 추적 0.11.0) |
+| `omarchy-launch-floating-terminal-with-presentation` | SAFE | package | v0.12.0. gum 프레젠테이션 레이어(`omarchy-restart-gum`/`-show-logo`/`-show-done`)와 logo.txt를 기능 단위로 함께 스테이징해 audio restart/passwordless sudo/custom DNS 메뉴 행을 닫았다 |
 | `omarchy-launch-screensaver` | SAFE | package | 0.11.0 verbatim stage. 짝 헬퍼 `omarchy-screensaver` 와 함께 올린다 — 하나만 올리면 창이 뜨고 본체가 127 로 즉시 죽는다. `tests/data/closure-exceptions.tsv` 예외 행 회수 |
 | `omarchy-launch-webapp` | SAFE | package | 0.8.0 verbatim stage. .desktop Exec 추출 → uwsm-app --app=$url. keystone |
 | `omarchy-menu` | SAFE | package | 0.8.0 verbatim stage. 순수 IPC 래퍼 — omarchy-shell toggle/summon/hide/call |
@@ -508,10 +513,10 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-remove-security-sshd` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
 | `omarchy-remove-service-dropbox` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
 | `omarchy-remove-service-tailscale` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
-| `omarchy-restart-audio` | SAFE | package | audio-tuning 전이. 메뉴 `update.hardware.audio` 는 여전히 `omarchy-launch-floating-terminal-with-presentation` 뒤에 붙어 그 런처가 없으면 행 실행은 실패 |
+| `omarchy-restart-audio` | SAFE | package | audio-tuning 전이. v0.12.0에서 `omarchy-launch-floating-terminal-with-presentation` 프레젠테이션 체인까지 스테이징해 `update.hardware.audio` 메뉴 행의 실행 결손을 닫았다 |
 | `omarchy-restart-bluetooth` | SAFE | package | 0.8.0 verbatim stage. rfkill unblock/list bluetooth |
 | `omarchy-restart-hyprsunset` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-restart-shell` | ADAPTED | wrapper | later `cachy-omarchy-reload`. M3 미구현. `tests/data/closure-exceptions.tsv` 등록(v0.9, 추적 0.11.0) — quickshell kill/재기동 + 세션 락 재확보 폴링까지 있어 verbatim 이 아니라 래퍼 구현이 필요 |
+| `omarchy-restart-shell` | ADAPTED | wrapper | v0.12.0 compat 적응 카피(`overlay/compat/bin/omarchy-restart-shell`) → `cachy-omarchy-reload` 위임. quickshell kill/재기동 + 세션 락 재확보 폴링이 있는 원본은 미스테이징 헬퍼 3개(`omarchy-hyprland-session-locked`(blocked)·`omarchy-launch-shell`·`omarchy-system-sleep-lock`)를 전제하고 이 환경의 quickshell 0.3.0(kill 즉시 반환)에서 레이스를 만들어 verbatim 이 아니라 락 인지 재시작 프런트로 대체한다. `tests/data/closure-exceptions.tsv` 예외 행 회수 |
 | `omarchy-restart-trackpad` | SAFE | package | 0.8.0 verbatim stage. i2c_hid_acpi 언바인드/바인드 + modprobe |
 | `omarchy-restart-wifi` | SAFE | package | 0.8.0 verbatim stage. rfkill + nmcli radio |
 | `omarchy-restart-xcompose` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
