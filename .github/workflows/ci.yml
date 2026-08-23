@@ -31,6 +31,17 @@ jobs:
       - name: 소유권 이전
         run: chown -R builder:builder "$GITHUB_WORKSPACE"
 
+      # 패키지 빌드는 upstream.lock 이 고정한 정확한 Omarchy 소스를 사용한다.
+      - name: Omarchy 소스 준비
+        run: |
+          sudo -u builder --preserve-env=GITHUB_WORKSPACE bash -lc '
+            cd "$GITHUB_WORKSPACE"
+            source upstream.lock
+            git clone "$OMARCHY_REPOSITORY" build/omarchy
+            git -C build/omarchy checkout --detach "$OMARCHY_COMMIT"
+            test "$(git -C build/omarchy rev-parse HEAD)" = "$OMARCHY_COMMIT"
+          '
+
       # bin/test-packages 는 bin/build-packages 가 남긴 validated-build
       # 매니페스트를 검증한다. 둘을 같은 사용자로 돌려야 상태 디렉터리가
       # 일치한다.
