@@ -63,4 +63,31 @@ if pacman -Q omarchy-settings >/dev/null 2>&1; then
 fi
 ok "게이트 B 기준선: 설치 뒤 omarchy-settings 없음"
 
+# 4) 게이트 C — 여기가 이 lane 의 값어치다.
+#
+#    설치가 됐다는 것은 depends 가 해결 가능하다는 뜻일 뿐이다. 충분하다는
+#    것은 우리 헬퍼가 부르는 명령이 실제로 PATH 에 있다는 뜻이다. 스캐너는
+#    평소 샌드박스에 풀어놓은 아카이브를 보지만, 여기서는 진짜 pacman -S 로
+#    설치된 트리를 본다 — 같은 도구, 훨씬 강한 주장.
+installed_root=${COO_INSTALLED_ROOT:-/}
+[[ -d "$installed_root/usr/share/cachy-omarchy/upstream" ]] \
+  || fail "게이트 C: 설치된 upstream 트리가 없다: $installed_root/usr/share/cachy-omarchy/upstream"
+[[ -d "$installed_root/usr/lib/cachy-omarchy/compat/bin" ]] \
+  || fail "게이트 C: 설치된 overlay compat 트리가 없다: $installed_root/usr/lib/cachy-omarchy/compat/bin"
+
+# closure_check.py 의 --tree 는 /usr/share/cachy-omarchy 가 아니라 패키지
+# 루트를 받는다. 기존 테스트의 추출 트리는 tree/usr/share/... 와
+# tree/overlay/usr/lib/... 로 나뉘고, 스캐너는 그 overlay/ 분기부터 먼저
+# 찾는다. pacman 설치 후에는 /usr/share/... 와 /usr/lib/... 이 한 루트 아래라
+# overlay/ 분기가 없고 두 번째 실설치 분기(/usr/lib/cachy-omarchy/compat/bin)가
+# 선택된다. 그러므로 / 를 넘긴다.
+python3 "$repo_root/tests/runtime/closure_check.py" \
+  --tree "$installed_root" \
+  --repo "$repo_root" \
+  --map "$repo_root/tests/data/command-packages.tsv" \
+  --upstream-helpers "$repo_root/tests/data/upstream-helpers.txt" \
+  --exceptions "$repo_root/tests/data/closure-exceptions.tsv" \
+  || fail "게이트 C: HARD 명령이 실설치 트리에서 해결되지 않는다 — depends 선언 누락"
+ok "게이트 C: 폐쇄 스캐너가 실설치 트리에서 통과했다"
+
 printf '의존 해석 lane 통과\n'

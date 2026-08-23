@@ -20,5 +20,6 @@ assert_contains "$body" "cachy-omarchy-overlay" "overlay 만 설치해 패키지
 assert_contains "$body" "omarchy-settings" "공식 패키지 부재를 게이트로 검사한다"
 assert_contains "$body" "게이트 B conflicts" "omarchy conflicts 결과를 별도로 기록한다"
 assert_contains "$body" "게이트 B 기준선" "omarchy-settings 기준선 부재를 별도로 기록한다"
+assert_contains "$body" "closure_check.py" "게이트 C: 폐쇄 스캐너를 실설치 트리에 돌린다"
 
 exit "$ASSERT_FAILURES"
