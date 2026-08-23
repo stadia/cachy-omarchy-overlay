@@ -1,6 +1,6 @@
 # Maintainer: Cachy Omarchy Overlay
 pkgname=cachy-omarchy-overlay
-pkgver=0.11.0
+pkgver=0.12.0
 pkgrel=1
 pkgdesc='CachyOS integration for the pinned Omarchy Quattro shell runtime'
 arch=('any')

@@ -20,8 +20,8 @@ Two Arch packages are produced.
 
 | Package | Version | Role |
 |---|---|---|
-| `cachy-omarchy-shell` | 4.0.0-18 | The pinned Omarchy Quattro shell runtime (Quickshell tree, `omarchy-settings` excluded) |
-| `cachy-omarchy-overlay` | 0.11.0-1 | The CachyOS integration layer (wrapper commands, Hyprland bindings, defaults) |
+| `cachy-omarchy-shell` | 4.0.0-19 | The pinned Omarchy Quattro shell runtime (Quickshell tree, `omarchy-settings` excluded) |
+| `cachy-omarchy-overlay` | 0.12.0-1 | The CachyOS integration layer (wrapper commands, Hyprland bindings, defaults) |
 
 The upstream pin is managed by `upstream.lock` (currently `basecamp/omarchy @ v4.0.0`,
 `f0020448`).
@@ -220,6 +220,15 @@ file only.
   `overlay/hypr/bindings.lua` opens the `hyprland.lua`-only toggles seam that
   clamshell (and the already-staged `omarchy-hyprland-monitor-internal(-mirror)`)
   needs. `xdg-terminal-exec` stays an AUR optdepend — no fallback adapter.
+- **v0.12 (presentation & runtime polish)** — staged `omarchy-bar-text-color`
+  (bar text contrast against the background image, `imagemagick` optdepend)
+  and the gum presentation layer (`omarchy-restart-gum`, `omarchy-show-logo`,
+  `omarchy-show-done`, `omarchy-launch-floating-terminal-with-presentation`),
+  which closes three menu rows that previously failed for lacking a launcher:
+  hardware-audio restart, passwordless-sudo setup, and custom-DNS setup.
+  `cachy-omarchy-shell --restart` (and its `cachy-omarchy-reload` front) now
+  refuses while the session is locked instead of racing hyprlock; recovering a
+  stranded lock stays out of scope (`docs/RUNTIME_STARTUP.md` §22.4).
 
 ## License
 

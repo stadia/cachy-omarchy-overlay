@@ -62,52 +62,68 @@ OPT) 과 `ttfx`(AUR — 리포 무결과) 를 optdepends 로 선언했고, `stty
 선례대로 AUR optdepend 를 유지한다(fallback 어댑터를 만들지 않는다 — 만들면
 이미 출하된 omarchy-launch-tui 와 동작이 갈린다).
 
-## v0.12.0 — Presentation & Runtime Polish (2026-08-23 확정)
+## v0.12.0 — Presentation & Runtime Polish (출하 완료, 2026-08-23)
 
-네 갈래로 묶는다. A 는 v0.11 출고 직후 이미 닫혔다.
+네 갈래로 묶어 계획했고, 넷 다 그대로 출하됐다. A 는 v0.11 출고 직후 이미
+닫혀 있었다.
 
-**A. correctness — newline-safe Hypr toggle sweep** ✅ 완료(`12bb343`)
+**A. correctness — newline-safe Hypr toggle sweep** ✅ 완료(`12bb343`, main 에서)
 `overlay/hypr/bindings.lua` 의 sweep 이 `find | sort` 를 줄 단위로 읽어, 파일명에
 개행이 들어가면 경로가 잘려 그 toggle 이 조용히 로드되지 않았다. `-print0` + NUL
 분리 + `table.sort` 로 교체했다. 위험도는 낮았다 — `pcall` 이 설정 전체를 지키고
 omarchy 헬퍼는 고정된 이름만 쓴다 — 그래서 v0.12 로 넘겼으나 착수 비용이 낮아
 먼저 닫았다.
 
-**B. visual parity — omarchy-bar-text-color**
+**B. visual parity — omarchy-bar-text-color** ✅ 완료(`0faaf0b`)
 125줄 verbatim + `imagemagick` optdepend 선언. 배경 이미지에서 바 텍스트 대비색을
-계산한다. 새 외부 의존 하나뿐이라 자체완결적이다.
+계산한다. `magick` 은 `tests/data/command-packages.tsv` 에, 클로저는
+`docs/RUNTIME_DEPENDENCIES.md` 에 반영했다. 새 외부 의존 하나뿐이라
+자체완결적이었다 — 계획과 실제 출하가 정확히 일치한다.
 
-**C. safe shell lifecycle**
-- lock-aware restart
-- `cachy-omarchy-reload`
-- `omarchy-restart-shell` compat
+**C. safe shell lifecycle** ✅ 완료(`638b659`, `ade0fa4`, `7237394`)
+- `638b659` — `cachy-omarchy-shell --restart` 가 락 인지: 세션이 secure/locking
+  이거나 응답한 셸의 회신을 파싱할 수 없으면 거부한다(exit 1, 영어 stderr
+  `Refusing to restart the shell while the session is locked.`). 명확히 언락
+  상태이거나 IPC 가 아예 실패하면 진행한다.
+- `ade0fa4` — `cachy-omarchy-reload` 를 7번째 공개 명령으로 추가. `--restart`
+  위의 얇은 앞단.
+- `7237394` — `overlay/compat/bin/omarchy-restart-shell` 을
+  `cachy-omarchy-reload` 로 위임하도록 재작성. compat 적응 카피는 이제 6개다.
 
-verbatim 금지 — 업스트림 원본은 quickshell 을 kill·재기동하며 세션 락 상태를
-폴링해 재확보한다. 어댑터로 감싼다.
+verbatim 은 처음부터 금지였다 — 업스트림 원본은 quickshell 을 kill·재기동하며
+세션 락 상태를 폴링해 재확보한다. 계획대로 어댑터로 감쌌다.
 
-**※ stranded-lock recovery 는 제외한다.** `omarchy-hyprland-session-locked` 는
-`milestone=blocked` 이며, 스테이징하면 hyprlock 이 세션을 쥔 상태에서 ext-session-lock
-거부로 quickshell 이 죽는다(`docs/RUNTIME_STARTUP.md` §22.4 실측). 어댑터는 그
-헬퍼 없이 성립하므로 경계를 여기서 긋는다.
+**※ stranded-lock recovery 는 계획대로 범위 밖에 남겨뒀다.**
+`omarchy-hyprland-session-locked` 는 여전히 `milestone=blocked` 다. 스테이징하면
+hyprlock 이 세션을 쥔 상태에서 ext-session-lock 거부로 quickshell 이 죽는다는
+실측(`docs/RUNTIME_STARTUP.md` §22.4)이 그대로 유효하고, 이번 마일스톤에서 그
+실측을 재확인하거나 뒤집는 작업은 하지 않았다. 락 인지 재시작 어댑터는 그
+헬퍼 없이 성립하므로 경계를 그대로 유지한다.
 
-**D. presentation layer**
+**D. presentation layer** ✅ 완료(`c7c8820`)
 - `omarchy-launch-floating-terminal-with-presentation`
 - `omarchy-restart-gum`
 - `omarchy-show-logo`
 - `omarchy-show-done`
 - `logo.txt`
 
-얇은 앞단이 아니라 gum 테마 프레젠테이션 레이어 전체가 진짜 작업이다. 알려진
-실제 결손: 메뉴 `update.hardware.audio` 행이 이 런처 뒤에 붙어 있어 부재 시
-그 행 실행이 실패한다.
+얇은 앞단이 아니라 gum 테마 프레젠테이션 레이어 전체가 진짜 작업이었다. `clear`
+(ncurses, BASE) 를 새로 매핑했다. 알려졌던 실제 결손 셋을 닫았다 — 메뉴
+`update.hardware.audio`, `setup.security.passwordless-sudo`,
+`setup.network.dns.custom` 세 행이 이 런처 부재로 실패하던 것이 이제 실행된다.
 
-## 이후 — backlog 를 v0.12 로 끌어오지 않는 이유
+**결산.** 네 갈래 다 `closure-exceptions.tsv` 의 기존 예외 행을 지우는 것으로
+끝났다 — 이번 마일스톤에서 새로 등록한 backlog 예외 행은 없다. 유일하게 계속
+열어두기로 한 것은 stranded-lock recovery 이고, 그건 애초에 예외 행이 아니라
+`milestone=blocked` 로 표시된 별도 결정이다.
+
+## 이후 — v0.12.0 이후 backlog
 
 경계는 기준 ① 에 있다. v0.9~v0.12 는 전부 "현재 Quattro desktop 의 결손을
-닫는다" 였는데, 아래 항목들은 "새 기능 표면을 채택한다" 로 성격이 바뀐다 —
-없어서 무언가 깨진 것이 아니라, 지금 없는 능력을 새로 들이는 일이다. 채택
-여부는 그 자체로 결정할 문제이지 마일스톤에 얹을 일이 아니다.
-
+닫는다" 였다. v0.12.0 을 끝으로 그 범주의 알려진 결손은 남아 있지 않다 —
+아래 항목들은 "새 기능 표면을 채택한다" 로 성격이 다르다. 없어서 무언가
+깨진 것이 아니라, 지금 없는 능력을 새로 들이는 일이다. 채택 여부는 그
+자체로 결정할 문제이지 마일스톤에 얹을 일이 아니다.
 
 - P2 선택 기능: network-password+network-qr(자격증명 노출 실측 선행),
   network-speedtest·disk-speedtest(외부 트래픽/디스크 쓰기),
@@ -116,5 +132,6 @@ verbatim 금지 — 업스트림 원본은 quickshell 을 kill·재기동하며 
   agent+default-agent, voxtype-status+voxtype-config(v0.11.0 에서
   omarchy-cmd-missing 이 스테이징돼 예전의 127 가드 붕괴 우려는 해소됐다 —
   남은 유일한 이유는 voxtype 딕테이션 기능 자체의 채택 여부 미정).
-- HOLD: hyprland-session-locked(blocked — 해제 조건은 예외 행 사유 참조),
+- HOLD: hyprland-session-locked(blocked — 해제 조건은 §22.4 실측을 뒤집는 새
+  증거뿐이다. v0.12.0 은 그 실측을 재확인·재측정하지 않고 그대로 상속했다),
   omarchy·channel-current·update(never — 진입점·패키지/채널 경계).

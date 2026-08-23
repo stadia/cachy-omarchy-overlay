@@ -19,8 +19,8 @@ SUPER + K      →  Omarchy 스타일 키바인딩 뷰어
 
 | 패키지 | 버전 | 역할 |
 |---|---|---|
-| `cachy-omarchy-shell` | 4.0.0-18 | 핀된 Omarchy Quattro 셸 런타임 (Quickshell 트리, `omarchy-settings` 제외) |
-| `cachy-omarchy-overlay` | 0.11.0-1 | CachyOS 통합 계층 (래퍼 명령, Hyprland 바인딩, 기본값) |
+| `cachy-omarchy-shell` | 4.0.0-19 | 핀된 Omarchy Quattro 셸 런타임 (Quickshell 트리, `omarchy-settings` 제외) |
+| `cachy-omarchy-overlay` | 0.12.0-1 | CachyOS 통합 계층 (래퍼 명령, Hyprland 바인딩, 기본값) |
 
 업스트림 핀은 `upstream.lock`이 관리한다 (현재 `basecamp/omarchy @ v4.0.0`,
 `f0020448`).
@@ -214,6 +214,15 @@ bin/rollback                 # 이전 핀으로 복귀
   `omarchy-hyprland-monitor-internal(-mirror)`)이 필요로 하는
   `hyprland.lua` 전용 toggle seam 을 열었다. `xdg-terminal-exec` 는 여전히
   AUR optdepend — fallback 어댑터는 만들지 않는다.
+- **v0.12 (프레젠테이션 & 런타임 다듬기)** — `omarchy-bar-text-color`(배경
+  이미지 대비 바 텍스트 색상, `imagemagick` optdepend)와 gum 프레젠테이션
+  레이어(`omarchy-restart-gum`, `omarchy-show-logo`, `omarchy-show-done`,
+  `omarchy-launch-floating-terminal-with-presentation`)를 스테이징했다 —
+  런처 부재로 실패하던 메뉴 3행(hardware-audio 재시작, passwordless-sudo
+  설정, custom-DNS 설정)이 이제 실행된다. `cachy-omarchy-shell --restart`
+  (와 그 앞단 `cachy-omarchy-reload`)는 세션이 잠긴 동안 hyprlock 과
+  경합하는 대신 거부한다 — stranded lock 복구는 범위 밖으로 남겨뒀다
+  (`docs/RUNTIME_STARTUP.md` §22.4).
 
 ## 라이선스
 

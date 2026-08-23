@@ -132,14 +132,17 @@ the new pin to be already staged and built. Unwind it in this order:
 업스트림 소스가 아니라 이 레포에서 새로 작성한 CachyOS 통합 레이어. 소유 파일은
 다음 범주다(정확한 목록은 `tests/package/test_overlay_files.sh` 가 단언한다):
 
-- `usr/bin/cachy-omarchy-{shell,launcher,keybindings,bindings,init,doctor}`
-  — 공개 명령 6개.
+- `usr/bin/cachy-omarchy-{shell,launcher,keybindings,bindings,init,doctor,reload}`
+  — 공개 명령 7개(v0.12.0 에서 `cachy-omarchy-reload` 추가).
 - `usr/lib/cachy-omarchy/compat/bin/{omarchy-shell,omarchy-update-available,
-  omarchy-theme-set-browser,omarchy-theme-set-keyboard}` — compat 적응 카피 4개.
-  실체는 이 통제 경로에만 둔다(§44).
-- `usr/bin/omarchy-{shell,update-available,theme-set-browser,theme-set-keyboard}`
-  — compat 실체를 가리키는 상대 심링크 4개. `/usr/bin` 은 심링크만 놓는 평평한
-  뷰이다(§45 개정).
+  omarchy-theme-set-browser,omarchy-theme-set-keyboard,omarchy-menu-keybindings,
+  omarchy-restart-shell}` — compat 적응 카피 6개. 실체는 이 통제 경로에만
+  둔다(§44). `omarchy-restart-shell` 은 v0.12.0 에서 `cachy-omarchy-reload` 로
+  위임하도록 새로 얹었다(→ `cachy-omarchy-shell --restart`, 세션이 잠긴 동안은
+  거부).
+- `usr/bin/omarchy-{shell,update-available,theme-set-browser,theme-set-keyboard,
+  menu-keybindings,restart-shell}` — compat 실체를 가리키는 상대 심링크 6개.
+  `/usr/bin` 은 심링크만 놓는 평평한 뷰이다(§45 개정).
 - `usr/share/uwsm/env-hyprland.d/10-cachy-omarchy` — uwsm 세션 환경 드롭인.
   그래픽 세션에 `OMARCHY_PATH=/usr/share/cachy-omarchy/upstream` 을 공급한다(§45).
 - `usr/share/cachy-omarchy/defaults/shell.json` — `cachy-omarchy-init` 가 최초 실행 시

@@ -1889,3 +1889,48 @@ Hyprland -c <tmp>/hyprland.conf --verify-config`, 사용자 세션 무관)로 �
 뿐 그 안의 Lua 를 실행하지 않으므로, seam 은 `hyprland.lua` 설정에서만
 성립한다. 관리 블록(`conf_snippet()`)에는 toggles glob source 줄을 넣지
 않는다. conf 사용자에게는 `cachy-omarchy-doctor` 가 WARN 한다.
+
+## §24 락 인지 셸 재시작 + reload/compat 위임 체인 (v0.12.0, 2026-08-23)
+
+`cachy-omarchy-shell --restart` 는 kill 전에 셸 자신에게 `qs ipc -n -p
+$OMARCHY_PATH/shell call -- lock status` 로 락 상태를 묻는다. 판정:
+
+- IPC 자체가 실패(타임아웃/셸 미기동) → 보존할 락이 없으므로 **진행**.
+- IPC 는 성공했지만 응답에서 `.secure or .requested` 가 `jq` 로 정확히
+  `false` 로 읽히는 경우만 **진행**.
+- 그 외 전부 — `true`, 파싱 불가, `jq` 부재 — **거부**(exit 1, 영어 stderr
+  `Refusing to restart the shell while the session is locked.`).
+
+거부 쪽으로 기운 것은 의도다: 잘못 진행하면 hyprlock 이 quickshell 과 함께
+죽어 세션이 Hyprland failsafe 뒤에 갇히는 중대 사고(§22.4)이고, 잘못
+거부하면 재시작 한 번을 손해 보는 경미한 사고이기 때문이다. 이 계약은
+`tests/runtime/test_shell_restart_lock.sh` 가 고정한다(실제 hyprlock 을
+잠그는 라이브 실험은 하지 않았다 — mock IPC 응답으로 세 분기를 각각
+검사한다).
+
+위임 체인:
+
+```
+omarchy-restart-shell (compat, /usr/bin 심링크 → compat/bin 실체)
+  → cachy-omarchy-reload (공개 명령 7번째, 인자 없는 얇은 앞단)
+    → cachy-omarchy-shell --restart (락 조회 → kill → 재기동 로직 실체)
+```
+
+세 계층 모두 락 조회·kill 로직을 이중화하지 않는다 — `cachy-omarchy-reload`
+는 `exec cachy-omarchy-shell --restart` 이고, compat `omarchy-restart-shell`
+은 `exec cachy-omarchy-reload` 다. 업스트림 `omarchy-restart-shell` 을
+verbatim 으로 올리지 않은 이유: 원본은 미스테이징 헬퍼 3개
+(`omarchy-hyprland-session-locked`, `omarchy-launch-shell`,
+`omarchy-system-sleep-lock`)를 전제하고 `quickshell kill` 이 종료까지
+블록하는 빌드를 가정하는데, 이 환경에 고정된 quickshell 0.3.0 은 kill 이
+즉시 반환해 그 전제가 레이스가 된다.
+
+**stranded-lock recovery 를 이 체인에 넣지 않은 이유.**
+`omarchy-hyprland-session-locked` (업스트림에서 고아 락을 판별해 재확보를
+시도하는 헬퍼)는 여전히 스테이징하지 않는다 — `milestone=blocked`. §22.4 의
+실측이 근거다: hyprlock 이 세션을 쥔 상태에서 quickshell 이 ext-session-lock
+을 요청하면 hyprlock 은 `onLockFinished` 로 우아하게 처리해 생존하지만,
+quickshell 은 Wayland 프로토콜 오류로 연결이 끊겨 죽는다. 이 마일스톤은 그
+비대칭을 다시 측정하거나 뒤집지 않았다 — 그래서 우리 재시작 계약은 "거부"
+까지만 하고, 락을 강제로 회수하려는 시도는 하지 않는다
+(`docs/CLOSURE_PRIORITY.md` v0.12.0 절 C 참조).
