@@ -83,6 +83,27 @@ cmd_ipc() {
 
 cmd_restart() {
   require_tree
+
+  # 세션이 잠긴 동안 재시작하면 화면 잠금 클라이언트(hyprlock)가 함께 죽어
+  # 세션이 Hyprland failsafe 뒤에 갇힌다(RUNTIME_STARTUP §22.4). 고아 락을
+  # 판별해 재획득까지 시도하는 업스트림 omarchy-hyprland-session-locked 경로는
+  # v0.12.0 범위 밖(CLOSURE_PRIORITY) — 우리는 거부만 한다.
+  #
+  # 셸이 IPC 에 전혀 응답하지 않으면(실행 중이 아님/타임아웃) 보존할 락도
+  # 없으므로 그대로 진행한다. 반대로 응답은 왔는데 JSON 파싱이 안 되거나
+  # (jq 부재 포함) 값이 명확히 "잠기지 않음"이 아니면 안전한 쪽으로 거부한다:
+  # 잘못 진행하면 hyprlock 을 죽여 세션이 갇히는 중대 사고이고, 잘못 거부하면
+  # 재시작 한 번을 손해 보는 경미한 사고이기 때문이다.
+  local lock_out lock_status locking
+  lock_out=$(timeout --kill-after=1s "${COO_IPC_TIMEOUT:-2s}" \
+    qs ipc -n -p "$OMARCHY_PATH/shell" call -- lock status 2>/dev/null)
+  lock_status=$?
+  if (( lock_status == 0 )); then
+    locking=$(printf '%s' "$lock_out" | jq -r '.secure or .requested' 2>/dev/null)
+    [[ $locking == "false" ]] \
+      || fail "Refusing to restart the shell while the session is locked."
+  fi
+
   # 정밀 매칭: qs ipc 프로세스(qs ipc -n -p <경로> call)는 cmdline 에
   # "quickshell -n -p <경로>" 가 없으므로 false positive 안 남(#5).
   # 이 패턴은 systemd-cat 부모(systemd-cat -t cachy-omarchy-shell -- quickshell -n -p <경로>)
