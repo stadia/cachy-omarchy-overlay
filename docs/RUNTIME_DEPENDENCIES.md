@@ -112,6 +112,7 @@
 | `cat` | `coreutils` | BASE | 기반 |
 | `checkupdates` | `pacman-contrib` | OPT | 업데이트 확인 메뉴 항목 |
 | `chmod` | `coreutils` | BASE | 기반 |
+| `clear` | `ncurses` | BASE | 프레젠테이션 로고 출력 전 터미널 초기화 — ncurses는 bash의 전이 의존 |
 | `cmp` | `diffutils` | BASE | 기반(base 그룹) |
 | `cp` | `coreutils` | BASE | 기반 |
 | `curl` | `curl` | BASE | 이미 선언된 의존의 전이 의존(§4.2 개정) |
@@ -215,9 +216,9 @@
 | `xkbcli` | `libxkbcommon` | BASE | 이미 선언된 의존의 전이 의존(§4.2 개정) |
 | `zbarimg` | `zbar` | OPT | QR 코드 스캔 메뉴 항목 |
 
-tests/data/command-packages.tsv: 전체 117행, 위 표에는 도달한 113행이 모두 실린다(BASE 61행 포함 — BASE 는 declare 대상이 아닐 뿐 검사 대상에서 빠지지 않는다)
+tests/data/command-packages.tsv: 전체 118행, 위 표에는 도달한 114행이 모두 실린다(BASE 62행 포함 — BASE 는 declare 대상이 아닐 뿐 검사 대상에서 빠지지 않는다)
 
-docs/COMMAND_AUDIT.md 의 DISABLED 행으로 메뉴 루트에서 억제된 이름: 91개 (의도적으로 미지원인 Omarchy OS 스택 — 예외 파일과 달리 사유·신선도 검사가 없는 통로다)
+docs/COMMAND_AUDIT.md 의 DISABLED 행으로 메뉴 루트에서 억제된 이름: 90개 (의도적으로 미지원인 Omarchy OS 스택 — 예외 파일과 달리 사유·신선도 검사가 없는 통로다)
 - `omarchy-branding-about`
 - `omarchy-branding-screensaver`
 - `omarchy-channel-current`
@@ -258,7 +259,6 @@ docs/COMMAND_AUDIT.md 의 DISABLED 행으로 메뉴 루트에서 억제된 이�
 - `omarchy-install-service-tailscale`
 - `omarchy-install-terminal`
 - `omarchy-launch-about`
-- `omarchy-launch-floating-terminal-with-presentation`
 - `omarchy-menu-herdr-keybindings`
 - `omarchy-menu-plugin`
 - `omarchy-menu-share`

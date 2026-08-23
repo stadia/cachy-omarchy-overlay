@@ -81,6 +81,7 @@ asdcontrol	asdcontrol	UNPACKAGED	Apple Studio Display 밝기 제어(하드웨어
 bluetoothctl	bluez-utils	OPT	블루투스 컨트롤러 부재 환경(데스크톱) 존재 — 위젯은 가드로 숨는다
 brightnessctl	brightnessctl	OPT	내장 백라이트 — 이미 optdepends
 checkupdates	pacman-contrib	OPT	업데이트 확인 메뉴 항목
+clear	ncurses	BASE	프레젠테이션 로고 출력 전 터미널 초기화 — ncurses는 bash의 전이 의존
 curl	curl	BASE	이미 선언된 의존의 전이 의존(§4.2 개정)
 ddcutil	ddcutil	OPT	외부 모니터 밝기 — 이미 optdepends
 discord	discord	OPT	Discord 커뮤니티 실행 메뉴 항목

@@ -7,6 +7,9 @@ defaults=${3:?defaults dir}
 install -d "$dest/usr/share/cachy-omarchy/upstream"
 cp -a "$src/shell" "$dest/usr/share/cachy-omarchy/upstream/"
 install -D -m644 "$src/version" "$dest/usr/share/cachy-omarchy/upstream/version"
+# v0.12.0 Track D: omarchy-show-logo 가 $OMARCHY_PATH/logo.txt 를 읽는다.
+# 프레젠테이션 헬퍼와 같은 업스트림 루트에 원본 그대로 설치한다.
+install -D -m644 "$src/logo.txt" "$dest/usr/share/cachy-omarchy/upstream/logo.txt"
 install -D -m644 "$src/default/omarchy/omarchy-menu.jsonc" \
   "$dest/usr/share/cachy-omarchy/upstream/default/omarchy/omarchy-menu.jsonc"
 # 테마 런타임 (M9): colors.toml 과 default/themed/*.tpl 은 같이 진화하는 한
@@ -313,6 +316,18 @@ helpers=(
   # OPT 다 — 부재 시 omarchy-cmd-present magick 가드가 fallback() 으로
   # 빠져 텍스트색이 그냥 테마 전경색이 된다(fail-safe, PKGBUILD optdepends).
   omarchy-bar-text-color
+  # v0.12.0 Track D: gum 프레젠테이션 레이어. 메뉴의
+  # update.hardware.audio(omarchy-restart-audio),
+  # setup.security.passwordless-sudo(omarchy-sudo-passwordless),
+  # setup.network.dns.custom(omarchy-dns) 행이 이 런처를 거친다.
+  # restart-gum 은 source 되고, show-logo/show-done 은 터미널 안에서 실행되므로
+  # 네 헬퍼와 위의 logo.txt 를 기능 단위로 verbatim 스테이징한다.
+  # gum 은 이미 depends, xdg-terminal-exec 은 이미 AUR optdepend,
+  # uwsm-app 은 uwsm 패키지 소유라 새 의존 선언은 없다.
+  omarchy-restart-gum
+  omarchy-show-logo
+  omarchy-show-done
+  omarchy-launch-floating-terminal-with-presentation
 )
 
 for helper in "${helpers[@]}"; do
