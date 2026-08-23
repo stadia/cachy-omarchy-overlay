@@ -33,29 +33,134 @@ done
 lane_rows=$(awk '$0 ~ /^\| / && $0 !~ /^\| lane \|/ && $0 !~ /^\| ---/ { count++ } END { print count + 0 }' <<<"$lane_section")
 assert_eq "$lane_rows" "4" "lane 표에는 네 행만 있다"
 
-# 핵심 표 행은 중간에 끊기지 않고 모두 핵심·미검증 상태여야 한다.
-core_section=$(awk '/^## 핵심 — 측정됨 필수$/ { found=1; next } /^## 주변/ { if (found) exit } found { print }' "$doc")
-polkit_row='| polkit (아래 §polkit) | 핵심 | host | 미검증 | |'
-assert_contains "$core_section" "$polkit_row" "polkit 은 핵심 표의 행이다"
-if grep -q -B1 -F "$polkit_row" <<<"$core_section" | grep -qx -- ''; then
-  printf 'FAIL: polkit 앞에 빈 줄이 없어 핵심 표에 이어진다\n'
-  ASSERT_FAILURES=$((ASSERT_FAILURES + 1))
-else
-  printf 'ok:   polkit 앞에 빈 줄이 없어 핵심 표에 이어진다\n'
-fi
+# 핵심·주변 표를 각 섹션의 정확한 헤더에서만 읽어 열 위치까지 검사한다.
+gate_tables=$(awk '
+function trim(value) {
+  sub(/^[[:space:]]+/, "", value)
+  sub(/[[:space:]]+$/, "", value)
+  return value
+}
+function fail(message) {
+  if (!failed) reason = message
+  failed = 1
+}
+function valid_lane(lane) {
+  return lane == "container" || lane == "auto-live" || lane == "vm" || lane == "host"
+}
+function count_occurrences(line, needle, start, offset) {
+  start = 1
+  while ((offset = index(substr(line, start), needle)) != 0) {
+    occurrences[needle]++
+    start += offset + length(needle) - 1
+  }
+}
+function parse_row(kind, line, fields, count, item, grade, lane, status) {
+  count = split(line, fields, "|")
+  if (count != 7 || trim(fields[1]) != "" || trim(fields[7]) != "") {
+    fail(kind " 표 행은 다섯 열이어야 한다")
+    return
+  }
 
-while IFS= read -r row; do
-  [[ "$row" == '| 항목 |'* || "$row" == '| --- |'* ]] && continue
-  if [[ "$row" == '|'* ]]; then
-    assert_contains "$row" '| 핵심 |' "핵심 표 행 등급: $row"
-    assert_contains "$row" '| 미검증 |' "핵심 표 행 상태: $row"
-  fi
-done <<<"$core_section"
+  item = trim(fields[2])
+  grade = trim(fields[3])
+  lane = trim(fields[4])
+  status = trim(fields[5])
+  if (item == "") fail(kind " 표 항목 열이 비어 있다")
+  if (!valid_lane(lane)) fail(kind " 표 lane 열이 유효하지 않다")
 
-# 선택 의존 제공자를 쓰는 주변 행은 주변 등급을 유지한다.
-for row in 'QR 스캔 / OCR' '화면 녹화' '플로팅 프레젠테이션 터미널'; do
-  assert_contains "$text" "| $row | 주변 |" "선택 제공자 항목은 주변: $row"
-done
+  if (kind == "핵심") {
+    if (grade != "핵심") fail("핵심 표 등급 열이 핵심이 아니다")
+    if (status != "미검증") fail("핵심 표 상태 열이 미검증이 아니다")
+    core_items[item]++
+    if (item == "polkit (아래 §polkit)") core_polkit++
+  } else {
+    if (grade != "주변") fail("주변 표 등급 열이 주변이 아니다")
+    if (status != "미검증") fail("주변 표 상태 열이 미검증이 아니다")
+    peripheral_items[item]++
+  }
+}
+{
+  count_occurrences($0, "QR 스캔 / OCR")
+  count_occurrences($0, "화면 녹화")
+  count_occurrences($0, "플로팅 프레젠테이션 터미널")
+}
+$0 == "## 핵심 — 측정됨 필수" {
+  phase = "core-before-header"
+  next
+}
+$0 == "## 주변 — 미검증 문서화 허용" {
+  phase = "peripheral-before-header"
+  next
+}
+phase == "core-before-header" {
+  if ($0 == "| 항목 | 등급 | lane | 상태 | 증거 |") {
+    core_header = 1
+    phase = "core-separator"
+  }
+  next
+}
+phase == "core-separator" {
+  if ($0 != "| --- | --- | --- | --- | --- |") fail("핵심 표 헤더 구분선이 없다")
+  phase = "core-rows"
+  next
+}
+phase == "core-rows" {
+  if ($0 == "") {
+    core_blank = 1
+    next
+  }
+  if (core_blank || $0 !~ /^\|/) {
+    fail("핵심 표 안에 빈 줄 또는 표 밖 텍스트가 있다")
+    next
+  }
+  parse_row("핵심", $0)
+  core_rows++
+  next
+}
+phase == "peripheral-before-header" {
+  if ($0 == "| 항목 | 등급 | lane | 상태 | 증거 |") {
+    peripheral_header = 1
+    phase = "peripheral-separator"
+  }
+  next
+}
+phase == "peripheral-separator" {
+  if ($0 != "| --- | --- | --- | --- | --- |") fail("주변 표 헤더 구분선이 없다")
+  phase = "peripheral-rows"
+  next
+}
+phase == "peripheral-rows" && /^## / {
+  phase = "after-peripheral"
+  next
+}
+phase == "peripheral-rows" {
+  if ($0 == "") {
+    peripheral_blank = 1
+    next
+  }
+  if (peripheral_blank || $0 !~ /^\|/) {
+    fail("주변 표 안에 빈 줄 또는 표 밖 텍스트가 있다")
+    next
+  }
+  parse_row("주변", $0)
+  peripheral_rows++
+  next
+}
+END {
+  if (!core_header || core_rows == 0) fail("핵심 표를 찾지 못했다")
+  if (core_polkit != 1) fail("polkit 핵심 항목은 정확히 한 행이어야 한다")
+  if (!peripheral_header || peripheral_rows == 0) fail("주변 표를 찾지 못했다")
+  if (peripheral_items["QR 스캔 / OCR"] != 1 || occurrences["QR 스캔 / OCR"] != 1) fail("QR 스캔 / OCR 은 주변 표에만 한 번 있어야 한다")
+  if (peripheral_items["화면 녹화"] != 1 || occurrences["화면 녹화"] != 1) fail("화면 녹화는 주변 표에만 한 번 있어야 한다")
+  if (peripheral_items["플로팅 프레젠테이션 터미널"] != 1 || occurrences["플로팅 프레젠테이션 터미널"] != 1) fail("프레젠테이션 터미널은 주변 표에만 한 번 있어야 한다")
+  print failed ? reason : "ok"
+}
+' "$doc")
+assert_eq "$gate_tables" "ok" "게이트 표의 열 구조와 항목 위치를 유지한다"
+
+# 선택 제공자를 쓰는 주변 항목의 판정 근거를 문서에 남긴다.
+assert_contains "$text" "스크린샷은 핵심" "스크린샷 핵심 판정을 설명한다"
+assert_contains "$text" "선택 의존성" "녹화·프레젠테이션 주변 판정을 설명한다"
 
 # 알려진 편차와 함정은 문서에 남는다.
 assert_contains "$text" "ISA" "ISA 레벨 편차를 기록한다"
