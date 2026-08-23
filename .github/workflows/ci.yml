@@ -52,3 +52,43 @@ jobs:
             bin/build-packages
             bin/test-packages
           '
+
+  resolve:
+    runs-on: ubuntu-latest
+    container:
+      image: docker.io/cachyos/cachyos:latest
+      options: --user root
+    steps:
+      - name: 빌드 도구 설치
+        run: pacman -Syu --noconfirm --needed base-devel git python sudo
+
+      - name: 빌드 사용자 생성
+        run: |
+          useradd -m builder
+          printf 'builder ALL=(ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/builder
+
+      - uses: actions/checkout@v4
+
+      - name: 소유권 이전
+        run: chown -R builder:builder "$GITHUB_WORKSPACE"
+
+      # 패키지 빌드는 upstream.lock 이 고정한 정확한 Omarchy 소스를 사용한다.
+      - name: Omarchy 소스 준비
+        run: |
+          sudo -u builder --preserve-env=GITHUB_WORKSPACE bash -lc '
+            cd "$GITHUB_WORKSPACE"
+            source upstream.lock
+            git clone "$OMARCHY_REPOSITORY" build/omarchy
+            git -C build/omarchy checkout --detach "$OMARCHY_COMMIT"
+            test "$(git -C build/omarchy rev-parse HEAD)" = "$OMARCHY_COMMIT"
+          '
+
+      - name: 패키지 빌드
+        run: |
+          sudo -u builder --preserve-env=GITHUB_WORKSPACE bash -lc '
+            cd "$GITHUB_WORKSPACE" && bin/build-packages
+          '
+
+      # 설치는 root 로. 스크립트가 게이트 A·B 를 스스로 검사한다.
+      - name: 의존 해석 설치
+        run: bin/ci-resolve-install

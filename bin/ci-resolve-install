@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# 깨끗한 시스템에서 PKGBUILD 의 depends 선언이 충분한지 증명한다.
+#
+# 기존 clean build(bin/build-packages --clean)는 의존 검사를 건너뛰므로
+# 이 스크립트가 실제 pacman 트랜잭션으로 그 구멍을 메운다.
+set -uo pipefail
+
+repo_root=${COO_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}
+build_dir=${COO_BUILD_DIR:-$repo_root/build}
+local_repo=${COO_LOCAL_REPO:-/tmp/coo-localrepo}
+
+fail() { printf 'error: %s\n' "$1" >&2; exit 1; }
+ok()   { printf 'ok:   %s\n' "$1"; }
+
+shopt -s nullglob
+pkgs=("$build_dir"/*.pkg.tar.zst)
+shopt -u nullglob
+(( ${#pkgs[@]} >= 2 )) || fail "빌드 산출물이 부족하다: ${#pkgs[@]} (build-packages 를 먼저 돌린다)"
+
+# 1) 로컬 pacman 저장소
+mkdir -p "$local_repo"
+cp "${pkgs[@]}" "$local_repo/"
+( cd "$local_repo" && repo-add --quiet coo.db.tar.gz ./*.pkg.tar.zst ) \
+  || fail "repo-add 실패"
+ok "로컬 저장소 생성: ${#pkgs[@]} 개"
+
+if ! grep -q '^\[coo\]' /etc/pacman.conf; then
+  printf '\n[coo]\nSigLevel = Optional TrustAll\nServer = file://%s\n' "$local_repo" \
+    >> /etc/pacman.conf
+fi
+
+# 2) 게이트 B 사전조건. omarchy 는 conflicts 검증 대상이고,
+# omarchy-settings 는 현재 conflicts 대상이 아닌 깨끗한 이미지 기준선이다.
+if pacman -Q omarchy >/dev/null 2>&1; then
+  fail "게이트 B 사전조건: 깨끗한 이미지에 omarchy 가 이미 설치됨"
+fi
+ok "게이트 B 사전조건: 깨끗한 이미지에 omarchy 없음"
+
+if pacman -Q omarchy-settings >/dev/null 2>&1; then
+  fail "게이트 B 기준선: 깨끗한 이미지에 omarchy-settings 가 이미 설치됨"
+fi
+ok "게이트 B 기준선: 깨끗한 이미지에 omarchy-settings 없음"
+
+# 3) 부분 업그레이드를 피한 뒤 의존을 해석시켜 설치한다.
+pacman -Syu --noconfirm >/dev/null || fail "pacman -Syu 실패"
+pacman -S --noconfirm cachy-omarchy-overlay || fail "게이트 A: 의존 해석 설치 실패"
+ok "게이트 A: pacman -S 가 의존을 해석해 설치했다"
+
+# overlay 만 요청했으므로 shell 은 depends 로 끌려와야 한다.
+pacman -Q cachy-omarchy-shell >/dev/null 2>&1 \
+  || fail "게이트 A: cachy-omarchy-shell 이 depends 로 끌려오지 않았다"
+ok "게이트 A: 패키지 간 의존이 같은 트랜잭션으로 해석됐다"
+
+# 4) 게이트 B 설치 후 재확인. omarchy 부재는 conflicts 결과이고,
+# omarchy-settings 부재는 설치가 깨끗한 이미지 기준선을 보존한 결과다.
+if pacman -Q omarchy >/dev/null 2>&1; then
+  fail "게이트 B conflicts: 설치 뒤 omarchy 가 존재함"
+fi
+ok "게이트 B conflicts: 설치 뒤 omarchy 없음"
+
+if pacman -Q omarchy-settings >/dev/null 2>&1; then
+  fail "게이트 B 기준선: 설치 뒤 omarchy-settings 가 존재함"
+fi
+ok "게이트 B 기준선: 설치 뒤 omarchy-settings 없음"
+
+printf '의존 해석 lane 통과\n'
