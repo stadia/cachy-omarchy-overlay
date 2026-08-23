@@ -26,10 +26,14 @@ SPEC §61 의 역사적 기록으로 남으며, 이 문서가 그보다 넓은 �
 
 ## 알려진 편차
 
-- **ISA 레벨.** 개발 머신은 znver4 저장소를 쓰지만 CI 컨테이너는 다른 최적화
-  레벨의 저장소로 떨어진다(실측 command 의 stdout(저장소 섹션과 loader 지원 ISA 출력)을 증거 칸에 전문으로 인용). 의존 **선언**의
-  충분성 증명에는 영향이 없다 — 패키지 이름과 provides 는 ISA 레벨과
-  무관하다. 조용히 넘어가지 않기 위해 기록한다.
+- **ISA 레벨.** 2026-08-24 개발 머신의 `/etc/pacman.conf`는
+  `cachyos-core-znver4`, `cachyos-extra-znver4`, `cachyos-znver4`를 활성화했고
+  `Architecture = auto x86_64_v4`를 쓴다. 같은 머신의
+  `/lib/ld-linux-x86-64.so.2 --help`는 `x86-64-v4 (supported, searched)`를
+  보고했다. CI 컨테이너의 실제 저장소/loader 출력은 아직 인벤토리에 측정되지
+  않았다. 의존 **선언**의 충분성 증명에는 ISA 레벨 차이가 영향을 주지 않는다 —
+  패키지 이름과 provides 는 ISA 레벨과 무관하다. 조용히 넘어가지 않기 위해
+  기록한다.
 
 ## 측정 순서
 
