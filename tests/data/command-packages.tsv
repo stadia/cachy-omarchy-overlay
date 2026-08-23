@@ -79,11 +79,11 @@ perl	perl	HARD	텍스트 처리 헬퍼 — 기본 경로에서 도달하나 depe
 hyprsunset	hyprsunset	HARD	nightlight 서비스가 기본 활성 — depends 없음
 asdcontrol	asdcontrol	UNPACKAGED	Apple Studio Display 밝기 제어(하드웨어 한정, omarchy-brightness-display-apple 이 sudo asdcontrol 을 부른다) — 공식 리포에도 AUR 에도 제공자가 없다(AUR RPC info/search 둘 다 0건 실측). 어디에도 선언하지 않는다; 사용자가 직접 빌드해야 하며, 없으면 그 헬퍼 하나만 동작하지 않는다.
 bluetoothctl	bluez-utils	OPT	블루투스 컨트롤러 부재 환경(데스크톱) 존재 — 위젯은 가드로 숨는다
-brightnessctl	brightnessctl	OPT	내장 백라이트 — 이미 optdepends
+brightnessctl	brightnessctl	OPT	내장 백라이트 — v0.12.1 에서 depends 로 승격
 checkupdates	pacman-contrib	OPT	업데이트 확인 메뉴 항목
 clear	ncurses	BASE	프레젠테이션 로고 출력 전 터미널 초기화 — ncurses는 bash의 전이 의존
 curl	curl	BASE	이미 선언된 의존의 전이 의존(§4.2 개정)
-ddcutil	ddcutil	OPT	외부 모니터 밝기 — 이미 optdepends
+ddcutil	ddcutil	OPT	외부 모니터 밝기 — v0.12.1 에서 depends 로 승격
 discord	discord	OPT	Discord 커뮤니티 실행 메뉴 항목
 fc-list	fontconfig	BASE	이미 선언된 의존의 전이 의존(§4.2 개정)
 fc-match	fontconfig	BASE	이미 선언된 의존의 전이 의존(§4.2 개정)
@@ -103,7 +103,7 @@ slurp	slurp	HARD	스크린샷 영역 선택 행의 구동 기계(§4.2 개정) �
 sudo	sudo	HARD	cachy-omarchy-init 이 락스크린 PAM 서비스 설정을 omarchy-apply-lock 에 위임하며 그것이 root 를 요구한다 — 메뉴 행이 아니라 우리 설치 경로에서 도달(컨트롤러 룰링, task-2)
 tensaku-edit	tensaku	AUR	클립보드/스크린샷 편집기 기본값(omarchy-clipboard-open:33) — 미설치 시 폴백 없음. 바이너리명 tensaku-edit 는 패키지명이 아니다 — 실제 AUR 패키지는 tensaku(AUR RPC info 1건 실측, tensaku-bin/tensaku-git 도 별도 존재).
 tesseract	tesseract	OPT	OCR 메뉴 항목
-tmux	tmux	OPT	tmux 테마 훅 — 이미 optdepends
+tmux	tmux	OPT	tmux 테마 훅 — v0.12.1 에서 depends 로 승격
 update-desktop-database	desktop-file-utils	OPT	webapp 제거 후 desktop DB 갱신(omarchy-webapp-remove) — 이전에는 BASE 로 적혀 있었으나 선언된 depends 의 전이 폐포에도 base/base-devel 에도 없다(BASE 정당성 검사 실측)
 upower	upower	HARD	Power 패널 구동 기계 — Panel.qml:210이 omarchy-battery-status --shell을 무조건 실행
 usbreset	usbutils	OPT	USB 오디오 장치 복구 메뉴 항목

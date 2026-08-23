@@ -1,7 +1,7 @@
 # Maintainer: Cachy Omarchy Overlay
 pkgname=cachy-omarchy-shell
 pkgver=4.0.0
-pkgrel=19
+pkgrel=20
 pkgdesc='Pinned Omarchy Quattro shell runtime for CachyOS (no omarchy-settings)'
 arch=('any')
 url='https://github.com/basecamp/omarchy'
@@ -42,20 +42,30 @@ license=('MIT')
 #     아래 optdepends 블록 참고.)
 #   upower (v0.10.0): omarchy-battery-status 의 구동 기계 — Power 패널이
 #     Panel.qml:210 에서 무조건 호출(docs/CLOSURE_PRIORITY.md).
+# v0.12.1 정책 전환: 아래 두 번째 블록 16개는 v0.12.0 까지 optdepends 였다.
+#   분류(tests/data/command-packages.tsv 의 OPT)는 "기본 활성 경로에서 도달하지
+#   않는다"는 도달성 사실이고 그건 그대로다 — 바뀐 것은 선언 정책이다. 이
+#   오버레이는 큐레이팅된 데스크톱을 출하하며, 메뉴·패널 항목이 설치 직후
+#   동작하지 않는 상태를 기본값으로 두지 않는다. 클로저 스캐너는 OPT 를
+#   depends·optdepends 어느 쪽으로도 만족시킬 수 있다(closure_check.py:1074).
+#   AUR class(xdg-terminal-exec/ttfx/dropbox-cli/tensaku)는 여전히 depends 에
+#   둘 수 없다 — pacman -U 가 리포/설치된 패키지로만 해결한다(bin/install-packages).
 depends=('quickshell' 'hyprland' 'uwsm' 'inotify-tools' 'libvips' 'procps-ng'
          'psmisc' 'jq' 'wl-clipboard' 'wtype' 'wireplumber' 'pipewire-pulse'
          'xdg-utils' 'git' 'grim' 'gum' 'hyprsunset' 'libnotify' 'libpulse'
-         'perl' 'slurp' 'sudo' 'upower' 'which')
+         'perl' 'slurp' 'sudo' 'upower' 'which'
+         # 테마 훅·하드웨어 제어·메뉴/패널 대상 — v0.12.1 에서 optdepends 에서 승격.
+         # 배열 안 주석에 괄호를 쓰지 않는다: 테스트가 sed 범위로 배열을 뜨는데
+         # 닫는 괄호 한 글자가 추출을 조용히 잘라먹는다.
+         'tmux' 'foot' 'brightnessctl' 'ddcutil' 'lsp-plugins-lv2' 'socat'
+         'bluez-utils' 'desktop-file-utils' 'gtk-update-icon-cache' 'hyprpicker'
+         'iw' 'mpv' 'networkmanager' 'pacman-contrib' 'power-profiles-daemon'
+         'usbutils')
 # /usr/bin/omarchy-* 를 공식 omarchy 패키지와 같은 이름으로 소유한다. 상호
 # 배타가 의도다. provides 는 하지 않는다 — Omarchy 전체를 제공하지 않는다.
 conflicts=('omarchy')
 makedepends=('git')
 optdepends=(
-  'tmux: omarchy-theme-set-tmux hook'
-  'foot: omarchy-theme-set-foot hook (OSC reload)'
-  'brightnessctl: omarchy-brightness-display internal backlight'
-  'ddcutil: omarchy-brightness-display-ddc external monitors'
-  'lsp-plugins-lv2: omarchy-audio-tuning limiter'
   # v0.9 클로저 스캐너 실측으로 신규 선언(tests/data/command-packages.tsv 근거,
   # 18건). 메뉴/패널 항목이며 기본 경로에서 도달하지 않는다 — 사용자가 그
   # 기능을 씀으로써 선택한다.
@@ -70,37 +80,22 @@ optdepends=(
   # (bin/install-packages:55) depends 에 넣으면 우리 패키지 자체가 설치
   # 불가해진다 — 그래서 HARD 성격이라도 optdepends 에 둔다:
   'xdg-terminal-exec: AUR — 터미널 실행의 구동 기계, omarchy-launch-tui/omarchy-launch-terminal/omarchy-launch-floating-terminal-with-presentation 전부 이것 없이는 실패(HARD 성격이나 리포에 없어 depends 불가)'
-  # v0.11.0 스크린세이버. socat 은 extra 리포에 있으나 OPT 다 — 스크린세이버는
-  # 사용자가 idle 로 진입하거나 메뉴에서 고를 때만 도달한다.
-  'socat: omarchy-launch-screensaver 의 Hyprland .socket2 이벤트 대기(부재 시 모니터별 순차 배치가 깨진다)'
   # ttfx 는 리포 무결과(pacman -Ss ttfx 0건, 2026-08-23 실측) — AUR 전용이라
   # xdg-terminal-exec 과 같은 이유로 depends 에 둘 수 없다. 부재는 crash 가
   # 아니다: omarchy-launch-screensaver 첫 줄의 omarchy-cmd-missing 가드가
   # exit 1 로 흡수한다.
   'ttfx: AUR — 스크린세이버 효과 렌더러(omarchy-screensaver 본체). 없으면 스크린세이버만 조용히 뜨지 않는다'
-  # v0.10.0: 바 Bluetooth 위젯. OPT — 컨트롤러 없는 데스크톱에 bluez-utils 를
-  # 강제하지 않는다. rfkill 은 이미 util-linux BASE.
-  'bluez-utils: Bluetooth 패널/위젯 (omarchy-bluetooth-power/-device)'
-  'desktop-file-utils: omarchy-webapp-remove 뒤 desktop DB 갱신 (v0.9 최종 wave 의 BASE 정당성 검사로 발견 — BASE 로 적혀 있었으나 선언된 depends 의 전이 폐포에도 base/base-devel 에도 없다)'
   'discord: Discord 커뮤니티 실행 메뉴 항목'
   'dropbox-cli: AUR — Dropbox 패널 대상 애플리케이션'
   'ffmpeg: 화면 녹화 인코딩'
   'gpu-screen-recorder: 화면 녹화 메뉴 항목'
-  'gtk-update-icon-cache: 웹앱 아이콘 설치 후처리'
-  'hyprpicker: 색상 선택 메뉴 항목'
   # v0.12.0 Track B: 바 투명 모드 텍스트 대비색(omarchy-bar-text-color).
   # 부재 시 헬퍼가 테마 전경색으로 폴백한다.
   'imagemagick: omarchy-bar-text-color 의 배경 대비 계산(투명 바 텍스트색). 부재 시 헬퍼가 테마 전경색으로 폴백한다'
-  'iw: Wi-Fi 진단 메뉴 항목'
-  'mpv: 미디어 미리보기 메뉴 항목'
-  'networkmanager: 네트워크 상태/제어 패널 대상 애플리케이션'
-  'pacman-contrib: checkupdates 업데이트 확인 메뉴 항목'
-  'power-profiles-daemon: 전원 프로파일 전환 메뉴 항목'
   'python: Dropbox 패널의 번들 상태 스크립트(status.py) 실행기'
   'tailscale: Tailscale 패널 대상 애플리케이션'
   'tensaku: AUR — 클립보드/스크린샷 편집기 기본값, 폴백 없음(바이너리명 tensaku-edit 는 패키지명이 아니다 — 실제 AUR 패키지는 tensaku)'
   'tesseract: OCR 메뉴 항목'
-  'usbutils: USB 장치 진단 메뉴 항목'
   'v4l-utils: 웹캠/캡처 장치 진단 메뉴 항목'
   'zbar: QR/바코드 스캔 메뉴 항목'
 )

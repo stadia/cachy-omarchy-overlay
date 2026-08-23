@@ -92,9 +92,11 @@ assert_eq "$x" "0" "kitty 설정은 업스트림에 없다 — 만들지 않는�
 # ttfx 가드의 fail-safe 전제. 이것이 없으면 가드가 127 로 끝나 통과해 버린다.
 assert_file_exists "$bin/omarchy-cmd-missing" "ttfx 가드의 전제가 서 있다"
 
-# 새 의존 선언: socat(extra) 과 ttfx(AUR) 는 optdepends 로만 선언한다.
+# 의존 선언: socat 은 extra 리포에 있어 v0.12.1 에서 hard depends 로 승격됐고,
+# ttfx 는 AUR 전용이라 optdepends 로만 선언한다.
 pkgbuild=$(<"$REPO_ROOT/packages/cachy-omarchy-shell/PKGBUILD")
-assert_contains "$pkgbuild" "socat:" "socat 이 optdepends 에 선언됐다"
+deps=$(sed -n '/^depends=(/,/)/p' "$REPO_ROOT/packages/cachy-omarchy-shell/PKGBUILD")
+assert_contains "$deps" "socat" "socat 이 depends 에 선언됐다"
 assert_contains "$pkgbuild" "ttfx:" "ttfx 가 optdepends 에 선언됐다"
 grep -qP "^\s*'?ttfx'?\s*$" <<<"$pkgbuild" && x=1 || x=0
 assert_eq "$x" "0" "ttfx 는 depends 에 없다(AUR 전용 — pacman -U 가 해결 못 한다)"
