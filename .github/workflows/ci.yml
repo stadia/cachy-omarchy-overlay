@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    container:
+      image: docker.io/cachyos/cachyos:latest
+      options: --user root
+    steps:
+      - name: 빌드 도구 설치
+        run: |
+          pacman -Syu --noconfirm --needed base-devel git python sudo
+
+      # makepkg 는 root 로 돌지 않는다. 빌드 전용 사용자를 만든다.
+      - name: 빌드 사용자 생성
+        run: |
+          useradd -m builder
+          printf 'builder ALL=(ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/builder
+
+      - uses: actions/checkout@v4
+
+      - name: 소유권 이전
+        run: chown -R builder:builder "$GITHUB_WORKSPACE"
+
+      # bin/test-packages 는 bin/build-packages 가 남긴 validated-build
+      # 매니페스트를 검증한다. 둘을 같은 사용자로 돌려야 상태 디렉터리가
+      # 일치한다.
+      - name: 빌드 + 테스트
+        run: |
+          sudo -u builder --preserve-env=GITHUB_WORKSPACE bash -lc '
+            cd "$GITHUB_WORKSPACE"
+            bin/build-packages
+            bin/test-packages
+          '
