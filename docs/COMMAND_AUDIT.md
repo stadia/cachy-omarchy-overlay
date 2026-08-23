@@ -17,7 +17,7 @@
 | --- | --- | --- | --- | --- | --- |
 | `omarchy-launch-shell` | 세션/유닛 | `quickshell -n -p $OMARCHY_PATH/shell` + journal + hyprctl 재시도 | quickshell, hyprctl, systemd-cat | ADAPTED | wrapper — `cachy-omarchy-shell --run`. 로직 재사용 가능, 이름/경로만 우리 것 |
 | `omarchy-shell` | 핫키, 메뉴, 플러그인 | 기동하지 않음. `qs ipc` 전달 | OMARCHY_PATH, qs, timeout | ADAPTED | wrapper — `cachy-omarchy-launcher`가 `shell toggle omarchy.menu` 호출 |
-| `omarchy-restart-shell` | 업데이트/디버그 | 기존 qs 인스턴스 kill 후 재기동 | quickshell kill | ADAPTED | wrapper later (`cachy-omarchy-reload`). M0에서 구현 없음 |
+| `omarchy-restart-shell` | 업데이트/디버그 | 기존 qs 인스턴스 kill 후 재기동 | quickshell kill | ADAPTED | wrapper — `overlay/compat/bin/omarchy-restart-shell` 이 `cachy-omarchy-reload` 로 위임한다 (v0.12.0) |
 | `quickshell` / `qs` | 위 두 명령 | 엔진 | CachyOS 패키지 | SAFE | package (의존) |
 
 ---
@@ -516,7 +516,7 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-restart-audio` | SAFE | package | audio-tuning 전이. v0.12.0에서 `omarchy-launch-floating-terminal-with-presentation` 프레젠테이션 체인까지 스테이징해 `update.hardware.audio` 메뉴 행의 실행 결손을 닫았다 |
 | `omarchy-restart-bluetooth` | SAFE | package | 0.8.0 verbatim stage. rfkill unblock/list bluetooth |
 | `omarchy-restart-hyprsunset` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-restart-shell` | ADAPTED | wrapper | later `cachy-omarchy-reload`. M3 미구현. `tests/data/closure-exceptions.tsv` 등록(v0.9, 추적 0.11.0) — quickshell kill/재기동 + 세션 락 재확보 폴링까지 있어 verbatim 이 아니라 래퍼 구현이 필요 |
+| `omarchy-restart-shell` | ADAPTED | wrapper | v0.12.0 compat 적응 카피(`overlay/compat/bin/omarchy-restart-shell`) → `cachy-omarchy-reload` 위임. quickshell kill/재기동 + 세션 락 재확보 폴링이 있는 원본은 미스테이징 헬퍼 3개(`omarchy-hyprland-session-locked`(blocked)·`omarchy-launch-shell`·`omarchy-system-sleep-lock`)를 전제하고 이 환경의 quickshell 0.3.0(kill 즉시 반환)에서 레이스를 만들어 verbatim 이 아니라 락 인지 재시작 프런트로 대체한다. `tests/data/closure-exceptions.tsv` 예외 행 회수 |
 | `omarchy-restart-trackpad` | SAFE | package | 0.8.0 verbatim stage. i2c_hid_acpi 언바인드/바인드 + modprobe |
 | `omarchy-restart-wifi` | SAFE | package | 0.8.0 verbatim stage. rfkill + nmcli radio |
 | `omarchy-restart-xcompose` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
