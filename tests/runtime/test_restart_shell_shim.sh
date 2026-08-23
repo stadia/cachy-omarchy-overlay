@@ -57,4 +57,17 @@ COO_RELOAD_BIN="$stub/cachy-omarchy-reload" "$SHIM" >/dev/null 2>&1
 code=$?
 assert_eq "$code" "1" "위임 대상 실패를 그대로 전달"
 
+# 인자를 받으면(업스트림은 안 주지만) 조용히 삼키지 않고 그대로 넘겨,
+# cachy-omarchy-reload 쪽의 "알 수 없는 인자" exit 1 이 호출자에게 보이게
+# 한다(#9).
+cat > "$stub/cachy-omarchy-reload" <<'STUB'
+#!/usr/bin/env bash
+printf 'called:%s\n' "$*" >> "$COO_CALL_LOG"
+exit 0
+STUB
+chmod +x "$stub/cachy-omarchy-reload"
+: > "$calls"
+COO_RELOAD_BIN="$stub/cachy-omarchy-reload" COO_CALL_LOG="$calls" "$SHIM" --bogus >/dev/null 2>&1
+assert_eq "$(cat "$calls")" "called:--bogus" "인자를 그대로 cachy-omarchy-reload 로 전달"
+
 exit "$ASSERT_FAILURES"

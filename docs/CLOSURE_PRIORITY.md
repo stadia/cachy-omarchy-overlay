@@ -81,10 +81,12 @@ omarchy 헬퍼는 고정된 이름만 쓴다 — 그래서 v0.12 로 넘겼으�
 자체완결적이었다 — 계획과 실제 출하가 정확히 일치한다.
 
 **C. safe shell lifecycle** ✅ 완료(`638b659`, `ade0fa4`, `7237394`)
-- `638b659` — `cachy-omarchy-shell --restart` 가 락 인지: 세션이 secure/locking
-  이거나 응답한 셸의 회신을 파싱할 수 없으면 거부한다(exit 1, 영어 stderr
-  `Refusing to restart the shell while the session is locked.`). 명확히 언락
-  상태이거나 IPC 가 아예 실패하면 진행한다.
+- `638b659` — `cachy-omarchy-shell --restart` 가 락 인지: 셸의 `lock status`
+  응답이 스키마가 온전한(`locked`/`secure`/`requested` 세 키를 다 갖춘)
+  "잠기지 않음"이 아니면 거부한다(exit 1, 영어 stderr
+  `Refusing to restart the shell while the session is locked.`). IPC 자체가
+  실패하거나 IPC-레벨 오류(lock 서비스 부재로 간주)면 보존할 락이 없으므로
+  진행한다(§24, `RUNTIME_STARTUP.md`).
 - `ade0fa4` — `cachy-omarchy-reload` 를 7번째 공개 명령으로 추가. `--restart`
   위의 얇은 앞단.
 - `7237394` — `overlay/compat/bin/omarchy-restart-shell` 을
@@ -120,10 +122,11 @@ hyprlock 이 세션을 쥔 상태에서 ext-session-lock 거부로 quickshell �
 ## 이후 — v0.12.0 이후 backlog
 
 경계는 기준 ① 에 있다. v0.9~v0.12 는 전부 "현재 Quattro desktop 의 결손을
-닫는다" 였다. v0.12.0 을 끝으로 그 범주의 알려진 결손은 남아 있지 않다 —
-아래 항목들은 "새 기능 표면을 채택한다" 로 성격이 다르다. 없어서 무언가
-깨진 것이 아니라, 지금 없는 능력을 새로 들이는 일이다. 채택 여부는 그
-자체로 결정할 문제이지 마일스톤에 얹을 일이 아니다.
+닫는다" 였다. v0.12.0 을 끝으로 그 범주에 남은 것은 §22.4 로 차단된
+stranded-lock recovery 하나뿐이다 — 아래 항목들은 "새 기능 표면을
+채택한다" 로 성격이 다르다. 없어서 무언가 깨진 것이 아니라, 지금 없는
+능력을 새로 들이는 일이다. 채택 여부는 그 자체로 결정할 문제이지
+마일스톤에 얹을 일이 아니다.
 
 - P2 선택 기능: network-password+network-qr(자격증명 노출 실측 선행),
   network-speedtest·disk-speedtest(외부 트래픽/디스크 쓰기),

@@ -12,4 +12,4 @@
 set -uo pipefail
 
 RELOAD_BIN=${COO_RELOAD_BIN:-cachy-omarchy-reload}
-exec "$RELOAD_BIN"
+exec "$RELOAD_BIN" "$@"

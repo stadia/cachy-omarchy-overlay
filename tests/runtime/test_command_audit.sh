@@ -30,6 +30,7 @@ assert_contains "$audit" "M5" "숨김/오버레이는 M5 로 미룬다"
 # 잡는다.
 staged=$(awk '/^helpers=\(/,/^\)/' \
   "$REPO_ROOT/packages/cachy-omarchy-shell/stage-upstream.sh" \
+  | grep -v '^[[:space:]]*#' \
   | grep -oE '\bomarchy-[a-z0-9-]+' | sort -u)
 [[ -n $staged ]] && parsed=0 || parsed=1
 assert_eq "$parsed" "0" "stage-upstream.sh 의 helpers 배열을 파싱했다"

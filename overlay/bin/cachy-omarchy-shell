@@ -12,6 +12,16 @@ export OMARCHY_PATH
 
 fail() { printf 'error: %s\n' "$1" >&2; exit 1; }
 
+# qs ipc 가 stdout 에 실어 exit 0 으로 돌려주는 IPC-레벨 오류 문자열들(§11).
+# cmd_ipc 와 cmd_restart 의 락 조회가 이 어휘를 공유한다 — 중복 정의 금지.
+is_ipc_error_output() {
+  case $1 in
+    "Target not found."|"Function not found."|"Too few arguments provided"*|"Too many arguments provided"*)
+      return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 usage() {
   cat <<'USAGE'
 사용법: cachy-omarchy-shell <명령>
@@ -72,10 +82,7 @@ cmd_ipc() {
 
   # IPC 레벨 오류는 stdout 에 실려 exit 0 으로 온다. 그대로 통과시키면
   # 실패가 성공처럼 보인다.
-  case $output in
-    "Target not found."|"Function not found."|"Too few arguments provided"*|"Too many arguments provided"*)
-      fail "$output" ;;
-  esac
+  is_ipc_error_output "$output" && fail "$output"
 
   [[ -n $output ]] && printf '%s\n' "$output"
   return 0
@@ -89,17 +96,27 @@ cmd_restart() {
   # 판별해 재획득까지 시도하는 업스트림 omarchy-hyprland-session-locked 경로는
   # v0.12.0 범위 밖(CLOSURE_PRIORITY) — 우리는 거부만 한다.
   #
-  # 셸이 IPC 에 전혀 응답하지 않으면(실행 중이 아님/타임아웃) 보존할 락도
-  # 없으므로 그대로 진행한다. 반대로 응답은 왔는데 JSON 파싱이 안 되거나
-  # (jq 부재 포함) 값이 명확히 "잠기지 않음"이 아니면 안전한 쪽으로 거부한다:
-  # 잘못 진행하면 hyprlock 을 죽여 세션이 갇히는 중대 사고이고, 잘못 거부하면
-  # 재시작 한 번을 손해 보는 경미한 사고이기 때문이다.
+  # 셸이 IPC 에 전혀 응답하지 않거나(실행 중이 아님/타임아웃), 응답은 왔지만
+  # IPC 레벨 오류(대상 없음 등 — lock 플러그인이 아직 로드되지 않았거나
+  # 애초에 빠졌다는 뜻)면 보존할 락도 없으므로 그대로 진행한다. 반대로
+  # 응답은 왔는데 스키마가 온전한 "잠기지 않음"이 아니면(JSON 파싱 실패,
+  # jq 부재, 필수 키 누락 등) 안전한 쪽으로 거부한다: 잘못 진행하면
+  # hyprlock 을 죽여 세션이 갇히는 중대 사고이고, 잘못 거부하면 재시작
+  # 한 번을 손해 보는 경미한 사고이기 때문이다. 정리하면: **스키마가
+  # 온전한 "unlocked" 응답만 진행, 락 서비스 부재도 진행, 그 외 전부 거부.**
+  #
+  # 셸 자신이 이미 판정한 값(lock/Service.qml 의 `locked` 프로퍼티, 정확히
+  # lockRequested||sessionLock.locked||sessionLock.secure)을 status() 가
+  # `.locked` 로 그대로 노출하므로 이를 우선 사용한다 — 클라이언트에서
+  # `.secure`/`.requested` 두 항만 재조합하는 것보다 강한 판정이다.
   local lock_out lock_status locking
   lock_out=$(timeout --kill-after=1s "${COO_IPC_TIMEOUT:-2s}" \
     qs ipc -n -p "$OMARCHY_PATH/shell" call -- lock status 2>/dev/null)
   lock_status=$?
-  if (( lock_status == 0 )); then
-    locking=$(printf '%s' "$lock_out" | jq -r '.secure or .requested' 2>/dev/null)
+  if (( lock_status == 0 )) && ! is_ipc_error_output "$lock_out"; then
+    locking=$(printf '%s' "$lock_out" \
+      | jq -r 'if (has("locked") and has("secure") and has("requested"))
+                then (.locked or .secure or .requested) else "unknown" end' 2>/dev/null)
     [[ $locking == "false" ]] \
       || fail "Refusing to restart the shell while the session is locked."
   fi

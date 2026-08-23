@@ -1893,12 +1893,20 @@ Hyprland -c <tmp>/hyprland.conf --verify-config`, 사용자 세션 무관)로 �
 ## §24 락 인지 셸 재시작 + reload/compat 위임 체인 (v0.12.0, 2026-08-23)
 
 `cachy-omarchy-shell --restart` 는 kill 전에 셸 자신에게 `qs ipc -n -p
-$OMARCHY_PATH/shell call -- lock status` 로 락 상태를 묻는다. 판정:
+$OMARCHY_PATH/shell call -- lock status` 로 락 상태를 묻는다. `status()` 는
+`shell/plugins/lock/Service.qml` 이 이미 계산해 둔 `locked`
+(`lockRequested || sessionLock.locked || sessionLock.secure`) 를 포함해
+`secure`/`requested` 등을 JSON 으로 반환한다. 판정:
 
-- IPC 자체가 실패(타임아웃/셸 미기동) → 보존할 락이 없으므로 **진행**.
-- IPC 는 성공했지만 응답에서 `.secure or .requested` 가 `jq` 로 정확히
-  `false` 로 읽히는 경우만 **진행**.
-- 그 외 전부 — `true`, 파싱 불가, `jq` 부재 — **거부**(exit 1, 영어 stderr
+- IPC 자체가 실패(타임아웃/셸 미기동)하거나, IPC 는 응답했지만 IPC-레벨
+  오류(`qs ipc` 가 stdout + exit 0 으로 돌려주는 `Target not found.` 류 —
+  lock 플러그인이 아직 로드되지 않았거나 애초에 빠졌다는 뜻)면 보존할
+  락이 없으므로 **진행**.
+- IPC 는 성공했고 응답이 `locked`/`secure`/`requested` 세 키를 모두 갖춘
+  JSON 이며 `jq` 로 `.locked or .secure or .requested` 가 정확히 `false`
+  로 읽히는 경우만 **진행**(셸 자신의 `locked` 판정을 우선한다).
+- 그 외 전부 — 세 키 중 하나라도 없음(예: `{}`), 파싱 불가, `jq` 부재,
+  판정값이 `true` — **거부**(exit 1, 영어 stderr
   `Refusing to restart the shell while the session is locked.`).
 
 거부 쪽으로 기운 것은 의도다: 잘못 진행하면 hyprlock 이 quickshell 과 함께

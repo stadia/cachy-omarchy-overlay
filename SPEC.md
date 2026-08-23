@@ -641,10 +641,10 @@ must be an explicit architecture decision.
 /usr/bin/cachy-omarchy-shell
 /usr/bin/cachy-omarchy-launcher
 /usr/bin/cachy-omarchy-keybindings
+/usr/bin/cachy-omarchy-bindings
+/usr/bin/cachy-omarchy-init
 /usr/bin/cachy-omarchy-doctor
 /usr/bin/cachy-omarchy-reload
-/usr/bin/cachy-omarchy-build
-/usr/bin/cachy-omarchy-update
 ```
 
 ## 9.4 User Config
@@ -767,6 +767,8 @@ cachy-omarchy-overlay/
 │   │   ├── cachy-omarchy-shell
 │   │   ├── cachy-omarchy-launcher
 │   │   ├── cachy-omarchy-keybindings
+│   │   ├── cachy-omarchy-bindings
+│   │   ├── cachy-omarchy-init
 │   │   ├── cachy-omarchy-doctor
 │   │   └── cachy-omarchy-reload
 │   │
