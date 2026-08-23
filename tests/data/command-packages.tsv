@@ -93,6 +93,7 @@ gtk-update-icon-cache	gtk-update-icon-cache	OPT	웹앱 아이콘 설치 후처�
 hyprpicker	hyprpicker	OPT	색상 선택 메뉴 항목
 ip	iproute2	BASE	base 그룹 — 이미 선언된 의존의 전이 의존(§4.2 개정)
 iw	iw	OPT	Wi-Fi 진단 메뉴 항목
+magick	imagemagick	OPT	omarchy-bar-text-color 의 배경 대비 계산(투명 바 텍스트색) — omarchy-cmd-present 가드 뒤라 부재 시 fallback() 으로 조용히 빠진다
 mpv	mpv	OPT	미디어 미리보기 메뉴 항목
 nmcli	networkmanager	OPT	네트워크 관리 메뉴 항목
 pkexec	polkit	BASE	이미 선언된 의존의 전이 의존(§4.2 개정)

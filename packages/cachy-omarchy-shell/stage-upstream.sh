@@ -305,6 +305,14 @@ helpers=(
   # `omarchy-cmd-missing ttfx && exit 1` 로 흡수된다 — 그 가드가 Task 1 이다.
   omarchy-screensaver
   omarchy-launch-screensaver
+  # v0.12.0 Track B: 바 투명 모드 텍스트 대비색. Bar.qml:834 가
+  # requestedTransparent 일 때만 부른다 — 부재 시 Process 가 조용히 실패해
+  # 투명 바 텍스트가 테마 전경색으로 고정된다(크래시 아님, 가시적 결손).
+  # 이미 스테이징된 omarchy-cmd-present 하나만 부르는 자체완결 스크립트라
+  # verbatim 으로 올린다. 새 외부 의존은 magick(ImageMagick) 하나뿐이고
+  # OPT 다 — 부재 시 omarchy-cmd-present magick 가드가 fallback() 으로
+  # 빠져 텍스트색이 그냥 테마 전경색이 된다(fail-safe, PKGBUILD optdepends).
+  omarchy-bar-text-color
 )
 
 for helper in "${helpers[@]}"; do

@@ -218,6 +218,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-audio-sink-availability` | SAFE | package | 0.10.0. Audio 패널 싱크 선택 목록. `omarchy-audio-tuning`(staged) fronted-sink 만 호출 |
 | `omarchy-audio-tuning` | SAFE | package | 노트북 스피커 튜닝. `on` 만 `~/.config/pipewire` + user unit 템플릿을 복사. 데이터는 `$OMARCHY_PATH/default/audio` |
 | `omarchy-bar` | SAFE | package | 메뉴 `style.bar` position/transparent. layer-shell 네임스페이스 `omarchy-bar` 와 동명·별개 |
+| `omarchy-bar-text-color` | SAFE | package | v0.12.0. `Bar.qml:834` 가 `requestedTransparent` 일 때만 부른다. 이미 스테이징된 `omarchy-cmd-present` 만 부르는 self-contained 스크립트. `magick`(ImageMagick, OPT) 부재 시 fallback() 으로 테마 전경색을 반환한다 |
 | `omarchy-battery-low` | SAFE | package | v0.9. battery 플러그인(기본 활성)이 10% 이하에서 부른다. 체인은 omarchy-notification-send + omarchy-hook 뿐이라 verbatim |
 | `omarchy-battery-status` | SAFE | package | 0.10.0. Power 패널 구동 기계. Panel.qml:210 이 --shell 을 무조건 호출. 외부 omarchy 의존 0(upower + sysfs) |
 | `omarchy-bluetooth-device` | SAFE | package | 0.10.0. 바 Bluetooth 위젯 pair/connect/disconnect/forget. `omarchy-bluetooth-power`(staged)만 호출. bluetoothctl(opt) |
