@@ -94,6 +94,15 @@ bar layout in `~/.config/omarchy/shell.json`. Creating that file does not
 deep-merge: package defaults are ignored wholesale, and `cachy-omarchy-doctor`
 WARNs on its existence (`docs/RUNTIME_STARTUP.md`, `docs/RC_GAP_INVENTORY.md`).
 
+### Support scope
+
+Lua toggle files apply only with a `hyprland.lua` config —
+**Lua toggle 파일은 hyprland.lua 설정에서만 적용된다.** With a `hyprland.conf`
+setup, install/shell/launcher/theme all work, but those Lua toggle files are
+silently ignored because `.conf` does not execute Lua files. This does not
+claim laptop-lid support: the overlay does not stage upstream's lid-switch
+binding. See the "지원 계약" section in SPEC.md.
+
 ## Session lifecycle (v0.11)
 
 The idle → screensaver → lock → wake chain is packaged: idle timeout dims the

@@ -90,6 +90,14 @@ helper 와 런타임 의존성(`jq`, `wl-clipboard`, `wtype`, `wireplumber`,
 기본값이 통째로 무시되고, `cachy-omarchy-doctor` 가 존재 시 WARN 한다
 (`docs/RUNTIME_STARTUP.md`, `docs/RC_GAP_INVENTORY.md`).
 
+### 지원 범위
+
+**Lua toggle 파일은 hyprland.lua 설정에서만 적용된다.** `hyprland.conf` 를
+쓰는 경우 설치·셸·런처·테마는 정상 동작하지만 그 Lua toggle 파일은 적용되지
+않습니다 — `.conf` 는 Lua 파일을 실행하지 않기 때문입니다. 이는 노트북 뚜껑
+동작을 지원한다는 뜻이 아닙니다. 이 오버레이는 upstream lid-switch 바인딩을
+스테이징하지 않습니다. 자세한 내용은 SPEC 의 "지원 계약" 절을 참고하세요.
+
 ## 세션 생명주기 (v0.11)
 
 idle → screensaver → lock → wake 체인이 패키징돼 있다: idle 타임아웃은 키보드

@@ -2756,3 +2756,28 @@ ROLL BACK
 ```
 
 That is the architecture going forward.
+
+---
+
+# 76. 지원 계약
+
+지원 대상은 `~/.config/hypr/hyprland.lua` 구성에서 관리하는 Lua toggle
+파일이다. **Lua toggle 파일은 hyprland.lua 설정에서만 적용된다.**
+
+`hyprland.conf` 구성에서도 설치·셸·런처·테마는 정상 동작한다. 다만 conf 는
+그 Lua toggle 파일을 적용하지 않는다. 이것은 제품이 노트북 뚜껑 동작을
+지원한다는 선언이 아니다. 이 오버레이는 upstream lid-switch 바인딩을
+스테이징하지 않으며, clamshell helper 가 출하돼도 뚜껑을 닫는 동작으로
+도달하지 않는다(`README.md`의 Session lifecycle).
+
+이유는 우리가 만든 제약이 아니다. `.conf` 는 Lua 파일을 실행하지 않는다 —
+`source = .../*.lua` 는 파싱은 되지만 일반 config 키워드 줄로 취급돼 조용히
+버려진다(2026-08-23 중첩 Hyprland 실측, `tests/runtime/test_toggles_seam.sh:82`).
+그래서 관리 블록에 글롭 source 를 넣지 않는 것이 확정 동작이며, 기존
+`cachy-omarchy-doctor` WARN(`hyprland.conf setup: omarchy hypr toggles are not
+applied ... clamshell/monitor toggles are ignored — switch to a hyprland.lua
+config`)과 `cachy-omarchy-init` 이 설치 시점에 같은 경계를 고지한다.
+
+conf 사용자를 위한 toggle adapter 는 구현하지 않는다. 모든 Hyprland 구성을
+지원하려다 upstream deviation 을 늘리는 것보다, 경계를 명확히 하는 쪽을
+택했다.
