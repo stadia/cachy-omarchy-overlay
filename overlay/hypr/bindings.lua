@@ -42,14 +42,30 @@ end
 do
   local dir = os.getenv("HOME") .. "/.local/state/omarchy/toggles/hypr"
   local quoted = "'" .. dir:gsub("'", "'\\''") .. "'"
+  -- -print0 + NUL 분리: 줄 단위로 읽으면 파일명에 든 개행에서 경로가 잘려
+  -- 그 toggle 이 조용히 로드되지 않는다. 정렬은 셸 `sort` 대신 table.sort 로
+  -- 옮긴다 — NUL 스트림을 파이프로 한 번 더 넘기지 않기 위해서다.
   local pipe = io.popen(
-    "find " .. quoted .. " -maxdepth 1 -type f -name '*.lua' 2>/dev/null | sort"
+    "find " .. quoted .. " -maxdepth 1 -type f -name '*.lua' -print0 2>/dev/null"
   )
   if pipe then
-    for path in pipe:lines() do
+    local blob = pipe:read("*a") or ""
+    pipe:close()
+
+    -- 평문 find 로 자른다. Lua 패턴의 %z 는 5.1 에만 있고 5.2+ 에서 빠졌는데,
+    -- Hyprland 가 임베드한 버전을 전제하지 않기 위해 패턴을 쓰지 않는다.
+    local paths, start = {}, 1
+    while true do
+      local stop = blob:find("\0", start, true)
+      if not stop then break end
+      if stop > start then paths[#paths + 1] = blob:sub(start, stop - 1) end
+      start = stop + 1
+    end
+    table.sort(paths)
+
+    for _, path in ipairs(paths) do
       -- toggle 파일 하나가 깨져도 사용자 설정 전체가 죽지 않는다(SPEC §5.1).
       pcall(dofile, path)
     end
-    pipe:close()
   end
 end

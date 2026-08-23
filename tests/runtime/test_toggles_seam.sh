@@ -61,6 +61,24 @@ run_harness "$h3"; rc=$?
 assert_eq "$rc" "0" "깨진 toggle 이 설정 전체를 죽이지 않는다"
 assert_file_exists "$h3/loaded" "깨진 toggle 뒤의 정상 toggle 이 로드된다"
 
+# 경우 4: 파일명에 개행이 들어가도 경로가 잘리지 않는다. find -print0 + NUL 분리
+# 이전에는 `find | sort` 의 줄 단위 읽기가 개행에서 경로를 두 조각으로 잘라,
+# 두 조각 중 어느 것도 실재하지 않아 toggle 이 조용히 로드되지 않았다.
+# 위험도는 낮다(정상 omarchy 헬퍼는 고정된 이름만 쓴다) — 그래도 sweep 이
+# 파일명을 해석하지 않고 그대로 다루는지는 고정해 둔다.
+h4=$COO_TEST_SANDBOX/h4
+mkdir -p "$h4/.local/state/omarchy/toggles/hypr"
+nl_toggle=$(printf '%s/.local/state/omarchy/toggles/hypr/10-new
+line.lua' "$h4")
+cat > "$nl_toggle" <<LUA
+local f = io.open("$h4/loaded-newline", "w")
+f:write("yes")
+f:close()
+LUA
+run_harness "$h4"; rc=$?
+assert_eq "$rc" "0" "개행 파일명이 설정을 죽이지 않는다"
+assert_file_exists "$h4/loaded-newline" "개행이 든 파일명의 toggle 도 로드된다"
+
 # conf 경로: .lua 글롭을 받지 않는다(2026-08-23 중첩 Hyprland 실측 —
 # source = <dir>/*.lua 자체는 파싱 오류를 내지 않지만, 그 안의 Lua 는
 # 실행되지 않고 일반 config 키워드 줄로 취급돼 조용히 버려진다). 관리
