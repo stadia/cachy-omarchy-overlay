@@ -80,13 +80,19 @@ awk -v version="$latest" -v pin="$commit" '
 ' "$candidate_pkg" >"$pkg_tmp"
 "$mv_bin" "$pkg_tmp" "$candidate_pkg"
 
-# Copy the selected pinned source into the disposable candidate before applying
-# maintained runtime patches. Never mutate build/omarchy or another caller-owned
-# checkout: both package building and candidate tests receive this copy.
-candidate_source_input=${COO_OMARCHY_GIT:-$repo_root/build/omarchy}
-[[ -d $candidate_source_input ]] || fail "upstream source missing: $candidate_source_input"
+# Fetch the selected new pin into the disposable candidate before applying
+# maintained runtime patches. COO_OMARCHY_GIT may still name an older local
+# checkout while an update is available, so never copy it here. Both candidate
+# package building and tests must receive the newly selected commit.
 candidate_source=$candidate/upstream
-cp -a "$candidate_source_input" "$candidate_source"
+if ! "$git_bin" init -q "$candidate_source" ||
+   ! "$git_bin" -C "$candidate_source" fetch -q --depth 1 "$OMARCHY_REPOSITORY" "$commit" 2>/dev/null ||
+   ! git -C "$candidate_source" cat-file -e "$commit^{commit}" 2>/dev/null ||
+   ! git -C "$candidate_source" checkout -q --detach "$commit"; then
+  fail "could not fetch selected upstream source for $commit"
+fi
+candidate_head=$(git -C "$candidate_source" rev-parse --verify 'HEAD^{commit}') || fail 'could not read candidate upstream source HEAD'
+[[ $candidate_head == "$commit" ]] || fail "candidate upstream source is not selected commit: $candidate_head"
 
 if [[ ${COO_PATCH_FAIL:-0} == 1 ]]; then
   fail 'patch application failed'
@@ -111,6 +117,19 @@ done < <(find "$patches_source" -name '*.patch' -type f -print0 | sort -z)
 # explicit patch contract in the candidate index so the nested test runner sees
 # the same inputs that were applied to its disposable source.
 git -C "$candidate" add packages/cachy-omarchy-shell/patches
+
+# The nested package-file test reads COO_OMARCHY_GIT and applies the maintained
+# patches itself. It must start from the pristine selected pin, while package
+# builds above deliberately use the patched candidate_source.
+candidate_test_source=$candidate/upstream-pristine
+if ! "$git_bin" init -q "$candidate_test_source" ||
+   ! "$git_bin" -C "$candidate_test_source" fetch -q --depth 1 "$OMARCHY_REPOSITORY" "$commit" 2>/dev/null ||
+   ! git -C "$candidate_test_source" cat-file -e "$commit^{commit}" 2>/dev/null ||
+   ! git -C "$candidate_test_source" checkout -q --detach "$commit"; then
+  fail 'could not prepare pristine candidate source for tests'
+fi
+candidate_test_head=$(git -C "$candidate_test_source" rev-parse --verify 'HEAD^{commit}') || fail 'could not read pristine candidate source HEAD'
+[[ $candidate_test_head == "$commit" ]] || fail "pristine candidate source is not selected commit: $candidate_test_head"
 
 # tests/data/upstream-helpers.txt and upstream.lock's OMARCHY_COMMIT are one
 # fact in two files: the inventory is the closure scanner's ground truth for
@@ -165,7 +184,7 @@ COO_REPO_ROOT="$candidate" COO_BUILD_DIR="$candidate_build" COO_STATE_DIR="$cand
   COO_OMARCHY_GIT="$candidate_source" \
   "$candidate/bin/build-packages"
 COO_REPO_ROOT="$candidate" COO_STATE_DIR="$candidate_state" \
-  COO_OMARCHY_GIT="$candidate_source" \
+  COO_OMARCHY_GIT="$candidate_test_source" \
   "$candidate/bin/test-packages"
 
 candidate_manifest=$candidate_state/validated-build.manifest

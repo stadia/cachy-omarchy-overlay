@@ -151,6 +151,18 @@ cat >"$fake/makepkg" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 printf '%s\n' "$(basename "$PWD")" >>"$COO_TOOL_LOG"
+if [[ -n ${COO_EXPECT_UPSTREAM_COMMIT:-} ]]; then
+  actual_upstream_commit=$(/usr/bin/git -C "$COO_OMARCHY_GIT" rev-parse --verify 'HEAD^{commit}')
+  [[ $actual_upstream_commit == "$COO_EXPECT_UPSTREAM_COMMIT" ]] || {
+    printf 'fake-makepkg: candidate source HEAD mismatch: %s\n' "$actual_upstream_commit" >&2
+    exit 6
+  }
+  [[ -f $COO_OMARCHY_GIT/shell/services/PluginRegistry.qml ]] || {
+    printf 'fake-makepkg: candidate source is not the newly fetched upstream tree\n' >&2
+    exit 6
+  }
+  [[ -z ${COO_CANDIDATE_SOURCE_LOG:-} ]] || printf '%s\n' "$actual_upstream_commit" >>"$COO_CANDIDATE_SOURCE_LOG"
+fi
 if [[ ${COO_FAKE_BUILD_FAIL:-0} == 1 ]]; then
   echo 'fake-makepkg: forced build failure (COO_FAKE_BUILD_FAIL)' >&2
   exit 7
@@ -623,10 +635,30 @@ cp -a "$REPO_ROOT/lib" "$root/lib"
 cp -a "$REPO_ROOT/overlay" "$root/overlay"
 
 # U02/U03: successful update uses peeled commit, resets only shell pkgrel, and never installs.
+# Its caller source deliberately remains on the old pin. The candidate must
+# fetch the newly discovered tag rather than copying COO_OMARCHY_GIT verbatim.
+old_source_fixture=$COO_TEST_SANDBOX/old-source-fixture
+mkdir -p "$old_source_fixture"
+git init -q "$old_source_fixture"
+printf 'old upstream fixture\n' >"$old_source_fixture/old-source-marker"
+git -C "$old_source_fixture" add old-source-marker
+git -C "$old_source_fixture" -c user.email=fixture@example.invalid -c user.name=fixture -c commit.gpgsign=false \
+  commit -q -m 'old pin fixture'
+old_source_commit=$(git -C "$old_source_fixture" rev-parse HEAD)
+assert_eq "$(git -C "$old_source_fixture" rev-parse HEAD)" "$old_source_commit" "U02 caller source stays at old fixture commit"
+if [[ $old_source_commit == "$fixture_commit" ]]; then
+  printf 'FAIL: U02 caller source differs from the newly discovered commit\n'
+  ASSERT_FAILURES=$((ASSERT_FAILURES + 1))
+else
+  printf 'ok:   U02 caller source differs from the newly discovered commit\n'
+fi
+
 update_state=$COO_TEST_SANDBOX/update-state
 update_build=$COO_TEST_SANDBOX/update-build
 pac_update=$COO_TEST_SANDBOX/update-pacman.log
+candidate_source_log=$COO_TEST_SANDBOX/candidate-source.log
 : >"$pac_update"
+: >"$candidate_source_log"
 # "Independent" means this shell-only upstream update leaves the overlay's
 # own pkgver exactly as it was beforehand -- capture that here, immediately
 # before the call, and compare it to itself afterward. A literal like
@@ -635,8 +667,9 @@ pac_update=$COO_TEST_SANDBOX/update-pacman.log
 # though nothing about independence changed.
 overlay_pkgver_before_update=$(grep -m1 '^pkgver=' "$root/packages/cachy-omarchy-overlay/PKGBUILD")
 code=0
-out=$(WAYLAND_DISPLAY= COO_UPDATE_PIPELINE_NESTED=1 COO_REPO_ROOT="$root" COO_GIT_BIN="$fake/git" COO_STATE_DIR="$update_state" COO_BUILD_DIR="$update_build" COO_OMARCHY_GIT="$fixture_upstream" COO_TOOL_LOG="$log" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_FAKE_SHELL_ARTIFACT="$u02_shell_fixture" COO_FAKE_OVERLAY_ARTIFACT="$u02_overlay_fixture" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$pac_update" "$root/bin/update-upstream" 2>&1) || code=$?
+out=$(WAYLAND_DISPLAY= COO_UPDATE_PIPELINE_NESTED=1 COO_REPO_ROOT="$root" COO_GIT_BIN="$fake/git" COO_STATE_DIR="$update_state" COO_BUILD_DIR="$update_build" COO_OMARCHY_GIT="$old_source_fixture" COO_EXPECT_UPSTREAM_COMMIT="$fixture_commit" COO_CANDIDATE_SOURCE_LOG="$candidate_source_log" COO_TOOL_LOG="$log" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_FAKE_SHELL_ARTIFACT="$u02_shell_fixture" COO_FAKE_OVERLAY_ARTIFACT="$u02_overlay_fixture" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$pac_update" "$root/bin/update-upstream" 2>&1) || code=$?
 assert_eq "$code" "0" "U02 update validates and publishes candidate"
+assert_eq "$(sort -u "$candidate_source_log")" "$fixture_commit" "U02 candidate build uses the newly discovered commit"
 assert_contains "$out" "PASS tests/runtime/test_m3_docs.sh" "candidate default suite runs M3 docs test"
 assert_contains "$out" "PASS tests/package/test_package_files.sh" "candidate default suite reaches package files test"
 assert_contains "$out" "PASS tests/runtime/test_support_contract.sh" "candidate default suite reaches support contract test"
