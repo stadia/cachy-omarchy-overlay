@@ -185,18 +185,17 @@ CachyOS에서 `omarchy.menu`를 쓰려면 공식 OS가 아니라 **핀된 런타
 
 상세와 실측 근거는 `docs/RUNTIME_STARTUP.md` §6.
 
-- **셸 종료 시 `inotifywait` 자식이 남는다** — Quickshell 0.3.0 의 `Io.Process` 는
-  종료할 때 자식을 정리하지 않는다(실측: quickshell 은 SIGTERM 에 ~250ms 만에
-  정상 종료하고, 자식은 `systemd --user` 로 재부모화된 채 계속 산다). 끄는
-  프로퍼티도 없다 — 설치된 `quickshell-io.qmltypes` 의 `Process` 는 `running /
-  processId / command / workingDirectory / environment / clearEnvironment /
-  stdout / stderr / stdinEnabled` 뿐. 감시 디렉터리를 지워도 해소되지 않는다:
-  워치가 전부 제거되면 이벤트가 영영 오지 않아 `select()` 에서 무한 대기한다
-  (`/proc/<pid>/fdinfo` 에 워치 0개, `wchan: do_select`). 셸을 재시작할 때마다
-  하나씩 쌓인다. 테스트 하네스 쪽은 `tests/lib/sandbox.sh` 가 샌드박스 경로로
-  스코프해 회수하지만, **실세션 재시작 누수는 미해결**이다.
-
 ### 역사 기록 (해소됨 — 이 목록에 있었으나 더 이상 제한이 아니다)
+
+> **셸 종료 시 `inotifywait` 자식이 남는다** (해소됨 2026-08-24) —
+> Quickshell 0.3.0 의 `Io.Process` 는 종료할 때 자식을 정리하지 않는다(실측:
+> quickshell 은 SIGTERM 에 ~250ms 만에 정상 종료하고, 자식은 `systemd --user`
+> 로 재부모화된 채 계속 산다). 패치 `0001-stop-plugin-watcher-on-shell-exit.patch`
+> 가 `setpriv --pdeathsig TERM --` 로 커널 parent-death signal을 워처에 건다 —
+> 셸이 어떻게 죽든 커널이 SIGTERM을 보낸다. 실세션 reload 측정(2026-08-24
+> 21:25)에서 옛 워처가 100ms 내 종료, 고아 0 확인. `Component.onDestruction`
+> 핸들러도 추가했으나, Quickshell 0.3.0 은 SIGTERM 핸들러가 없어 exit 143 으로
+> 즉사하고 QML 엔진 teardown 이 돌지 않으므로 `pdeathsig`가 실제 보증이다.
 
 > **테마 Tier C `omarchy-theme-install`/`-update`/`-remove` 제외** (M9 원래 판단) —
 > 이 세 helper 도 Tier C("네트워크 설치")로 분류되어 처음엔 제외됐으나, 0.8.0 감사
