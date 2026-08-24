@@ -189,4 +189,11 @@ assert_contains "$text" "ISA" "ISA 레벨 편차를 기록한다"
 assert_contains "$text" "polkit" "polkit 항목이 있다"
 assert_contains "$text" "한글 입력기" "polkit 암호 측정의 입력기 함정을 경고한다"
 
+# Task 3: 라이브 측정 뒤 결함이 닫히면 남아야 할 증거 어휘.
+# Steps 6-8 의 host 측정이 성공하기 전에는 이 단언들이 실패한다 —
+# open defect 단락이 측정 증거로 교체되어야 통과한다.
+assert_contains "$text" "Request dismissed" "polkit lock cancellation ends request explicitly"
+assert_contains "$text" "reload 1회당" "acceptance tracks watcher leak rate or its elimination"
+assert_contains "$text" "고아 0" "acceptance records no orphan watcher after reload"
+
 exit "$ASSERT_FAILURES"
