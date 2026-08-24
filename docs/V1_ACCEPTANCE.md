@@ -108,8 +108,10 @@ polkit 과 충돌 가능하다는 우려는 남아 있음, 재검토 필요" 로
 | 1 | GUI 권한 요청 → 프롬프트 등장 | 2026-08-24 PASS: `pkexec /usr/bin/id`(action `org.freedesktop.policykit.exec`, `auth_admin` — 캐시 없음) 실행 시 `hyprctl layers` 에 `omarchy-polkit` 등장, 캡처에 `Authorize running '/usr/bin/id'` 제목과 자물쇠 + 암호 입력창이 실제로 렌더됨. |
 | 2 | 취소 → 요청이 거부로 끝나는가 | 2026-08-24 PASS: Escape 후 `pkexec` 가 exit 126 + `Error executing command as another user: Request dismissed`, 서피스 소멸, polkitd 가 해당 action 에 대해 FAILED to authenticate 를 기록하고 `polkit-agent-helper@…service` 가 Deactivated successfully — 헬퍼 유닛 누수 없음. |
 | 3 | 틀린 암호 → 재시도 허용 / 잠금 없음 | 2026-08-24 부분 PASS + **주의 사항**: 틀린 암호에 `pam_unix authentication failure` 뒤 에이전트가 재시도 헬퍼(`helper@9`)를 한 번 더 띄웠으므로 재시도 경로는 있다. 그러나 **잠금은 일어난다** — 시스템 기본 faillock(`/etc/security/faillock.conf` 전부 주석 = `deny=3`, `unlock_time=600`)에 실패가 3건 차면서 sudo·polkit 이 10분간 거부 상태가 됐다. 더 놀라운 것은 **프롬프트 "취소"도 실패로 집계된다**는 점이다(16:49:16 취소, 16:51:05 오답, 16:51:34 재시도 무입력 = 3건) — 취소 3번이면 sudo 가 잠긴다. 이는 배포판 PAM 정책이지 우리 것이 아니다. |
-| 4 | 맞는 암호 → 권한 상승 성공 | |
-| 5 | 셸 재시작 후 1~4 반복 — 등록이 살아남는가 | 부분: reload(893157) 뒤에도 `omarchy polkit agent registered` 가 다시 남고 1~3 단계가 그 셸에서 측정됐다. 1~4 전체 재반복은 4 단계 뒤에 수행한다. |
+| 4 | 맞는 암호 → 권한 상승 성공 | 2026-08-24 PASS: 프롬프트에 올바른 암호를 넣자 `pkexec /usr/bin/id` 가 rc=0 과 `uid=0(root) gid=0(root) groups=0(root)` 를 반환 — 실제 권한 상승이 우리 셸 에이전트를 통해 이뤄졌다. `pam_unix(polkit-1:session): session opened for user root` 기록, 서피스 소멸, `polkit-agent-helper@…service` Deactivated successfully. 성공한 인증이 `pam_faillock authsucc` 로 실패 집계를 비웠다(faillock 목록 공백 확인). |
+| 5 | 셸 재시작 후 1~4 반복 — 등록이 살아남는가 | 2026-08-24 PASS: `cachy-omarchy-reload` 로 셸을 893157→926740 으로 교체한 직후 저널에 `omarchy polkit agent registered` 가 다시 남았고, 새 셸에서 프롬프트가 정상 등장(1)하고 올바른 암호가 다시 rc=0 · uid=0(root) 를 냈다(4). 앞선 1~3 단계도 이미 reload 로 태어난 셸(893157)에서 측정한 것이므로 등록은 재시작을 두 번 넘겨 살아남았다. 등록 중복 WARN 은 어느 재시작에서도 나타나지 않았다. |
+
+**reload 워처 누수의 누적률을 확정했다.** `~/.config/omarchy/plugins` 를 감시하는 우리 `inotifywait` 는 reload 두 번 뒤 3개가 됐다: 873421(구 셸 873223 의 고아, PPID 876), 893275(구 셸 893157 의 고아, PPID 876), 926863(현 셸 926740 소유). 즉 **reload 1회당 정확히 1개**가 systemd user manager 로 리페어런트돼 영구히 남는다. 세션을 오래 쓰며 셸을 재시작할수록 선형으로 쌓인다.
 
 **결함 후보 — 잠금이 polkit 프롬프트를 고아로 만든다.** 2026-08-24 17:01:48 에 띄운 `pkexec /usr/bin/id` 프롬프트가 17:04:28 idle 진입과 17:06:59 잠금을 거치는 동안 사라졌고, 17:11:36 에 잠금을 풀어 세션이 정상으로 돌아온 뒤에도 **다시 뜨지 않았다**. `hyprctl layers` 에 `omarchy-polkit` 이 없는데 `pkexec` 프로세스는 10분 45초째 살아서 대기 중이었다 — 사용자가 완료할 수도 취소할 수도 없는 상태다. 측정을 위해 수동으로 kill 했다. 잠금·idle 을 사이에 둔 권한 요청은 조용히 영구 대기로 남는다는 뜻이므로, 1.0 전에 재현 조건(잠금 때문인지 에이전트 자체 타임아웃인지)을 좁혀 수정 대상으로 다뤄야 한다.
 
