@@ -70,15 +70,15 @@ SPEC §61 의 역사적 기록으로 남으며, 이 문서가 그보다 넓은 �
 | idle → screensaver → lock → wake | 핵심 | host | 미검증 | |
 | suspend → resume | 핵심 | host | 미검증 | 이 머신에서 측정 불가: 2026-08-24 16:23:56 `systemctl suspend` 가 logind 에서 "Unit suspend.target is masked, refusing operation" 으로 거부됐다. `/etc/systemd/system/{suspend,sleep,hibernate}.target` 이 2026-07-12 부터 `/dev/null` 로 마스크된 시스템 정책이며 우리 오버레이가 만든 상태가 아니다. 마스크를 푸는 것은 시스템 정책 변경이므로 측정하려면 별도 승인이 필요하다. |
 | 테마 / 배경 | 핵심 | host | 미검증 | |
-| 투명 바 대비 | 핵심 | host | 미검증 | |
-| 클립보드 / 이모지 | 핵심 | host | 미검증 | |
-| 알림 | 핵심 | host | 미검증 | |
-| 날씨 | 핵심 | host | 미검증 | |
-| 오디오 입출력 | 핵심 | host | 미검증 | |
-| 블루투스 | 핵심 | host | 미검증 | |
-| NetworkManager | 핵심 | host | 미검증 | |
-| 전원 프로파일 | 핵심 | host | 미검증 | |
-| 스크린샷 | 핵심 | host | 미검증 | |
+| 투명 바 대비 | 핵심 | host | 측정됨 | 2026-08-24 host PASS: `omarchy-bar-text-color top 26 #a9b1d6 #1a1b26` 가 현재 배경(`Winding Road`)의 상단 26px 스트립을 magick 으로 1x1 샘플링해 WCAG 상대휘도 대비를 계산하고 `#a9b1d6` 을 선택 — fallback 이 아니라 실제 계산 경로. 같은 순간의 `grim` 풀스크린 캡처(3840x2160)에서 상단 바 스트립을 잘라 확인: 좌측 워크스페이스 1~5, 중앙 `Monday 16:33` + 날씨, 우측 트레이 아이콘이 배경 위에서 판독 가능. |
+| 클립보드 / 이모지 | 핵심 | host | 측정됨 | 2026-08-24 host PASS: `wl-copy` 로 넣은 마커가 `wl-paste` 로 왕복했고 셸의 클립보드 히스토리가 178→179 로 증가하며 마커가 최상단에 기록됨. `omarchy-menu-clipboard`(= `omarchy-shell shell toggle omarchy.clipboard`) 토글로 `omarchy-clipboard` layer 등장→소멸, 캡처에 검색창·히스토리 목록·미리보기 패널이 한글 항목까지 렌더. `omarchy-menu-emoji` 토글로 `omarchy-emojis` layer 등장→소멸, 캡처에 컬러 이모지 그리드 렌더. |
+| 알림 | 핵심 | host | 측정됨 | 2026-08-24 host PASS: `omarchy-notification-send` exit 0 뒤 `hyprctl layers` 에 `omarchy-notifications` 서피스가 등장했고, `grim` 캡처에서 제목 `acceptance probe` 와 한글 본문이 실제로 그려진 토스트를 확인 — 불린이 아닌 렌더 증거. IPC target `notifications` 에 dismiss/dnd/history 함수가 노출됨. |
+| 날씨 | 핵심 | host | 측정됨 | 2026-08-24 host PASS: `omarchy-weather-status` 가 `Gwangju · Temp 29°C · Wind →9km/h`, `omarchy-weather-location` 이 `Gwangju` 를 반환. 같은 값이 바 캡처 중앙 위젯에도 렌더됨. |
+| 오디오 입출력 | 핵심 | host | 측정됨 | 2026-08-24 host PASS: `omarchy-audio-sink-availability` 가 analog-stereo 와 hdmi-stereo 두 싱크를 가용으로 보고하고 `omarchy-audio-output-sink` 가 현재 hdmi-stereo 를 반환. `omarchy-audio-output-volume -5` → `+5` 로 wpctl 볼륨이 1.00→0.95→1.00 으로 왕복했고 그 순간 `omarchy-osd` layer 가 렌더됨. 입력 소스도 열거됨(현재 사용자 상태는 MUTED). |
+| 블루투스 | 핵심 | host | 측정됨 | 2026-08-24 host PASS: `omarchy-bluetooth-power is-on` exit 0(전원 켜짐), 컨트롤러 2C:C6:82:96:4C:88 (cachyos) 가 rfkill 언블록 상태로 보고되고 페어링된 기기 2대(Magic Mouse, Xbox Wireless Controller)가 열거됨. Magic Mouse 는 세션 입력으로 실사용 중. |
+| NetworkManager | 핵심 | host | 측정됨 | 2026-08-24 host PASS: `omarchy-network-status` 가 `wifi	Ahch-To_Jedi_Temple	77	5240.0` 를 반환(연결 종류·SSID·신호세기·대역). `nmcli general status` 는 connected:full. |
+| 전원 프로파일 | 핵심 | host | 측정됨 | 2026-08-24 host PASS: `omarchy-powerprofiles-list --active-state` 가 power-saver/balanced/performance 세 프로필과 balanced 활성(1)을 반환하고 D-Bus `net.hadess.PowerProfiles.ActiveProfile` 도 balanced. **측정 함정 기록:** 대화형 셸 PATH 로 실행하면 linuxbrew/mise python 이 `/usr/bin/python3` 를 가려 `powerprofilesctl` 이 `No module named 'gi'` 로 죽고, 헬퍼가 `2>/dev/null` 로 stderr 를 삼켜 빈 출력 + exit 0 인 조용한 실패처럼 보인다. 셸 프로세스(`/proc/<quickshell>/environ`)의 uwsm 세션 PATH 에는 linuxbrew/mise 가 없어 정상 동작한다 — 헬퍼 측정은 반드시 세션 PATH 로 한다. |
+| 스크린샷 | 핵심 | host | 측정됨 | 2026-08-24 host PASS: `omarchy-capture-screenshot fullscreen save` exit 0 으로 3840x2160 PNG(3.7MB) 생성. 경로는 `hyprshot`/`satty`/`swappy` 가 아니라 hyprpicker 프리즈 + `grim` + `wl-clipboard` + jq 이며 넷 다 설치돼 있다. 헬퍼가 캡처 동안 `cursor:no_hardware_cursors` 를 0 으로 바꿨다가 trap 으로 원복하는 경로까지 실행됐고, 캡처 이미지에 바·배경·창이 모두 담겼다. |
 | polkit (아래 §polkit) | 핵심 | host | 미검증 | |
 
 ## 주변 — 미검증 문서화 허용
