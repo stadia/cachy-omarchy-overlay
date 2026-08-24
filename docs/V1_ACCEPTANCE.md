@@ -79,7 +79,7 @@ SPEC §61 의 역사적 기록으로 남으며, 이 문서가 그보다 넓은 �
 | NetworkManager | 핵심 | host | 측정됨 | 2026-08-24 host PASS: `omarchy-network-status` 가 `wifi	Ahch-To_Jedi_Temple	77	5240.0` 를 반환(연결 종류·SSID·신호세기·대역). `nmcli general status` 는 connected:full. |
 | 전원 프로파일 | 핵심 | host | 측정됨 | 2026-08-24 host PASS: `omarchy-powerprofiles-list --active-state` 가 power-saver/balanced/performance 세 프로필과 balanced 활성(1)을 반환하고 D-Bus `net.hadess.PowerProfiles.ActiveProfile` 도 balanced. **측정 함정 기록:** 대화형 셸 PATH 로 실행하면 linuxbrew/mise python 이 `/usr/bin/python3` 를 가려 `powerprofilesctl` 이 `No module named 'gi'` 로 죽고, 헬퍼가 `2>/dev/null` 로 stderr 를 삼켜 빈 출력 + exit 0 인 조용한 실패처럼 보인다. 셸 프로세스(`/proc/<quickshell>/environ`)의 uwsm 세션 PATH 에는 linuxbrew/mise 가 없어 정상 동작한다 — 헬퍼 측정은 반드시 세션 PATH 로 한다. |
 | 스크린샷 | 핵심 | host | 측정됨 | 2026-08-24 host PASS: `omarchy-capture-screenshot fullscreen save` exit 0 으로 3840x2160 PNG(3.7MB) 생성. 경로는 `hyprshot`/`satty`/`swappy` 가 아니라 hyprpicker 프리즈 + `grim` + `wl-clipboard` + jq 이며 넷 다 설치돼 있다. 헬퍼가 캡처 동안 `cursor:no_hardware_cursors` 를 0 으로 바꿨다가 trap 으로 원복하는 경로까지 실행됐고, 캡처 이미지에 바·배경·창이 모두 담겼다. |
-| polkit (아래 §polkit) | 핵심 | host | 미검증 | |
+| polkit (아래 §polkit) | 핵심 | host | 측정됨 | 2026-08-24 host: §polkit 0~5 단계 전부 측정 완료. 응답 에이전트는 우리 셸이며 `hyprpolkitagent` 와의 경합은 실제로 일어나지 않았다. 프롬프트 등장·취소·오답 재시도·정답 권한 상승·셸 재시작 후 재등록이 모두 확인됐다. **다만 결함 후보 1건이 열려 있다** — idle/잠금을 사이에 둔 요청이 프롬프트를 잃고 영구 대기로 남는다(§polkit 참조). 그 건은 등급과 무관하게 수정 대상이다. |
 
 ## 주변 — 미검증 문서화 허용
 
