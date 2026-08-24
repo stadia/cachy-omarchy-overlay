@@ -397,19 +397,30 @@ SUPER/mainMod 형식만 충돌로 인식한다. 테스트는 사용자 설정을
 
 **해소 (2026-08-24).** 유지보수 패치 `0001` 이 감시자 명령을
 `setpriv --pdeathsig TERM -- inotifywait …` 로 감싼다. 커널의 parent-death 신호는
-셸이 어떤 방식으로 죽든(정상 종료·`SIGTERM`·`SIGKILL`) 감시자를 회수하므로 QML
-teardown 여부에 의존하지 않는다. `setpriv` 는 `util-linux`(BASE)가 제공하며 권한이
-필요 없다 — `tests/data/command-packages.tsv` 에 이미 BASE 로 분류돼 있어 의존성
-선언 변화는 없다. QML 쪽 `stopLocalPluginWatcher()` / 재시작 가드는 그대로 남는다:
+셸이 어떤 방식으로 죽든 감시자를 회수하므로 QML teardown 여부에 의존하지 않는다.
+`setpriv` 는 `util-linux`(BASE)가 제공하며 권한이 필요 없다 —
+`tests/data/command-packages.tsv` 에 이미 BASE 로 분류돼 있어 의존성 선언 변화는
+없다. QML 쪽 `stopLocalPluginWatcher()` / 재시작 가드는 그대로 남는다:
 셸이 QML 을 정상적으로 내려놓는 경로(엔진 재적재 등)에서는 그쪽이 더 빨리, 더
 깔끔하게 닫는다. 즉 두 장치는 대체가 아니라 이중화다.
 
+**실측 범위 (2026-08-24).** 런타임 테스트가 직접 잰 경로는 `kill -TERM` 로
+셸을 종료하는 SIGTERM 경로 하나뿐이다. `PR_SET_PDEATHSIG` 의 커널 동작
+특성상 SIGKILL·로그아웃(세션 스코프 종료)·정상 QML teardown 경로에서도
+감시자가 회수될 것으로 **추론**하지만, 이 문서의 실측 원칙에 따라 해당
+경로들은 아직 실측이 아니다. 별도 측정 없이 "모든 종료 경로에서 회수된다"고
+단언하지 않는다.
+
 `setpriv` 래핑은 Quickshell 이 어느 스레드에서 fork 하는지에 따라 조기 종료
-위험이 있다. 그 위험의 감시자는 위 런타임 테스트의 "감시자 1개 발견" 단언이다 —
-조기에 죽으면 그 단언이 먼저 깨진다. 스테이징 쪽 대응 단언은
-`tests/package/test_package_files.sh` 의 `--pdeathsig` 검사다. overlay 패키지,
-`cachy-omarchy-init`, Waybar 처리와 실제 설치 통합은 **M5 범위 밖**이며,
-사용자 지시 전에는 구현하거나 merge/handoff 하지 않는다.
+위험이 있다. `PR_SET_PDEATHSIG` 는 부모 *스레드* 종료에 발동하므로, 워커
+스레드에서 fork 한 경우 셸이 살아 있는 동안 감시자가 SIGTERM 을 받을 수 있고,
+업스트림 Timer 가 1초마다 되살려 매초 새 PID 가 돌아온다. "감시자 1개 발견"
+단언만으로는 이 루프를 잡지 못한다 — 항상 정확히 1개가 살아 있으므로. 따라서
+런타임 테스트는 약 3초 dwell 한 뒤 동일 PID 인지 재확인하여 조기 종료·재시작
+루프를 탐지한다. 스테이징 쪽 대응 단언은 `tests/package/test_package_files.sh`
+의 `--pdeathsig` 검사다. overlay 패키지, `cachy-omarchy-init`, Waybar 처리와
+실제 설치 통합은 **M5 범위 밖**이며, 사용자 지시 전에는 구현하거나
+merge/handoff 하지 않는다.
 
 ---
 

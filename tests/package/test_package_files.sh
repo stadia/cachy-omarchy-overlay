@@ -17,16 +17,37 @@ assert_file_exists "$script" "stage-upstream.sh"
 
 defaults=$REPO_ROOT/overlay/defaults
 patched_src="$COO_TEST_SANDBOX/upstream"
-cp -a "$src" "$patched_src"
 # The srcdir fallback above is makepkg's own checkout, and the shell PKGBUILD's
-# prepare() applies the maintained patches there. Copying it therefore yields an
-# already-patched working tree, and re-applying would fail for the wrong reason.
-# Restore the copy to its pinned commit first; the original is never touched.
-if [[ -d $patched_src/.git ]]; then
-  git -C "$patched_src" checkout -- . 2>/dev/null || true
+# prepare() applies the maintained patches there — copying that working tree
+# would yield an already-patched source and re-applying would fail for the wrong
+# reason. Export the pinned commit instead of copying and then trying to undo:
+# `git archive` produces a pristine tree by construction, so there is no restore
+# step whose failure could be swallowed. The source is never mutated either way.
+mkdir -p "$patched_src"
+pinned_commit=$(grep -m1 "^_commit=" "$REPO_ROOT/packages/cachy-omarchy-shell/PKGBUILD" | cut -d= -f2- | tr -d "'\"")
+[[ -n $pinned_commit ]] || { printf 'error: PKGBUILD 에서 _commit 을 읽지 못했다\n' >&2; exit 1; }
+if [[ -d $src/.git ]]; then
+  git -C "$src" archive --format=tar "$pinned_commit" \
+    | tar -C "$patched_src" -xf - \
+    || { printf 'error: 핀 커밋 %s 를 %s 에서 내보내지 못했다\n' "$pinned_commit" "$src" >&2; exit 1; }
+else
+  # No git metadata to export from; the tree must already be pristine. Prove it
+  # rather than assume it — a pre-patched copy here would make every assertion
+  # below pass without prepare() ever having run.
+  cp -a "$src/." "$patched_src/"
+  if grep -q "stopLocalPluginWatcher" "$patched_src/shell/services/PluginRegistry.qml"; then
+    printf 'error: 패치 없는 원본이 필요한데 %s 가 이미 패치돼 있다\n' "$src" >&2
+    exit 1
+  fi
 fi
+assert_file_exists "$patched_src/shell/services/PluginRegistry.qml" "pristine pinned source exported"
+# The exported tree has no git metadata, so apply from inside it with plain
+# `git apply` (it operates on the working tree and needs no repository). Any
+# failure is fatal — silently skipping a patch here would make the staged
+# assertions below meaningless.
 while IFS= read -r -d '' patch; do
-  git -C "$patched_src" apply "$patch"
+  ( cd "$patched_src" && git apply -p1 "$patch" ) \
+    || { printf 'error: 패치 적용 실패: %s\n' "${patch##*/}" >&2; exit 1; }
 done < <(find "$REPO_ROOT/packages/cachy-omarchy-shell/patches" -name '*.patch' -type f -print0 | sort -z)
 bash "$script" "$patched_src" "$stage" "$defaults"
 

@@ -63,6 +63,29 @@ if [[ -f $shell_artifact ]]; then
     ASSERT_FAILURES=$((ASSERT_FAILURES + 1))
   fi
   printf 'ok:   excluded helpers/units absent from artifact (if no FAIL above)\n'
+
+  # v1.0 수용: 유지보수 런타임 패치가 **실제 빌드 산출물**에 실렸는지 여기서
+  # 단언한다. 이건 스테이징 스크립트 단언이나 "테스트가 스스로 패치해 보는"
+  # 검사로는 대체되지 않는다 — 그런 검사는 PKGBUILD 의 prepare() 가 패치를
+  # 적용하지 않아도 전부 통과한다. 실측 근거: 패치 도입 직후 이 파일에
+  # stopLocalPluginWatcher 가 0회 들어 있었다(docs/RUNTIME_STARTUP.md).
+  # 라이브 세션이 필요 없는 아티팩트 수준 검사이므로 게이트 없이 항상 돈다.
+  registry_path=usr/share/cachy-omarchy/upstream/shell/services/PluginRegistry.qml
+  assert_contains "$list" "$registry_path" "shell artifact has PluginRegistry.qml"
+  registry_qml=$(bsdtar -xOf "$shell_artifact" "$registry_path" 2>/dev/null || true)
+  if [[ -z $registry_qml ]]; then
+    printf 'FAIL: 아티팩트에서 PluginRegistry.qml 을 읽지 못했다: %s\n' "$registry_path"
+    ASSERT_FAILURES=$((ASSERT_FAILURES + 1))
+  else
+    assert_contains "$registry_qml" "stopLocalPluginWatcher" \
+      "artifact QML carries the watcher cleanup patch (prepare() applied it)"
+    assert_contains "$registry_qml" "Component.onDestruction" \
+      "artifact QML stops the watcher on QML teardown"
+    assert_contains "$registry_qml" "!registry.localPluginWatcherStopping" \
+      "artifact QML guards the watcher restart during shutdown"
+    assert_contains "$registry_qml" '"--pdeathsig"' \
+      "artifact QML arms the kernel parent-death signal on the watcher"
+  fi
 fi
 if [[ -f $overlay_artifact ]]; then
   list=$(bsdtar -tf "$overlay_artifact")

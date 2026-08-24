@@ -125,6 +125,28 @@ assert_eq "$old_watcher_found" "0" "shell started one sandbox plugin watcher"
   printf '      FINDING: %s 를 감시하는 프로세스 %d개 (PID: %s)\n' \
     "$plugins_dir" "$watcher_count" "${watcher_pids//$'\n'/ }"
 
+# ------------------------------------------------- watcher PID 안정성 (I5)
+#
+# PR_SET_PDEATHSIG 는 부모 *스레드* 종료에 발동하므로, Quickshell 이 감시자를
+# 워커 스레드에서 fork 했을 때 셸이 살아 있는 동안 감시자가 조기에 SIGTERM 을
+# 받을 수 있다. 업스트림 Timer 가 1초마다 되살리므로 그 경우 매초 새 PID 의
+# 감시자가 돌아온다 — "감시자 1개" 단언만으로는 이 루프를 잡지 못한다(항상
+# 정확히 1개가 살아 있으므로). 약 3초 dwell 하며 동일 PID 인지 재확인하여
+# 조기 종료·재시작 루프를 탐지한다.
+stable_pid=1
+for _ in $(seq 1 30); do
+  cur_pids=$(coo_sandbox_pids "$plugins_dir")
+  cur_pid=$(printf '%s\n' "$cur_pids" | head -n 1)
+  if [[ -z $cur_pid || $cur_pid != "$old_watcher_pid" ]]; then
+    stable_pid=0
+    printf '      FINDING: watcher PID 가 %.1f초 안에 바뀌었다: %s -> %s (조기 pdeathsig 또는 재시작 루프)\n' \
+      "$(( _ * 1 ))" "$old_watcher_pid" "${cur_pid:-<gone>}" >&2
+    break
+  fi
+  sleep 0.1
+done
+assert_eq "$stable_pid" "1" "watcher PID stable for ~3s (no premature pdeathsig respawn)"
+
 # ------------------------------------------------- 회수 판정
 #
 # 상한 있는 폴링. 20 x 100ms = 2s (SPEC 19.3: 무한 대기 금지).

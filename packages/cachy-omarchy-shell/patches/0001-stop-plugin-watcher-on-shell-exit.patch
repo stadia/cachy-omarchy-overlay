@@ -16,7 +16,7 @@ index f08bf765..2c2605c4 100644
    property bool scanning: false
    property string lastEnableError: ""
 +  property bool localPluginWatcherStopping: false
- 
+
    signal pluginsChanged()
 +
 +  function stopLocalPluginWatcher() {
@@ -34,7 +34,7 @@ index f08bf765..2c2605c4 100644
    signal pluginLoadFailed(string id, string error)
    signal localPluginChanged(string id)
 @@ -635,6 +648,17 @@ QtObject {
- 
+
    property Process localPluginWatcher: Process {
      command: [
 +      // Quickshell 0.3.0 installs no SIGTERM handler: the process dies at 143
@@ -60,7 +60,7 @@ index f08bf765..2c2605c4 100644
 +      if (!registry.localPluginWatcherStopping) localPluginWatcherRestart.restart()
 +    }
    }
- 
+
    property Timer localPluginWatcherRestart: Timer {
--- 
+--
 2.55.0

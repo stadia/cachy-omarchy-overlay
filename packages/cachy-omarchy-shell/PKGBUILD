@@ -101,6 +101,24 @@ optdepends=(
 )
 _commit='f0020448ca87329199de7cb12f2015ebc4a3e5e7'
 
+# Maintained runtime patches (patches/README.md). The patch set is declared
+# here as a fixed contract — prepare() applies exactly this list from
+# $startdir/patches/, and any absence or application failure aborts the build.
+# A silently unpatched package is exactly the regression
+# tests/runtime/test_reload_watcher_reap.sh exists to catch.
+#
+# The names and their order are also what patches/README.md promises; keep
+# _patches and patches/README.md in lockstep.
+_patches=(
+  '0001-stop-plugin-watcher-on-shell-exit.patch'
+  '0002-cancel-polkit-flow-before-session-lock.patch'
+)
+# sha256sum packages/cachy-omarchy-shell/patches/<name>.patch
+_patch_sums=(
+  '4fb973bc114b992f726db6080b21dcc6938e00f81a70e1122e448fd23bba5d96'
+  'a76d0ad12562b9616cd319f9c4cf54774c0feaba0c3925c35cb9f8b7cc3b93e5'
+)
+
 # bin/build-packages --clean creates these source archives only in a temporary
 # makechrootpkg context. They keep the repository overlay as the single
 # tracked source of truth while making every package input available inside
@@ -126,16 +144,39 @@ fi
 # is the only point both the direct makepkg path and the clean-chroot path pass
 # through, so this is where the patch contract becomes real in the artifact.
 #
-# Lexicographic order, matching what patches/README.md promises. A failure is
-# fatal: a silently unpatched package is exactly the regression
+# Patches are read from $startdir/patches/ and checksum-verified against
+# _patch_sums before application. Nothing here is conditional: an empty patch
+# set, a missing file, a checksum mismatch, or a failed application all abort
+# the build. A silently unpatched package is exactly the regression
 # tests/runtime/test_reload_watcher_reap.sh exists to catch.
 prepare() {
-  local patch
-  for patch in "$startdir"/patches/*.patch; do
-    [[ -f $patch ]] || continue
-    msg2 "applying maintained runtime patch: ${patch##*/}"
-    git -C "$srcdir/omarchy" apply "$patch"
+  local patch applied=0 sum expected
+
+  if (( ${#_patches[@]} == 0 )); then
+    error 'no maintained runtime patches declared; patches/README.md requires at least one'
+    return 1
+  fi
+
+  for patch in "${_patches[@]}"; do
+    local f="$startdir/patches/$patch"
+    [[ -f $f ]] \
+      || { error "maintained runtime patch not found: %s" "$f"; return 1; }
+    sum=$(sha256sum "$f" | cut -d' ' -f1)
+    expected=${_patch_sums[$applied]}
+    if [[ $sum != "$expected" ]]; then
+      error "maintained runtime patch checksum mismatch: %s" "$patch"
+      error "  expected: %s" "$expected"
+      error "  actual:   %s" "$sum"
+      return 1
+    fi
+    msg2 "applying maintained runtime patch: %s" "$patch"
+    git -C "$srcdir/omarchy" apply "$f" \
+      || { error "maintained runtime patch failed to apply: %s" "$patch"; return 1; }
+    applied=$(( applied + 1 ))
   done
+
+  (( applied == ${#_patches[@]} )) \
+    || { error 'applied %s of %s maintained runtime patches' "$applied" "${#_patches[@]}"; return 1; }
 }
 
 package() {
