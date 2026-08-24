@@ -234,6 +234,16 @@ esac
    → **해소됨.** `inotify-tools` 는 `cachy-omarchy-shell` 의 `depends` 에 들어가 있다
    (2026-08-20 확인). 실제 `pacman -U` 트랜잭션이 이것을 끌어온 기록은 §12.2.
 
+   → **후속 (2026-08-24, v1.0 수용):** 같은 감시자가 이번에는 **종료 쪽에서** 샌다.
+   Quickshell 0.3.0 의 `Io.Process` 는 소유자가 사라져도 자식을 죽이지 않으므로,
+   셸을 한 번 띄울 때마다 `inotifywait -m -r` 하나가 `systemd --user` 로
+   재부모화되어 `select()` 에 영원히 걸린 채 남는다. 감시 대상 디렉터리를 지워도
+   풀리지 않는다 — `tests/test.sh` 가 샌드박스를 "죽이고 나서 지우는" 이유와 같은
+   사정이다. 회수 여부는 `tests/runtime/test_reload_watcher_reap.sh` 가 추출된
+   패키지 트리를 실제로 띄워 런타임에서 판정한다(§9.5 의 `skip:` 정책 적용 —
+   게이트는 라이브 런타임과 빌드 아티팩트 두 개뿐이고, 셸을 띄운 뒤로는 어떤
+   경로로도 조용히 통과하지 않는다).
+
 3. **셸 자동 기동 누락** — 셸은 Hyprland autostart(`overlay/hypr/bindings.lua`
    의 `hl.on("hyprland.start", …)`)로 기동한다. 업그레이드로 autostart 줄이
    추가됐더라도 live `~/.config/cachy-omarchy/hypr/bindings.lua` 는 `--force`
@@ -355,7 +365,49 @@ SUPER/mainMod 형식만 충돌로 인식한다. 테스트는 사용자 설정을
 
 이후 v1.0 수용에서 plugin watcher cleanup과 session lock 전 Polkit cancellation을 위한
 두 개의 유지보수 패치가 추가됐다. 적용 순서와 제거 조건은
-`packages/cachy-omarchy-shell/patches/README.md`에 기록한다. overlay 패키지,
+`packages/cachy-omarchy-shell/patches/README.md`에 기록한다.
+
+**패치가 아티팩트에 실제로 실리는 지점 (2026-08-24 실측 정정).** 이 패치들은
+`bin/update-upstream`만으로는 패키지에 들어가지 않는다. `update-upstream`은 후보
+소스의 *작업 트리*에 `git apply`하지만, 모든 빌드 경로는 PKGBUILD 의
+`#commit=${_commit}` 로 고정된 커밋 객체를 `$srcdir` 로 clone 하므로 작업 트리
+수정은 그 clone 에서 사라진다. 실측: 패치 도입 후 `bin/build-packages` 로 만든
+아티팩트의 `upstream/shell/services/PluginRegistry.qml` 에 `stopLocalPluginWatcher`
+가 **0회** 나왔다. 따라서 패치 적용은 직접 `makepkg` 경로와 clean-chroot 경로가
+모두 지나는 유일한 지점인 `packages/cachy-omarchy-shell/PKGBUILD` 의 `prepare()`
+에서 한다. 적용 실패는 치명적으로 다룬다 — 조용히 패치되지 않은 패키지가 바로
+`tests/runtime/test_reload_watcher_reap.sh` 가 잡으려는 회귀다.
+
+**종료 시 정리의 상한.** 회수 판정은 러너의 리퍼(`coo_reap_sandbox_procs`)가
+치워 주는 것을 보는 게 아니라, 셸 자신이 종료하면서 자기 감시자를 데려가는지를
+본다. 그래서 판정은 항상 리퍼보다 먼저 돌고, 리퍼는 마지막 안전망일 뿐이다.
+대기는 전부 상한이 있다(SPEC §19.3): 셸 종료는 `kill -TERM` 후 2초 감시자로
+`kill -KILL`, 감시자 소멸 폴링은 20 × 100ms = 2초. 프로세스 식별은 이름이 아니라
+**샌드박스 플러그인 디렉터리 경로**로만 한다 — `pkill inotifywait` 는 사용자의
+라이브 셸이 띄운 감시자까지 죽인다.
+
+**QML 정리만으로는 닫히지 않는다 (2026-08-24 실측).** 위 런타임 판정은 패치를
+실제로 실은 아티팩트에서도 처음에는 **여전히 실패했다**. 원인은 패치 적용이 아니라
+패치의 전제였다: Quickshell 0.3.0 은 `SIGTERM` 에 핸들러를 걸지 않아 **exit 143
+으로 즉시 죽고 QML 엔진 teardown 을 돌리지 않는다**(실측: 저널에 종료 로그가 한
+줄도 남지 않음). 따라서 `Component.onDestruction` 은 호출되지 않고
+`stopLocalPluginWatcher()` 도 돌지 않는다. 그런데 실제 종료 경로는 전부
+`SIGTERM` 이다 — `overlay/bin/cachy-omarchy-shell --restart` 가 `kill -TERM` 을
+쓰고, 로그아웃도 마찬가지다.
+
+**해소 (2026-08-24).** 유지보수 패치 `0001` 이 감시자 명령을
+`setpriv --pdeathsig TERM -- inotifywait …` 로 감싼다. 커널의 parent-death 신호는
+셸이 어떤 방식으로 죽든(정상 종료·`SIGTERM`·`SIGKILL`) 감시자를 회수하므로 QML
+teardown 여부에 의존하지 않는다. `setpriv` 는 `util-linux`(BASE)가 제공하며 권한이
+필요 없다 — `tests/data/command-packages.tsv` 에 이미 BASE 로 분류돼 있어 의존성
+선언 변화는 없다. QML 쪽 `stopLocalPluginWatcher()` / 재시작 가드는 그대로 남는다:
+셸이 QML 을 정상적으로 내려놓는 경로(엔진 재적재 등)에서는 그쪽이 더 빨리, 더
+깔끔하게 닫는다. 즉 두 장치는 대체가 아니라 이중화다.
+
+`setpriv` 래핑은 Quickshell 이 어느 스레드에서 fork 하는지에 따라 조기 종료
+위험이 있다. 그 위험의 감시자는 위 런타임 테스트의 "감시자 1개 발견" 단언이다 —
+조기에 죽으면 그 단언이 먼저 깨진다. 스테이징 쪽 대응 단언은
+`tests/package/test_package_files.sh` 의 `--pdeathsig` 검사다. overlay 패키지,
 `cachy-omarchy-init`, Waybar 처리와 실제 설치 통합은 **M5 범위 밖**이며,
 사용자 지시 전에는 구현하거나 merge/handoff 하지 않는다.
 
