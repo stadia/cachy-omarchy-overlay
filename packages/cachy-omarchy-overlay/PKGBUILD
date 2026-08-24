@@ -1,7 +1,7 @@
 # Maintainer: Cachy Omarchy Overlay
 pkgname=cachy-omarchy-overlay
-pkgver=0.12.1
-pkgrel=2
+pkgver=1.0.0
+pkgrel=1
 pkgdesc='CachyOS integration for the pinned Omarchy Quattro shell runtime'
 arch=('any')
 url='https://github.com/basecamp/omarchy'
