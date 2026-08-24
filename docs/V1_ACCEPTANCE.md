@@ -63,12 +63,12 @@ SPEC §61 의 역사적 기록으로 남으며, 이 문서가 그보다 넓은 �
 | 패키지 업그레이드 | 핵심 | vm | 측정됨 | 2026-08-24 VM PASS: bin/install-packages --install 로 shell 4.0.0-20 을 설치한 뒤 bump-pkgrel 과 재빌드로 4.0.0-21 로 업그레이드 UPGRADE_EXIT=0, 이전 검증 페어가 1건 아카이브됐고 pacman -Q 가 4.0.0-21 을 보고했다. |
 | 롤백 | 핵심 | vm | 측정됨 | 2026-08-24 VM PASS: bin/rollback ROLLBACK_EXIT=0 으로 shell 4.0.0-21 에서 4.0.0-20 으로 다운그레이드했고 previous- 아카이브 매니페스트에서 복원했다. 롤백 뒤 세션 안 doctor 가 DOCTOR_EXIT=0 이며 installed artifact/manifest 가 PASS 로 바뀌었다. |
 | 사용자 상태 보존 | 핵심 | vm | 측정됨 | 2026-08-24 VM PASS: 업그레이드와 롤백 전후로 bindings.conf · bindings.lua · hyprland.lua · state 프로브 네 파일의 sha256 이 모두 동일했고 사용자가 손으로 넣은 편집 마커와 관리 source 블록이 그대로 남았다. |
-| login / logout | 핵심 | host | 미검증 | |
+| login / logout | 핵심 | host | 측정됨 | 2026-08-24 host PASS: 16:26:59 세션 13 로그아웃에서 `uwsm_env-preloader` 가 세션 변수(`OMARCHY_PATH`·`WAYLAND_DISPLAY`·`XDG_*`)를 systemd user manager 에서 제거하고 초기 env 를 복원한 뒤 `env_pre`·`env_session.conf`·`env_cleanup.list` 를 삭제, "Stopped target Session envelope of hyprland.desktop" 과 `wayland-wm@hyprland.desktop.service`·`app-graphical.slice` 정리를 거쳐 uwsm 이 RC 0 으로 종료. 16:27:05 세션 16(type=wayland, class=user, tty2)으로 재로그인, 셸 PID 873223 이 Configuration Loaded·polkit agent registered·idle service-ready 를 남김. 세션 안 doctor DOCTOR_EXIT=0 (session OMARCHY_PATH · Quickshell process running · IPC ping ok), `hyprctl layers` 에 omarchy-background 3072x1728 과 omarchy-bar 3072x26 실측 — 불린이 아닌 서피스 증거. 재로그인 뒤 셸 journal 에 QML 오류 없음(아이콘 WARN 만), 구 세션의 elephant PID 3834180 은 사라졌고 `inotifywait` 6 으로 기준선과 동일. 유일한 WARN 은 기존 사용자 override `~/.config/omarchy/shell.json`. |
 | reboot / shutdown | 핵심 | host | 미검증 | |
 | shell reload | 핵심 | host | 미검증 | |
 | lock 중 reload 거부 | 핵심 | host | 미검증 | |
 | idle → screensaver → lock → wake | 핵심 | host | 미검증 | |
-| suspend → resume | 핵심 | host | 미검증 | |
+| suspend → resume | 핵심 | host | 미검증 | 이 머신에서 측정 불가: 2026-08-24 16:23:56 `systemctl suspend` 가 logind 에서 "Unit suspend.target is masked, refusing operation" 으로 거부됐다. `/etc/systemd/system/{suspend,sleep,hibernate}.target` 이 2026-07-12 부터 `/dev/null` 로 마스크된 시스템 정책이며 우리 오버레이가 만든 상태가 아니다. 마스크를 푸는 것은 시스템 정책 변경이므로 측정하려면 별도 승인이 필요하다. |
 | 테마 / 배경 | 핵심 | host | 미검증 | |
 | 투명 바 대비 | 핵심 | host | 미검증 | |
 | 클립보드 / 이모지 | 핵심 | host | 미검증 | |
