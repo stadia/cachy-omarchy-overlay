@@ -211,9 +211,9 @@ assert_eq "$code" "0" "shim -q 는 실패해도 exit 0"
 assert_eq "$out" "" "shim -q 는 failing helper 출력을 숨긴다"
 assert_eq "$(cat "$fake_log")" $'--ipc\nshell\ntoggle\nomarchy.menu\n{}' "shim -q toggle 도 {} 를 한 번 붙인다"
 
-# --- 패치 수 0 유지 ----------------------------------------------------------
+# --- 유지보수 런타임 패치 계약 -------------------------------------------------
 assert_file_exists "$PATCHES" "patches README 존재"
 psrc=$(cat "$PATCHES")
-assert_contains "$psrc" "none" "패치 수 0 유지"
+assert_contains "$psrc" "maintained runtime patches" "유지보수 런타임 패치 계약"
 
 exit "$ASSERT_FAILURES"

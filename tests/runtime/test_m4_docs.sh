@@ -24,12 +24,12 @@ assert_contains "$m4" "SUPER+K" "관리 SUPER+K 바인딩이 기록됨"
 assert_contains "$m4" "hyprctl reload 없음" "M4 는 hyprctl reload 하지 않는다"
 assert_contains "$m4" "Waybar 보존을 성공으로 선언하지 않는다" "Waybar 보존을 선언하지 않는다"
 assert_contains "$m4" "M5" "M5 범위 밖이 기록됨"
-assert_contains "$m4" "패치 수 0" "패치 수 0 유지"
+assert_contains "$m4" "유지보수 패치" "런타임 패치 계약 기록"
 assert_contains "$m4" "omarchy-menu-select" "스테이징된 upstream select helper"
 assert_contains "$m4" "동명 shim" "메뉴 동명 action 이 범위 밖임을 기록"
 
 assert_file_exists "$patches" "patches README 존재"
 psrc=$(cat "$patches")
-assert_contains "$psrc" "none" "패치 README 는 none"
+assert_contains "$psrc" "maintained runtime patches" "패치 README 유지보수 계약"
 
 exit "$ASSERT_FAILURES"

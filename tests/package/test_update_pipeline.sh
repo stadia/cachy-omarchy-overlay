@@ -52,8 +52,13 @@ assert_eq "$(sha256sum "$u02_overlay_fixture" | awk '{print $1}')" "$(sha256sum 
 # service currently advertises -- and passes every other subcommand
 # straight through to the real system git, so the fetch this test exercises
 # is a real fetch against real objects.
+fixture_source=${COO_OMARCHY_GIT:-$REPO_ROOT/build/omarchy}
+if [[ ! -d $fixture_source && -d $REPO_ROOT/packages/cachy-omarchy-shell/src/omarchy ]]; then
+  fixture_source=$REPO_ROOT/packages/cachy-omarchy-shell/src/omarchy
+fi
+assert_file_exists "$fixture_source/shell/shell.qml" "U02 fixture starts from pinned upstream source"
 fixture_upstream=$COO_TEST_SANDBOX/upstream-fixture
-mkdir -p "$fixture_upstream/bin"
+cp -a "$fixture_source" "$fixture_upstream"
 for helper in omarchy omarchy-menu omarchy-theme-set omarchy-battery-status omarchy-weather-status; do
   printf '#!/usr/bin/env bash\n# fixture helper: %s\n' "$helper" >"$fixture_upstream/bin/$helper"
 done
@@ -630,7 +635,7 @@ pac_update=$COO_TEST_SANDBOX/update-pacman.log
 # though nothing about independence changed.
 overlay_pkgver_before_update=$(grep -m1 '^pkgver=' "$root/packages/cachy-omarchy-overlay/PKGBUILD")
 code=0
-out=$(WAYLAND_DISPLAY= COO_UPDATE_PIPELINE_NESTED=1 COO_REPO_ROOT="$root" COO_GIT_BIN="$fake/git" COO_STATE_DIR="$update_state" COO_BUILD_DIR="$update_build" COO_OMARCHY_GIT="$REPO_ROOT/build/omarchy" COO_TOOL_LOG="$log" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_FAKE_SHELL_ARTIFACT="$u02_shell_fixture" COO_FAKE_OVERLAY_ARTIFACT="$u02_overlay_fixture" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$pac_update" "$root/bin/update-upstream" 2>&1) || code=$?
+out=$(WAYLAND_DISPLAY= COO_UPDATE_PIPELINE_NESTED=1 COO_REPO_ROOT="$root" COO_GIT_BIN="$fake/git" COO_STATE_DIR="$update_state" COO_BUILD_DIR="$update_build" COO_OMARCHY_GIT="$fixture_upstream" COO_TOOL_LOG="$log" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_FAKE_SHELL_ARTIFACT="$u02_shell_fixture" COO_FAKE_OVERLAY_ARTIFACT="$u02_overlay_fixture" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$pac_update" "$root/bin/update-upstream" 2>&1) || code=$?
 assert_eq "$code" "0" "U02 update validates and publishes candidate"
 assert_contains "$out" "PASS tests/runtime/test_m3_docs.sh" "candidate default suite runs M3 docs test"
 assert_contains "$out" "PASS tests/package/test_package_files.sh" "candidate default suite reaches package files test"

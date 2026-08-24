@@ -25,7 +25,7 @@ assert_contains "$m6" "clean chroot" "M6 records chroot deferral"
 assert_contains "$m6" "cachy-omarchy-bindings --force" "M6 records autostart migration requires --force"
 assert_contains "$m6" "U01" "M6 update test coverage is recorded"
 assert_contains "$m6" "U10" "M6 rollback test coverage is recorded"
-assert_contains "$m6" "패치 수 0" "M6 records zero patch count"
+assert_contains "$m6" "maintained runtime patches" "M6 records maintained runtime patches"
 
 assert_file_exists "$upstream" "UPSTREAM.md exists"
 usrc=$(cat "$upstream")
@@ -33,6 +33,6 @@ assert_contains "$usrc" "사람이 유지하는" "UPSTREAM table is human-mainta
 assert_contains "$usrc" "stale" "UPSTREAM snapshot staleness is documented"
 
 assert_file_exists "$patches" "patch README exists"
-assert_contains "$(cat "$patches")" "none" "patch count remains zero"
+assert_contains "$(cat "$patches")" "maintained runtime patches" "patch README records maintained runtime patches"
 
 exit "$ASSERT_FAILURES"

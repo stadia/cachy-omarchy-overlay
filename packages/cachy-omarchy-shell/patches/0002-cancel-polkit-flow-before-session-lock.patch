@@ -1,0 +1,67 @@
+From 2bc64b1b03e6696973b58e4ca1dc3ba02c548a50 Mon Sep 17 00:00:00 2001
+From: Cachy Omarchy Overlay <noreply@users.noreply.github.com>
+Date: Mon, 24 Aug 2026 18:05:37 +0900
+Subject: [PATCH] fix: cancel polkit flow before session lock
+
+---
+ shell/plugins/lock/Service.qml       | 10 ++++++++++
+ shell/plugins/polkit/PolkitAgent.qml |  8 ++++++++
+ 2 files changed, 18 insertions(+)
+
+diff --git a/shell/plugins/lock/Service.qml b/shell/plugins/lock/Service.qml
+index 9ecb1cc0..4b170b58 100644
+--- a/shell/plugins/lock/Service.qml
++++ b/shell/plugins/lock/Service.qml
+@@ -125,6 +125,14 @@ Item {
+     if (fingerprintPam.active) fingerprintPam.abort()
+   }
+ 
++  function cancelPolkitForSessionLock() {
++    if (!shell || typeof shell.firstPartyServiceFor !== "function") return
++    var polkit = shell.firstPartyServiceFor("omarchy.polkit")
++    if (polkit && typeof polkit.cancelForSessionLock === "function") {
++      polkit.cancelForSessionLock()
++    }
++  }
++
+   function beginLock() {
+     if (!passwordPamConfigured) {
+       logEvent("lock-denied: missing-pam")
+@@ -133,6 +141,7 @@ Item {
+ 
+     resetAuthenticationState()
+     lockRequested = true
++    cancelPolkitForSessionLock()
+     armBlankTimer()
+     logEvent("lock-requested")
+     queueSessionLock()
+@@ -235,6 +244,7 @@ Item {
+     onSecureStateChanged: {
+       root.logEvent("secure=" + secure)
+       if (secure) {
++        root.cancelPolkitForSessionLock()
+         root.pendingSessionLock = false
+         sessionLockStabilizeTimer.stop()
+         pendingSessionLockTimer.stop()
+diff --git a/shell/plugins/polkit/PolkitAgent.qml b/shell/plugins/polkit/PolkitAgent.qml
+index 8ce95973..83034ec3 100644
+--- a/shell/plugins/polkit/PolkitAgent.qml
++++ b/shell/plugins/polkit/PolkitAgent.qml
+@@ -125,6 +125,14 @@ Item {
+     if (flow) flow.cancelAuthenticationRequest()
+   }
+ 
++  function cancelForSessionLock() {
++    var flow = polkitAgent.flow
++    if (!polkitAgent.isActive || !flow || flow.isCompleted || flow.isCancelled) return
++    closing = true
++    closeTimer.restart()
++    flow.cancelAuthenticationRequest()
++  }
++
+   function triggerFailureFeedback() {
+     submitted = false
+     errorFlash = true
+-- 
+2.55.0
+

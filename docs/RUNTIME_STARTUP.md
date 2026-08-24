@@ -353,8 +353,10 @@ M4 데모 격리용이며 사용자 상태/기존 Waybar 문제 해결이 아니
 SUPER/mainMod 형식만 충돌로 인식한다. 테스트는 사용자 설정을 바꾸지 않으며
 **hyprctl reload 없음**을 정적으로 검증한다.
 
-패치 수 0을 유지한다(`packages/cachy-omarchy-shell/patches/README.md`: `none`).
-overlay 패키지, `cachy-omarchy-init`, Waybar 처리와 실제 설치 통합은 **M5 범위 밖**이며,
+이후 v1.0 수용에서 plugin watcher cleanup과 session lock 전 Polkit cancellation을 위한
+두 개의 유지보수 패치가 추가됐다. 적용 순서와 제거 조건은
+`packages/cachy-omarchy-shell/patches/README.md`에 기록한다. overlay 패키지,
+`cachy-omarchy-init`, Waybar 처리와 실제 설치 통합은 **M5 범위 밖**이며,
 사용자 지시 전에는 구현하거나 merge/handoff 하지 않는다.
 
 ---
@@ -634,8 +636,11 @@ failure, U06 build failure, U07 audit failure, U08 test/skip failure, U09 prior 
 retention, U10 valid/corrupt rollback을 검증한다. 실패 경로는 모두 install/pacman을
 호출하지 않고 원래 lock/PKGBUILD를 보존해야 한다.
 
-패치 수 0은 계속 유지한다. `packages/*/PKGBUILD`가 `$startdir/../../overlay`을
-참조하므로 clean chroot는 여전히 깨져 있으며 M7에서 해결한다. 또한 이 호스트의
+`bin/update-upstream`은 핀된 업스트림 후보에 두 개의 **maintained runtime patches**를
+lexicographic 순서로 적용한다: 셸 종료 시 plugin watcher cleanup과 session lock 전
+Polkit cancellation. 각 패치의 제거 조건은
+`packages/cachy-omarchy-shell/patches/README.md`에 기록한다. `packages/*/PKGBUILD`가
+`$startdir/../../overlay`을 참조하므로 clean chroot는 여전히 깨져 있으며 M7에서 해결한다. 또한 이 호스트의
 `graphical-session.target`은 inactive여서 service의 자동 기동은 미검증이다.
 `WantedBy=graphical-session.target`은 의도이지 관측된 자동 시작이 아니다.
 
@@ -715,8 +720,10 @@ fail-closed로 유지되고 doctor가 이를 FAIL로 보고하며 이후 install
 
 ### 11.5 RC 체크리스트 판정
 
-패치 수는 **패치 수 0**이다 (`packages/cachy-omarchy-shell/patches/README.md`가 `none`).
-공식 `omarchy`와 `omarchy-settings` 패키지는 기록된 호스트 검사에서 부재이며 의존이나
+두 개의 **maintained runtime patches**가 핀된 upstream source에 적용된다: plugin
+watcher cleanup과 session lock 전 Polkit cancellation. 적용 순서와 제거 조건은
+`packages/cachy-omarchy-shell/patches/README.md`가 기록한다. 공식 `omarchy`와
+`omarchy-settings` 패키지는 기록된 호스트 검사에서 부재이며 의존이나
 설치 대상이 아니다. `docs/RC_GAP_INVENTORY.md`가 SPEC §61의 권위 체크리스트다 —
 모든 기준을 `측정됨`, `추론됨`, `미검증`으로 표시하고 해당 테스트를 연결한다. 위의
 미검증 항목은 릴리스 갭이지 완료된 수용이 아니다.

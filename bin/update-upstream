@@ -80,14 +80,37 @@ awk -v version="$latest" -v pin="$commit" '
 ' "$candidate_pkg" >"$pkg_tmp"
 "$mv_bin" "$pkg_tmp" "$candidate_pkg"
 
-# Current patch set is empty, but the stage is explicit and injectable for U05.
+# Copy the selected pinned source into the disposable candidate before applying
+# maintained runtime patches. Never mutate build/omarchy or another caller-owned
+# checkout: both package building and candidate tests receive this copy.
+candidate_source_input=${COO_OMARCHY_GIT:-$repo_root/build/omarchy}
+[[ -d $candidate_source_input ]] || fail "upstream source missing: $candidate_source_input"
+candidate_source=$candidate/upstream
+cp -a "$candidate_source_input" "$candidate_source"
+
 if [[ ${COO_PATCH_FAIL:-0} == 1 ]]; then
   fail 'patch application failed'
 fi
 patch_bin=${COO_PATCH_APPLY_BIN:-git}
 while IFS= read -r -d '' patch; do
-  ( cd "$candidate" && "$patch_bin" apply "$patch" ) || fail "patch application failed: ${patch##*/}"
-done < <(find "$candidate/packages" -path '*/patches/*.patch' -type f -print0 | sort -z)
+  "$patch_bin" -C "$candidate_source" apply "$patch" || fail "patch application failed: ${patch##*/}"
+done < <(find "$repo_root/packages" -path '*/patches/*.patch' -type f -print0 | sort -z)
+
+# The candidate's package and test contracts must retain the maintained patches
+# used to construct its disposable source, but copying untracked files would
+# pull in ignored makepkg artifacts. Copy only the README and patch inputs.
+patches_source=$repo_root/packages/cachy-omarchy-shell/patches
+patches_candidate=$candidate/packages/cachy-omarchy-shell/patches
+mkdir -p "$patches_candidate"
+cp -a "$patches_source/README.md" "$patches_candidate/README.md"
+while IFS= read -r -d '' patch; do
+  cp -a "$patch" "$patches_candidate/${patch##*/}"
+done < <(find "$patches_source" -name '*.patch' -type f -print0 | sort -z)
+
+# Source-tree tests copied by update-upstream read only tracked files. Stage the
+# explicit patch contract in the candidate index so the nested test runner sees
+# the same inputs that were applied to its disposable source.
+git -C "$candidate" add packages/cachy-omarchy-shell/patches
 
 # tests/data/upstream-helpers.txt and upstream.lock's OMARCHY_COMMIT are one
 # fact in two files: the inventory is the closure scanner's ground truth for
@@ -138,12 +161,9 @@ inventory_short=${commit:0:12}
 # deliberately so U06–U08 can use fake makepkg/audit/test tools without network.
 candidate_state=$candidate/state
 candidate_build=$candidate/build
-candidate_source=${COO_OMARCHY_GIT:-$repo_root/build/omarchy}
 COO_REPO_ROOT="$candidate" COO_BUILD_DIR="$candidate_build" COO_STATE_DIR="$candidate_state" \
   COO_OMARCHY_GIT="$candidate_source" \
   "$candidate/bin/build-packages"
-# Source-tree package tests default to $REPO_ROOT/build/omarchy; preserve the
-# selected original source path for the candidate's real test runner.
 COO_REPO_ROOT="$candidate" COO_STATE_DIR="$candidate_state" \
   COO_OMARCHY_GIT="$candidate_source" \
   "$candidate/bin/test-packages"

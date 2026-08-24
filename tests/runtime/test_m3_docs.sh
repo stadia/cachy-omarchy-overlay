@@ -78,6 +78,6 @@ assert_eq "$stale" "0" "PACKAGE_AUDIT.md §6 결론에 uwsm-app 을 걷어내라
 
 assert_file_exists "$patches" "patches README 존재"
 psrc=$(cat "$patches")
-assert_contains "$psrc" "none" "패치 수 0"
+assert_contains "$psrc" "maintained runtime patches" "유지되는 런타임 패치"
 
 exit "$ASSERT_FAILURES"

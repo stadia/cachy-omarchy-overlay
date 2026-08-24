@@ -1,0 +1,49 @@
+From c5606ac49c879c7c52407dbbef8f83a70f4157b4 Mon Sep 17 00:00:00 2001
+From: Cachy Omarchy Overlay <noreply@users.noreply.github.com>
+Date: Mon, 24 Aug 2026 18:04:33 +0900
+Subject: [PATCH] fix: stop plugin watcher on shell exit
+
+---
+ shell/services/PluginRegistry.qml | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
+
+diff --git a/shell/services/PluginRegistry.qml b/shell/services/PluginRegistry.qml
+index f08bf765..a52923a4 100644
+--- a/shell/services/PluginRegistry.qml
++++ b/shell/services/PluginRegistry.qml
+@@ -25,8 +25,21 @@ QtObject {
+   property int registryRevision: 0
+   property bool scanning: false
+   property string lastEnableError: ""
++  property bool localPluginWatcherStopping: false
+ 
+   signal pluginsChanged()
++
++  function stopLocalPluginWatcher() {
++    localPluginWatcherStopping = true
++    localPluginWatcherRestart.stop()
++    if (localPluginWatcher.running) {
++      localPluginWatcher.signal(15) // SIGTERM
++      localPluginWatcher.running = false
++    }
++  }
++
++  Component.onDestruction: stopLocalPluginWatcher()
++
+   signal scanFinished()
+   signal pluginLoadFailed(string id, string error)
+   signal localPluginChanged(string id)
+@@ -651,7 +664,9 @@ QtObject {
+         if (pluginId) registry.localPluginChanged(pluginId)
+       }
+     }
+-    onExited: localPluginWatcherRestart.restart()
++    onExited: {
++      if (!registry.localPluginWatcherStopping) localPluginWatcherRestart.restart()
++    }
+   }
+ 
+   property Timer localPluginWatcherRestart: Timer {
+-- 
+2.55.0
+

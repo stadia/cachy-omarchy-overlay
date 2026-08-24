@@ -21,7 +21,7 @@ assert_contains "$m7" "U01–U10" "M7 records update coverage"
 assert_contains "$m7" "fake lane" "M7 labels fake package-manager evidence"
 assert_contains "$m7" "install-pending.manifest" "M7 records pending state"
 assert_contains "$m7" "fail-closed" "M7 records fail-closed behavior"
-assert_contains "$m7" "패치 수 0" "M7 records zero patch count"
+assert_contains "$m7" "maintained runtime patches" "M7 records maintained runtime patches"
 assert_contains "$m7" "omarchy-settings" "M7 records official package absence"
 
 assert_file_exists "$gaps" "RC gap inventory exists"
@@ -35,6 +35,6 @@ assert_contains "$gap_text" "tests/package/test_update_pipeline.sh" "inventory c
 assert_contains "$gap_text" "pending" "inventory records pending fail-closed state"
 
 assert_file_exists "$patches" "patch README exists"
-assert_contains "$(cat "$patches")" "none" "patch count remains zero"
+assert_contains "$(cat "$patches")" "maintained runtime patches" "patch README records maintained runtime patches"
 
 exit "$ASSERT_FAILURES"
