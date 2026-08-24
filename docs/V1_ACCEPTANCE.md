@@ -104,12 +104,18 @@ polkit 과 충돌 가능하다는 우려는 남아 있음, 재검토 필요" 로
 
 | 단계 | 확인 | 결과 |
 | --- | --- | --- |
-| 0 | 어느 에이전트가 응답하는가 | |
-| 1 | GUI 권한 요청 → 프롬프트 등장 | |
-| 2 | 취소 → 요청이 거부로 끝나는가 | |
-| 3 | 틀린 암호 → 재시도 허용 / 잠금 없음 | |
+| 0 | 어느 에이전트가 응답하는가 | 2026-08-24 **우리 셸**. 셸이 기동/reload 마다 `omarchy polkit agent registered` 를 남기고(16:27:07 구 셸, 16:39:20 reload 후 신 셸) 실제 프롬프트도 셸의 `omarchy-polkit` 서피스로 뜬다. `org.hyprland.hyprpolkitagent` 는 유저 버스에 **activatable 로만** 존재하고 이 세션에서 한 번도 활성화되지 않았다 — 경합이 가설이었을 뿐 실제로는 일어나지 않는다. 이 세션 저널에 중복 등록 WARN 없음. |
+| 1 | GUI 권한 요청 → 프롬프트 등장 | 2026-08-24 PASS: `pkexec /usr/bin/id`(action `org.freedesktop.policykit.exec`, `auth_admin` — 캐시 없음) 실행 시 `hyprctl layers` 에 `omarchy-polkit` 등장, 캡처에 `Authorize running '/usr/bin/id'` 제목과 자물쇠 + 암호 입력창이 실제로 렌더됨. |
+| 2 | 취소 → 요청이 거부로 끝나는가 | 2026-08-24 PASS: Escape 후 `pkexec` 가 exit 126 + `Error executing command as another user: Request dismissed`, 서피스 소멸, polkitd 가 해당 action 에 대해 FAILED to authenticate 를 기록하고 `polkit-agent-helper@…service` 가 Deactivated successfully — 헬퍼 유닛 누수 없음. |
+| 3 | 틀린 암호 → 재시도 허용 / 잠금 없음 | 2026-08-24 부분 PASS + **주의 사항**: 틀린 암호에 `pam_unix authentication failure` 뒤 에이전트가 재시도 헬퍼(`helper@9`)를 한 번 더 띄웠으므로 재시도 경로는 있다. 그러나 **잠금은 일어난다** — 시스템 기본 faillock(`/etc/security/faillock.conf` 전부 주석 = `deny=3`, `unlock_time=600`)에 실패가 3건 차면서 sudo·polkit 이 10분간 거부 상태가 됐다. 더 놀라운 것은 **프롬프트 "취소"도 실패로 집계된다**는 점이다(16:49:16 취소, 16:51:05 오답, 16:51:34 재시도 무입력 = 3건) — 취소 3번이면 sudo 가 잠긴다. 이는 배포판 PAM 정책이지 우리 것이 아니다. |
 | 4 | 맞는 암호 → 권한 상승 성공 | |
-| 5 | 셸 재시작 후 1~4 반복 — 등록이 살아남는가 | |
+| 5 | 셸 재시작 후 1~4 반복 — 등록이 살아남는가 | 부분: reload(893157) 뒤에도 `omarchy polkit agent registered` 가 다시 남고 1~3 단계가 그 셸에서 측정됐다. 1~4 전체 재반복은 4 단계 뒤에 수행한다. |
+
+**화면 잠금은 이 정책에서 분리돼 있다.** 우리가 소유한 `/etc/pam.d/omarchy-lock-password` 는
+`pam_faillock` 을 `deny=10 unlock_time=120` 으로 명시해 시스템 기본(3/600)보다 관대하다.
+그래서 polkit 오답으로 sudo 가 잠긴 순간에도 사용자는 자기 화면 잠금을 풀 수 있다 —
+"자기 세션에서 쫓겨나지 않는다"가 설계 의도대로 실측됐다. faillock 집계는 사용자 단위로
+공유되지만 임계값은 서비스마다 따로 평가되기 때문이다.
 
 **3 단계의 함정:** 이 환경에서 `auth could not identify password` 는 틀린
 암호가 아니라 **입력이 도달하지 않은 것**일 수 있다(한글 입력기). 측정 전
