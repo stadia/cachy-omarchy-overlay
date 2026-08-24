@@ -59,10 +59,10 @@ SPEC §61 의 역사적 기록으로 남으며, 이 문서가 그보다 넓은 �
 | 키바인딩 토글 | 핵심 | auto-live | 측정됨 | 2026-08-23 `COO_RUN_LIVE=1 ./tests/test.sh test_keybindings_toggle` PASS: `omarchy-menu` layer 표시·화면 기하 확인, v13 관리 source 포함 Lua cache 49행, Escape 뒤 layer 제거 및 helper exit 0, journal QML 오류/`ERROR` 없음; `inotifywait` 6→6. |
 | 앱 실행 | 핵심 | auto-live | 측정됨 | 2026-08-23 `COO_RUN_LIVE=1 ./tests/test.sh test_app_launch` PASS: test-owned extracted shell의 Apps menu에서 sandbox `.desktop` probe를 선택해 marker 생성, menu layer 제거 확인; `inotifywait` 6→6. |
 | 앱 스코프 격리 | 핵심 | auto-live | 측정됨 | 2026-08-23 `COO_RUN_LIVE=1 ./tests/test.sh test_app_scope` PASS: probe가 `app-graphical.slice`의 독립 scope에 있고 extracted shell 재시작 뒤에도 생존; `inotifywait` 6→6. |
-| init → UWSM 로그인 | 핵심 | vm | 미검증 | |
-| 패키지 업그레이드 | 핵심 | vm | 미검증 | |
-| 롤백 | 핵심 | vm | 미검증 | |
-| 사용자 상태 보존 | 핵심 | vm | 미검증 | |
+| init → UWSM 로그인 | 핵심 | vm | 측정됨 | 2026-08-24 VM PASS: 깨끗한 CachyOS 설치본에서 cachy-omarchy-init 멱등 재실행 INIT_EXIT=0, hyprland.lua 358행에 pcall(dofile) 관리 블록 주입, `uwsm start -e -D Hyprland hyprland.desktop` 로그인 뒤 세션 안 doctor DOCTOR_EXIT=0 (session OMARCHY_PATH · Quickshell process running · IPC ping ok), `--ipc shell ping` 이 ok 를 반환, hyprctl layers 에 omarchy-background 와 omarchy-bar 실측, virsh screenshot 으로 바 렌더 확인, journal 에 QML 오류 없음. |
+| 패키지 업그레이드 | 핵심 | vm | 측정됨 | 2026-08-24 VM PASS: bin/install-packages --install 로 shell 4.0.0-20 을 설치한 뒤 bump-pkgrel 과 재빌드로 4.0.0-21 로 업그레이드 UPGRADE_EXIT=0, 이전 검증 페어가 1건 아카이브됐고 pacman -Q 가 4.0.0-21 을 보고했다. |
+| 롤백 | 핵심 | vm | 측정됨 | 2026-08-24 VM PASS: bin/rollback ROLLBACK_EXIT=0 으로 shell 4.0.0-21 에서 4.0.0-20 으로 다운그레이드했고 previous- 아카이브 매니페스트에서 복원했다. 롤백 뒤 세션 안 doctor 가 DOCTOR_EXIT=0 이며 installed artifact/manifest 가 PASS 로 바뀌었다. |
+| 사용자 상태 보존 | 핵심 | vm | 측정됨 | 2026-08-24 VM PASS: 업그레이드와 롤백 전후로 bindings.conf · bindings.lua · hyprland.lua · state 프로브 네 파일의 sha256 이 모두 동일했고 사용자가 손으로 넣은 편집 마커와 관리 source 블록이 그대로 남았다. |
 | login / logout | 핵심 | host | 미검증 | |
 | reboot / shutdown | 핵심 | host | 미검증 | |
 | shell reload | 핵심 | host | 미검증 | |
@@ -114,3 +114,44 @@ polkit 과 충돌 가능하다는 우려는 남아 있음, 재검토 필요" 로
 **3 단계의 함정:** 이 환경에서 `auth could not identify password` 는 틀린
 암호가 아니라 **입력이 도달하지 않은 것**일 수 있다(한글 입력기). 측정 전
 한/영 상태를 확인하지 않으면 없는 결함을 만들어낸다.
+
+## VM lane 측정 기록 (2026-08-24)
+
+**측정 환경.** 호스트의 `qemu:///session` 도메인 `coo-rc-vm` (4 vCPU, 8GiB,
+40GiB qcow2, q35, UEFI secure-boot off, virtio-gpu, passt 사용자 네트워킹).
+게스트는 `cachyos-desktop-linux-260809.iso` 로 `cachyos-installer` 무인 설치했다.
+ISO SHA256 은 미러와 CDN 의 공표값, 내려받은 파일의 재계산값이 모두
+`959f6577f45e25ee9fd8c220fd221b08e4ea79412c7315c0f922dd6d86d5e33c` 로 일치했다.
+커널 `7.2.0-1-cachyos`, 루트 `/dev/vda2` ext4, 저장소 `[cachyos] [core] [extra]
+[multilib]`, loader 는 `x86-64-v4 (supported, searched)` 를 보고했다.
+
+**기준선과 복원.** 설치 직후 405 개 패키지, `omarchy` 와 `omarchy-settings` 는
+물론 `hyprland` `uwsm` `quickshell` 도 모두 부재, 실패 유닛 0. 스냅샷
+`task10-baseline` (2026-08-24 08:35:38, shutoff) 을 만든 뒤 마커 파일 생성 →
+revert → 마커 소멸과 405 개 복귀로 복원 가능성을 실측했다.
+
+**의존 해석 게이트.** 게스트 안에서 `bin/build-packages` 로 두 패키지를 빌드하고
+`bin/ci-resolve-install` 을 root 로 돌렸다. 게이트 A·B·C 가 모두 `ok` 를 냈고
+`의존 해석 lane 통과` 로 끝났다. 설치 뒤 패키지 수는 405 에서 605 로 늘었고
+`hyprland 0.56.2-1` `uwsm 0.26.6-1` `quickshell 0.3.1-1` 이 우리 depends 로
+끌려왔다 — 설치 전에 셋 다 없었으므로 depends 선언이 실제로 이들을 해석한다는
+직접 증거다. 이것은 VM 실측이며, 같은 이름을 가진 container lane 항목은 CI 가
+이 브랜치에서 아직 돌지 않았으므로 미검증으로 남긴다.
+
+**측정 조건과 편차.** 이 이미지는 설치기의 `server_profile` 을 `minimal` 로
+골랐다. 데스크톱 프로파일은 수백 개 패키지를 미리 설치해 "우리 depends 선언이
+충분한가" 라는 주장을 약화시키기 때문이다. 그 결과 ufw 가 inbound 기본 거부로
+켜져 있고(22 만 허용), sshd 는 키 전용이며, server sysctl 이 적용돼 있다.
+커널만 `linux-cachyos` 로 덮어썼다. 또 이 최소 이미지에는 pipewire 와
+xdg-desktop-portal 이 없어 셸이 `Failed to connect pipewire context` 와 포털
+등록 경고를 남긴다 — 최소 이미지의 결과이지 제품 결함이 아니다.
+
+**무인 측정 장치.** `bin/install-packages` 와 `bin/rollback` 이 부르는 `sudo` 는
+tty 가 없으면 암호를 읽지 못하고, sudo 타임스탬프는 tty 가 없을 때 ppid 에 묶여
+스크립트가 부르는 자식 `sudo` 에 적용되지 않는다. 시스템 sudo 정책은 그대로 두고
+스크립트가 이미 제공하는 `COO_SUDO_BIN` 을 sudo askpass 헬퍼로 지정해 무인으로
+돌렸다. `sudo pacman` 이라는 실제 경로 자체는 바뀌지 않는다.
+
+**범위 밖.** 유휴 시간이 지나 잠금 화면이 뜬 것을 지나가며 관측했으나,
+lock 과 suspend 와 logout 과 reboot 과 polkit 은 host lane 항목이므로 측정으로
+기록하지 않는다.
