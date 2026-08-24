@@ -4,11 +4,11 @@ Date: Mon, 24 Aug 2026 18:04:33 +0900
 Subject: [PATCH] fix: stop plugin watcher on shell exit
 
 ---
- shell/services/PluginRegistry.qml | 17 ++++++++++++++++-
- 1 file changed, 16 insertions(+), 1 deletion(-)
+ shell/services/PluginRegistry.qml | 28 +++++++++++++++++++++++++++-
+ 1 file changed, 27 insertions(+), 1 deletion(-)
 
 diff --git a/shell/services/PluginRegistry.qml b/shell/services/PluginRegistry.qml
-index f08bf765..a52923a4 100644
+index f08bf765..2c2605c4 100644
 --- a/shell/services/PluginRegistry.qml
 +++ b/shell/services/PluginRegistry.qml
 @@ -25,8 +25,21 @@ QtObject {
@@ -33,7 +33,25 @@ index f08bf765..a52923a4 100644
    signal scanFinished()
    signal pluginLoadFailed(string id, string error)
    signal localPluginChanged(string id)
-@@ -651,7 +664,9 @@ QtObject {
+@@ -635,6 +648,17 @@ QtObject {
+ 
+   property Process localPluginWatcher: Process {
+     command: [
++      // Quickshell 0.3.0 installs no SIGTERM handler: the process dies at 143
++      // with no QML engine teardown, so Component.onDestruction never runs on
++      // the real exit paths (cachy-omarchy-shell --restart, logout). The
++      // stopLocalPluginWatcher() call below therefore cannot be the only
++      // guarantee. setpriv arms the kernel's parent-death signal on the
++      // watcher itself, so inotifywait is reaped whichever way the shell dies.
++      // setpriv is util-linux (BASE) and needs no privileges.
++      "setpriv",
++      "--pdeathsig",
++      "TERM",
++      "--",
+       "inotifywait",
+       "-m",
+       "-r",
+@@ -651,7 +675,9 @@ QtObject {
          if (pluginId) registry.localPluginChanged(pluginId)
        }
      }
@@ -46,4 +64,3 @@ index f08bf765..a52923a4 100644
    property Timer localPluginWatcherRestart: Timer {
 -- 
 2.55.0
-

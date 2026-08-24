@@ -18,6 +18,13 @@ assert_file_exists "$script" "stage-upstream.sh"
 defaults=$REPO_ROOT/overlay/defaults
 patched_src="$COO_TEST_SANDBOX/upstream"
 cp -a "$src" "$patched_src"
+# The srcdir fallback above is makepkg's own checkout, and the shell PKGBUILD's
+# prepare() applies the maintained patches there. Copying it therefore yields an
+# already-patched working tree, and re-applying would fail for the wrong reason.
+# Restore the copy to its pinned commit first; the original is never touched.
+if [[ -d $patched_src/.git ]]; then
+  git -C "$patched_src" checkout -- . 2>/dev/null || true
+fi
 while IFS= read -r -d '' patch; do
   git -C "$patched_src" apply "$patch"
 done < <(find "$REPO_ROOT/packages/cachy-omarchy-shell/patches" -name '*.patch' -type f -print0 | sort -z)
@@ -35,6 +42,10 @@ registry_qml=$(cat "$root/shell/services/PluginRegistry.qml")
 assert_contains "$registry_qml" "function stopLocalPluginWatcher()" "staged watcher cleanup function"
 assert_contains "$registry_qml" "localPluginWatcher.signal(15)" "staged watcher receives SIGTERM"
 assert_contains "$registry_qml" "!registry.localPluginWatcherStopping" "staged watcher restart is shutdown-guarded"
+# Component.onDestruction 만으로는 부족하다 — Quickshell 0.3.0 은 SIGTERM 핸들러가
+# 없어 exit 143 으로 즉사하고 QML 엔진 teardown 이 아예 돌지 않는다(실측,
+# docs/RUNTIME_STARTUP.md). 커널 parent-death 신호가 실제 보증이다.
+assert_contains "$registry_qml" '"--pdeathsig"' "staged watcher arms the kernel parent-death signal"
 polkit_qml=$(cat "$root/shell/plugins/polkit/PolkitAgent.qml")
 assert_contains "$polkit_qml" "function cancelForSessionLock()" "staged polkit lock cancellation API"
 lock_qml=$(cat "$root/shell/plugins/lock/Service.qml")

@@ -1,7 +1,7 @@
 # Maintainer: Cachy Omarchy Overlay
 pkgname=cachy-omarchy-shell
 pkgver=4.0.0
-pkgrel=20
+pkgrel=22
 pkgdesc='Pinned Omarchy Quattro shell runtime for CachyOS (no omarchy-settings)'
 arch=('any')
 url='https://github.com/basecamp/omarchy'
@@ -118,6 +118,25 @@ else
   sha256sums=('SKIP')
   _clean_context=0
 fi
+
+# Maintained runtime patches (patches/README.md) must be applied to the source
+# makepkg actually stages. `bin/update-upstream` patches its candidate's *working
+# tree*, but every build path here clones the pinned `#commit=` object into
+# $srcdir — a working-tree patch never survives that clone. Applying them here
+# is the only point both the direct makepkg path and the clean-chroot path pass
+# through, so this is where the patch contract becomes real in the artifact.
+#
+# Lexicographic order, matching what patches/README.md promises. A failure is
+# fatal: a silently unpatched package is exactly the regression
+# tests/runtime/test_reload_watcher_reap.sh exists to catch.
+prepare() {
+  local patch
+  for patch in "$startdir"/patches/*.patch; do
+    [[ -f $patch ]] || continue
+    msg2 "applying maintained runtime patch: ${patch##*/}"
+    git -C "$srcdir/omarchy" apply "$patch"
+  done
+}
 
 package() {
   if (( _clean_context )); then
