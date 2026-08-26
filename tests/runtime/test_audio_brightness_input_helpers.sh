@@ -143,10 +143,13 @@ out=$(run "$bin_src/omarchy-hw-touchscreen"); code=$?
 assert_eq "$out" "" "hw-touchscreen: 장치 없으면 빈 출력"
 
 # --- toggle-touchpad: hyprctl eval + sandbox state file, no live compositor ---
+# 4.0.1: 상태는 생성 Lua(touchpad-disabled.lua)가 아니라 데이터 파일
+# (*-disabled-name)에 장치 이름만 들어간다 — 이름이 절대 코드로 생성되지
+# 않는다. 복원 쪽은 overlay/hypr/bindings.lua seam 이 담당한다.
 : >"$log"
 run "$bin_src/omarchy-toggle-touchpad" off; code=$?
 assert_eq "$code" "0" "toggle-touchpad off: exit 0"
-state="$HOME/.local/state/omarchy/toggles/hypr/touchpad-disabled.lua"
+state="$HOME/.local/state/omarchy/toggles/hypr/touchpad-disabled-name"
 assert_file_exists "$state" "toggle-touchpad off: 상태 파일"
 assert_contains "$(cat "$state")" "test-touchpad" "toggle-touchpad off: 장치 이름"
 grep -q 'hyprctl eval' "$log" && x=0 || x=1

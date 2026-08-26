@@ -183,11 +183,23 @@ assert_eq "$(jq -r '(.disabledPlugins // []) | index("omarchy.menu") // "none"' 
 # 주차시킨다. 판정은 네임스페이스 이름이 아니라 level + 기하학으로 한다.
 our_layers='[]'
 onscreen=""
+mons='[]'
 if command -v hyprctl >/dev/null && (( alive == 0 )); then
-  our_layers=$(hyprctl -j layers 2>/dev/null | jq -c --argjson pid "$shell_pid" \
-    '[ to_entries[].value.levels | to_entries[] as $lv | $lv.value[]
-       | select(.pid == $pid) | . + {level: ($lv.key | tonumber)} ]') || our_layers='[]'
   mons=$(hyprctl -j monitors 2>/dev/null | jq -c '[ .[] | select(.disabled | not) ]') || mons='[]'
+
+  read_our_layers() {
+    our_layers=$(hyprctl -j layers 2>/dev/null | jq -c --argjson pid "$shell_pid" \
+      '[ to_entries[].value.levels | to_entries[] as $lv | $lv.value[]
+         | select(.pid == $pid) | . + {level: ($lv.key | tonumber)} ]') || our_layers='[]'
+    onscreen=$(jq -r -n --argjson l "$our_layers" --argjson m "$mons" '
+      [ $l[] as $layer | $m[] as $mon
+        | select($layer.level >= 2)
+        | select($layer.x < ($mon.x + $mon.width / $mon.scale)
+             and ($layer.x + $layer.w) > $mon.x
+             and $layer.y < ($mon.y + $mon.height / $mon.scale)
+             and ($layer.y + $layer.h) > $mon.y)
+        | $layer.namespace ] | unique | join(",")')
+  }
 
   # 아래 "화면 점유 없음" 은 our_layers 가 비면 아무것도 검사하지 않고 통과한다.
   # systemd-cat 이 exec 대신 fork 하거나 hyprctl JSON 모양이 바뀌면 PID 필터가
@@ -201,18 +213,22 @@ if command -v hyprctl >/dev/null && (( alive == 0 )); then
   [[ $total_layers =~ ^[0-9]+$ ]] || total_layers=0
   assert_eq "$(( total_layers > 0 ? 1 : 0 ))" "1" "(a) hyprctl layers 를 파싱해 표면을 관측했다 (전체 $total_layers개)"
 
+  read_our_layers
+
   layer_count=$(jq -r 'length' <<<"$our_layers" 2>/dev/null)
   [[ $layer_count =~ ^[0-9]+$ ]] || layer_count=0
   assert_eq "$(( layer_count > 0 ? 1 : 0 ))" "1" "(b) PID 필터가 우리 표면을 실제로 잡았다 ($layer_count개)"
 
-  onscreen=$(jq -r -n --argjson l "$our_layers" --argjson m "$mons" '
-    [ $l[] as $layer | $m[] as $mon
-      | select($layer.level >= 2)
-      | select($layer.x < ($mon.x + $mon.width / $mon.scale)
-           and ($layer.x + $layer.w) > $mon.x
-           and $layer.y < ($mon.y + $mon.height / $mon.scale)
-           and ($layer.y + $layer.h) > $mon.y)
-      | $layer.namespace ] | unique | join(",")')
+  # bar-off 주차는 비동기다: Bar.qml 의 barHiddenProbe 가 별도 Process 로
+  # 돌고, 결과가 들어와야 margin 이 -barSize 로 바뀐다. ping 이 온 직후에는
+  # 아직 바가 화면 상태 그대로라 단발 스냅샷은 레이스가 난다(4.0.1 발행
+  # 후보 스위트에서 y=26 으로 관측됐다가 같은 코드가 다음 실행에서는
+  # y=-26 으로 통과함). 주차가 관측될 때까지 bounded retry 한다.
+  for _ in $(seq 1 32); do
+    [[ $onscreen == "" ]] && break
+    sleep 0.25
+    read_our_layers
+  done
   assert_eq "$onscreen" "" "우리 셸의 top/overlay 표면이 러너의 창을 밀어내지 않는다"
 
   # 반대 방향 증거: 배경 레이어는 실제로 그려져야 한다. 억제를 걷어낸 뒤

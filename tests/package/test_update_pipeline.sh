@@ -59,14 +59,18 @@ fi
 assert_file_exists "$fixture_source/shell/shell.qml" "U02 fixture starts from pinned upstream source"
 fixture_upstream=$COO_TEST_SANDBOX/upstream-fixture
 cp -a "$fixture_source" "$fixture_upstream"
-for helper in omarchy omarchy-menu omarchy-theme-set omarchy-battery-status omarchy-weather-status; do
+# omarchy-weather-status 는 스텁으로 바꾸지 않는다: 후보 스위트의
+# test_weather_helpers.sh 가 스테이징된 그대로 실행해 "Seoul · Temp 21°C"
+# 출력을 기대하는데, 스텁은 아무것도 출력하지 않아 그 단언이 깨진다(4.0.1
+# 발행 때 실제로 깨짐). 커밋 전환 증명은 나머지 네 개 스텁으로 충분하다.
+for helper in omarchy omarchy-menu omarchy-theme-set omarchy-battery-status; do
   printf '#!/usr/bin/env bash\n# fixture helper: %s\n' "$helper" >"$fixture_upstream/bin/$helper"
 done
 git init -q "$fixture_upstream"
 git -C "$fixture_upstream" -c user.email=fixture@example.invalid -c user.name=fixture -c commit.gpgsign=false \
   add -A
 git -C "$fixture_upstream" -c user.email=fixture@example.invalid -c user.name=fixture -c commit.gpgsign=false \
-  commit -q -m 'v4.0.1 fixture'
+  commit -q -m 'v4.0.2 fixture'
 fixture_commit=$(git -C "$fixture_upstream" rev-parse HEAD)
 fixture_repo_url="file://$fixture_upstream"
 
@@ -126,21 +130,21 @@ cat >"$fake/git" <<'EOF'
 # passes straight through to the real system git, so a real fetch of the
 # fixture repository below does real work against real objects.
 if [[ ${1:-} == ls-remote && ${2:-} == --tags ]]; then
-  # v4.0.1 is annotated: direct ref is tag object, peeled ref is commit.
+  # v4.0.1 (the repo's pinned version) is annotated: direct ref is the tag
   if [[ ${COO_FAKE_NO_UPDATE:-0} == 1 ]]; then
-    printf '%s\n' 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa refs/tags/v4.0.0'
-    printf '%s\n' 'f0020448ca87329199de7cb12f2015ebc4a3e5e7 refs/tags/v4.0.0^{}'
+    printf '%s\n' 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa refs/tags/v4.0.1'
+    printf '%s\n' '13f18b2cb7286fb54f87daf571a031aa6af3d8f0 refs/tags/v4.0.1^{}'
     exit 0
   fi
   if [[ ${COO_FAKE_LIGHTWEIGHT:-0} == 1 ]]; then
-    printf '%s\n' 'f0020448ca87329199de7cb12f2015ebc4a3e5e7 refs/tags/v4.0.0'
-    printf '%s\n' '4444444444444444444444444444444444444444 refs/tags/v4.0.1'
+    printf '%s\n' '13f18b2cb7286fb54f87daf571a031aa6af3d8f0 refs/tags/v4.0.1'
+    printf '%s\n' '4444444444444444444444444444444444444444 refs/tags/v4.0.2'
     exit 0
   fi
-  printf '%s\n' 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa refs/tags/v4.0.0'
-  printf '%s\n' 'f0020448ca87329199de7cb12f2015ebc4a3e5e7 refs/tags/v4.0.0^{}'
-  printf '%s\n' '1111111111111111111111111111111111111111 refs/tags/v4.0.1'
-  printf '%s\n' '__FIXTURE_COMMIT__ refs/tags/v4.0.1^{}'
+  printf '%s\n' 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa refs/tags/v4.0.1'
+  printf '%s\n' '13f18b2cb7286fb54f87daf571a031aa6af3d8f0 refs/tags/v4.0.1^{}'
+  printf '%s\n' '1111111111111111111111111111111111111111 refs/tags/v4.0.2'
+  printf '%s\n' '__FIXTURE_COMMIT__ refs/tags/v4.0.2^{}'
   printf '%s\n' '3333333333333333333333333333333333333333 refs/tags/v3.9.9'
   exit 0
 fi
@@ -328,13 +332,13 @@ assert_eq "$(tr '\n' ' ' <"$log")" "cachy-omarchy-shell cachy-omarchy-overlay " 
 manifest=$COO_TEST_SANDBOX/state/validated-build.manifest
 assert_file_exists "$manifest" "validated manifest exists"
 manifest_src=$(cat "$manifest")
-assert_contains "$manifest_src" "OMARCHY_COMMIT=f0020448ca87329199de7cb12f2015ebc4a3e5e7" "manifest binds commit"
+assert_contains "$manifest_src" "OMARCHY_COMMIT=13f18b2cb7286fb54f87daf571a031aa6af3d8f0" "manifest binds commit"
 assert_contains "$manifest_src" "$overlay_artifact_pin" "manifest binds overlay artifact"
 release=$(awk -F= '$1 == "RELEASE" { print $2 }' "$manifest")
 # Derived from the fixture's own (hermetically pinned) PKGBUILD, not a
 # hardcoded pkgrel -- see shell_pkgrel_pin above.
-shell_artifact_v400="cachy-omarchy-shell-4.0.0-${shell_pkgrel_pin}-any.pkg.tar.zst"
-assert_file_exists "$COO_TEST_SANDBOX/state/$release/artifacts/$shell_artifact_v400" "manifest points to immutable shell release"
+shell_artifact_v401="cachy-omarchy-shell-4.0.1-${shell_pkgrel_pin}-any.pkg.tar.zst"
+assert_file_exists "$COO_TEST_SANDBOX/state/$release/artifacts/$shell_artifact_v401" "manifest points to immutable shell release"
 
 # U06: failed build publishes neither artifacts nor a manifest.
 rm -f "$log"
@@ -391,11 +395,11 @@ cp -a "$root" "$dyn"
 # literal -- capture the overlay's pkgver here, before anything touches this
 # checkout, so it can be compared against itself post-build below.
 dyn_overlay_ver_before=$(grep -m1 '^pkgver=' "$dyn/packages/cachy-omarchy-overlay/PKGBUILD" | cut -d= -f2 | tr -d "'\"")
-sed -i 's/OMARCHY_VERSION=4.0.0/OMARCHY_VERSION=4.0.1/; s/f0020448ca87329199de7cb12f2015ebc4a3e5e7/5555555555555555555555555555555555555555/' "$dyn/upstream.lock"
-sed -i "s/pkgver=4.0.0/pkgver=4.0.1/; s/_commit='[0-9a-f]*'/_commit='5555555555555555555555555555555555555555'/" "$dyn/packages/cachy-omarchy-shell/PKGBUILD"
+sed -i 's/OMARCHY_VERSION=4.0.1/OMARCHY_VERSION=4.0.2/; s/13f18b2cb7286fb54f87daf571a031aa6af3d8f0/5555555555555555555555555555555555555555/' "$dyn/upstream.lock"
+sed -i "s/pkgver=4.0.1/pkgver=4.0.2/; s/_commit='[0-9a-f]*'/_commit='5555555555555555555555555555555555555555'/" "$dyn/packages/cachy-omarchy-shell/PKGBUILD"
 COO_TOOL_LOG="$log" COO_REPO_ROOT="$dyn" COO_BUILD_DIR="$COO_TEST_SANDBOX/dynamic-build" COO_STATE_DIR="$COO_TEST_SANDBOX/dynamic-state" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" "$dyn/bin/build-packages" >/dev/null
 dynamic_manifest=$(cat "$COO_TEST_SANDBOX/dynamic-state/validated-build.manifest")
-assert_contains "$dynamic_manifest" "OMARCHY_VERSION=4.0.1" "dynamic lock version reaches manifest"
+assert_contains "$dynamic_manifest" "OMARCHY_VERSION=4.0.2" "dynamic lock version reaches manifest"
 # Read the expected name back out of the dynamic fixture's own PKGBUILD
 # (the sed above only touches pkgver, so pkgrel is inherited) instead of
 # hardcoding it, so this label is actually true.
@@ -475,14 +479,14 @@ assert_eq "$(wc -l <"$paclog")" "0" "archive rename failure invokes no pacman"
 
 COO_REPO_ROOT="$root" COO_STATE_DIR="$COO_TEST_SANDBOX/state" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$root/bin/install-packages" --install >/dev/null
 assert_contains "$(cat "$paclog")" "-U" "U09 install calls fake pacman explicitly"
-assert_contains "$(cat "$paclog")" "$shell_artifact_v400" "U09 installs exact current shell"
+assert_contains "$(cat "$paclog")" "$shell_artifact_v401" "U09 installs exact current shell"
 assert_eq "$(cat "$prior/artifacts/$old_shell")" "old-shell" "U09 previous shell remains archived"
 assert_eq "$(cat "$prior/artifacts/$old_overlay")" "old-overlay" "U09 previous overlay remains archived"
 assert_file_exists "$COO_TEST_SANDBOX/state/installed-build.manifest" "U09 finalizes installed build pointer"
 code=0
 out=$(run_rc_doctor "$COO_TEST_SANDBOX/state") || code=$?
 assert_eq "$code" "0" "U09 installed pair is doctor-healthy"
-assert_contains "$out" "PASS: installed artifact/manifest (4.0.0" "U09 doctor reads installed pair"
+assert_contains "$out" "PASS: installed artifact/manifest (4.0.1" "U09 doctor reads installed pair"
 archived_count=$(find "$COO_TEST_SANDBOX/state/packages" -name validated-build.manifest | wc -l)
 [[ $archived_count -ge 2 ]] && archived=0 || archived=1
 assert_eq "$archived" "0" "U09 install archives prior validated pair"
@@ -675,10 +679,10 @@ assert_contains "$out" "PASS tests/package/test_package_files.sh" "candidate def
 assert_contains "$out" "PASS tests/runtime/test_support_contract.sh" "candidate default suite reaches support contract test"
 updated_lock=$(cat "$root/upstream.lock")
 updated_pkg=$(cat "$root/packages/cachy-omarchy-shell/PKGBUILD")
-assert_contains "$updated_lock" "OMARCHY_VERSION=4.0.1" "U02 lock version updates"
+assert_contains "$updated_lock" "OMARCHY_VERSION=4.0.2" "U02 lock version updates"
 assert_contains "$updated_lock" "OMARCHY_COMMIT=$fixture_commit" "U02 lock uses peeled commit"
-assert_contains "$updated_lock" "OMARCHY_TAG=v4.0.1" "U02 lock tag updates"
-assert_contains "$updated_pkg" "pkgver=4.0.1" "U03 shell pkgver updates"
+assert_contains "$updated_lock" "OMARCHY_TAG=v4.0.2" "U02 lock tag updates"
+assert_contains "$updated_pkg" "pkgver=4.0.2" "U03 shell pkgver updates"
 assert_contains "$updated_pkg" "pkgrel=1" "U03 pkgrel resets to one"
 assert_contains "$updated_pkg" "_commit='$fixture_commit'" "U02 shell commit updates"
 # The happy path alone only proves regeneration ran, not that it published
@@ -690,8 +694,14 @@ assert_contains "$updated_pkg" "_commit='$fixture_commit'" "U02 shell commit upd
 updated_inventory=$(cat "$root/tests/data/upstream-helpers.txt")
 assert_contains "$updated_inventory" "# commit: $fixture_commit" "U02 inventory header moves to the new pin"
 inventory_names_actual=$(grep -v '^#' "$root/tests/data/upstream-helpers.txt" | grep -v '^[[:space:]]*$')
-expected_fixture_names=$(printf '%s
-' omarchy omarchy-battery-status omarchy-menu omarchy-theme-set omarchy-weather-status | LC_ALL=C sort)
+# 기대 집합은 fixture repo 가 실제로 커밋한 bin/ 목록과 같아야 한다 —
+# update-upstream 과 같은 의미론(ls-tree --name-only HEAD -- bin/)으로
+# 동적으로 뽑는다. 이 fixture 는 핀된 업스트림 소스를 통째로 베낀 뒤 네 개
+# 헬퍼만 스텁으로 덮어쓴 트리라 bin/ 이 진짜 전체 목록이다(4.0.1 발행 후보
+# 스위트에서 U02 가 처음 끝까지 도달하면서, 하드코드된 5-이름 목록과의
+# 불일치가 노출됐다). "인벤토리가 핀된 커밋의 트리를 실제로 읽었다" 는 것을
+# 검증하는 것이 목적이지 이름 다섯 개를 검증하는 것이 아니다.
+expected_fixture_names=$(git -C "$fixture_upstream" ls-tree --name-only HEAD -- bin/ | sed 's|^bin/||' | LC_ALL=C sort)
 assert_eq "$inventory_names_actual" "$expected_fixture_names" "U02 inventory content is exactly the fixture repository's real bin/ tree"
 assert_eq "$(grep -m1 '^pkgver=' "$root/packages/cachy-omarchy-overlay/PKGBUILD")" "$overlay_pkgver_before_update" "U02 overlay version is independent"
 assert_eq "$(wc -l <"$pac_update")" "0" "U02 update never invokes pacman"
@@ -702,7 +712,7 @@ assert_contains "$out" "UPSTREAM.md requires human" "UPSTREAM.md deferred with e
 code=0
 out=$(run_rc_doctor "$update_state") || code=$?
 assert_eq "$code" "0" "U02 update manifest is doctor-healthy"
-assert_contains "$out" "PASS: validated artifact/manifest (4.0.1" "U02 doctor reads updated manifest"
+assert_contains "$out" "PASS: validated artifact/manifest (4.0.2" "U02 doctor reads updated manifest"
 assert_contains "$out" "WARN: installed artifact/manifest not present" "U02 doctor distinguishes uninstalled build"
 
 # U04 is explicit local packaging revision only: no lock or version mutation.
@@ -719,10 +729,10 @@ assert_eq "$(sha256sum "$root/upstream.lock")" "$lock_before_bump" "U04 preserve
 for mode in patch build audit test; do
   failroot=$COO_TEST_SANDBOX/update-fail-$mode
   cp -a "$root" "$failroot"
-  # U02 changed root to 4.0.1; each failure fixture must start at the prior pin
+  # U02 changed root to 4.0.2; each failure fixture must start at the prior pin
   # so update-upstream actually enters its patch/build/audit/test stage.
-  sed -i "s/OMARCHY_VERSION=4\.0\.1/OMARCHY_VERSION=4.0.0/; s/OMARCHY_COMMIT=$fixture_commit/OMARCHY_COMMIT=f0020448ca87329199de7cb12f2015ebc4a3e5e7/; s/OMARCHY_TAG=v4\.0\.1/OMARCHY_TAG=v4.0.0/" "$failroot/upstream.lock"
-  sed -i "s/pkgver=4.0.1/pkgver=4.0.0/; s/pkgrel=2/pkgrel=1/; s/_commit='$fixture_commit'/_commit='f0020448ca87329199de7cb12f2015ebc4a3e5e7'/" "$failroot/packages/cachy-omarchy-shell/PKGBUILD"
+  sed -i "s/OMARCHY_VERSION=4\.0\.2/OMARCHY_VERSION=4.0.1/; s/OMARCHY_COMMIT=$fixture_commit/OMARCHY_COMMIT=13f18b2cb7286fb54f87daf571a031aa6af3d8f0/; s/OMARCHY_TAG=v4\.0\.2/OMARCHY_TAG=v4.0.1/" "$failroot/upstream.lock"
+  sed -i "s/pkgver=4.0.2/pkgver=4.0.1/; s/pkgrel=2/pkgrel=1/; s/_commit='$fixture_commit'/_commit='13f18b2cb7286fb54f87daf571a031aa6af3d8f0'/" "$failroot/packages/cachy-omarchy-shell/PKGBUILD"
   before_lock=$(sha256sum "$failroot/upstream.lock")
   before_pkg=$(sha256sum "$failroot/packages/cachy-omarchy-shell/PKGBUILD")
   fail_pac=$COO_TEST_SANDBOX/fail-$mode-pacman.log
@@ -758,8 +768,8 @@ done
 # leave both tracked inputs and the old authoritative pointer/release intact.
 pubroot=$COO_TEST_SANDBOX/metadata-publish-repo
 cp -a "$root" "$pubroot"
-sed -i "s/OMARCHY_VERSION=4\.0\.1/OMARCHY_VERSION=4.0.0/; s/OMARCHY_COMMIT=$fixture_commit/OMARCHY_COMMIT=f0020448ca87329199de7cb12f2015ebc4a3e5e7/; s/OMARCHY_TAG=v4\.0\.1/OMARCHY_TAG=v4.0.0/" "$pubroot/upstream.lock"
-sed -i "s/pkgver=4.0.1/pkgver=4.0.0/; s/pkgrel=2/pkgrel=1/; s/_commit='$fixture_commit'/_commit='f0020448ca87329199de7cb12f2015ebc4a3e5e7'/" "$pubroot/packages/cachy-omarchy-shell/PKGBUILD"
+sed -i "s/OMARCHY_VERSION=4\.0\.2/OMARCHY_VERSION=4.0.1/; s/OMARCHY_COMMIT=$fixture_commit/OMARCHY_COMMIT=13f18b2cb7286fb54f87daf571a031aa6af3d8f0/; s/OMARCHY_TAG=v4\.0\.2/OMARCHY_TAG=v4.0.1/" "$pubroot/upstream.lock"
+sed -i "s/pkgver=4.0.2/pkgver=4.0.1/; s/pkgrel=2/pkgrel=1/; s/_commit='$fixture_commit'/_commit='13f18b2cb7286fb54f87daf571a031aa6af3d8f0'/" "$pubroot/packages/cachy-omarchy-shell/PKGBUILD"
 pub_state=$COO_TEST_SANDBOX/metadata-publish-state
 cp -a "$COO_TEST_SANDBOX/state" "$pub_state"
 pub_lock_before=$(sha256sum "$pubroot/upstream.lock")
@@ -776,19 +786,19 @@ assert_contains "$out" "could not publish shell PKGBUILD; upstream.lock restored
 assert_eq "$(sha256sum "$pubroot/upstream.lock")" "$pub_lock_before" "metadata failure restores lock"
 assert_eq "$(sha256sum "$pubroot/packages/cachy-omarchy-shell/PKGBUILD")" "$pub_pkg_before" "metadata failure preserves PKGBUILD"
 assert_eq "$(cat "$pub_state/validated-build.manifest")" "$pub_pointer_before" "metadata failure preserves old manifest pointer"
-assert_file_exists "$pub_state/$pub_old_release/artifacts/$shell_artifact_v400" "metadata failure preserves old referenced release"
+assert_file_exists "$pub_state/$pub_old_release/artifacts/$shell_artifact_v401" "metadata failure preserves old referenced release"
 
 # A pacman-success/final-pointer-failure state is explicitly pending. Neither
 # a new install nor rollback may trust the stale installed pointer afterwards.
 postroot=$COO_TEST_SANDBOX/post-pacman-repo
 cp -a "$root" "$postroot"
-sed -i "s/OMARCHY_VERSION=4\.0\.1/OMARCHY_VERSION=4.0.0/; s/OMARCHY_COMMIT=$fixture_commit/OMARCHY_COMMIT=f0020448ca87329199de7cb12f2015ebc4a3e5e7/; s/OMARCHY_TAG=v4\.0\.1/OMARCHY_TAG=v4.0.0/" "$postroot/upstream.lock"
+sed -i "s/OMARCHY_VERSION=4\.0\.2/OMARCHY_VERSION=4.0.1/; s/OMARCHY_COMMIT=$fixture_commit/OMARCHY_COMMIT=13f18b2cb7286fb54f87daf571a031aa6af3d8f0/; s/OMARCHY_TAG=v4\.0\.2/OMARCHY_TAG=v4.0.1/" "$postroot/upstream.lock"
 # poststate below still carries the never-touched original validated
 # manifest from the very first build (pinned to shell_pkgrel_pin), so
 # postroot's checkout must reconstruct that exact pin -- a hardcoded "1"
 # here would silently diverge from it and break install-packages'
 # cross-check between the manifest and this checkout.
-sed -i "s/pkgver=4.0.1/pkgver=4.0.0/; s/pkgrel=2/pkgrel=${shell_pkgrel_pin}/; s/_commit='$fixture_commit'/_commit='f0020448ca87329199de7cb12f2015ebc4a3e5e7'/" "$postroot/packages/cachy-omarchy-shell/PKGBUILD"
+sed -i "s/pkgver=4.0.2/pkgver=4.0.1/; s/pkgrel=2/pkgrel=${shell_pkgrel_pin}/; s/_commit='$fixture_commit'/_commit='13f18b2cb7286fb54f87daf571a031aa6af3d8f0'/" "$postroot/packages/cachy-omarchy-shell/PKGBUILD"
 poststate=$COO_TEST_SANDBOX/post-pacman-state
 cp -a "$COO_TEST_SANDBOX/state" "$poststate"
 : >"$paclog"

@@ -39,7 +39,17 @@ end
 -- — 관리 블록은 pcall(dofile) 로 진입하므로 그 package.path 루트가 성립하지
 -- 않는다. dofile 은 모듈 캐시가 없어 업스트림 { reload = true } 의 의미가
 -- 그대로 따라온다. 디렉터리 부재는 정상 경로다.
+--
+-- 4.0.1 (보안): sweep 이 두 레거시 생성 파일을 코드로 로드하면 안 된다 —
+-- touchpad-disabled.lua / touchscreen-disabled.lua 는 구버전에서 USB
+-- 디스크립터의 장치 이름이 Lua 코드로 들어가 생성됐어서, 아직 마이그레이션
+-- 전인 설치에 남아 있으면 리로드마다 주입된 코드가 실행된다(업스트림
+-- default/hypr/toggles.lua 의 exclude 와 같은 계약). 대신 4.0.1 의
+-- omarchy-toggle-input-device 가 쓰는 데이터 파일 <kind>-disabled-name 을
+-- 읽어 장치만 끈다(upstream default/hypr/disabled-input-device.lua 자리) —
+-- 이름은 절대 코드로 합성하지 않는다.
 do
+  local home = os.getenv("HOME")
   local dir = os.getenv("HOME") .. "/.local/state/omarchy/toggles/hypr"
   local quoted = "'" .. dir:gsub("'", "'\\''") .. "'"
   -- -print0 + NUL 분리: 줄 단위로 읽으면 파일명에 든 개행에서 경로가 잘려
@@ -64,8 +74,29 @@ do
     table.sort(paths)
 
     for _, path in ipairs(paths) do
-      -- toggle 파일 하나가 깨져도 사용자 설정 전체가 죽지 않는다(SPEC §5.1).
-      pcall(dofile, path)
+      if path:sub(-22) == "/touchpad-disabled.lua"
+        or path:sub(-25) == "/touchscreen-disabled.lua"
+      then
+        -- 4.0.1 exclude: 레거시 생성 Lua 는 코드로 로드하지 않는다.
+      else
+        -- toggle 파일 하나가 깨져도 사용자 설정 전체가 죽지 않는다(SPEC §5.1).
+        pcall(dofile, path)
+      end
+    end
+  end
+
+  -- *-disabled-name: 장치 이름 데이터를 읽어 장치만 끈다. 빈 파일/부재는
+  -- 정상 경로다(업스트림의 name ~= "" 가드).
+  for _, kind in ipairs({ "touchpad", "touchscreen" }) do
+    local f = io.open(
+      dir .. "/" .. kind .. "-disabled-name", "r"
+    )
+    if f then
+      local name = f:read("*l")
+      f:close()
+      if name and name ~= "" then
+        hl.device({ name = name, enabled = false })
+      end
     end
   end
 end

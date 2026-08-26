@@ -15,6 +15,8 @@ assert_contains "$src" "toggles/hypr" "sweep 이 toggles 디렉터리를 본다"
 assert_contains "$src" "pcall(dofile" "toggle 로드는 pcall 가드"
 
 # hl 스텁: bindings.lua 의 최상위 hl.* 호출을 전부 흡수하는 permissive 테이블.
+# hl.device 만 COO_HL_DEVICE_LOG 에 기록한다 — 4.0.1 의 *-disabled-name 복원이
+# 진짜로 hl.device 를 부르는지 잰다.
 harness=$COO_TEST_SANDBOX/harness.lua
 cat > "$harness" <<'LUA'
 local function stub()
@@ -24,6 +26,17 @@ local function stub()
   })
 end
 hl = stub()
+local device_log = os.getenv("COO_HL_DEVICE_LOG")
+if device_log then
+  hl.device = function(t)
+    local f = io.open(device_log, "a")
+    if f then
+      f:write("name=" .. tostring(t and t.name) .. " enabled=" .. tostring(t and t.enabled) .. "\n")
+      f:close()
+    end
+    return stub()
+  end
+end
 dofile(os.getenv("COO_BINDINGS_LUA"))
 LUA
 
@@ -78,6 +91,57 @@ LUA
 run_harness "$h4"; rc=$?
 assert_eq "$rc" "0" "개행 파일명이 설정을 죽이지 않는다"
 assert_file_exists "$h4/loaded-newline" "개행이 든 파일명의 toggle 도 로드된다"
+
+# 경우 5 (4.0.1): 레거시 touchpad-disabled.lua / touchscreen-disabled.lua 는
+# 절대 코드로 로드하지 않는다. 업스트림 4.0.1 toggles.lua 의 exclude 와 같은
+# 계약이다 — 이 파일들은 구버전에서 생성됐고 USB 디스크립터의 장치 이름이
+# Lua 코드로 들어가던 형태라, 아직 마이그레이션되지 않은 설치에서 리로드마다
+# 주입된 람다를 실행하는 통로가 된다. sweep 이 제외 목록을 적용하지 않으면
+# 그 통로를 우리만 열어 두는 셈이다.
+h5=$COO_TEST_SANDBOX/h5
+mkdir -p "$h5/.local/state/omarchy/toggles/hypr"
+for kind in touchpad touchscreen; do
+  cat > "$h5/.local/state/omarchy/toggles/hypr/$kind-disabled.lua" <<LUA
+local f = io.open("$h5/pwned-$kind", "w")
+f:write("yes")
+f:close()
+LUA
+done
+run_harness "$h5"; rc=$?
+assert_eq "$rc" "0" "레거시 *-disabled.lua 가 있어도 설정이 죽지 않는다"
+for kind in touchpad touchscreen; do
+  [[ -e $h5/pwned-$kind ]] && x=1 || x=0
+  assert_eq "$x" "0" "레거시 $kind-disabled.lua 는 실행되지 않는다"
+done
+
+# 경우 6 (4.0.1): *-disabled-name 은 데이터로 읽어 hl.device({ name, enabled
+# = false }) 를 부른다 — 업스트림 default/hypr/disabled-input-device.lua 자리.
+# 장치 이름을 코드로 합성하지 않는다(문자열 보간으로 Lua/쉘을 만들지 않는다).
+h6=$COO_TEST_SANDBOX/h6
+mkdir -p "$h6/.local/state/omarchy/toggles/hypr"
+printf 'test-touchpad\n' > "$h6/.local/state/omarchy/toggles/hypr/touchpad-disabled-name"
+printf 'test-touchscreen; touch /tmp/owned\n' \
+  > "$h6/.local/state/omarchy/toggles/hypr/touchscreen-disabled-name"
+COO_HL_DEVICE_LOG="$h6/devices.log" run_harness "$h6"; rc=$?
+assert_eq "$rc" "0" "*-disabled-name 복원이 설정을 죽이지 않는다"
+assert_file_exists "$h6/devices.log" "disabled-name 이 있으면 hl.device 를 부른다"
+assert_contains "$(cat "$h6/devices.log")" "name=test-touchpad enabled=false" \
+  "touchpad-disabled-name 이 장치를 끈다"
+assert_contains "$(cat "$h6/devices.log")" \
+  "name=test-touchscreen; touch /tmp/owned enabled=false" \
+  "장치 이름은 코드가 아니라 데이터로 전달된다"
+[[ -e $h6/owned ]] && x=1 || x=0
+assert_eq "$x" "0" "장치 이름 속 명령은 실행되지 않는다"
+
+# 경우 7 (4.0.1): 비어 있는 *-disabled-name 은 hl.device 호출을 만들지
+# 않는다(업스트림의 name ~= "" 가드).
+h7=$COO_TEST_SANDBOX/h7
+mkdir -p "$h7/.local/state/omarchy/toggles/hypr"
+: >"$h7/.local/state/omarchy/toggles/hypr/touchpad-disabled-name"
+COO_HL_DEVICE_LOG="$h7/devices.log" run_harness "$h7"; rc=$?
+assert_eq "$rc" "0" "빈 disabled-name 은 오류가 아니다"
+[[ -s $h7/devices.log ]] && x=1 || x=0
+assert_eq "$x" "0" "빈 disabled-name 은 hl.device 를 부르지 않는다"
 
 # conf 경로: .lua 글롭을 받지 않는다(2026-08-23 중첩 Hyprland 실측 —
 # source = <dir>/*.lua 자체는 파싱 오류를 내지 않지만, 그 안의 Lua 는

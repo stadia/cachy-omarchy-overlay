@@ -1,7 +1,7 @@
 # Maintainer: Cachy Omarchy Overlay
 pkgname=cachy-omarchy-shell
-pkgver=4.0.0
-pkgrel=22
+pkgver=4.0.1
+pkgrel=1
 pkgdesc='Pinned Omarchy Quattro shell runtime for CachyOS (no omarchy-settings)'
 arch=('any')
 url='https://github.com/basecamp/omarchy'
@@ -30,7 +30,11 @@ license=('MIT')
 #     활성이고 Service.qml 이 uwsm-app -- hyprsunset 으로 데몬을 직접 띄운다.
 #   grim·slurp: 스크린샷 캡처/영역 선택 메뉴 행의 구동 기계 — 이 둘 없이는
 #     그 메뉴 행 자체가 동작하지 못한다(§4.2 개정).
-#   libnotify: omarchy-notification-send 폴백 경로(notify-send). libpulse:
+#   (4.0.1: omarchy-notification-send 가 notify-send 폴백을 버리고
+#    org.freedesktop.Notifications 를 직접 부르도록 바뀌어 libnotify 를
+#    depends 에서 뺐다 — 클로저 스캐너가 더 이상 notify-send 를 도달로 잡지
+#    않는다.)
+#   libpulse:
 #     pactl 의 실소유 패키지(위 참고) — pipewire-pulse 만으로는 부족했다.
 #   sudo: cachy-omarchy-init 이 락스크린 PAM 서비스 설정을
 #     omarchy-apply-lock 에 위임하며 그것이 root 를 요구한다 — 메뉴 행이
@@ -52,7 +56,7 @@ license=('MIT')
 #   둘 수 없다 — pacman -U 가 리포/설치된 패키지로만 해결한다(bin/install-packages).
 depends=('quickshell' 'hyprland' 'uwsm' 'inotify-tools' 'libvips' 'procps-ng'
          'psmisc' 'jq' 'wl-clipboard' 'wtype' 'wireplumber' 'pipewire-pulse'
-         'xdg-utils' 'git' 'grim' 'gum' 'hyprsunset' 'libnotify' 'libpulse'
+         'xdg-utils' 'git' 'grim' 'gum' 'hyprsunset' 'libpulse'
          'perl' 'slurp' 'sudo' 'upower' 'which'
          # 테마 훅·하드웨어 제어·메뉴/패널 대상 — v0.12.1 에서 optdepends 에서 승격.
          # 배열 안 주석에 괄호를 쓰지 않는다: 테스트가 sed 범위로 배열을 뜨는데
@@ -99,7 +103,7 @@ optdepends=(
   'v4l-utils: 웹캠/캡처 장치 진단 메뉴 항목'
   'zbar: QR/바코드 스캔 메뉴 항목'
 )
-_commit='f0020448ca87329199de7cb12f2015ebc4a3e5e7'
+_commit='13f18b2cb7286fb54f87daf571a031aa6af3d8f0'
 
 # Maintained runtime patches (patches/README.md). The patch set is declared
 # here as a fixed contract — prepare() applies exactly this list from

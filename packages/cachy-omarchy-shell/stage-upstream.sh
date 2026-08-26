@@ -286,6 +286,12 @@ helpers=(
   omarchy-theme-install
   omarchy-theme-remove
   omarchy-theme-update
+  # 4.0.1: git-url-check 는 theme-install / plugin-add 가 clone 전 URL 을
+  # 검증할 때 부르는 순수 bash 가드(ext::/fd:: 전송 차단). theme-extras 는
+  # 메뉴 "Extra Themes" 행의 when 가드(사용자 테마 디렉터리 나열, 외부
+  # omarchy 의존 0). 둘 다 새 외부 패키지 의존을 만들지 않는다.
+  omarchy-git-url-check
+  omarchy-theme-extras
   # v0.11.0 Session Lifecycle Parity — 가드와 프로브.
   # omarchy-cmd-missing: 화면보호기 런처(idle→screensaver 체인의 별도 스크립트)
   #   첫 줄의 ttfx 가드. 없으면 127 로 끝나 bash if 가 거짓으로 읽고 가드를

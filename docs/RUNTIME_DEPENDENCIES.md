@@ -105,6 +105,7 @@
 "Moving the pin" 절에 있다.
 
 <!-- CLOSURE_BEGIN -->
+
 | command | package | class | 근거 |
 | --- | --- | --- | --- |
 | `asdcontrol` | `asdcontrol` | UNPACKAGED | Apple Studio Display 밝기 제어(하드웨어 한정, omarchy-brightness-display-apple 이 sudo asdcontrol 을 부른다) — 공식 리포에도 AUR 에도 제공자가 없다(AUR RPC info/search 둘 다 0건 실측). 어디에도 선언하지 않는다; 사용자가 직접 빌드해야 하며, 없으면 그 헬퍼 하나만 동작하지 않는다. |
@@ -165,7 +166,6 @@
 | `mv` | `coreutils` | BASE | 기반 |
 | `nmcli` | `networkmanager` | OPT | 네트워크 관리 메뉴 항목 |
 | `nohup` | `coreutils` | BASE | 기반 |
-| `notify-send` | `libnotify` | HARD | omarchy-notification-send 폴백 경로 |
 | `nproc` | `coreutils` | BASE | 기반 |
 | `pactl` | `libpulse` | HARD | pactl 실소유 패키지는 pipewire-pulse 아닌 libpulse(pacman -Qqo 실측) — depends 는 pipewire-pulse 만 있음, MISSING_HARD_DEP 로 드러나는 진짜 결함 |
 | `perl` | `perl` | HARD | 텍스트 처리 헬퍼 — 기본 경로에서 도달하나 depends 없음 |
@@ -222,9 +222,9 @@
 | `xkbcli` | `libxkbcommon` | BASE | 이미 선언된 의존의 전이 의존(§4.2 개정) |
 | `zbarimg` | `zbar` | OPT | QR 코드 스캔 메뉴 항목 |
 
-tests/data/command-packages.tsv: 전체 118행, 위 표에는 도달한 114행이 모두 실린다(BASE 62행 포함 — BASE 는 declare 대상이 아닐 뿐 검사 대상에서 빠지지 않는다)
+tests/data/command-packages.tsv: 전체 117행, 위 표에는 도달한 113행이 모두 실린다(BASE 62행 포함 — BASE 는 declare 대상이 아닐 뿐 검사 대상에서 빠지지 않는다)
 
-docs/COMMAND_AUDIT.md 의 DISABLED 행으로 메뉴 루트에서 억제된 이름: 90개 (의도적으로 미지원인 Omarchy OS 스택 — 예외 파일과 달리 사유·신선도 검사가 없는 통로다)
+docs/COMMAND_AUDIT.md 의 DISABLED 행으로 메뉴 루트에서 억제된 이름: 93개 (의도적으로 미지원인 Omarchy OS 스택 — 예외 파일과 달리 사유·신선도 검사가 없는 통로다)
 - `omarchy-branding-about`
 - `omarchy-branding-screensaver`
 - `omarchy-channel-current`
@@ -296,6 +296,7 @@ docs/COMMAND_AUDIT.md 의 DISABLED 행으로 메뉴 루트에서 억제된 이�
 - `omarchy-remove-security-fido2`
 - `omarchy-remove-security-fingerprint`
 - `omarchy-remove-security-sshd`
+- `omarchy-remove-security-sudoless-docker`
 - `omarchy-remove-service-dropbox`
 - `omarchy-remove-service-tailscale`
 - `omarchy-restart-hyprsunset`
@@ -304,6 +305,8 @@ docs/COMMAND_AUDIT.md 의 DISABLED 행으로 메뉴 루트에서 억제된 이�
 - `omarchy-setup-security-fido2`
 - `omarchy-setup-security-fingerprint`
 - `omarchy-setup-security-sshd`
+- `omarchy-setup-security-sudoless-docker`
+- `omarchy-sudo-docker`
 - `omarchy-system-factory-reset`
 - `omarchy-theme-bg-install`
 - `omarchy-toggle-crash-capture`
@@ -325,7 +328,7 @@ docs/COMMAND_AUDIT.md 의 DISABLED 행으로 메뉴 루트에서 억제된 이�
 - `omarchy-battery`
 - `omarchy-clipboard`
 - `omarchy-emojis`
-- `omarchy-exec`
+- `omarchy-exec-argv`
 - `omarchy-glyph`
 - `omarchy-image-selector`
 - `omarchy-lock-fingerprint`
@@ -337,6 +340,7 @@ docs/COMMAND_AUDIT.md 의 DISABLED 행으로 메뉴 루트에서 억제된 이�
 - `omarchy-system`
 - `omarchy-theme`
 - `omarchy-webapp-handler`
+
 <!-- CLOSURE_END -->
 
 ### 스캐너의 알려진 한계 — 이 표가 완전성을 주장하지 않는 이유

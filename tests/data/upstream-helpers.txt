@@ -1,6 +1,6 @@
 # upstream helper inventory — basecamp/omarchy bin/ at the pinned commit.
-# commit: f0020448ca87329199de7cb12f2015ebc4a3e5e7
-# regenerate: git -C build/omarchy ls-tree --name-only f0020448ca87 bin/ | sed "s|^bin/||" | LC_ALL=C sort
+# commit: 13f18b2cb7286fb54f87daf571a031aa6af3d8f0
+# regenerate: git -C build/omarchy ls-tree --name-only 13f18b2cb728 bin/ | sed "s|^bin/||" | LC_ALL=C sort
 #
 # 이 파일은 스캐너의 ground truth 다. 업스트림에 그런 헬퍼가 실제로
 # 있는지는 설치 트리로 알 수 없다 — 설치 트리에는 우리가 스테이징한
@@ -88,6 +88,7 @@ omarchy-font-list
 omarchy-font-set
 omarchy-games-retro-cores
 omarchy-games-retro-install
+omarchy-git-url-check
 omarchy-hibernation-available
 omarchy-hibernation-remove
 omarchy-hibernation-setup
@@ -184,6 +185,7 @@ omarchy-launch-battlenet
 omarchy-launch-browser
 omarchy-launch-config-editor
 omarchy-launch-discord-community
+omarchy-launch-docker-tui
 omarchy-launch-editor
 omarchy-launch-floating-terminal-with-presentation
 omarchy-launch-nautilus
@@ -294,6 +296,7 @@ omarchy-remove-preinstalls
 omarchy-remove-security-fido2
 omarchy-remove-security-fingerprint
 omarchy-remove-security-sshd
+omarchy-remove-security-sudoless-docker
 omarchy-remove-service-1password
 omarchy-remove-service-dropbox
 omarchy-remove-service-sunshine
@@ -319,15 +322,16 @@ omarchy-setup-direct-boot
 omarchy-setup-security-fido2
 omarchy-setup-security-fingerprint
 omarchy-setup-security-sshd
+omarchy-setup-security-sudoless-docker
 omarchy-shell
 omarchy-shell-config
 omarchy-show-done
 omarchy-show-logo
 omarchy-snapshot
 omarchy-state
+omarchy-sudo-docker
 omarchy-sudo-keepalive
 omarchy-sudo-passwordless
-omarchy-sudo-reset
 omarchy-system-factory-reset
 omarchy-system-factory-reset-finish
 omarchy-system-lid-close
@@ -351,6 +355,7 @@ omarchy-theme-color
 omarchy-theme-colors-from-alacritty
 omarchy-theme-current
 omarchy-theme-dir
+omarchy-theme-extras
 omarchy-theme-install
 omarchy-theme-list
 omarchy-theme-osc

@@ -247,6 +247,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-dns` | SAFE | package | 0.8.0. nmcli/systemctl/resolved DNS 설정. Omarchy 의존 0 |
 | `omarchy-font-current` | SAFE | package | 0.8.0. fc-match 단일 호출 |
 | `omarchy-font-list` | SAFE | package | 0.8.0. fc-list 단일 호출 |
+| `omarchy-git-url-check` | SAFE | package | 4.0.1. theme-install/plugin-add 가 clone 전 URL 을 검증할 때 부르는 순수 bash 가드 — `<helper>::<address>` 와 비허용 스킴(ext/fd 등 git remote helper 실행 통로) 차단. 외부 omarchy 의존 0 |
 | `omarchy-hibernation-available` | SAFE | package | 0.8.0. /proc/swaps + /sys 읽기 전용 프로브. omarchy_resume.conf 부재 시 exit 1 |
 | `omarchy-hook` | SAFE | package | M9 theme-set post 훅 디스패처 (실측: theme-set 이 부름) |
 | `omarchy-hw-clamshell` | SAFE | package | 0.11.0. 클램셸(뚜껑 닫힘 + 외부 모니터) 판정. `omarchy-hw-laptop-closed` + `omarchy-hw-external-monitors`(둘 다 staged) 만 부르는 순수 조합 프로브 |
@@ -328,6 +329,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-theme-bg-next` | SAFE | package | M9 배경 묶음 |
 | `omarchy-theme-bg-set` | SAFE | package | M9 배경 묶음 |
 | `omarchy-theme-bg-switcher` | SAFE | package | M9 배경 묶음 |
+| `omarchy-theme-extras` | SAFE | package | 4.0.1 verbatim stage. 메뉴 `update.themes` when 가드(사용자 설치 테마 존재 여부). action 은 기스테이징된 `omarchy-theme-update` |
 | `omarchy-theme-color` | SAFE | package | M9 테마 코어 |
 | `omarchy-theme-colors-from-alacritty` | SAFE | package | M9 theme-set 코어 체인 |
 | `omarchy-theme-current` | SAFE | package | M9 테마 코어 |
@@ -511,6 +513,7 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-remove-security-fido2` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
 | `omarchy-remove-security-fingerprint` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
 | `omarchy-remove-security-sshd` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-remove-security-sudoless-docker` | DISABLED | disable | 4.0.1 신규(setup.security.sudoless-docker 행의 해제 쌍). docker 그룹 = root-equivalent 셀프토글 표면이라 스테이징하지 않는다(사용자 확인). 바이너리 부재 → when 가드 `omarchy-sudo-docker --configured` 가 거짓이라 행이 숨는 fail-safe. 전이로 `omarchy-update-restart`(미스테이징 체인)까지 당겨와 그 경로도 함께 막힌다 |
 | `omarchy-remove-service-dropbox` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
 | `omarchy-remove-service-tailscale` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
 | `omarchy-restart-audio` | SAFE | package | audio-tuning 전이. v0.12.0에서 `omarchy-launch-floating-terminal-with-presentation` 프레젠테이션 체인까지 스테이징해 `update.hardware.audio` 메뉴 행의 실행 결손을 닫았다 |
@@ -524,7 +527,9 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-setup-security-fido2` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-setup-security-fingerprint` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-setup-security-sshd` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
+| `omarchy-setup-security-sudoless-docker` | DISABLED | disable | 4.0.1 신규(메뉴 setup.security.sudoless-docker). docker 그룹 추가는 root-equivalent 권한 상승이라 이 오버레이가 조용히 노출하지 않는다(사용자 확인 `omarchy-setup` 계열 때문에 비활성). 바이너리 부재 = 행 숨김 |
 | `omarchy-shell` | ADAPTED | wrapper | M2 `cachy-omarchy-shell --ipc`. 메뉴의 summon/toggle 경로 |
+| `omarchy-sudo-docker` | DISABLED | disable | 4.0.1 신규. docker 두 행(`setup/remove.security.sudoless-docker`)의 when 가드. 이 가드 자체를 올리지 않으므로 두 행이 모두 숨겨진다 — 그래서 그 삼총사를 한 묶음 DISABLED 로 분류한다 |
 | `omarchy-sudo-passwordless` | SAFE | package | 0.8.0 verbatim stage. /etc/sudoers.d/99-omarchy-nopasswd-$USER + systemd-run 자동 만료. self-contained 이고 패스워드리스 sudo 를 부여하는 보안 민감 토글 |
 | `omarchy-system-factory-reset` | DISABLED | disable | Omarchy ISO `@factory` 전제. CachyOS PATH 에 올리지 않음. lock/logout/reboot/shutdown 과 별개 |
 | `omarchy-system-lock` | SAFE | package | 메뉴 `system.lock`. `omarchy-shell lock lock` + 이미 스테이징된 `omarchy-cmd-present` |
@@ -534,6 +539,7 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-theme-bg-install` | DISABLED | disable | 테마/plymouth/브랜딩. settings 패키지 가정 |
 | `omarchy-theme-bg-set` | SAFE | package | M9 배경 묶음 |
 | `omarchy-theme-bg-switcher` | SAFE | package | M9 배경 묶음 |
+| `omarchy-theme-extras` | SAFE | package | 4.0.1. 메뉴 `update.themes` 행의 when 가드 — 사용자 테마(`~/.config/omarchy/themes/*/.git`, symlink/worktree 제외)가 있을 때만 행을 띄운다. 디렉터리 나열뿐, 외부 omarchy 의존 0 |
 | `omarchy-theme-install` | SAFE | package | 0.8.0 verbatim stage. git clone + omarchy-theme-set. SPEC §44 Tier C 에서 회수 — channel/pkg 미사용 |
 | `omarchy-theme-remove` | SAFE | package | 0.8.0 verbatim stage. ~/.config/omarchy/themes rm + menu-select. SPEC §44 Tier C 회수 |
 | `omarchy-theme-set` | SAFE | package | M9 테마 코어. `$OMARCHY_PATH/themes` + `default/themed` 참조 |

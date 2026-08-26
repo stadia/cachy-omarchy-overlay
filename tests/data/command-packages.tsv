@@ -33,7 +33,6 @@ bash	bash	BASE	기반
 sh	bash	BASE	기반
 systemd-cat	systemd	BASE	기반
 systemctl	systemd	BASE	기반
-notify-send	libnotify	HARD	omarchy-notification-send 폴백 경로
 base64	coreutils	BASE	기반
 chmod	coreutils	BASE	기반
 id	coreutils	BASE	기반

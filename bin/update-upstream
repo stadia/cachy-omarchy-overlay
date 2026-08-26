@@ -40,7 +40,9 @@ fi
 candidate=$(mktemp -d "${TMPDIR:-/tmp}/coo-update-XXXXXX")
 trap 'rm -rf "$candidate"' EXIT
 # Copy every tracked runtime/test input needed by the default test runner while
-# deliberately pruning ignored makepkg leftovers (packages/*/{pkg,src}).
+# deliberately pruning ignored makepkg leftovers (packages/*/{pkg,src} and the
+# shell package's git VCS clone, whose frozen file:// origin points at the old
+# $COO_OMARCHY_GIT and makes the candidate's makepkg reject its own source).
 copy_tree() {
   local item=$1 path relative
   [[ -e $repo_root/$item ]] || return 0
@@ -48,7 +50,7 @@ copy_tree() {
     relative=${path#"$repo_root/"}
     mkdir -p "$candidate/$(dirname "$relative")"
     cp -a "$path" "$candidate/$relative"
-  done < <(find "$repo_root/$item" \( -path '*/pkg' -o -path '*/src' \) -prune -o -type f -print0)
+  done < <(find "$repo_root/$item" \( -path '*/pkg' -o -path '*/src' -o -path '*/packages/cachy-omarchy-shell/omarchy' \) -prune -o -type f -print0)
 }
 for item in bin packages overlay tests lib docs; do
   copy_tree "$item"
