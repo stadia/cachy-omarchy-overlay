@@ -21,7 +21,7 @@ Two Arch packages are produced.
 | Package | Version | Role |
 |---|---|---|
 | `cachy-omarchy-shell` | 4.0.1-1 | The pinned Omarchy Quattro shell runtime (Quickshell tree, `omarchy-settings` excluded) |
-| `cachy-omarchy-overlay` | 1.0.0-1 | The CachyOS integration layer (wrapper commands, Hyprland bindings, defaults) |
+| `cachy-omarchy-overlay` | 1.0.1-1 | The CachyOS integration layer (wrapper commands, Hyprland bindings, defaults) |
 
 The upstream pin is managed by `upstream.lock` (currently `basecamp/omarchy @ v4.0.0`,
 `f0020448`).
