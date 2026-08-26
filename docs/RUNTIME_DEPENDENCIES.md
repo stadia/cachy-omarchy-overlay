@@ -19,7 +19,7 @@
 | `shell/shell.qml` | IPC·기동 경로 검사 | 우리 셸 패키지 | REQUIRED | n/a | no | builtin config로 일부 폴백 | NONE — `shell/` 전체 패키징 |
 | `shell/plugins/menu/` | `omarchy.menu` | 우리 셸 패키지 | REQUIRED | n/a | no | 없음 | NONE |
 | `default/omarchy/omarchy-menu.jsonc` | `Menu.qml` `defaultMenuPath` | 공식은 settings가 설치 | REQUIRED | n/a | no | 빈 메뉴(앱 행만) | ENVIRONMENT — 셸 패키지에 파일만 포함. settings 금지 |
-| `config/omarchy/shell.json` | `shell.qml` `defaultsPath` | 공식은 settings | OPTIONAL | n/a | yes | `builtinShellConfig` | ENVIRONMENT — **실제 배포본은 `overlay/defaults/shell.json`, `disabledPlugins` 없음 → 전 플러그인 활성**(방향 전환 2026-08-17, `docs/PLUGIN_AUDIT.md` 참고). v0.1 시절 "최소 json이 안전" 판단은 뒤집혔다 |
+| `config/omarchy/shell.json` | `shell.qml` `defaultsPath` | 공식은 settings | OPTIONAL | n/a | yes | `builtinShellConfig` | ENVIRONMENT — **실제 배포본은 `overlay/defaults/shell.json`, `disabledPlugins` 없음 → 전 플러그인 활성**(방향 전환 2026-08-17). v0.1 시절 "최소 json이 안전" 판단은 뒤집혔다 |
 | `themes/` | 공식 `omarchy`가 설치. QML에서 경로 문자열 미검출 | 공식 `omarchy` | OPTIONAL | n/a | yes | 셸 내장 Color | NONE initially |
 | `bin/omarchy-launch-shell` | 장기 프로세스 | 공식 `omarchy` | REQUIRED(logic) | n/a | no | systemd ExecStart가 `quickshell` 직접 호출 | WRAPPER — `cachy-omarchy-shell --run` |
 | `bin/omarchy-shell` | IPC. 기동하지 않음 | 공식 `omarchy` | REQUIRED(logic) | n/a | no | `qs ipc` 직접 | WRAPPER — `cachy-omarchy-launcher` 등 |
@@ -460,4 +460,4 @@ qs ipc -n -p "$OMARCHY_PATH/shell" call -- shell toggle omarchy.menu '{"menu":"r
   따라 위임/폴백했으나(M3 R06 마커 실측), `uwsm` 이 `cachy-omarchy-shell` 의 hard
   depends 가 되면서 제거했다. 이 호스트에는 `uwsm` 이 설치돼 있고(`pacman -Q uwsm`)
   `/usr/bin/uwsm-app` 은 uwsm 패키지 소유다 — doctor 가 `pacman -Qqo` 로 검사한다.
-- **`omarchy.osd` 기동 불필요 확정** — 비활성 상태로 기동 정상. 상세는 `PLUGIN_AUDIT.md`.
+- **`omarchy.osd` 기동 불필요 확정** — 비활성 상태로 기동 정상.
