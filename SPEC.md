@@ -788,7 +788,6 @@ cachy-omarchy-overlay/
 │   ├── PACKAGE_AUDIT.md
 │   ├── RUNTIME_DEPENDENCIES.md
 │   ├── COMMAND_AUDIT.md
-│   ├── PLUGIN_AUDIT.md
 │   ├── UPDATE_PROCESS.md
 │   ├── ROLLBACK.md
 │   └── LEGACY_MIGRATION.md
@@ -1998,7 +1997,6 @@ Understand exactly what can be reused without installing official Omarchy.
 docs/PACKAGE_AUDIT.md
 docs/RUNTIME_DEPENDENCIES.md
 docs/COMMAND_AUDIT.md
-docs/PLUGIN_AUDIT.md
 ```
 
 ## Tasks
@@ -2526,7 +2524,6 @@ Audit the pinned Omarchy Quattro release and produce:
 - docs/PACKAGE_AUDIT.md
 - docs/RUNTIME_DEPENDENCIES.md
 - docs/COMMAND_AUDIT.md
-- docs/PLUGIN_AUDIT.md
 
 Focus on determining the minimum safe subset needed to run the original
 Omarchy Quattro `omarchy.menu` on CachyOS.

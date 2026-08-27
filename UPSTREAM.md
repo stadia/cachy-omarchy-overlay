@@ -7,17 +7,16 @@
 | 항목 | 값 |
 | --- | --- |
 | Repository | https://github.com/basecamp/omarchy.git |
-| Version | 4.0.0 |
-| Tag | v4.0.0 |
-| Commit | `f0020448ca87329199de7cb12f2015ebc4a3e5e7` |
+| Version | 4.0.1 |
+| Tag | v4.0.1 |
+| Commit | `13f18b2cb7286fb54f87daf571a031aa6af3d8f0` |
 | Channel | stable |
-| Release date | 2026-08-14 |
 | Source license | MIT (Copyright David Heinemeier Hansson) |
-| Packaging recipes | https://github.com/omacom-io/omarchy-pkgs (`pkgbuilds/omarchy`, `pkgbuilds/omarchy-settings`) @ `7e448b90313fea4fb78da9a78607287691d3b241` |
-| Known compatibility patches | none |
-| Last tested CachyOS environment | CachyOS, kernel 7.1.8-1-cachyos, Hyprland 0.56.2, Quickshell 0.3.0. `omarchy`/`omarchy-settings` 미설치. **M2** R01·R02. **M3** R03–R06 (`omarchy.menu` 토글·Escape·더미 앱 실행). **2026-08-17** 실 시스템 승인 검증: 실제 `pacman -U` 설치, `cachy-omarchy-init` 을 사용자 실제 Hyprland 설정에 실행(충돌 감지·주입 거부), 실제 rollback `4.0.0-2 → 4.0.0-1`, `devtools` chroot 에서 clean build 성공. 상세는 `docs/RUNTIME_STARTUP.md` §12. 패치 수 none. |
+| Known compatibility patches | `0001-stop-plugin-watcher-on-shell-exit.patch` (Quickshell `Io.Process` orphan cleanup, `docs/RUNTIME_STARTUP.md` §"역사 기록") |
+| Last tested CachyOS environment | CachyOS, kernel 7.1.8-1-cachyos, Hyprland 0.56.2, Quickshell 0.3.0. `omarchy`/`omarchy-settings` 미설치. 2026-08-26 `bin/update-upstream` candidate build, nested suite 76/76, transactional publish (자세한 내용은 커밋 `4a44140`). |
 
-체크아웃 `version` 파일은 `4.0.0.alpha`다. 공식 패키지 `pkgver`와 태그 `v4.0.0`을 권위로 쓴다.
+이전 핀(`v4.0.0`, `f0020448`)에 대한 실측 기록은 위 표를 이 핀으로 갱신하기
+전 git 히스토리에 남아 있다.
 
 ## Moving the pin
 

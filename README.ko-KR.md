@@ -43,7 +43,7 @@ SUPER + K      →  Omarchy 스타일 키바인딩 뷰어
 
 ## 테마
 
-업스트림 테마 파이프라인을 그대로 쓴다 (M9). 첫 `cachy-omarchy-init` 이 테마가
+업스트림 테마 파이프라인을 그대로 쓴다. 첫 `cachy-omarchy-init` 이 테마가
 없을 때만 "Tokyo Night" 를 시드한다.
 
 ```bash
@@ -54,12 +54,12 @@ omarchy-theme-set "Nord"     # 전환 — 셸 재시작 없이 바·메뉴에 �
 `~/.local/state/omarchy/current/theme/` 에 있고, 사용자 오버레이
 (`~/.config/omarchy/themes/<name>/`)가 패키지 테마 위에 합쳐진다.
 
-## 유틸리티 플러그인 (M10)
+## 유틸리티 플러그인
 
 업스트림 first-party 플러그인 다섯 개 — clipboard·emojis·image-picker·
-reminders·OSD — 는 업스트림 규칙상 기본 로드된다. M10 은 그 QML 이 부르는
+reminders·OSD — 는 업스트림 규칙상 기본 로드된다. 그 QML 이 부르는
 helper 와 런타임 의존성(`jq`, `wl-clipboard`, `wtype`, `wireplumber`,
-`pipewire-pulse`, `xdg-utils`)을 패키지가 닫는다.
+`pipewire-pulse`, `xdg-utils`)을 패키지가 함께 닫는다.
 
 - **Clipboard** — 메뉴의 clipboard 항목 또는 `omarchy.clipboard` 토글. 히스토리는
   업스트림과 같은 `~/.local/state/omarchy/clipboard-history.json` (최대 300개,
@@ -68,8 +68,8 @@ helper 와 런타임 의존성(`jq`, `wl-clipboard`, `wtype`, `wireplumber`,
   지우는 것은 사용자의 명시 동작뿐이다.
 - **Emojis** — 메뉴의 Emoji 항목. 선택한 emoji 를 clipboard 에 넣고 focused 앱에
   한 번 붙여넣는다. 취소는 아무 side effect 도 없다.
-- **Image picker** — 테마/배경 선택 등에 쓰이는 업스트림 image-grid (M9 의
-  `omarchy-menu-images` 경로 그대로).
+- **Image picker** — 테마/배경 선택 등에 쓰이는 업스트림 image-grid
+  (`omarchy-menu-images` 경로 그대로).
 - **Reminders** — `omarchy-reminder -i`/메뉴에서 설정. user systemd 타이머
   (`omarchy-reminder-*.timer`)와 `${XDG_RUNTIME_DIR:-/tmp}/omarchy-reminders/`
   메타데이터만 사용한다 — system 유닛·`/etc`·root 없음.
@@ -98,7 +98,7 @@ helper 와 런타임 의존성(`jq`, `wl-clipboard`, `wtype`, `wireplumber`,
 동작을 지원한다는 뜻이 아닙니다. 이 오버레이는 upstream lid-switch 바인딩을
 스테이징하지 않습니다. 자세한 내용은 SPEC 의 "지원 계약" 절을 참고하세요.
 
-## 세션 생명주기 (v0.11)
+## 세션 생명주기
 
 idle → screensaver → lock → wake 체인이 패키징돼 있다: idle 타임아웃은 키보드
 백라이트를 끄고(`off`) 화면을 잠그며, 명시적 lock 요청은 터미널
@@ -164,73 +164,12 @@ bin/rollback                 # 이전 핀으로 복귀
 마일스톤 설계·구현 플랜은 비공개 개발 트리에 남겨 두고 이 저장소에는 담지 않는다.
 공개 문서에서 설계 기록을 인용할 때는 파일명만 밝힌다.
 
-## 로드맵
+## 알려진 한계
 
-- **v0.1** — 런타임 패키징 + 런처 + 키바인딩 + 업데이트/재빌드. 완료.
-- **v0.2 (Milestone 8)** — `omarchy.bar` 채택. 완료(`v0.2.0`). 업스트림 바를
-  켠 채로 출고한다. Waybar를 대체하지는 않는다 — 둘을 함께 띄우면 겹치지 않고
-  쌓이며(세로 예약 `36 → 62px`), 우리는 Waybar를 중지·제거하지 않는다.
-- **v0.3 (Milestone 9)** — 업스트림 테마 런타임 채택. 완료(`v0.3.0`).
-  `themes/`+`default/themed/`+테마 helper 를 같은 핀에서 스테이징하고,
-  `/usr/bin` 심링크로 업스트림 `omarchy-theme-set` 을 무패치 실행한다. 실측: `docs/RUNTIME_STARTUP.md` §18.6.
-- **v0.4 (Milestone 10)** — 유틸리티 플러그인(clipboard·emojis·image-picker·
-  reminders·OSD) helper/의존성 채택. 완료(`v0.4.0`). 실측:
-  `docs/RUNTIME_STARTUP.md` §19.2.
-- **v0.5** — 세션 환경: uwsm Hyprland 드롭인이 `OMARCHY_PATH` 를 공급하고,
-  `/usr/bin/omarchy-*` 는 심링크만 놓는 뷰이며 PATH 는 조작하지 않는다.
-  완료(`v0.5.0`). 실측: `docs/RUNTIME_STARTUP.md` §20.
-- **v0.6** — 메뉴 `style.bar` 와 세션 lock/logout/reboot/shutdown helper 를
-  스테이징한다 (`omarchy-bar` 및 config/catalog/state/window-close 전이).
-  factory-reset 은 Omarchy ISO `@factory` 전제라 PATH 에 올리지 않는다.
-  완료(`v0.6.0`).
-- **v0.7** — 오디오 출력 전환/튜닝 템플릿, 디스플레이 밝기, 터치패드·터치스크린
-  가드를 verbatim 스테이징. laptop/monitor-internal 은 래퍼가 필요해서 PATH 에
-  올리지 않는다. 완료(`v0.7.0`). 실측: `docs/RUNTIME_STARTUP.md` §21.1.
-- **v0.8** — 테마 설치/갱신/제거(`omarchy-theme-install`/`-update`/`-remove`),
-  Hyprland 토글, 하드웨어 helper 를 verbatim 스테이징(`v0.8.0`) — 이 릴리스가
-  `omarchy-hw-laptop` 과 monitor-internal 체인에 대한 v0.7 의 "래퍼 필요" 판단을
-  뒤집었다; 둘 다 이 릴리스부터 스테이징된다. 키바인딩 시트가 오버레이 자신의
-  바인드를 읽고(`v0.8.1`), 명령이 아니라 이름으로 보이게 라벨을 단다(`v0.8.2`).
-- **잠금 공존 실측** — SPEC §61 인수 기준의 마지막 항목이 2026-08-20 에 닫혀
-  **21/21 측정됨**이 됐다. 중첩 Hyprland 격리에서 hyprlock 과 양방향으로 쟀다.
-  실측: `docs/RUNTIME_STARTUP.md` §22.
-- **v0.9 (의존성 폐쇄 검사)** — 실제 진입점(키바인딩, 활성 플러그인 QML, 패키지된
-  메뉴)에서 출발해 스테이징된 업스트림 helper 까지 훑고, 도달하지만 미선언·
-  미스테이징인 것이 있으면 빌드를 실패시키는 스캐너를 도입했다. 완료(`v0.9.0`).
-  10개 패키지를 `depends` 로, 20개를 `optdepends` 로 승격했고,
-  `omarchy-battery-low` 를 스테이징했으며 `omarchy-menu-keybindings` 에 호환
-  shim 을 달았다. 그 컷의 실측 격차: `xdg-terminal-exec` 는 AUR 전용이고,
-  `omarchy-battery-status` 는 아직 미스테이징이라 Power 패널의 배터리 상세
-  행이 숨어 있었다.
-- **v0.10 (가시 Quattro 완성)** — 기본 bar/패널이 이미 호출하던 헬퍼 9개를
-  스테이징했다: `omarchy-battery-status`, `omarchy-system-stats`,
-  `omarchy-theme-refresh`, `omarchy-audio-input-set-default`,
-  `omarchy-audio-sink-availability`, `omarchy-bluetooth-power`,
-  `omarchy-bluetooth-device`, `omarchy-weather-location`,
-  `omarchy-weather-status`. Power 패널 배터리 상세 행과 bar
-  monitor/audio/bluetooth/weather 위젯이 더 이상 exit 127 로 죽지 않는다. 남은
-  실측 격차: `xdg-terminal-exec` 는 여전히 AUR 전용(방향은 v0.11 선행).
-- **v0.11 (세션 생명주기 parity)** — idle → screensaver → lock → wake 체인을
-  닫았다. 계획 당시 후보는 7이었으나 클로저를 열어보니 예외 표에 행조차
-  없던 미스테이징 4개가 더 있어 실제 출하 집합은 9다: `omarchy-cmd-missing`,
-  `omarchy-hw-laptop-closed`, `omarchy-hw-external-monitors`,
-  `omarchy-hw-clamshell`, `omarchy-brightness-keyboard`,
-  `omarchy-hyprland-monitor-clamshell`, `omarchy-system-wake`,
-  `omarchy-screensaver`, `omarchy-launch-screensaver` — 그리고 터미널
-  screensaver 설정 3개. `overlay/hypr/bindings.lua` 에 새 `pcall(dofile)`
-  sweep 블록을 놓아 clamshell(그리고 이미 스테이징돼 있던
-  `omarchy-hyprland-monitor-internal(-mirror)`)이 필요로 하는
-  `hyprland.lua` 전용 toggle seam 을 열었다. `xdg-terminal-exec` 는 여전히
-  AUR optdepend — fallback 어댑터는 만들지 않는다.
-- **v0.12 (프레젠테이션 & 런타임 다듬기)** — `omarchy-bar-text-color`(배경
-  이미지 대비 바 텍스트 색상, `imagemagick` optdepend)와 gum 프레젠테이션
-  레이어(`omarchy-restart-gum`, `omarchy-show-logo`, `omarchy-show-done`,
-  `omarchy-launch-floating-terminal-with-presentation`)를 스테이징했다 —
-  런처 부재로 실패하던 메뉴 3행(hardware-audio 재시작, passwordless-sudo
-  설정, custom-DNS 설정)이 이제 실행된다. `cachy-omarchy-shell --restart`
-  (와 그 앞단 `cachy-omarchy-reload`)는 세션이 잠긴 동안 hyprlock 과
-  경합하는 대신 거부한다 — stranded lock 복구는 범위 밖으로 남겨뒀다
-  (`docs/RUNTIME_STARTUP.md` §22.4).
+`xdg-terminal-exec` 는 여전히 AUR 전용 optdepend — fallback 어댑터는 만들지
+않는다. 크래시한 `hyprlock` 이 stranded 시킨 잠금을 복구하는 것은 범위 밖이다
+(`docs/RUNTIME_STARTUP.md` §22.4). 릴리스 이력은 git 태그(`v0.1.2`부터
+`v1.0.1`까지)에 있다.
 
 ## 라이선스
 
