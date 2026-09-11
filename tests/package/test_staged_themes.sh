@@ -21,7 +21,7 @@ assert_file_exists "$up/themes/tokyo-night/colors.toml" "tokyo-night colors.toml
 assert_file_exists "$up/themes/tokyo-night/icons.theme" "tokyo-night icons.theme"
 
 n_tpl=$(find "$up/default/themed" -name '*.tpl' | wc -l)
-assert_eq "$n_tpl" "17" "템플릿 17개 스테이징"
+assert_eq "$n_tpl" "19" "템플릿 19개 스테이징"
 assert_file_exists "$up/default/themed/shell.toml.tpl" "shell.toml.tpl (셸 팔레트)"
 assert_file_exists "$up/default/themed/hyprland.lua.tpl" "hyprland.lua.tpl"
 

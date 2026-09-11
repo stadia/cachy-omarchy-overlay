@@ -57,6 +57,11 @@ install -D -m644 "$src/default/ghostty/screensaver" \
 # 테마 체인 (M9): omarchy-theme-set 의 critical path + 배경 묶음 + 메뉴 UI
 # 프론트(omarchy-menu-images). yq 는 핀 커밋에서 불필요 (감사 실측).
 # browser/keyboard/install/update/remove 는 제외 — M9 설계 문서 D3·Tier C.
+# 4.0.3 은 post 훅 두 개를 더했다. omarchy-theme-set-t3code 는 자체완결
+# (홈에만 쓰고 T3 Code 상태 디렉터리가 없으면 exit 0)이라 Tier B 로 올린다.
+# omarchy-theme-set-hermes 는 미스테이징 omarchy-install-hermes-cli 를 준비
+# 프로브로 부르고 hermes-desktop 을 전제하므로 제외한다
+# (tests/data/closure-exceptions.tsv 에 사유 기록).
 # omarchy-toggle-enabled 는 theme-set-vscode 의 skip 토글 게이트 — 사용자
 # 상태의 존재만 읽는 1행 테스트라 shim 없이 원본을 둔다 (M9 라이브 실측에서
 # 누락 확인, RUNTIME_STARTUP §18.6).
@@ -128,6 +133,7 @@ helpers=(
   omarchy-theme-set-gnome
   omarchy-theme-set-pi
   omarchy-theme-set-claude
+  omarchy-theme-set-t3code
   omarchy-theme-set-vscode
   omarchy-theme-set-obsidian
   omarchy-toggle-enabled

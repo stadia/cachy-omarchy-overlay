@@ -7,15 +7,15 @@
 | 항목 | 값 |
 | --- | --- |
 | Repository | https://github.com/basecamp/omarchy.git |
-| Version | 4.0.1 |
-| Tag | v4.0.1 |
-| Commit | `13f18b2cb7286fb54f87daf571a031aa6af3d8f0` |
+| Version | 4.0.3 |
+| Tag | v4.0.3 |
+| Commit | `0534987009061cbe2dacdde4ad564092ab698d12` |
 | Channel | stable |
 | Source license | MIT (Copyright David Heinemeier Hansson) |
 | Known compatibility patches | `0001-stop-plugin-watcher-on-shell-exit.patch` (Quickshell `Io.Process` orphan cleanup, `docs/RUNTIME_STARTUP.md` §"역사 기록") |
-| Last tested CachyOS environment | CachyOS, kernel 7.1.8-1-cachyos, Hyprland 0.56.2, Quickshell 0.3.0. `omarchy`/`omarchy-settings` 미설치. 2026-08-26 `bin/update-upstream` candidate build, nested suite 76/76, transactional publish (자세한 내용은 커밋 `4a44140`). |
+| Last tested CachyOS environment | CachyOS, kernel 7.2.3-1-cachyos, Hyprland 0.56.2, Quickshell 0.3.1. `omarchy`/`omarchy-settings` 미설치. 2026-09-11 `bin/update-upstream` candidate build, nested suite 76/76, transactional publish + 실저장소 재빌드 후 `./tests/test.sh` 76/76. 라이브 세션 실측(`COO_RUN_LIVE=1`)은 아직. |
 
-이전 핀(`v4.0.0`, `f0020448`)에 대한 실측 기록은 위 표를 이 핀으로 갱신하기
+이전 핀(`v4.0.1`, `13f18b2c`)에 대한 실측 기록은 위 표를 이 핀으로 갱신하기
 전 git 히스토리에 남아 있다.
 
 ## Moving the pin
@@ -94,7 +94,10 @@ the new pin to be already staged and built. Unwind it in this order:
 - `themes/` + `default/themed/` (M9) — 테마 런타임. `colors.toml` 과 `*.tpl` 은
   같이 진화하는 한 쌍이라 반드시 셸과 같은 핀 커밋에서 온다.
 - `bin/omarchy-theme-*` + 연쇄 helper (M9) — Tier A(코어 체인)·Tier B(post 훅)를
-  스테이징. Tier C(네트워크 설치·/etc 쓰기·하드웨어 전용) 중 plymouth/browser/
+  스테이징. 4.0.3 의 새 post 훅 중 `omarchy-theme-set-t3code` 는
+  자체완결(홈에만 쓰고 T3 Code 상태 디렉터리 부재 시 exit 0)이라 올리고,
+  `omarchy-theme-set-hermes` 는 미스테이징 `omarchy-install-hermes-cli` 준비
+  프로브와 `hermes-desktop` 을 전제해 제외한다. Tier C(네트워크 설치·/etc 쓰기·하드웨어 전용) 중 plymouth/browser/
   keyboard 훅은 제외하고, `omarchy-theme-set-browser`·`-keyboard` 는 오버레이의
   no-op compat shim 이 대신 메운다. **`omarchy-theme-install/update/remove`는
   0.8.0 부터 스테이징된다** — self-contained 로 재판정됐다(SPEC "Milestone 9 —
@@ -172,6 +175,10 @@ systemd 유저 유닛은 기동 전환(§"Milestone 8 — Shell Autostart", RUNT
 - 테마 Tier C helper 중 plymouth/browser/keyboard 훅(`omarchy-plymouth-set-by-theme`,
   `omarchy-theme-set-browser`, `omarchy-theme-set-keyboard*`) — no-op compat
   shim 으로만 대체
+- `omarchy-theme-set-hermes` (4.0.3) — Hermes 설치 체인 전제
+  (`tests/data/closure-exceptions.tsv` 에 사유)
+- `omarchy-install-ai-*` / `omarchy-remove-ai-*` (4.0.3 신규 메뉴 행) — 기존
+  install/remove 계열과 같은 패키지/설치 경로 경계
 - XF86 media 키의 자동 주입 (M10 D6)
 - `omarchy-system-factory-reset` / `-finish` (Omarchy ISO `@factory` 전제)
 - 락/알림의 기본 활성 (OSD 패널은 M10 에서 채택 — direct CLI/audio helper 경로만)

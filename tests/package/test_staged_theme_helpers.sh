@@ -32,7 +32,8 @@ done
 # browser(/etc 정책 쓰기)와 keyboard(특정 하드웨어)만 제외한다 (설계 문서 D3).
 for h in omarchy-theme-set-foot omarchy-theme-set-tmux \
          omarchy-theme-set-gnome omarchy-theme-set-pi \
-         omarchy-theme-set-claude omarchy-theme-set-vscode \
+         omarchy-theme-set-claude omarchy-theme-set-t3code \
+         omarchy-theme-set-vscode \
          omarchy-theme-set-obsidian \
          omarchy-toggle-enabled ; do
   assert_file_exists "$bin/$h" "Tier B 스테이징: $h"
@@ -56,6 +57,7 @@ done
 # 자산이므로 이 스테이징 산출물에는 애초에 나타나지 않는다 (R02 ①).
 for h in omarchy-theme-bg-install omarchy-plymouth-set-by-theme \
          omarchy-theme-set-browser omarchy-theme-set-keyboard \
+         omarchy-theme-set-hermes \
          omarchy-theme-set-keyboard-asus-rog omarchy-theme-set-keyboard-f16 \
          omarchy-dev-theme-preview omarchy-dev-benchmark-theme-switcher ; do
   [[ -e $bin/$h ]] && x=1 || x=0

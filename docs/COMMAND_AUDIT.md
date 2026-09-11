@@ -344,6 +344,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-theme-set-gnome` | SAFE | package | M9 앱별 테마 적용 |
 | `omarchy-theme-set-obsidian` | SAFE | package | M9 앱별 테마 적용 |
 | `omarchy-theme-set-pi` | SAFE | package | M9 앱별 테마 적용 |
+| `omarchy-theme-set-t3code` | SAFE | package | 4.0.3 신규 post 훅. `~/.t3/userdata/themes/omarchy.json` 에 팔레트 원자적 복사, T3 Code 상태 디렉터리 부재 시 exit 0 — 자체완결이라 Tier B 로 스테이징 |
 | `omarchy-theme-set-templates` | SAFE | package | M9 theme-set 코어 체인 |
 | `omarchy-theme-set-tmux` | SAFE | package | M9 앱별 테마 적용 |
 | `omarchy-theme-set-vscode` | SAFE | package | M9 앱별 테마 적용 |
@@ -439,6 +440,9 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-hyprland-window-single-square-aspect-toggle` | SAFE | package | 0.8.0 verbatim stage. hyprland-toggle 전이 + toggles/single-window-aspect-ratio.lua |
 | `omarchy-hyprland-workspace-layout-toggle` | SAFE | package | 0.8.0 verbatim stage. hyprctl keyword layout 폴백. 토글 helper 미사용 |
 | `omarchy-install-ai-chatgpt` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
+| `omarchy-install-ai-hermes` | DISABLED | disable | 4.0.3 신규(install.ai.hermes). 패키지/설치 경로 — AUR `hermes-desktop` 설치 + `omarchy-install-hermes-cli` 전이. 바이너리 부재 → 메뉴 행이 127 로 degrade |
+| `omarchy-install-ai-openclaw` | DISABLED | disable | 4.0.3 신규(install.ai.openclaw). 패키지/설치 경로. `omarchy-install-openclaw-cli`·`omarchy-openclaw-onboard` 체인까지 함께 미스테이징 |
+| `omarchy-install-ai-t3-code` | DISABLED | disable | 4.0.3 신규(install.ai.t3-code). 패키지/설치 경로(`t3code-bin` AUR). 테마 쪽 짝인 `omarchy-theme-set-t3code` 는 자체완결이라 별도로 스테이징한다 |
 | `omarchy-install-and-launch` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
 | `omarchy-install-app` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
 | `omarchy-install-browser` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
@@ -498,6 +502,10 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-refresh-shell` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-refresh-tmux` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-reminder` | SAFE | package | M8 부터 stage. user systemd timer + `${XDG_RUNTIME_DIR:-/tmp}/omarchy-reminders` metadata 만 사용 (M10 계약 고정) |
+| `omarchy-remove-ai-hermes` | DISABLED | disable | 4.0.3 신규(remove.ai.hermes). install 쌍의 해제 경로. 바이너리 부재 = 행 숨김/degrade |
+| `omarchy-remove-ai-openclaw` | DISABLED | disable | 4.0.3 신규(remove.ai.openclaw). install 쌍의 해제 경로 |
+| `omarchy-remove-ai-perplexity` | DISABLED | disable | 4.0.3 신규(remove.ai.perplexity). install 행은 `omarchy-install-and-launch`(이미 DISABLED) 를 쓰므로 해제 쪽만 새 이름이다 |
+| `omarchy-remove-ai-t3-code` | DISABLED | disable | 4.0.3 신규(remove.ai.t3-code). install 쌍의 해제 경로 |
 | `omarchy-remove-browser` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
 | `omarchy-remove-dev-env` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |
 | `omarchy-remove-gaming-battlenet` | DISABLED | disable | 패키지/설치 경로. 공식 omarchy 가정 |

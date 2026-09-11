@@ -1,6 +1,6 @@
 # Maintainer: Cachy Omarchy Overlay
 pkgname=cachy-omarchy-shell
-pkgver=4.0.1
+pkgver=4.0.3
 pkgrel=1
 pkgdesc='Pinned Omarchy Quattro shell runtime for CachyOS (no omarchy-settings)'
 arch=('any')
@@ -103,7 +103,7 @@ optdepends=(
   'v4l-utils: 웹캠/캡처 장치 진단 메뉴 항목'
   'zbar: QR/바코드 스캔 메뉴 항목'
 )
-_commit='13f18b2cb7286fb54f87daf571a031aa6af3d8f0'
+_commit='0534987009061cbe2dacdde4ad564092ab698d12'
 
 # Maintained runtime patches (patches/README.md). The patch set is declared
 # here as a fixed contract — prepare() applies exactly this list from

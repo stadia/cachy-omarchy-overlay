@@ -224,7 +224,7 @@
 
 tests/data/command-packages.tsv: 전체 117행, 위 표에는 도달한 113행이 모두 실린다(BASE 62행 포함 — BASE 는 declare 대상이 아닐 뿐 검사 대상에서 빠지지 않는다)
 
-docs/COMMAND_AUDIT.md 의 DISABLED 행으로 메뉴 루트에서 억제된 이름: 93개 (의도적으로 미지원인 Omarchy OS 스택 — 예외 파일과 달리 사유·신선도 검사가 없는 통로다)
+docs/COMMAND_AUDIT.md 의 DISABLED 행으로 메뉴 루트에서 억제된 이름: 100개 (의도적으로 미지원인 Omarchy OS 스택 — 예외 파일과 달리 사유·신선도 검사가 없는 통로다)
 - `omarchy-branding-about`
 - `omarchy-branding-screensaver`
 - `omarchy-channel-current`
@@ -236,6 +236,9 @@ docs/COMMAND_AUDIT.md 의 DISABLED 행으로 메뉴 루트에서 억제된 이�
 - `omarchy-hw-fingerprint`
 - `omarchy-hw-hybrid-gpu`
 - `omarchy-install-ai-chatgpt`
+- `omarchy-install-ai-hermes`
+- `omarchy-install-ai-openclaw`
+- `omarchy-install-ai-t3-code`
 - `omarchy-install-and-launch`
 - `omarchy-install-app`
 - `omarchy-install-browser`
@@ -281,6 +284,10 @@ docs/COMMAND_AUDIT.md 의 DISABLED 행으로 메뉴 루트에서 억제된 이�
 - `omarchy-refresh-plymouth`
 - `omarchy-refresh-shell`
 - `omarchy-refresh-tmux`
+- `omarchy-remove-ai-hermes`
+- `omarchy-remove-ai-openclaw`
+- `omarchy-remove-ai-perplexity`
+- `omarchy-remove-ai-t3-code`
 - `omarchy-remove-browser`
 - `omarchy-remove-dev-env`
 - `omarchy-remove-gaming-battlenet`
