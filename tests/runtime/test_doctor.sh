@@ -260,6 +260,13 @@ assert_contains "$out" "PASS: shell autostart declared (conf)" "exec-once 있으
 sed -i 's/^exec-once/# exec-once/' "$config/hypr/bindings.conf"
 out=$(run_doctor); code=$?
 assert_contains "$out" "FAIL: shell autostart missing" "주석 처리된 exec-once 는 PASS 가 아니다"
+# hyprland.lua 가 있으면 bindings 는 lua 를 고른다 — 남아 있는 conf 블록은
+# 비활성이므로 conf 진단을 하지 않는다(lua 는 hyprland.start 로 셸을 띄운다).
+: > "$hypr/hyprland.lua"
+out=$(run_doctor); code=$?
+[[ $out == *"shell autostart"* ]] && inactive=1 || inactive=0
+assert_eq "$inactive" "0" "lua 설정이 활성이면 비활성 conf 사본을 진단하지 않는다"
+rm -f "$hypr/hyprland.lua"
 rm -f "$config/hypr/bindings.conf"
 mv "$hypr/hyprland.conf.bak" "$hypr/hyprland.conf"
 
