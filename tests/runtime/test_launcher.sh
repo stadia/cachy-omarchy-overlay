@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Task 1: cachy-omarchy-launcher 정적 계약 + IPC 오류 문자열 실측.
-# 메뉴를 실제로 열지 않는다 (R04/R05 는 Task 2).
+# SUPER+SPACE 체인(업스트림 omarchy-menu → compat omarchy-shell → 래퍼)과 호환
+# 별칭, IPC 오류 문자열 실측. 메뉴를 실제로 열지 않는다 (R04/R05 는
+# test_launcher_toggle.sh).
 set -uo pipefail
 REPO_ROOT="${REPO_ROOT:?}"
 source "$REPO_ROOT/tests/lib/assert.sh"
@@ -8,36 +9,37 @@ source "$REPO_ROOT/lib/runtime.sh"
 
 L="$REPO_ROOT/overlay/bin/cachy-omarchy-launcher"
 W="$REPO_ROOT/overlay/bin/cachy-omarchy-shell"
+COMPAT="$REPO_ROOT/overlay/compat/bin"
 
-assert_file_exists "$L" "런처 존재"
-[[ -x $L ]] && x=0 || x=1
-assert_eq "$x" "0" "런처 실행 가능"
-[[ -x $L ]] || exit 1
+# SUPER+SPACE 는 업스트림 `omarchy-menu toggle` 이다. 호환 별칭
+# cachy-omarchy-launcher 는 옛 사용자 바인딩 사본을 위해 그것으로 넘긴다.
+fake="$COO_TEST_SANDBOX/launcher-fake"
+mkdir -p "$fake"
+cat >"$fake/omarchy-menu" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >"$COO_FAKE_LOG"
+STUB
+chmod +x "$fake/omarchy-menu"
+PATH="$fake:$PATH" COO_FAKE_LOG="$fake/menu.log" "$L"; code=$?
+assert_eq "$code" "0" "호환 별칭 exit 0"
+assert_eq "$(cat "$fake/menu.log")" "toggle" "호환 별칭은 omarchy-menu toggle 로 넘긴다"
 
-out=$("$L" --help 2>&1); code=$?
-assert_eq "$code" "0" "--help exit 0"
-assert_contains "$out" "omarchy.menu" "--help 가 omarchy.menu 를 설명한다"
-assert_contains "$out" "--ipc" "--help 가 셸 IPC 위임을 설명한다"
-
-# IPC 를 재발명하지 않는다 — 정본 래퍼를 부른다.
-src=$(cat "$L")
-assert_contains "$src" 'cachy-omarchy-shell --ipc' "셸 --ipc 에 위임한다"
-assert_contains "$src" "toggle omarchy.menu" "토글 대상은 omarchy.menu"
-assert_contains "$src" '{"menu":"root"}' "루트 메뉴 인자를 그대로 전달한다"
-
-out=$("$L" --nonsense 2>&1); code=$?
-assert_eq "$code" "1" "알 수 없는 인자 → exit 1"
-
-out=$(COO_OMARCHY_PATH=/nonexistent "$L" 2>&1); code=$?
-assert_eq "$code" "1" "잘못된 OMARCHY_PATH → exit 1"
-assert_contains "$out" "shell.qml" "오류가 무엇이 없는지 말해준다"
+# 실제 체인: 업스트림 omarchy-menu → compat omarchy-shell → 우리 셸 래퍼.
+# 래퍼 자리에 스텁을 둬 IPC 인자만 본다(셸을 띄우지 않는다).
+cat >"$fake/cachy-omarchy-shell" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$@" >"$COO_FAKE_LOG"
+STUB
+chmod +x "$fake/cachy-omarchy-shell"
 
 dest="$COO_TEST_SANDBOX/pkg"
 if coo_extract_pkg "$dest" 2>/dev/null; then
   root=$(coo_upstream_root "$dest")
-  out=$(COO_OMARCHY_PATH="$root" "$L" 2>&1); code=$?
-  assert_eq "$code" "1" "셸 미기동 → exit 1"
-  assert_contains "$out" "기동" "미기동 안내가 있다"
+  PATH="$COMPAT:$PATH" COO_SHELL_BIN="$fake/cachy-omarchy-shell" COO_FAKE_LOG="$fake/ipc.log" \
+    "$root/bin/omarchy-menu" toggle; code=$?
+  assert_eq "$code" "0" "omarchy-menu toggle 체인 exit 0"
+  assert_eq "$(cat "$fake/ipc.log")" $'--ipc\nshell\ntoggle\nomarchy.menu\n{"menu":"root"}' \
+    "omarchy-menu toggle 이 래퍼에 루트 메뉴 토글 IPC 를 보낸다"
 fi
 
 # ---------------------------------------------------------------- IPC 오류 문자열 실측 (M2 발견 3)

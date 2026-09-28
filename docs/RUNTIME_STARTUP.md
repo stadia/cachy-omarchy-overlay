@@ -509,13 +509,12 @@ $OMARCHY_PATH/shell call -- lock status` 로 락 상태를 묻는다. `status()`
 
 ```
 omarchy-restart-shell (compat, /usr/bin 심링크 → compat/bin 실체)
-  → cachy-omarchy-reload (공개 명령 7번째, 인자 없는 얇은 앞단)
-    → cachy-omarchy-shell --restart (락 조회 → kill → 재기동 로직 실체)
+  → cachy-omarchy-shell --restart (락 조회 → kill → 재기동 로직 실체)
 ```
 
-세 계층 모두 락 조회·kill 로직을 이중화하지 않는다 — `cachy-omarchy-reload`
-는 `exec cachy-omarchy-shell --restart` 이고, compat `omarchy-restart-shell`
-은 `exec cachy-omarchy-reload` 다. 업스트림 `omarchy-restart-shell` 을
+compat `omarchy-restart-shell` 은 `exec cachy-omarchy-shell --restart` 다 — 락
+조회·kill 로직을 이중화하지 않는다. (v0.12.0 에는 사이에 `cachy-omarchy-reload`
+별칭이 있었으나 `--restart` 와 같은 일이라 지웠다.) 업스트림 `omarchy-restart-shell` 을
 verbatim 으로 올리지 않은 이유: 원본은 미스테이징 헬퍼 3개
 (`omarchy-hyprland-session-locked`, `omarchy-launch-shell`,
 `omarchy-system-sleep-lock`)를 전제하고 `quickshell kill` 이 종료까지

@@ -27,10 +27,10 @@ assert_eq "$("$BIN/cachy-omarchy-shell" --path)" \
   "$COO_PREFIX_ROOT/upstream" "--path 가 설치 트리를 가리킨다"
 assert_file_exists "$COO_PREFIX_ROOT/upstream/shell/shell.qml" "업스트림 셸 트리 존재"
 
-# 2) 두 패키지의 shell.json 이 같은 파일이다 (한 정본).
-assert_eq "$(jq -S . "$COO_PREFIX_ROOT/upstream/config/omarchy/shell.json")" \
-          "$(jq -S . "$COO_PREFIX_ROOT/defaults/shell.json")" \
-          "defaults 와 스테이징된 기본값이 동일"
+# 2) 기본 shell.json 은 셸 패키지의 업스트림 트리 한 곳에만 있다.
+assert_file_exists "$COO_PREFIX_ROOT/upstream/config/omarchy/shell.json" "기본 shell.json 존재"
+[[ -e $COO_PREFIX_ROOT/defaults/shell.json ]] && dup=1 || dup=0
+assert_eq "$dup" "0" "읽는 곳 없는 두 번째 사본을 설치하지 않는다"
 
 # 3) init 가 설치 트리만으로 동작한다. 이 테스트는 반드시 headless 시드
 # 경로만 타야 한다. 실제 세션의 quickshell 을 pgrep 이 발견하면 theme-set post

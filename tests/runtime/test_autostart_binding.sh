@@ -13,7 +13,7 @@ assert_contains "$lua" 'cachy-omarchy-shell --run' "autostart 가 래퍼 --run �
 assert_contains "$lua" 'hl.on(' "hl.on 으로 1회 구독"
 # 기존 리바인딩은 그대로 유지돼야 한다.
 assert_contains "$lua" 'SUPER + space' "super+space 리바인딩 유지"
-assert_contains "$lua" 'cachy-omarchy-launcher' "super+space → 런처 유지"
+assert_contains "$lua" 'omarchy-menu toggle' "super+space → 업스트림 메뉴"
 
 # hyprland.conf 사용자도 같은 1회 기동을 받아야 한다. conf 는 Lua 를 실행하지
 # 않으므로 hl.on 대신 exec-once 로 선언한다 — 없으면 conf 구성에서 셸이 뜨지

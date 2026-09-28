@@ -105,7 +105,6 @@
 "Moving the pin" 절에 있다.
 
 <!-- CLOSURE_BEGIN -->
-
 | command | package | class | 근거 |
 | --- | --- | --- | --- |
 | `asdcontrol` | `asdcontrol` | UNPACKAGED | Apple Studio Display 밝기 제어(하드웨어 한정, omarchy-brightness-display-apple 이 sudo asdcontrol 을 부른다) — 공식 리포에도 AUR 에도 제공자가 없다(AUR RPC info/search 둘 다 0건 실측). 어디에도 선언하지 않는다; 사용자가 직접 빌드해야 하며, 없으면 그 헬퍼 하나만 동작하지 않는다. |
@@ -116,6 +115,7 @@
 | `bluetoothctl` | `bluez-utils` | OPT | 블루투스 컨트롤러 부재 환경(데스크톱) 존재 — 위젯은 가드로 숨는다 |
 | `brightnessctl` | `brightnessctl` | OPT | 내장 백라이트 — v0.12.1 에서 depends 로 승격 |
 | `busctl` | `systemd` | BASE | 기반 |
+| `cachy-omarchy-keybindings` | `cachy-omarchy-overlay` | BASE | 우리 오버레이 명령 — compat omarchy-menu-keybindings 가 같은 패키지 안의 이 명령으로 위임한다(list.sh 선례: 같은 패키지 파일트리라 항상 존재) |
 | `cat` | `coreutils` | BASE | 기반 |
 | `checkupdates` | `pacman-contrib` | OPT | 업데이트 확인 메뉴 항목 |
 | `chmod` | `coreutils` | BASE | 기반 |
@@ -222,7 +222,7 @@
 | `xkbcli` | `libxkbcommon` | BASE | 이미 선언된 의존의 전이 의존(§4.2 개정) |
 | `zbarimg` | `zbar` | OPT | QR 코드 스캔 메뉴 항목 |
 
-tests/data/command-packages.tsv: 전체 117행, 위 표에는 도달한 113행이 모두 실린다(BASE 62행 포함 — BASE 는 declare 대상이 아닐 뿐 검사 대상에서 빠지지 않는다)
+tests/data/command-packages.tsv: 전체 118행, 위 표에는 도달한 114행이 모두 실린다(BASE 63행 포함 — BASE 는 declare 대상이 아닐 뿐 검사 대상에서 빠지지 않는다)
 
 docs/COMMAND_AUDIT.md 의 DISABLED 행으로 메뉴 루트에서 억제된 이름: 100개 (의도적으로 미지원인 Omarchy OS 스택 — 예외 파일과 달리 사유·신선도 검사가 없는 통로다)
 - `omarchy-branding-about`
@@ -347,7 +347,6 @@ docs/COMMAND_AUDIT.md 의 DISABLED 행으로 메뉴 루트에서 억제된 이�
 - `omarchy-system`
 - `omarchy-theme`
 - `omarchy-webapp-handler`
-
 <!-- CLOSURE_END -->
 
 ### 스캐너의 알려진 한계 — 이 표가 완전성을 주장하지 않는 이유
