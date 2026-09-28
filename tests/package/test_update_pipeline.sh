@@ -296,12 +296,6 @@ ln -s ../lib/cachy-omarchy/compat/bin/omarchy-shell "$doctor_root/usr/bin/omarch
 cat >"$doctor_fake/pacman" <<'EOF'
 #!/usr/bin/env bash
 case ${1:-} in
-  -Qqo)
-    [[ ${2:-} == */uwsm-app ]] || exit 1
-    printf 'uwsm\n'
-    ;;
-  # Verbose ownership output is unavailable; doctor must use -Qqo.
-  -Qo) exit 1 ;;
   -Q)
     case ${2:-} in
       cachy-omarchy-shell|cachy-omarchy-overlay) printf '%s 0.1.0-1\n' "$2"; exit 0 ;;

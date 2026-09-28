@@ -228,10 +228,13 @@ uwsm 패키지 소유 실 바이너리다 (shim 삭제). SPEC §45.
 - `tests/runtime/test_init_theme_seed.sh` — 추출 페이로드 init, 격리 PATH
   에서 `omarchy-theme-set` 부재는 exact note.
 - `tests/runtime/test_doctor.sh` — 세션 `OMARCHY_PATH` 부재 FAIL, 개별
-  `omarchy-theme-set`/`omarchy-shell` 노출, `pacman -Qqo` 로케일 무관 소유권.
-- `tests/runtime/test_app_scope.sh` + `test_app_scope_safety.sh` — 추출 셸만
-  기동, AppLibrary→real `/usr/bin/uwsm-app`→`app-graphical.slice`, 프로덕션
-  `--restart` 금지.
+  `omarchy-theme-set`/`omarchy-shell` 노출.
+- `tests/runtime/test_app_scope.sh` — 추출 셸만 기동하고 `--restart` 도 그
+  추출 경로 패턴에만 매칭, AppLibrary→real `/usr/bin/uwsm-app`→`app-graphical.slice`.
+
+측정 당시 있었던 doctor 의 `pacman -Qqo` uwsm-app 소유권 검사와
+`test_app_scope_safety.sh`(`test_app_scope.sh` 본문 문자열 고정)는 지웠다.
+소유권은 위 `test_usr_bin_helpers.sh` 가 패키지 단계에서 막는다.
 
 ### 20.2 라이브 실측 (2026-08-19)
 
