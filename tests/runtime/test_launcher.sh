@@ -50,6 +50,22 @@ if coo_extract_pkg "$dest" 2>/dev/null; then
   assert_eq "$code" "0" "omarchy-menu toggle 체인 exit 0"
   assert_eq "$(cat "$fake/ipc.log")" $'--ipc\nshell\ntoggle\nomarchy.menu\n{"menu":"root"}' \
     "omarchy-menu toggle 이 래퍼에 루트 메뉴 토글 IPC 를 보낸다"
+
+  # 셸이 없으면 실패가 호출자까지 올라와야 한다. 업스트림 omarchy-menu 는
+  # omarchy-shell 을 -q 없이 부르므로 compat shim 이 오류를 삼키지 않는다.
+  cat >"$fake/down-shell" <<'STUB'
+#!/usr/bin/env bash
+printf 'error: 셸이 실행 중이 아니다\n' >&2
+exit 1
+STUB
+  chmod +x "$fake/down-shell"
+  cat >"$fake/omarchy-menu" <<STUB
+#!/usr/bin/env bash
+exec "$root/bin/omarchy-menu" "\$@"
+STUB
+  out=$(PATH="$fake:$COMPAT:$PATH" COO_SHELL_BIN="$fake/down-shell" "$L" 2>&1); code=$?
+  assert_eq "$code" "1" "셸 미기동이면 호환 별칭도 실패한다"
+  assert_contains "$out" "셸이 실행 중이 아니다" "실패 사유가 호출자에게 보인다"
 fi
 
 # ---------------------------------------------------------------- IPC 오류 문자열 실측 (M2 발견 3)
