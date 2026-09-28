@@ -61,8 +61,9 @@ while IFS= read -r t; do
   rm -rf "$sandbox"
 done < "$test_list"
 
-printf '\n%d/%d test files passed\n' "$((total - failed))" "$total"
-(( skipped )) && printf '%d of them skipped (see SKIP lines)\n' "$skipped"
+# Skipped files verified nothing, so they are not counted as passed.
+printf '\n%d/%d test files passed, %d skipped, %d failed\n' \
+  "$((total - failed - skipped))" "$total" "$skipped" "$failed"
 if [[ $total -eq 0 ]]; then
   printf 'error: no test files matched%s\n' "${only:+ filter: $only}" >&2
   exit 1
