@@ -83,6 +83,10 @@ cmd_ipc() {
   # IPC 레벨 오류는 stdout 에 실려 exit 0 으로 온다. 그대로 통과시키면
   # 실패가 성공처럼 보인다.
   is_ipc_error_output "$output" && fail "$output"
+  # 기동 중인 셸도 stdout + exit 0 으로 답한다 — ping 이 성공으로 읽히면
+  # 안 된다. 업스트림 bin/omarchy-shell 과 같은 판정. (--restart 의 락 조회는
+  # 이 응답을 JSON 파싱 실패로 보고 이미 안전하게 거부한다.)
+  [[ $output == "Not ready to accept queries yet"* ]] && fail "셸이 아직 준비되지 않았다 (not ready)"
 
   [[ -n $output ]] && printf '%s\n' "$output"
   return 0
