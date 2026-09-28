@@ -230,7 +230,7 @@ check_packages
 check_file "shell.qml" "$OMARCHY_PATH/shell/shell.qml"
 check_file "omarchy.menu availability" "$OMARCHY_PATH/default/omarchy/omarchy-menu.jsonc"
 check_executable "shell wrapper" "$BIN_DIR/cachy-omarchy-shell"
-check_executable "launcher invocation" "$BIN_DIR/cachy-omarchy-launcher"
+check_executable "launcher invocation" "$BIN_DIR/omarchy-menu"
 check_executable "binding helper" "$BIN_DIR/cachy-omarchy-bindings"
 check_executable "keybinding invocation" "$BIN_DIR/cachy-omarchy-keybindings"
 check_executable "compat omarchy-shell" "$COMPAT_BIN/omarchy-shell"
@@ -282,19 +282,6 @@ for required in omarchy-theme-set omarchy-shell; do
   fi
 done
 
-# uwsm-app belongs to the uwsm package, never to either Cachy Omarchy package.
-# -Qqo emits the package name only; unlike -Qo prose it is locale-independent.
-if command -v pacman >/dev/null 2>&1 && command -v uwsm-app >/dev/null 2>&1; then
-  owner=$(pacman -Qqo "$(command -v uwsm-app)" 2>/dev/null) || owner=""
-  if [[ $owner == uwsm ]]; then
-    pass "uwsm-app owned by uwsm package"
-  else
-    warn "uwsm-app not owned by the uwsm package"
-  fi
-else
-  warn "uwsm-app presence not measurable"
-fi
-
 if has_binding_conflict; then
   fail "Hyprland binding conflict: SUPER+SPACE or SUPER+K already bound"
 elif [[ -f $HYPR_DIR/hyprland.conf || -f $HYPR_DIR/hyprland.lua ]]; then
@@ -314,7 +301,7 @@ if command -v pgrep >/dev/null 2>&1 && pgrep -x quickshell >/dev/null 2>&1; then
   elif ! command -v timeout >/dev/null 2>&1; then
     warn "IPC ping not measurable (timeout missing)"
   else
-    ipc_output=$(COO_OMARCHY_PATH="$OMARCHY_PATH" COO_COMPAT_BIN="$COMPAT_BIN" \
+    ipc_output=$(COO_OMARCHY_PATH="$OMARCHY_PATH" \
       timeout --kill-after=1s "$IPC_TIMEOUT" "$BIN_DIR/cachy-omarchy-shell" --ipc shell ping 2>&1)
     ipc_status=$?
     if [[ $ipc_status -eq 0 ]]; then
@@ -334,11 +321,6 @@ fi
 check_manifest
 check_installed_manifest
 
-if [[ -e $CONFIG_DIR/shell.json ]]; then
-  warn "inert shell.json: $CONFIG_DIR/shell.json is a legacy copy (init no longer creates it); shell reads $USER_OMARCHY_CONFIG_DIR/shell.json"
-else
-  pass "inert shell.json legacy copy absent"
-fi
 if [[ -e $USER_OMARCHY_CONFIG_DIR/shell.json ]]; then
   warn "user shell override present: $USER_OMARCHY_CONFIG_DIR/shell.json"
 else
@@ -395,14 +377,6 @@ if [[ -f $HYPR_DIR/hyprland.conf && ! -f $HYPR_DIR/hyprland.lua ]] \
   && compgen -G "$OMARCHY_STATE_DIR/toggles/hypr/*.lua" >/dev/null; then
   warn "hyprland.conf setup: omarchy hypr toggles are not applied: $OMARCHY_STATE_DIR/toggles/hypr/*.lua (clamshell/monitor toggles are ignored — switch to a hyprland.lua config to make them take effect)"
 fi
-# M10: jq 는 hard depends 로 승격됐다 (clipboard history, reminders timer JSON,
-# OSD payload). pacman 이 강제하지만 깨진 설치는 여기서 드러나야 한다.
-if command -v jq >/dev/null 2>&1; then
-  pass "jq (clipboard/reminders/OSD, 테마 훅)"
-else
-  warn "jq missing — clipboard history·reminders·OSD·테마 훅이 동작하지 않는다 (pacman -S jq)"
-fi
-
 # M10: clipboard history 존재 공개 (§66 — 사용자가 모를 수 있는 로컬 상태를
 # 알리되 지우는 것은 사용자 몫). upstream Clipboard.qml:20 은 XDG_STATE_HOME 이
 # 아니라 항상 $HOME/.local/state/omarchy 를 쓰므로 doctor 도 그대로 읽는다.

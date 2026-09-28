@@ -122,11 +122,9 @@ the new pin to be already staged and built. Unwind it in this order:
   은 Omarchy ISO `@factory` 전제라 넣지 않는다.
 - `version` (핀 표시·doctor)
 - `default/omarchy/omarchy-menu.jsonc` (메뉴 정의)
-- `config/omarchy/shell.json` — **업스트림 것이 아니라 우리 기본값**(`overlay/defaults/shell.json`).
-  업스트림 기본값은 바 레이아웃 전체 + `disabledPlugins` 없음이어서, 그대로 쓰면
-  사용자 Waybar 위에 Omarchy 바가 뜬다(§4.3). `applyShellConfig()` 가 딥머지하지 않으므로
-  이 파일을 우리 것으로 교체하는 것이 무패치 바 억제 수단. 단, `disabledPlugins` 는
-  내장 바를 끄지 못한다 — `RUNTIME_STARTUP.md` §3·§9.3 한계 참조.
+- `config/omarchy/shell.json` — 핀 커밋 업스트림 원본과 같은 내용이다(v0.2.0 부터 바를
+  켠 채 출고). 설치 원본은 아직 `overlay/defaults/shell.json` 사본이며 업스트림 원본을
+  직접 설치하도록 바꾸는 일은 이슈 #4 에서 한다.
 - `LICENSE` (MIT)
 
 ### `cachy-omarchy-overlay` (`packages/cachy-omarchy-overlay/stage-overlay.sh`)
@@ -134,22 +132,19 @@ the new pin to be already staged and built. Unwind it in this order:
 업스트림 소스가 아니라 이 레포에서 새로 작성한 CachyOS 통합 레이어. 소유 파일은
 다음 범주다(정확한 목록은 `tests/package/test_overlay_files.sh` 가 단언한다):
 
-- `usr/bin/cachy-omarchy-{shell,launcher,keybindings,bindings,init,doctor,reload}`
-  — 공개 명령 7개(v0.12.0 에서 `cachy-omarchy-reload` 추가).
+- `usr/bin/cachy-omarchy-{shell,launcher,keybindings,bindings,init,doctor}`
+  — 공개 명령 6개. `launcher` 는 업스트림 `omarchy-menu toggle` 의 호환 별칭이다
+  (SUPER+SPACE 는 그것을 직접 부른다). `reload` 는 `--restart` 와 같은 별칭이라 지웠다.
 - `usr/lib/cachy-omarchy/compat/bin/{omarchy-shell,omarchy-update-available,
   omarchy-theme-set-browser,omarchy-theme-set-keyboard,omarchy-menu-keybindings,
   omarchy-restart-shell}` — compat 적응 카피 6개. 실체는 이 통제 경로에만
-  둔다(§44). `omarchy-restart-shell` 은 v0.12.0 에서 `cachy-omarchy-reload` 로
-  위임하도록 새로 얹었다(→ `cachy-omarchy-shell --restart`, 세션이 잠긴 동안은
-  거부).
+  둔다(§44). `omarchy-restart-shell` 은 `cachy-omarchy-shell --restart` 로 위임한다
+  (세션이 잠긴 동안은 거부).
 - `usr/bin/omarchy-{shell,update-available,theme-set-browser,theme-set-keyboard,
   menu-keybindings,restart-shell}` — compat 실체를 가리키는 상대 심링크 6개.
   `/usr/bin` 은 심링크만 놓는 평평한 뷰이다(§45 개정).
 - `usr/share/uwsm/env-hyprland.d/10-cachy-omarchy` — uwsm 세션 환경 드롭인.
   그래픽 세션에 `OMARCHY_PATH=/usr/share/cachy-omarchy/upstream` 을 공급한다(§45).
-- `usr/share/cachy-omarchy/defaults/shell.json` — `cachy-omarchy-init` 가 최초 실행 시
-  사용자 설정으로 복사하는 정본. `cachy-omarchy-shell` 패키지의 스테이징된 기본값과
-  내용이 동일하다(`test_installed_tree.sh` 가 `jq -S` 로 비교).
 - `usr/share/cachy-omarchy/hypr/{bindings.conf,bindings.lua}` — `cachy-omarchy-bindings`
   가 사용자 `~/.config/cachy-omarchy/hypr/` 로 복사하는 소스.
 

@@ -4,7 +4,7 @@ src=${1:?overlay dir}
 dest=${2:?pkgdir}
 
 install -d "$dest/usr/bin"
-for b in shell launcher keybindings bindings init doctor reload; do
+for b in shell launcher keybindings bindings init doctor; do
   install -D -m755 "$src/bin/cachy-omarchy-$b" "$dest/usr/bin/cachy-omarchy-$b"
 done
 
@@ -14,16 +14,12 @@ done
 # uwsm-app 은 여기에 없다: /usr/bin/uwsm-app 은 uwsm 패키지 소유이고,
 # cachy-omarchy-shell 이 uwsm 을 depends 로 끌어온다.
 install -d "$dest/usr/lib/cachy-omarchy/compat/bin"
-install -d "$dest/usr/bin"
 for c in omarchy-shell omarchy-update-available \
          omarchy-theme-set-browser omarchy-theme-set-keyboard \
          omarchy-menu-keybindings omarchy-restart-shell; do
   install -D -m755 "$src/compat/bin/$c" "$dest/usr/lib/cachy-omarchy/compat/bin/$c"
   ln -sf "../lib/cachy-omarchy/compat/bin/$c" "$dest/usr/bin/$c"
 done
-
-install -D -m644 "$src/defaults/shell.json" \
-  "$dest/usr/share/cachy-omarchy/defaults/shell.json"
 
 install -D -m644 "$src/hypr/bindings.conf" \
   "$dest/usr/share/cachy-omarchy/hypr/bindings.conf"

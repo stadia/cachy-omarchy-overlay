@@ -9,9 +9,10 @@ mapfile -t patches < <(find "$REPO_ROOT/packages/cachy-omarchy-shell/patches" -n
 assert_eq "${patches[*]}" \
   "0001-stop-plugin-watcher-on-shell-exit.patch 0002-cancel-polkit-flow-before-session-lock.patch" \
   "runtime patch inventory"
+# Every maintained patch must carry a documented reason and removal condition.
 readme_text=$(cat "$readme")
-assert_contains "$readme_text" "Plugin watcher cleanup" "README documents watcher patch"
-assert_contains "$readme_text" "Polkit cancellation before session lock" "README documents polkit patch"
-assert_contains "$readme_text" "maintained runtime patches" "README documents maintained patch contract"
+for p in "${patches[@]}"; do
+  assert_contains "$readme_text" "$p" "README documents $p"
+done
 
 [[ $ASSERT_FAILURES -eq 0 ]]

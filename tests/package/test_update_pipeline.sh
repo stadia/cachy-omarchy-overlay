@@ -279,7 +279,7 @@ mkdir -p "$doctor_prefix/upstream/shell" "$doctor_prefix/upstream/default/omarch
   "$doctor_compat" "$doctor_root/usr/bin" "$doctor_root/usr/lib/systemd/user" "$doctor_fake"
 printf '// fixture shell\n' >"$doctor_prefix/upstream/shell/shell.qml"
 printf '{}\n' >"$doctor_prefix/upstream/default/omarchy/omarchy-menu.jsonc"
-for command in cachy-omarchy-shell cachy-omarchy-launcher cachy-omarchy-bindings cachy-omarchy-keybindings; do
+for command in cachy-omarchy-shell cachy-omarchy-bindings cachy-omarchy-keybindings; do
   printf '#!/usr/bin/env bash\nexit 0\n' >"$doctor_root/usr/bin/$command"
   chmod +x "$doctor_root/usr/bin/$command"
 done
@@ -289,16 +289,13 @@ mkdir -p "$doctor_prefix/upstream/bin"
 printf '#!/usr/bin/env bash\nexit 0\n' >"$doctor_prefix/upstream/bin/omarchy-theme-set"
 chmod +x "$doctor_prefix/upstream/bin/omarchy-theme-set"
 ln -s ../share/cachy-omarchy/upstream/bin/omarchy-theme-set "$doctor_root/usr/bin/omarchy-theme-set"
+printf '#!/usr/bin/env bash\nexit 0\n' >"$doctor_prefix/upstream/bin/omarchy-menu"
+chmod +x "$doctor_prefix/upstream/bin/omarchy-menu"
+ln -s ../share/cachy-omarchy/upstream/bin/omarchy-menu "$doctor_root/usr/bin/omarchy-menu"
 ln -s ../lib/cachy-omarchy/compat/bin/omarchy-shell "$doctor_root/usr/bin/omarchy-shell"
 cat >"$doctor_fake/pacman" <<'EOF'
 #!/usr/bin/env bash
 case ${1:-} in
-  -Qqo)
-    [[ ${2:-} == */uwsm-app ]] || exit 1
-    printf 'uwsm\n'
-    ;;
-  # Verbose ownership output is unavailable; doctor must use -Qqo.
-  -Qo) exit 1 ;;
   -Q)
     case ${2:-} in
       cachy-omarchy-shell|cachy-omarchy-overlay) printf '%s 0.1.0-1\n' "$2"; exit 0 ;;
@@ -694,9 +691,9 @@ assert_eq "$code" "0" "U02 update validates and publishes candidate"
 # The nested candidate suite is the only record of why it rejected the pin.
 (( code )) && printf '%s\n' "$out" | grep -E '^(FAIL|SKIP|skip:|error:|warn:)' | sed 's/^/      candidate: /'
 assert_eq "$(sort -u "$candidate_source_log")" "$fixture_commit" "U02 candidate build uses the newly discovered commit"
-assert_contains "$out" "PASS tests/runtime/test_m3_docs.sh" "candidate default suite runs M3 docs test"
+assert_contains "$out" "PASS tests/runtime/test_wrapper.sh" "candidate default suite runs runtime wrapper test"
 assert_contains "$out" "PASS tests/package/test_package_files.sh" "candidate default suite reaches package files test"
-assert_contains "$out" "PASS tests/runtime/test_support_contract.sh" "candidate default suite reaches support contract test"
+assert_contains "$out" "PASS tests/runtime/test_doctor.sh" "candidate default suite reaches doctor test"
 updated_lock=$(cat "$root/upstream.lock")
 updated_pkg=$(cat "$root/packages/cachy-omarchy-shell/PKGBUILD")
 assert_contains "$updated_lock" "OMARCHY_VERSION=$next_ver" "U02 lock version updates"

@@ -25,15 +25,14 @@ SUPER + K      →  Omarchy 스타일 키바인딩 뷰어
 업스트림 핀은 `upstream.lock`이 관리한다 (현재 `basecamp/omarchy @ v4.0.4`,
 `c668141`).
 
-설치되는 공개 명령 8개 (`/usr/bin`):
+설치되는 공개 명령 7개 (`/usr/bin`):
 
 - `cachy-omarchy-shell` — 셸 기동(`--run`)·IPC(`--ipc`)·수동 재기동(`--restart`)
-- `cachy-omarchy-launcher` — 런처 토글 (SUPER + SPACE)
+- `cachy-omarchy-launcher` — 업스트림 `omarchy-menu toggle` 의 호환 별칭 (SUPER + SPACE 는 이제 그것을 직접 부른다)
 - `cachy-omarchy-keybindings` — 키바인딩 뷰어 토글 (SUPER + K)
 - `cachy-omarchy-bindings` — 사용자 Hyprland 설정에 관리 source 블록 주입/제거
 - `cachy-omarchy-init` — 최초 1회 사용자 설정 생성 (기존 파일 덮어쓰지 않음)
 - `cachy-omarchy-doctor` — 읽기 전용 진단 (테마 상태 포함)
-- `cachy-omarchy-reload` — `cachy-omarchy-shell --restart` 의 락 인지 앞단
 - `omarchy-theme-set` — 감사된 업스트림 helper 집합으로 테마 적용
 
 ## 세션 요구사항
@@ -88,7 +87,7 @@ helper 와 런타임 의존성(`jq`, `wl-clipboard`, `wtype`, `wireplumber`,
 않는다. 위젯을 끄려면 `~/.config/omarchy/shell.json` bar layout 에서
 `omarchy.weather` 를 제거한다. 그 파일을 만들면 딥머지가 없다 — 패키지
 기본값이 통째로 무시되고, `cachy-omarchy-doctor` 가 존재 시 WARN 한다
-(`docs/RUNTIME_STARTUP.md`, `docs/RC_GAP_INVENTORY.md`).
+(`docs/RUNTIME_STARTUP.md`).
 
 ### 지원 범위
 

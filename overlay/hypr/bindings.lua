@@ -5,7 +5,7 @@
 -- displays them instead of the raw command, and upstream prioritize_entries
 -- ranks rows by matching this exact English text (Keybindings=0, Launch apps=5).
 hl.unbind("SUPER + space")
-hl.bind("SUPER + space", hl.dsp.exec_cmd("cachy-omarchy-launcher"), { description = "Launch apps" })
+hl.bind("SUPER + space", hl.dsp.exec_cmd("omarchy-menu toggle"), { description = "Launch apps" })
 hl.unbind("SUPER + K")
 hl.bind("SUPER + K", hl.dsp.exec_cmd("cachy-omarchy-keybindings"), { description = "Keybindings" })
 

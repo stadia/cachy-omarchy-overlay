@@ -26,7 +26,7 @@ root=$(coo_upstream_root "$dest")
 mkdir -p "$HOME/.local/state/omarchy/toggles"
 : > "$HOME/.local/state/omarchy/toggles/bar-off"
 
-L="$REPO_ROOT/overlay/bin/cachy-omarchy-launcher"
+COMPAT="$REPO_ROOT/overlay/compat/bin"
 W="$REPO_ROOT/overlay/bin/cachy-omarchy-shell"
 export COO_OMARCHY_PATH="$root"
 export OMARCHY_PATH="$root"
@@ -107,7 +107,8 @@ before=$(jq -r 'length' <<<"$(menu_layers)")
 [[ $before =~ ^[0-9]+$ ]] || before=0
 assert_eq "$before" "0" "토글 전 omarchy-menu layer 없음"
 
-out=$("$L" 2>&1); code=$?
+# SUPER+SPACE 가 실제로 실행하는 명령 그대로: 업스트림 omarchy-menu toggle.
+out=$(PATH="$COMPAT:$PATH" COO_SHELL_BIN="$W" "$root/bin/omarchy-menu" toggle 2>&1); code=$?
 assert_eq "$code" "0" "런처 토글 호출 exit 0"
 
 wait_menu open && opened=0 || opened=1

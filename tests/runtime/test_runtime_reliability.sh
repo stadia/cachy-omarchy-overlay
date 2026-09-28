@@ -20,15 +20,15 @@ root="$COO_TEST_SANDBOX/root"
 coo_extract_overlay "$root"
 coo_extract_pkg "$root"
 W="$root/usr/bin/cachy-omarchy-shell"
-defaults="$root/usr/share/cachy-omarchy/defaults/shell.json"
+defaults="$root/usr/share/cachy-omarchy/upstream/config/omarchy/shell.json"
 overlay_artifact=$(coo_overlay_artifact)
 
 assert_file_exists "$W" "R01-R05 and manual-restart extracted wrapper exists"
 assert_file_exists "$defaults" "R08-R10 extracted defaults exist"
 assert_file_exists "$root/usr/share/cachy-omarchy/upstream/shell/shell.qml" \
   "R01-R03 extracted shell.qml exists"
-assert_file_exists "$root/usr/bin/cachy-omarchy-launcher" \
-  "R04 extracted launcher exists"
+assert_file_exists "$root/usr/bin/omarchy-menu" \
+  "R04 extracted upstream menu command exists"
 assert_file_exists "$root/usr/bin/cachy-omarchy-keybindings" \
   "R05 extracted keybindings helper exists"
 # R06: app-launch now goes through the real uwsm-app from the uwsm package

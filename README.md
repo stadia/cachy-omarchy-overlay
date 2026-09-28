@@ -26,15 +26,14 @@ Two Arch packages are produced.
 The upstream pin is managed by `upstream.lock` (currently `basecamp/omarchy @ v4.0.4`,
 `c668141`).
 
-Eight public commands are installed into `/usr/bin`:
+Seven public commands are installed into `/usr/bin`:
 
 - `cachy-omarchy-shell` — start the shell (`--run`), talk to it (`--ipc`), restart it manually (`--restart`)
-- `cachy-omarchy-launcher` — toggle the launcher (SUPER + SPACE)
+- `cachy-omarchy-launcher` — compatibility alias for upstream `omarchy-menu toggle`, which SUPER + SPACE now calls directly
 - `cachy-omarchy-keybindings` — toggle the keybinding viewer (SUPER + K)
 - `cachy-omarchy-bindings` — inject/remove the managed source block in your Hyprland config
 - `cachy-omarchy-init` — one-time user setup (never overwrites existing files)
 - `cachy-omarchy-doctor` — read-only diagnostics (including theme state)
-- `cachy-omarchy-reload` — lock-aware front for `cachy-omarchy-shell --restart`
 - `omarchy-theme-set` — apply a theme from the audited upstream helper set
 
 ## Session requirement
@@ -92,12 +91,11 @@ file is absent, every lookup infers the city from the client IP via wttr.in and
 does not persist it. To disable the widget, remove `omarchy.weather` from the
 bar layout in `~/.config/omarchy/shell.json`. Creating that file does not
 deep-merge: package defaults are ignored wholesale, and `cachy-omarchy-doctor`
-WARNs on its existence (`docs/RUNTIME_STARTUP.md`, `docs/RC_GAP_INVENTORY.md`).
+WARNs on its existence (`docs/RUNTIME_STARTUP.md`).
 
 ### Support scope
 
-Lua toggle files apply only with a `hyprland.lua` config —
-**Lua toggle 파일은 hyprland.lua 설정에서만 적용된다.** With a `hyprland.conf`
+**Lua toggle files apply only with a `hyprland.lua` config.** With a `hyprland.conf`
 setup, install/shell/launcher/theme all work, but those Lua toggle files are
 silently ignored because `.conf` does not execute Lua files. This does not
 claim laptop-lid support: the overlay does not stage upstream's lid-switch

@@ -36,15 +36,6 @@ omarchy-apply-lock 을 직접 실행해 복구할 수 있다.
 Omarchy 내장 바는 기본으로 보인다. 숨기려면 직접 토글을 만든다:
   : > ~/.local/state/omarchy/toggles/bar-off
 
-주의: 셸 설정(~/.config/cachy-omarchy/shell.json)은 만들지 않는다.
-셸은 ~/.config/omarchy/shell.json 을 읽지 이 경로를 읽지 않으므로,
-여기에 파일을 만들어도 사용자 편집이 조용히 무시된다. 패키지 기본값은
-/usr/share/cachy-omarchy/upstream/config/omarchy/shell.json 으로
-스테이징되며 init 없이도 적용된다.
-
-참고: 내장 바는 화면 상단에 26px 를 예약한다. 이 명령의 실행 여부와는
-무관하며 — init 은 바를 켜지도 끄지도 않는다 — 위의 bar-off 토글로만 끈다.
-
 옵션:
   --dry-run  무엇을 할지 출력만 하고 아무것도 쓰지 않는다.
   --force    바인딩 충돌이 있어도 관리 블록을 넣는다 (사용자 줄은 지우지 않음).
@@ -63,14 +54,7 @@ while (( $# )); do
   shift
 done
 
-# 1) 셸 설정(~/.config/cachy-omarchy/shell.json)은 만들지 않는다.
-#    shell.qml:31 이 읽는 사용자 경로는 ~/.config/omarchy/shell.json 이지 이
-#    경로가 아니므로, 여기에 파일을 만들면 사용자 편집이 조용히 무시된다.
-#    패키지 기본값은 /usr/share/cachy-omarchy/upstream/config/omarchy/shell.json
-#    으로 스테이징되며 init 없이도 셸이 적용한다. 기존 사용자가 이 dead file
-#    을 갖고 있다면 cachy-omarchy-doctor 가 WARN 으로 알린다.
-
-# 2) bar 토글은 만들지 않는다. M8 원칙 0 — cachy-omarchy 를 설치한다는 것은
+# 1) bar 토글은 만들지 않는다. M8 원칙 0 — cachy-omarchy 를 설치한다는 것은
 #    omarchy 가 주는 것을 쓰겠다는 의사이므로 업스트림 기본값(바 표시)이
 #    기본이다. 바를 끄고 싶으면 사용자가 직접 토글을 만든다:
 #      : > ~/.local/state/omarchy/toggles/bar-off

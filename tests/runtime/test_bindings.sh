@@ -18,19 +18,19 @@ assert_file_exists "$LUA" "정본 bindings.lua"
 
 csrc=$(cat "$CONF")
 assert_contains "$csrc" "SUPER, SPACE" "conf 가 SUPER+SPACE 를 바인딩한다"
-assert_contains "$csrc" "cachy-omarchy-launcher" "conf 대상은 런처"
+assert_contains "$csrc" "omarchy-menu toggle" "conf 대상은 업스트림 메뉴"
 assert_contains "$csrc" "unbind = SUPER, K" "conf 는 SUPER+K 를 먼저 unbind 한다"
 # bindd = MOD, key, description, dispatcher, params — Hyprland 0.56.2 실측으로
 # 지원되고 `hyprctl binds` 가 description 을 그대로 보고한다(레코드 머리글은
 # `bindd` 지만 파서의 /^bind/ 가 접두로 잡는다). lua 쪽 description 과 짝이다.
 assert_contains "$csrc" "bindd = SUPER, K, Keybindings, exec, cachy-omarchy-keybindings" "conf 가 SUPER+K 를 description 과 함께 바인딩한다"
-assert_contains "$csrc" "bindd = SUPER, SPACE, Launch apps, exec, cachy-omarchy-launcher" "conf 런처 bind 도 description 을 단다"
+assert_contains "$csrc" "bindd = SUPER, SPACE, Launch apps, exec, omarchy-menu toggle" "conf 런처 bind 도 description 을 단다"
 [[ $csrc == *"bindd = SUPER, K,"* ]] && klive=1 || klive=0
 assert_eq "$klive" "1" "conf 는 SUPER+K 를 활성화한다"
 
 lsrc=$(cat "$LUA")
 assert_contains "$lsrc" 'SUPER + space' "lua 가 SUPER+SPACE 를 바인딩한다"
-assert_contains "$lsrc" "cachy-omarchy-launcher" "lua 대상은 런처"
+assert_contains "$lsrc" "omarchy-menu toggle" "lua 대상은 업스트림 메뉴"
 assert_contains "$lsrc" "hl.unbind" "lua 는 unbind 후 bind 한다"
 assert_contains "$lsrc" 'hl.unbind("SUPER + K")' "lua 는 SUPER+K 를 먼저 unbind 한다"
 assert_contains "$lsrc" 'hl.bind("SUPER + K", hl.dsp.exec_cmd("cachy-omarchy-keybindings"), { description = "Keybindings" })' "lua 가 SUPER+K 를 keybindings 명령에 바인딩한다"

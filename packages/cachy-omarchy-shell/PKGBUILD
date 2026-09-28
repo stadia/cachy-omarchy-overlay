@@ -45,7 +45,7 @@ license=('MIT')
 #     depends 에 못 둔다 — fix round 1 에서 optdepends AUR class 로 재배치.
 #     아래 optdepends 블록 참고.)
 #   upower (v0.10.0): omarchy-battery-status 의 구동 기계 — Power 패널이
-#     Panel.qml:210 에서 무조건 호출(docs/CLOSURE_PRIORITY.md).
+#     Panel.qml:210 에서 무조건 호출.
 # v0.12.1 정책 전환: 아래 두 번째 블록 16개는 v0.12.0 까지 optdepends 였다.
 #   분류(tests/data/command-packages.tsv 의 OPT)는 "기본 활성 경로에서 도달하지
 #   않는다"는 도달성 사실이고 그건 그대로다 — 바뀐 것은 선언 정책이다. 이

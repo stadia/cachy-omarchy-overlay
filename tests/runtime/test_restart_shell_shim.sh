@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# omarchy-restart-shell compat shim 이 cachy-omarchy-reload 로 위임만 하는지
-# 검증한다. 락 판단/kill 로직은 이중화하지 않으므로 여기서 다시 재지 않는다
-# — COO_RELOAD_BIN 스텁이 인자 없이 불렸는지만 확인한다.
+# omarchy-restart-shell compat shim 이 cachy-omarchy-shell --restart 로 위임만
+# 하는지 검증한다. 락 판단/kill 로직은 이중화하지 않으므로 여기서 다시 재지
+# 않는다 — COO_SHELL_BIN 스텁이 --restart 로 불렸는지만 확인한다.
 set -uo pipefail
 REPO_ROOT="${REPO_ROOT:?}"
 source "$REPO_ROOT/tests/lib/assert.sh"
@@ -28,6 +28,13 @@ case "$code_lines" in
   *) k=0 ;;
 esac
 assert_eq "$k" "0" "shim 자체는 kill 을 하지 않는다"
+# 중간 별칭(cachy-omarchy-reload)을 거치지 않는다. 호스트에 설치된 옛 별칭이
+# 있으면 동작 단언만으로는 이것을 구분하지 못한다.
+case "$code_lines" in
+  *"cachy-omarchy-reload"*|*"COO_RELOAD_BIN"*) via_alias=1 ;;
+  *) via_alias=0 ;;
+esac
+assert_eq "$via_alias" "0" "reload 별칭을 거치지 않고 --restart 로 직접 위임한다"
 
 fake="$COO_TEST_SANDBOX/restart-shell"
 stub="$fake/stub"
@@ -35,39 +42,31 @@ calls="$fake/calls.log"
 mkdir -p "$stub"
 : > "$calls"
 
-cat > "$stub/cachy-omarchy-reload" <<'STUB'
+cat > "$stub/cachy-omarchy-shell" <<'STUB'
 #!/usr/bin/env bash
 printf 'called:%s\n' "$*" >> "$COO_CALL_LOG"
-exit 0
+exit "${STUB_EXIT:-0}"
 STUB
-chmod +x "$stub/cachy-omarchy-reload"
+chmod +x "$stub/cachy-omarchy-shell"
 
-out=$(COO_RELOAD_BIN="$stub/cachy-omarchy-reload" COO_CALL_LOG="$calls" "$SHIM" 2>&1)
+out=$(COO_SHELL_BIN="$stub/cachy-omarchy-shell" COO_CALL_LOG="$calls" "$SHIM" 2>&1)
 code=$?
 assert_eq "$code" "0" "위임 성공 시 exit 0"
-assert_eq "$(cat "$calls")" "called:" "인자 없이 cachy-omarchy-reload 를 호출"
+assert_eq "$(cat "$calls")" "called:--restart" "cachy-omarchy-shell --restart 를 호출"
 
 # 위임 대상이 실패하면 그 exit code 를 그대로 전달한다(집어삼키지 않는다).
-cat > "$stub/cachy-omarchy-reload" <<'STUB'
-#!/usr/bin/env bash
-exit 1
-STUB
-chmod +x "$stub/cachy-omarchy-reload"
-COO_RELOAD_BIN="$stub/cachy-omarchy-reload" "$SHIM" >/dev/null 2>&1
+STUB_EXIT=1 COO_SHELL_BIN="$stub/cachy-omarchy-shell" COO_CALL_LOG="$calls" "$SHIM" >/dev/null 2>&1
 code=$?
 assert_eq "$code" "1" "위임 대상 실패를 그대로 전달"
 
-# 인자를 받으면(업스트림은 안 주지만) 조용히 삼키지 않고 그대로 넘겨,
-# cachy-omarchy-reload 쪽의 "알 수 없는 인자" exit 1 이 호출자에게 보이게
-# 한다(#9).
-cat > "$stub/cachy-omarchy-reload" <<'STUB'
-#!/usr/bin/env bash
-printf 'called:%s\n' "$*" >> "$COO_CALL_LOG"
-exit 0
-STUB
-chmod +x "$stub/cachy-omarchy-reload"
+# 공개 이름이라 --help 나 오타가 셸을 재시작하면 안 된다.
 : > "$calls"
-COO_RELOAD_BIN="$stub/cachy-omarchy-reload" COO_CALL_LOG="$calls" "$SHIM" --bogus >/dev/null 2>&1
-assert_eq "$(cat "$calls")" "called:--bogus" "인자를 그대로 cachy-omarchy-reload 로 전달"
+out=$(COO_SHELL_BIN="$stub/cachy-omarchy-shell" COO_CALL_LOG="$calls" "$SHIM" --help 2>&1); code=$?
+assert_eq "$code" "0" "--help exit 0"
+assert_contains "$out" "cachy-omarchy-shell --restart" "--help 가 위임 대상을 말한다"
+assert_eq "$(cat "$calls")" "" "--help 는 재시작하지 않는다"
+COO_SHELL_BIN="$stub/cachy-omarchy-shell" COO_CALL_LOG="$calls" "$SHIM" --bogus >/dev/null 2>&1; code=$?
+assert_eq "$code" "1" "알 수 없는 인자 → exit 1"
+assert_eq "$(cat "$calls")" "" "알 수 없는 인자는 재시작하지 않는다"
 
 exit "$ASSERT_FAILURES"

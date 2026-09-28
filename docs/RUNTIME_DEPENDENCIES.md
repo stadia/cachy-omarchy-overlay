@@ -28,7 +28,7 @@
 | `gum` | 다수 헬퍼 TUI | CachyOS `gum` | OPTIONAL | installed | yes for menu open | 없음 | NONE — **M4 실측: 키바인딩 경로 미사용** — `omarchy-menu-keybindings` / `omarchy-menu-select` / `omarchy-cmd-present` 에 `gum` 0 매치(grep). 선택 UI 는 gum 이 아니라 `summon omarchy.menu` select mode. **M2 실측: 기동 경로 미사용** 유지 |
 | `xkbcli` | `omarchy-menu-keybindings` `parse_keycodes` — `xkbcli compile-keymap` | CachyOS `libxkbcommon` | OPTIONAL | installed | no(목록 품질 저하) | 하드코딩 code: 폴백 테이블 | NONE — **M4 실측**: 없으면 `code:NNN` bind 가 심볼로 안 풀릴 뿐 스크립트는 동작 |
 | `lua` | `omarchy-menu-keybindings` Lua bind 캐시 (`hyprland.lua` 소스 파서) | CachyOS `lua` | OPTIONAL | 5.5.1-1 | no(목록 품질 저하) | `omarchy-cmd-present lua` 가드가 캐시를 끈다 | NONE — **M4 실측**: `lua` 가 없어도 스크립트 자체는 동작(Lua bind 메타만 빈 캐시) |
-| `uwsm` / `uwsm-app` | `AppLibrary.launch`: `uwsm-app -- gtk-launch <id>.desktop` | Arch `uwsm` 패키지 — `cachy-omarchy-shell` hard depends | REQUIRED | 0.26.6-1 | no | 없음 | NONE — shim 은 삭제됐다. uwsm-app 은 uwsm 패키지가 소유하는 실제 바이너리이며, 어느 레이어도 PATH 를 조작하지 않는다(§45 개정). doctor 가 `pacman -Qqo` 로 소유권을 검사한다 |
+| `uwsm` / `uwsm-app` | `AppLibrary.launch`: `uwsm-app -- gtk-launch <id>.desktop` | Arch `uwsm` 패키지 — `cachy-omarchy-shell` hard depends | REQUIRED | 0.26.6-1 | no | 없음 | NONE — shim 은 삭제됐다. uwsm-app 은 uwsm 패키지가 소유하는 실제 바이너리이며, 어느 레이어도 PATH 를 조작하지 않는다(§45 개정). 우리 패키지가 소유하지 않음은 `tests/package/test_usr_bin_helpers.sh` 가 검사한다 |
 | `inotifywait` / `inotify-tools` | `services/PluginRegistry.qml:638` `localPluginWatcher` 가 `~/.config/omarchy/plugins` 감시 | CachyOS `inotify-tools` | REQUIRED(정상 기동) | **`PKGBUILD depends`에 있음**(`packages/cachy-omarchy-shell/PKGBUILD`) | no | 없음 — 없으면 1초마다 WARN 반복 | NONE — **M2 실측으로 신규 추가, 이후 depends 에 반영됨**(당시 발견된 누락은 해소됨) |
 | `gtk-launch` | 앱 실행 | `glib2` | REQUIRED for app launch | yes | no | `gio launch` | NONE or WRAPPER |
 | `systemd --user` | 우리 유닛 계획 | systemd | REQUIRED for M2 | yes | no | 수동 기동 | WRAPPER |
@@ -105,7 +105,6 @@
 "Moving the pin" 절에 있다.
 
 <!-- CLOSURE_BEGIN -->
-
 | command | package | class | 근거 |
 | --- | --- | --- | --- |
 | `asdcontrol` | `asdcontrol` | UNPACKAGED | Apple Studio Display 밝기 제어(하드웨어 한정, omarchy-brightness-display-apple 이 sudo asdcontrol 을 부른다) — 공식 리포에도 AUR 에도 제공자가 없다(AUR RPC info/search 둘 다 0건 실측). 어디에도 선언하지 않는다; 사용자가 직접 빌드해야 하며, 없으면 그 헬퍼 하나만 동작하지 않는다. |
@@ -116,6 +115,7 @@
 | `bluetoothctl` | `bluez-utils` | OPT | 블루투스 컨트롤러 부재 환경(데스크톱) 존재 — 위젯은 가드로 숨는다 |
 | `brightnessctl` | `brightnessctl` | OPT | 내장 백라이트 — v0.12.1 에서 depends 로 승격 |
 | `busctl` | `systemd` | BASE | 기반 |
+| `cachy-omarchy-keybindings` | `cachy-omarchy-overlay` | BASE | 우리 오버레이 명령 — compat omarchy-menu-keybindings 가 같은 패키지 안의 이 명령으로 위임한다(list.sh 선례: 같은 패키지 파일트리라 항상 존재) |
 | `cat` | `coreutils` | BASE | 기반 |
 | `checkupdates` | `pacman-contrib` | OPT | 업데이트 확인 메뉴 항목 |
 | `chmod` | `coreutils` | BASE | 기반 |
@@ -222,7 +222,7 @@
 | `xkbcli` | `libxkbcommon` | BASE | 이미 선언된 의존의 전이 의존(§4.2 개정) |
 | `zbarimg` | `zbar` | OPT | QR 코드 스캔 메뉴 항목 |
 
-tests/data/command-packages.tsv: 전체 117행, 위 표에는 도달한 113행이 모두 실린다(BASE 62행 포함 — BASE 는 declare 대상이 아닐 뿐 검사 대상에서 빠지지 않는다)
+tests/data/command-packages.tsv: 전체 118행, 위 표에는 도달한 114행이 모두 실린다(BASE 63행 포함 — BASE 는 declare 대상이 아닐 뿐 검사 대상에서 빠지지 않는다)
 
 docs/COMMAND_AUDIT.md 의 DISABLED 행으로 메뉴 루트에서 억제된 이름: 100개 (의도적으로 미지원인 Omarchy OS 스택 — 예외 파일과 달리 사유·신선도 검사가 없는 통로다)
 - `omarchy-branding-about`
@@ -347,7 +347,6 @@ docs/COMMAND_AUDIT.md 의 DISABLED 행으로 메뉴 루트에서 억제된 이�
 - `omarchy-system`
 - `omarchy-theme`
 - `omarchy-webapp-handler`
-
 <!-- CLOSURE_END -->
 
 ### 스캐너의 알려진 한계 — 이 표가 완전성을 주장하지 않는 이유
@@ -411,7 +410,7 @@ $ awk -F'\t' '!/^#/ && NF {print $1}' tests/data/closure-exceptions.tsv | while 
 v0.10.0 이 `omarchy-battery-status` 를 포함한 가시 UI 헬퍼 9개를 스테이징하면서,
 이전에 여기 적혀 있던 Power 패널 배터리 상세 행 결손은 닫혔다. weather 위젯의
 외부 요청(wttr.in IP 조회는 비저장, 패널은 Open-Meteo 예보/지오코딩도 사용)은
-스테이징 결손이 아니라 문서화된 표면이다(`docs/CLOSURE_PRIORITY.md`). 남은
+스테이징 결손이 아니라 문서화된 표면이다(README "Weather widget"). 남은
 사용자가 체감하는 격차는 `xdg-terminal-exec` 가 AUR 전용이라는 점이며, 방향
 결정은 v0.11 선행 과제다.
 
@@ -466,5 +465,6 @@ qs ipc -n -p "$OMARCHY_PATH/shell" call -- shell toggle omarchy.menu '{"menu":"r
 - **`uwsm-app` shim 은 삭제됐다** — M2/M3 시절 compat shim 이 실제 `uwsm-app` 유무에
   따라 위임/폴백했으나(M3 R06 마커 실측), `uwsm` 이 `cachy-omarchy-shell` 의 hard
   depends 가 되면서 제거했다. 이 호스트에는 `uwsm` 이 설치돼 있고(`pacman -Q uwsm`)
-  `/usr/bin/uwsm-app` 은 uwsm 패키지 소유다 — doctor 가 `pacman -Qqo` 로 검사한다.
+  `/usr/bin/uwsm-app` 은 uwsm 패키지 소유다(`pacman -Qqo` 실측) — 우리 패키지가
+  소유하지 않음은 `tests/package/test_usr_bin_helpers.sh` 가 검사한다.
 - **`omarchy.osd` 기동 불필요 확정** — 비활성 상태로 기동 정상.

@@ -27,7 +27,7 @@ usage() {
 사용법: cachy-omarchy-shell <명령>
 
 명령:
-  --run                       Quickshell 을 포그라운드로 기동한다 (systemd ExecStart 용).
+  --run                       Quickshell 을 포그라운드로 기동한다 (Hyprland autostart 용).
   --ipc <target> <method> ..  실행 중인 셸에 IPC 호출을 전달한다.
   --path                      해석된 OMARCHY_PATH 를 출력한다.
   --restart                   실행 중 셸을 kill 하고 새 인스턴스를 detached 로 띄운다.
@@ -98,7 +98,7 @@ cmd_restart() {
   # 세션이 잠긴 동안 재시작하면 화면 잠금 클라이언트(hyprlock)가 함께 죽어
   # 세션이 Hyprland failsafe 뒤에 갇힌다(RUNTIME_STARTUP §22.4). 고아 락을
   # 판별해 재획득까지 시도하는 업스트림 omarchy-hyprland-session-locked 경로는
-  # v0.12.0 범위 밖(CLOSURE_PRIORITY) — 우리는 거부만 한다.
+  # 범위 밖(closure-exceptions.tsv 의 blocked 행) — 우리는 거부만 한다.
   #
   # 셸이 IPC 에 전혀 응답하지 않거나(실행 중이 아님/타임아웃), 응답은 왔지만
   # IPC 레벨 오류(대상 없음 등 — lock 플러그인이 아직 로드되지 않았거나
