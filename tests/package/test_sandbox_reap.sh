@@ -113,7 +113,9 @@ leaked=$(<"$outfile")
 assert_eq "$(printf '%s' "$leaked" | grep -cE '^[0-9]+$')" "1" \
   "fixture run reported the PID it stranded (got: ${leaked:-<empty>})"
 if [[ $leaked =~ ^[0-9]+$ ]]; then
-  is_alive "$leaked" && survived=1 || survived=0
+  # The reaper stops watching once the command line is gone, which the kernel
+  # clears before the process finishes exiting. Poll, like the check above.
+  survived=0; await_gone "$leaked" || survived=1
   assert_eq "$survived" "0" "runner reaps a process stranded inside a test sandbox"
   # Never let a failing run become the leak it is testing for.
   (( survived )) && kill -KILL "$leaked" 2>/dev/null
