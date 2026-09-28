@@ -59,4 +59,14 @@ STUB_EXIT=1 COO_SHELL_BIN="$stub/cachy-omarchy-shell" COO_CALL_LOG="$calls" "$SH
 code=$?
 assert_eq "$code" "1" "위임 대상 실패를 그대로 전달"
 
+# 공개 이름이라 --help 나 오타가 셸을 재시작하면 안 된다.
+: > "$calls"
+out=$(COO_SHELL_BIN="$stub/cachy-omarchy-shell" COO_CALL_LOG="$calls" "$SHIM" --help 2>&1); code=$?
+assert_eq "$code" "0" "--help exit 0"
+assert_contains "$out" "cachy-omarchy-shell --restart" "--help 가 위임 대상을 말한다"
+assert_eq "$(cat "$calls")" "" "--help 는 재시작하지 않는다"
+COO_SHELL_BIN="$stub/cachy-omarchy-shell" COO_CALL_LOG="$calls" "$SHIM" --bogus >/dev/null 2>&1; code=$?
+assert_eq "$code" "1" "알 수 없는 인자 → exit 1"
+assert_eq "$(cat "$calls")" "" "알 수 없는 인자는 재시작하지 않는다"
+
 exit "$ASSERT_FAILURES"
