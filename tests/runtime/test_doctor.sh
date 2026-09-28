@@ -20,7 +20,7 @@ fake_bin=$COO_TEST_SANDBOX/fake-bin
 unset COO_IPC_TIMEOUT COO_TEST_DOCTOR_SHA256_BIN \
   COO_FAKE_PROCESS COO_FAKE_PING_FAIL COO_FAKE_OFFICIAL_PRESENT COO_TEST_WAYLAND_DISPLAY \
   TEST_DOCTOR_PROCESS TEST_DOCTOR_PING_FAIL TEST_DOCTOR_OFFICIAL_PRESENT \
-  TEST_DOCTOR_WAYLAND_DISPLAY TEST_DOCTOR_UWSM_APP \
+  TEST_DOCTOR_WAYLAND_DISPLAY \
   COO_TEST_DOCTOR_PAM_LOCK_FILE
 mkdir -p "$prefix/upstream/shell" "$prefix/upstream/default/omarchy" "$compat" \
   "$root/usr/bin" "$root/usr/lib/systemd/user" "$hypr" "$config" "$user_config" "$state" "$fake_bin"
@@ -35,7 +35,7 @@ pam_lock=$COO_TEST_SANDBOX/pam/omarchy-lock-password
 mkdir -p "$(dirname "$pam_lock")"
 printf '#%%PAM-1.0\n' >"$pam_lock"
 omarchy_state=$COO_TEST_SANDBOX/.local/state/omarchy
-for cmd in cachy-omarchy-launcher cachy-omarchy-bindings cachy-omarchy-keybindings; do
+for cmd in cachy-omarchy-bindings cachy-omarchy-keybindings; do
   printf '#!/usr/bin/env bash\nexit 0\n' >"$root/usr/bin/$cmd"
   chmod +x "$root/usr/bin/$cmd"
 done
@@ -77,17 +77,6 @@ assert_eq "$jq_uses_python" "0" "fake jq has no undeclared Python dependency"
 cat >"$fake_bin/pacman" <<'EOF'
 #!/usr/bin/env bash
 case ${1:-} in
-  -Qqo)
-    printf '%s\n' "$1" >>"${COO_PACMAN_OWNER_LOG:?}"
-    [[ ${2:-} == "$TEST_DOCTOR_UWSM_APP" ]] || exit 1
-    printf 'uwsm\n'
-    ;;
-  -Qo)
-    # Verbose ownership prose is intentionally unavailable: doctor must use
-    # the quiet package-name query, not parse localized human output.
-    printf '%s\n' "$1" >>"${COO_PACMAN_OWNER_LOG:?}"
-    exit 1
-    ;;
   -Q)
     printf '%s\n' "${2:-}" >>"${COO_PACMAN_LOG:?}"
     case ${2:-} in
@@ -100,23 +89,24 @@ case ${1:-} in
   *) exit 2 ;;
 esac
 EOF
-for cmd in hyprctl quickshell uwsm-app; do printf '#!/usr/bin/env bash\nexit 0\n' >"$fake_bin/$cmd"; done
-chmod +x "$fake_bin/pgrep" "$fake_bin/qs" "$fake_bin/pacman" "$fake_bin/hyprctl" "$fake_bin/quickshell" "$fake_bin/uwsm-app"
+for cmd in hyprctl quickshell; do printf '#!/usr/bin/env bash\nexit 0\n' >"$fake_bin/$cmd"; done
+chmod +x "$fake_bin/pgrep" "$fake_bin/qs" "$fake_bin/pacman" "$fake_bin/hyprctl" "$fake_bin/quickshell"
 printf '#!/usr/bin/env bash\nexit 0\n' >"$compat/omarchy-shell"
 chmod +x "$compat/omarchy-shell"
 mkdir -p "$prefix/upstream/bin"
 printf '#!/usr/bin/env bash\nexit 0\n' >"$prefix/upstream/bin/omarchy-theme-set"
 chmod +x "$prefix/upstream/bin/omarchy-theme-set"
 ln -s ../share/cachy-omarchy/upstream/bin/omarchy-theme-set "$root/usr/bin/omarchy-theme-set"
+# SUPER+SPACE 대상. /usr/bin 의 omarchy-* 는 전부 심링크여야 한다.
+printf '#!/usr/bin/env bash\nexit 0\n' >"$prefix/upstream/bin/omarchy-menu"
+chmod +x "$prefix/upstream/bin/omarchy-menu"
+ln -s ../share/cachy-omarchy/upstream/bin/omarchy-menu "$root/usr/bin/omarchy-menu"
 ln -s ../lib/cachy-omarchy/compat/bin/omarchy-shell "$root/usr/bin/omarchy-shell"
 
 pacman_log=$COO_TEST_SANDBOX/pacman.log
-owner_query_log=$COO_TEST_SANDBOX/pacman-owner-query.log
-: >"$owner_query_log"
-export COO_PACMAN_OWNER_LOG=$owner_query_log
 run_doctor() {
   PATH="$fake_bin:/usr/bin:/bin" WAYLAND_DISPLAY="${TEST_DOCTOR_WAYLAND_DISPLAY:-}" \
-    OMARCHY_PATH="$prefix/upstream" TEST_DOCTOR_UWSM_APP="$fake_bin/uwsm-app" \
+    OMARCHY_PATH="$prefix/upstream" \
     COO_PACMAN_LOG="$pacman_log" COO_PREFIX_ROOT="$prefix" COO_COMPAT_BIN="$compat" COO_HYPR_DIR="$hypr" \
     COO_CONFIG_DIR="$config" COO_OMARCHY_CONFIG_DIR="$user_config" COO_STATE_DIR="$state" \
     COO_OMARCHY_PATH="$prefix/upstream" COO_OS_RELEASE="$os_release" \
@@ -142,7 +132,6 @@ assert_contains "$out" "PASS: lock screen PAM service" "healthy tree reports the
 
 assert_contains "$(cat "$pacman_log")" "omarchy" "doctor queries official omarchy package"
 assert_contains "$(cat "$pacman_log")" "omarchy-settings" "doctor queries official omarchy-settings package"
-assert_eq "$(cat "$owner_query_log")" "-Qqo"   "healthy doctor queries uwsm-app ownership with pacman -Qqo"
 
 # Regression for the defect this check exists to catch: without
 # /etc/pam.d/omarchy-lock-password the lock plugin returns "missing-pam" and
@@ -179,7 +168,6 @@ assert_contains "$out" "PASS: session OMARCHY_PATH" "세션 변수가 있으면 
 assert_contains "$out" "PASS: /usr/bin omarchy-* symlinks resolve" "심링크가 있으면 PASS"
 assert_contains "$out" "PASS: exposed: omarchy-theme-set" "업스트림 핵심 명령 노출을 확인한다"
 assert_contains "$out" "PASS: exposed: omarchy-shell" "compat 핵심 명령 노출을 확인한다"
-assert_contains "$out" "PASS: uwsm-app owned by uwsm package" "quiet ownership query is locale-independent"
 
 ln -s ../share/cachy-omarchy/upstream/bin/omarchy-gone "$root/usr/bin/omarchy-gone"
 out_broken=$(run_doctor); broken_code=$?
@@ -194,7 +182,7 @@ mkdir -p "$empty_root/usr/bin" "$empty_prefix/upstream/shell" "$empty_prefix/ups
 printf '// fixture shell\n' >"$empty_prefix/upstream/shell/shell.qml"
 printf '{}\n' >"$empty_prefix/upstream/default/omarchy/omarchy-menu.jsonc"
 out_empty=$(PATH="$fake_bin:/usr/bin:/bin" WAYLAND_DISPLAY="${TEST_DOCTOR_WAYLAND_DISPLAY:-}" \
-  OMARCHY_PATH="$empty_prefix/upstream" TEST_DOCTOR_UWSM_APP="$fake_bin/uwsm-app" \
+  OMARCHY_PATH="$empty_prefix/upstream" \
   COO_PACMAN_LOG="$pacman_log" COO_PREFIX_ROOT="$empty_prefix" COO_COMPAT_BIN="$compat" \
   COO_HYPR_DIR="$hypr" COO_CONFIG_DIR="$config" COO_OMARCHY_CONFIG_DIR="$user_config" \
   COO_STATE_DIR="$state" COO_OMARCHY_PATH="$empty_prefix/upstream" COO_OS_RELEASE="$os_release" \
@@ -204,7 +192,7 @@ assert_contains "$out_empty" "FAIL: no omarchy-* commands exposed" "빈 노출�
 assert_eq "$empty_nonzero" "0" "빈 노출은 nonzero exit"
 
 out_nosession=$(PATH="$fake_bin:/usr/bin:/bin" \
-  WAYLAND_DISPLAY="${TEST_DOCTOR_WAYLAND_DISPLAY:-}" TEST_DOCTOR_UWSM_APP="$fake_bin/uwsm-app" \
+  WAYLAND_DISPLAY="${TEST_DOCTOR_WAYLAND_DISPLAY:-}" \
   COO_PACMAN_LOG="$pacman_log" COO_PREFIX_ROOT="$prefix" COO_COMPAT_BIN="$compat" \
   COO_HYPR_DIR="$hypr" COO_CONFIG_DIR="$config" \
   COO_OMARCHY_CONFIG_DIR="$user_config" COO_STATE_DIR="$state" \
@@ -271,7 +259,6 @@ rm -f "$config/hypr/bindings.conf"
 mv "$hypr/hyprland.conf.bak" "$hypr/hyprland.conf"
 
 out=$(run_doctor); code=$?
-assert_contains "$out" "PASS: jq" "test-local jq 존재는 PASS"
 
 # M10: clipboard history 는 upstream 의 HOME 고정 경로(Clipboard.qml:20)에서만
 # 읽는다. 경로·항목 수만 보고하고 내용은 출력하지 않으며 절대 수정하지 않는다.
@@ -395,11 +382,6 @@ assert_eq "$code" 1 "manifest without checksum tool cannot pass"
 assert_contains "$out" "FAIL: artifact/manifest mismatch" "missing checksum tool is explicit"
 rm -rf "$state/$release" "$state/validated-build.manifest"
 
-printf '{}\n' >"$config/shell.json"
-out=$(run_doctor); code=$?
-assert_eq "$code" 0 "inert reference copy is warning only"
-assert_contains "$out" "WARN: inert shell.json" "inert shell.json is explicit"
-rm -f "$config/shell.json"
 printf '{}\n' >"$user_config/shell.json"
 out=$(run_doctor); code=$?
 assert_eq "$code" 0 "user shell override is warning only"

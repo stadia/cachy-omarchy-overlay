@@ -27,7 +27,7 @@ usage() {
 사용법: cachy-omarchy-shell <명령>
 
 명령:
-  --run                       Quickshell 을 포그라운드로 기동한다 (systemd ExecStart 용).
+  --run                       Quickshell 을 포그라운드로 기동한다 (Hyprland autostart 용).
   --ipc <target> <method> ..  실행 중인 셸에 IPC 호출을 전달한다.
   --path                      해석된 OMARCHY_PATH 를 출력한다.
   --restart                   실행 중 셸을 kill 하고 새 인스턴스를 detached 로 띄운다.
