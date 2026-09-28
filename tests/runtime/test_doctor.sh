@@ -243,6 +243,26 @@ out=$(run_doctor); code=$?
 assert_contains "$out" "WARN: theme hyprland.lua not sourced" "주석 source 줄은 PASS 가 아니다"
 mv "$hypr/hyprland.conf.bak" "$hypr/hyprland.conf"
 
+# 구형 conf 사본: 관리 블록이 불러오는 bindings.conf 에 exec-once 가 없으면
+# 셸이 자동 기동되지 않는다. bindings 는 기존 사본을 --force 없이 보존하므로
+# 업그레이드한 conf 사용자는 doctor 가 잡아야 한다.
+cp "$hypr/hyprland.conf" "$hypr/hyprland.conf.bak"
+printf '# >>> cachy-omarchy >>>\nsource = %s/bindings.conf\n# <<< cachy-omarchy <<<\n' \
+  "$config/hypr" >> "$hypr/hyprland.conf"
+mkdir -p "$config/hypr"
+printf 'bindd = SUPER, SPACE, Launch apps, exec, cachy-omarchy-launcher\n' > "$config/hypr/bindings.conf"
+out=$(run_doctor); code=$?
+assert_contains "$out" "FAIL: shell autostart missing from $config/hypr/bindings.conf — run: cachy-omarchy-bindings --force" \
+  "exec-once 없는 구형 사본은 FAIL 과 복구 명령"
+printf 'exec-once = cachy-omarchy-shell --run\n' >> "$config/hypr/bindings.conf"
+out=$(run_doctor); code=$?
+assert_contains "$out" "PASS: shell autostart declared (conf)" "exec-once 있으면 PASS"
+sed -i 's/^exec-once/# exec-once/' "$config/hypr/bindings.conf"
+out=$(run_doctor); code=$?
+assert_contains "$out" "FAIL: shell autostart missing" "주석 처리된 exec-once 는 PASS 가 아니다"
+rm -f "$config/hypr/bindings.conf"
+mv "$hypr/hyprland.conf.bak" "$hypr/hyprland.conf"
+
 out=$(run_doctor); code=$?
 assert_contains "$out" "PASS: jq" "test-local jq 존재는 PASS"
 

@@ -372,6 +372,17 @@ if [[ -s $OMARCHY_STATE_DIR/current/theme.name && -f $HYPR_DIR/hyprland.conf ]] 
     warn "theme hyprland.lua not sourced — run: cachy-omarchy-bindings --force"
   fi
 fi
+# conf 사용자의 셸 자동 기동은 bindings.conf 의 exec-once 한 줄뿐이다. 그 줄이
+# 생기기 전에 만든 사본은 cachy-omarchy-bindings 가 --force 없이 보존하므로
+# 업그레이드해도 셸이 뜨지 않는다 — 런처·키바인딩 뷰어가 모두 죽는다.
+if [[ -f $HYPR_DIR/hyprland.conf && -f $CONFIG_DIR/hypr/bindings.conf ]] \
+  && grep -qF '# >>> cachy-omarchy >>>' "$HYPR_DIR/hyprland.conf"; then
+  if grep -qE '^[[:space:]]*exec-once[[:space:]]*=[[:space:]]*cachy-omarchy-shell[[:space:]]+--run' "$CONFIG_DIR/hypr/bindings.conf"; then
+    pass "shell autostart declared (conf)"
+  else
+    fail "shell autostart missing from $CONFIG_DIR/hypr/bindings.conf — run: cachy-omarchy-bindings --force"
+  fi
+fi
 
 # v0.11: the toggles seam only holds for lua configs (2026-08-23 nested
 # Hyprland measurement — a .conf source of a *.lua glob parses without error,
