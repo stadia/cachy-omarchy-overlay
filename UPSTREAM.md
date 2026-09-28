@@ -7,15 +7,15 @@
 | 항목 | 값 |
 | --- | --- |
 | Repository | https://github.com/basecamp/omarchy.git |
-| Version | 4.0.3 |
-| Tag | v4.0.3 |
-| Commit | `0534987009061cbe2dacdde4ad564092ab698d12` |
+| Version | 4.0.4 |
+| Tag | v4.0.4 |
+| Commit | `c668141e9c42b13c80c9ca4ea108e11708c5e8a5` |
 | Channel | stable |
 | Source license | MIT (Copyright David Heinemeier Hansson) |
 | Known compatibility patches | `0001-stop-plugin-watcher-on-shell-exit.patch` (Quickshell `Io.Process` orphan cleanup, `docs/RUNTIME_STARTUP.md` §"역사 기록") |
-| Last tested CachyOS environment | CachyOS, kernel 7.2.3-1-cachyos, Hyprland 0.56.2, Quickshell 0.3.1. `omarchy`/`omarchy-settings` 미설치. 2026-09-11 `bin/update-upstream` candidate build, nested suite 76/76, transactional publish + 실저장소 재빌드 후 `./tests/test.sh` 76/76. 라이브 세션 실측(`COO_RUN_LIVE=1`)은 아직. |
+| Last tested CachyOS environment | CachyOS, kernel 7.2.5-1-cachyos, Hyprland 0.56.2, Quickshell 0.3.1. `omarchy`/`omarchy-settings` 미설치. 2026-09-28 `bin/update-upstream` candidate build, nested suite 76/76, transactional publish + 실저장소 재빌드 후 `./tests/test.sh` 76/76 (스테이징 검증 생략 note 0건). 라이브 세션 실측(`COO_RUN_LIVE=1`)은 아직. |
 
-이전 핀(`v4.0.1`, `13f18b2c`)에 대한 실측 기록은 위 표를 이 핀으로 갱신하기
+이전 핀(`v4.0.3`, `05349870`)에 대한 실측 기록은 위 표를 이 핀으로 갱신하기
 전 git 히스토리에 남아 있다.
 
 ## Moving the pin

@@ -1,6 +1,6 @@
 # upstream helper inventory — basecamp/omarchy bin/ at the pinned commit.
-# commit: 0534987009061cbe2dacdde4ad564092ab698d12
-# regenerate: git -C build/omarchy ls-tree --name-only 053498700906 bin/ | sed "s|^bin/||" | LC_ALL=C sort
+# commit: c668141e9c42b13c80c9ca4ea108e11708c5e8a5
+# regenerate: git -C build/omarchy ls-tree --name-only c668141e9c42 bin/ | sed "s|^bin/||" | LC_ALL=C sort
 #
 # 이 파일은 스캐너의 ground truth 다. 업스트림에 그런 헬퍼가 실제로
 # 있는지는 설치 트리로 알 수 없다 — 설치 트리에는 우리가 스테이징한

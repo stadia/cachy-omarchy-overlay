@@ -19,11 +19,11 @@ SUPER + K      →  Omarchy 스타일 키바인딩 뷰어
 
 | 패키지 | 버전 | 역할 |
 |---|---|---|
-| `cachy-omarchy-shell` | 4.0.3-1 | 핀된 Omarchy Quattro 셸 런타임 (Quickshell 트리, `omarchy-settings` 제외) |
+| `cachy-omarchy-shell` | 4.0.4-1 | 핀된 Omarchy Quattro 셸 런타임 (Quickshell 트리, `omarchy-settings` 제외) |
 | `cachy-omarchy-overlay` | 1.0.2-1 | CachyOS 통합 계층 (래퍼 명령, Hyprland 바인딩, 기본값) |
 
-업스트림 핀은 `upstream.lock`이 관리한다 (현재 `basecamp/omarchy @ v4.0.3`,
-`0534987`).
+업스트림 핀은 `upstream.lock`이 관리한다 (현재 `basecamp/omarchy @ v4.0.4`,
+`c668141`).
 
 설치되는 공개 명령 8개 (`/usr/bin`):
 
