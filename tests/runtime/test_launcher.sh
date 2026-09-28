@@ -42,9 +42,9 @@ fi
 
 # ---------------------------------------------------------------- IPC 오류 문자열 실측 (M2 발견 3)
 # 메뉴 토글은 하지 않는다. 잘못된 target/method 만 호출한다.
-coo_live_runtime_usable || { exit "$ASSERT_FAILURES"; }
-coo_pkg_artifact >/dev/null || { exit "$ASSERT_FAILURES"; }
-[[ -n ${root:-} ]] || { exit "$ASSERT_FAILURES"; }
+coo_live_runtime_usable || { echo "skip: 라이브 Wayland 런타임 없음 (quickshell/qs/systemd-cat 사용 불가 또는 WAYLAND_DISPLAY 소켓 없음)"; exit "$ASSERT_FAILURES"; }
+coo_pkg_artifact >/dev/null || { echo "skip: 셸 아티팩트 없음"; exit "$ASSERT_FAILURES"; }
+[[ -n ${root:-} ]] || { printf 'FAIL: 아티팩트는 있는데 추출에 실패했다\n'; exit 1; }
 
 [[ ${HOME:-} == "${COO_TEST_SANDBOX:?}" ]] || {
   printf 'FAIL: HOME 이 샌드박스가 아니다 — 사용자 상태를 건드릴 수 있어 중단한다\n' >&2

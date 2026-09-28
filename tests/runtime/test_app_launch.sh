@@ -19,13 +19,15 @@ printf 'launched\n' > '$marker'
 EOF
 chmod +x "$COO_TEST_SANDBOX/r06.probe.sh"
 
-command -v jq >/dev/null || { exit "$ASSERT_FAILURES"; }
-command -v hyprctl >/dev/null || { exit "$ASSERT_FAILURES"; }
-command -v wtype >/dev/null || { echo "skip: wtype 없음 (R06 라이브)"; exit "$ASSERT_FAILURES"; }
+# 옵트인 게이트가 먼저다 — 그 뒤의 전제 부재는 전부 이유를 말하고 skip 한다.
+# 조용히 exit 0 하면 러너가 PASS 로 센다.
 [[ ${COO_RUN_LIVE:-0} == 1 ]] || { echo "skip: 라이브 키 주입 (COO_RUN_LIVE=1 필요)"; exit 0; }
+command -v jq >/dev/null || { echo "skip: jq 없음 (R06 라이브)"; exit "$ASSERT_FAILURES"; }
+command -v hyprctl >/dev/null || { echo "skip: hyprctl 없음 (R06 라이브)"; exit "$ASSERT_FAILURES"; }
+command -v wtype >/dev/null || { echo "skip: wtype 없음 (R06 라이브)"; exit "$ASSERT_FAILURES"; }
 command -v gtk-launch >/dev/null || { echo "skip: gtk-launch 없음"; exit "$ASSERT_FAILURES"; }
-coo_live_runtime_usable || { exit "$ASSERT_FAILURES"; }
-coo_pkg_artifact >/dev/null || { exit "$ASSERT_FAILURES"; }
+coo_live_runtime_usable || { echo "skip: 라이브 Wayland 런타임 없음 (quickshell/qs/systemd-cat 사용 불가 또는 WAYLAND_DISPLAY 소켓 없음)"; exit "$ASSERT_FAILURES"; }
+coo_pkg_artifact >/dev/null || { echo "skip: 셸 아티팩트 없음"; exit "$ASSERT_FAILURES"; }
 
 [[ ${HOME:-} == "${COO_TEST_SANDBOX:?}" ]] || {
   printf 'FAIL: HOME 이 샌드박스가 아니다 — 사용자 상태를 건드릴 수 있어 중단한다\n' >&2
