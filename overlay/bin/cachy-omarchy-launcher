@@ -2,4 +2,10 @@
 # 호환용 별칭. 새 바인딩은 업스트림 `omarchy-menu toggle` 을 직접 부르지만,
 # 1.0.x 에서 만든 사용자 bindings 사본(~/.config/cachy-omarchy/hypr/)은
 # `cachy-omarchy-bindings --force` 전까지 이 이름으로 SUPER+SPACE 를 부른다.
-exec omarchy-menu toggle "$@"
+case ${1:-} in
+  "") exec omarchy-menu toggle ;;
+  --help)
+    printf '사용법: cachy-omarchy-launcher\n\n업스트림 `omarchy-menu toggle` 의 호환 별칭 — 루트 메뉴를 토글한다.\n'
+    ;;
+  *) printf 'error: 알 수 없는 인자: %s\n' "$1" >&2; exit 1 ;;
+esac

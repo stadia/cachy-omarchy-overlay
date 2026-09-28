@@ -24,6 +24,16 @@ PATH="$fake:$PATH" COO_FAKE_LOG="$fake/menu.log" "$L"; code=$?
 assert_eq "$code" "0" "호환 별칭 exit 0"
 assert_eq "$(cat "$fake/menu.log")" "toggle" "호환 별칭은 omarchy-menu toggle 로 넘긴다"
 
+# 별칭도 공개 명령이다 — 인자를 메뉴 route 로 흘려보내지 않는다.
+: >"$fake/menu.log"
+out=$(PATH="$fake:$PATH" COO_FAKE_LOG="$fake/menu.log" "$L" --help 2>&1); code=$?
+assert_eq "$code" "0" "--help exit 0"
+assert_contains "$out" "omarchy-menu toggle" "--help 가 위임 대상을 말한다"
+assert_eq "$(cat "$fake/menu.log")" "" "--help 는 메뉴를 토글하지 않는다"
+out=$(PATH="$fake:$PATH" COO_FAKE_LOG="$fake/menu.log" "$L" --nonsense 2>&1); code=$?
+assert_eq "$code" "1" "알 수 없는 인자 → exit 1"
+assert_eq "$(cat "$fake/menu.log")" "" "알 수 없는 인자는 메뉴를 토글하지 않는다"
+
 # 실제 체인: 업스트림 omarchy-menu → compat omarchy-shell → 우리 셸 래퍼.
 # 래퍼 자리에 스텁을 둬 IPC 인자만 본다(셸을 띄우지 않는다).
 cat >"$fake/cachy-omarchy-shell" <<'STUB'
