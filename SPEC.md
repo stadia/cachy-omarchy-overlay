@@ -1,8 +1,8 @@
 # Cachy Omarchy Overlay — SPEC.md
 
-> Status: **Rewrite / New Architecture**
+> Status: **v1.0 출하됨** (cachy-omarchy-overlay 1.0.x, cachy-omarchy-shell = 핀된 업스트림 버전)
 > Version: **Spec 1.0**
-> Date: 2026-08-16
+> Date: 2026-08-16 (이후 개정은 git 이력)
 > Target: **CachyOS + Hyprland**
 > Upstream: **Omarchy Quattro**
 > Packaging: **Arch Linux packages**
@@ -644,7 +644,6 @@ must be an explicit architecture decision.
 /usr/bin/cachy-omarchy-bindings
 /usr/bin/cachy-omarchy-init
 /usr/bin/cachy-omarchy-doctor
-/usr/bin/cachy-omarchy-reload
 ```
 
 ## 9.4 User Config
@@ -734,66 +733,24 @@ This document is human-readable.
 
 ```text
 cachy-omarchy-overlay/
-├── SPEC.md
-├── README.md              # English (primary)
-├── README.ko-KR.md        # Korean
-├── LICENSE
-├── UPSTREAM.md
-├── upstream.lock
-│
+├── SPEC.md · UPSTREAM.md · README.md (English) · README.ko-KR.md · LICENSE
+├── upstream.lock                     # 핀: 버전·커밋·채널·저장소·태그
 ├── packages/
-│   ├── cachy-omarchy-shell/
-│   │   ├── PKGBUILD
-│   │   ├── patches/
-│   │   │   └── README.md
-│   │   └── install/
-│   │
-│   └── cachy-omarchy-overlay/
-│       ├── PKGBUILD
-│       ├── src/
-│       └── install/
-│
-├── bin/
-│   ├── check-upstream
-│   ├── update-upstream
-│   ├── build-packages
-│   ├── test-packages
-│   ├── install-packages
-│   ├── rollback
-│   └── release
-│
-├── overlay/
-│   ├── bin/
-│   │   ├── cachy-omarchy-shell
-│   │   ├── cachy-omarchy-launcher
-│   │   ├── cachy-omarchy-keybindings
-│   │   ├── cachy-omarchy-bindings
-│   │   ├── cachy-omarchy-init
-│   │   ├── cachy-omarchy-doctor
-│   │   └── cachy-omarchy-reload
-│   │
-│   ├── defaults/
-│   └── hypr/
-│
-├── patches/
-│   └── README.md
-│
-├── tests/
-│   ├── package/
-│   ├── runtime/
-│   ├── integration/
-│   └── fixtures/
-│
-├── docs/
-│   ├── PACKAGE_AUDIT.md
-│   ├── RUNTIME_DEPENDENCIES.md
-│   ├── COMMAND_AUDIT.md
-│   ├── UPDATE_PROCESS.md
-│   ├── ROLLBACK.md
-│   └── LEGACY_MIGRATION.md
-│
-└── build/
-    └── .gitkeep
+│   ├── cachy-omarchy-shell/          # PKGBUILD, stage-upstream.sh, patches/
+│   └── cachy-omarchy-overlay/        # PKGBUILD, stage-overlay.sh
+├── overlay/                          # 우리가 쓴 통합층 — 오버레이 패키지의 원본
+│   ├── bin/                          # cachy-omarchy-{shell,launcher,keybindings,bindings,init,doctor}
+│   ├── compat/bin/                   # 업스트림 이름의 적응 카피 (§44)
+│   ├── defaults/shell.json           # 셸 패키지가 설치하는 기본 설정(업스트림과 동일 내용)
+│   ├── hypr/bindings.{lua,conf}      # 관리 블록이 불러오는 바인딩 정본
+│   └── uwsm/10-cachy-omarchy         # 세션 환경 드롭인 (§45)
+├── bin/                              # check-upstream, update-upstream, build-packages,
+│                                     # test-packages, install-packages, rollback,
+│                                     # bump-pkgrel, ci-resolve-install, validated-build.sh
+├── lib/runtime.sh                    # 테스트용 아티팩트 추출 헬퍼
+├── tests/                            # test.sh 러너, lib/, data/, package/, runtime/
+├── docs/                             # COMMAND_AUDIT, RUNTIME_DEPENDENCIES, RUNTIME_STARTUP
+└── build/                            # 빌드 산출물·업스트림 클론 (git 무시)
 ```
 
 ---
@@ -1508,23 +1465,8 @@ Independent semantic version:
 
 # 35. Optional `-git` Package
 
-Future:
-
-```text
-cachy-omarchy-shell-git
-```
-
-Purpose:
-
-Track development commits for testing.
-
-It must:
-
-- conflict with stable `cachy-omarchy-shell`;
-- never be installed automatically;
-- be clearly marked experimental.
-
-Stable users should track Omarchy releases, not arbitrary HEAD.
+보류. HEAD 를 따라가는 `cachy-omarchy-shell-git` 은 만들지 않았다. 만든다면 안정
+패키지와 conflicts 하고, 자동 설치되지 않으며, 실험용으로 표시해야 한다.
 
 ---
 
@@ -1621,8 +1563,9 @@ Minimum commands:
 cachy-omarchy-shell
 cachy-omarchy-launcher
 cachy-omarchy-keybindings
+cachy-omarchy-bindings
+cachy-omarchy-init
 cachy-omarchy-doctor
-cachy-omarchy-reload
 ```
 
 Developer/update commands remain in the source repository initially.
@@ -1926,45 +1869,13 @@ U10 rollback works
 
 # 50. Legacy Architecture Retirement
 
-Previous implementation may contain:
-
-```text
-custom coo-shell
-custom Quickshell host
-ported Menu.qml
-Walker theme
-Walker launcher
-custom app index
-custom command index
-```
-
-These are no longer architectural requirements.
-
-Default action:
-
-```text
-delete or archive
-```
-
-Do not preserve old code merely because it exists.
+완료. 옛 Walker 포트·자체 `coo-shell` 코드는 모두 지웠다. 원문은 태그 `v1.0.2` 의 `SPEC.md` 에 있다(`git show v1.0.2:SPEC.md`).
 
 ---
 
 # 51. Legacy Code That May Be Reused
 
-Generic code can be retained if it still fits the new design:
-
-```text
-Hyprland config discovery
-managed source block insertion
-keybinding conflict detection
-backup helpers
-doctor output helpers
-test fixtures
-recursive Hyprland source parser
-```
-
-Reuse must be based on usefulness, not sunk cost.
+완료(§50). 원문은 태그 `v1.0.2` 의 `SPEC.md` 에 있다(`git show v1.0.2:SPEC.md`).
 
 ---
 
@@ -1986,205 +1897,49 @@ Otherwise remove it.
 
 # 53. Milestone 0 — Official Package Audit
 
-## Goal
-
-Understand exactly what can be reused without installing official Omarchy.
-
-## Deliverables
-
-```text
-docs/PACKAGE_AUDIT.md
-docs/RUNTIME_DEPENDENCIES.md
-docs/COMMAND_AUDIT.md
-```
-
-## Tasks
-
-Inspect official:
-
-```text
-omarchy PKGBUILD
-omarchy-settings PKGBUILD
-omarchy-settings.install
-shell/
-bin/omarchy-shell
-```
-
-Record:
-
-- upstream paths;
-- package dependencies;
-- shell dependencies;
-- helper commands;
-- unsafe system integrations;
-- menu plugin runtime needs.
-
-## Exit Criteria
-
-We can answer:
-
-> "What is the minimum safe subset of Omarchy Quattro required to run
-> `omarchy.menu` on CachyOS?"
-
-No implementation beyond audit is required.
+완료. 목표·완료 기준의 원문은 태그 `v1.0.2` 의 `SPEC.md` 에 있다(`git show v1.0.2:SPEC.md`).
 
 ---
 
 # 54. Milestone 1 — Minimal `cachy-omarchy-shell` Package
 
-## Goal
-
-Build the upstream shell runtime as a standalone Arch package.
-
-## Requirements
-
-- pinned upstream source;
-- no `omarchy-settings`;
-- no bootloader dependencies;
-- no global CachyOS identity changes;
-- package audit passes.
-
-## Exit Criteria
-
-```bash
-makepkg
-```
-
-produces:
-
-```text
-cachy-omarchy-shell-<version>-<rel>-any.pkg.tar.zst
-```
-
-and forbidden-path audit passes.
+완료. 목표·완료 기준의 원문은 태그 `v1.0.2` 의 `SPEC.md` 에 있다(`git show v1.0.2:SPEC.md`).
 
 ---
 
 # 55. Milestone 2 — Launch Original Quattro Shell
 
-## Goal
-
-Run the packaged upstream shell on CachyOS.
-
-Implement only the compatibility needed to start it.
-
-Likely tools:
-
-```text
-OMARCHY_PATH
-compat PATH
-systemd user service
-small wrapper scripts
-```
-
-## Exit Criteria
-
-```text
-Quickshell process starts
-IPC ping succeeds
-no full Omarchy installation exists
-```
+완료. 목표·완료 기준의 원문은 태그 `v1.0.2` 의 `SPEC.md` 에 있다(`git show v1.0.2:SPEC.md`).
 
 ---
 
 # 56. Milestone 3 — Original Quattro Launcher
 
-## Goal
-
-Open the upstream `omarchy.menu`.
-
-Implement:
-
-```text
-cachy-omarchy-launcher
-SUPER + SPACE integration
-```
-
-Audit and disable unsupported menu commands.
-
-## Exit Criteria
-
-```text
-SUPER + SPACE
-```
-
-opens the original/minimally patched Quattro launcher and launches normal
-desktop applications.
+완료. 목표·완료 기준의 원문은 태그 `v1.0.2` 의 `SPEC.md` 에 있다(`git show v1.0.2:SPEC.md`).
 
 ---
 
 # 57. Milestone 4 — Keybinding UI
 
-## Goal
-
-Provide:
-
-```text
-SUPER + K
-```
-
-Prefer upstream.
-
-If upstream assumes Omarchy-specific config, adapt data collection while keeping
-the upstream visual/runtime mechanism.
-
-Use legacy parser only if useful.
+완료. 목표·완료 기준의 원문은 태그 `v1.0.2` 의 `SPEC.md` 에 있다(`git show v1.0.2:SPEC.md`).
 
 ---
 
 # 58. Milestone 5 — Overlay Package
 
-Package all CachyOS-specific integration as:
-
-```text
-cachy-omarchy-overlay
-```
-
-Remove ad-hoc installation scripts from the normal user path.
-
-Exit:
-
-```text
-pacman owns all system integration files
-```
+완료. 목표·완료 기준의 원문은 태그 `v1.0.2` 의 `SPEC.md` 에 있다(`git show v1.0.2:SPEC.md`).
 
 ---
 
 # 59. Milestone 6 — Update/Rebuild Pipeline
 
-Implement:
-
-```text
-check-upstream
-update-upstream
-build-packages
-test-packages
-install-packages
-rollback
-```
-
-Exit:
-
-A newer Omarchy release can be adopted without manually rewriting PKGBUILD
-values.
+완료. 목표·완료 기준의 원문은 태그 `v1.0.2` 의 `SPEC.md` 에 있다(`git show v1.0.2:SPEC.md`).
 
 ---
 
 # 60. Milestone 7 — Reliability
 
-Implement:
-
-```text
-clean builds
-package audits
-runtime tests
-doctor
-upgrade test
-rollback test
-documentation
-```
-
-This is the v0.1 release candidate.
+완료. 목표·완료 기준의 원문은 태그 `v1.0.2` 의 `SPEC.md` 에 있다(`git show v1.0.2:SPEC.md`).
 
 ---
 
@@ -2324,117 +2079,53 @@ All must be true:
 - [x] Normal applications can launch.
 - [x] `SUPER + K` opens keybinding UI.
 - [x] Existing Hyprland config is preserved.
-- [x] An installed Waybar is not removed or stopped by us. *(2026-08-17 실측 — waybar 0.15.0 설치·실행 상태에서 바를 켠 셸을 띄웠고 waybar 프로세스는 그대로였다. 두 바는 겹치지 않고 쌓인다(예약 36→62px). RUNTIME_STARTUP §17.6)*
-- [x] A running notification daemon is not stopped, masked or uninstalled by us. *(v0.2.0 개정 — 셸이 알림 플러그인을 켠 채로 뜬다. mako 가 이름을 쥐고 있으면 물러나고, 셸이 먼저 잡으면 mako 는 활성화되지 않는다 — 밀어내기가 아니라 순서. §17.4 실측, 재로그인 실측 §17.7)*
-- [x] An installed lock helper is not removed or stopped by us. *(2026-08-20 실측 — 중첩 Hyprland 격리에서 hyprlock 0.9.6 과 양방향 공존을 쟀다. 우리 셸이 떠 있어도 hyprlock 은 세션을 정상 잠근다. 우리는 어떤 lock 경로/유닛도 소유하지 않고, stop/mask/disable/제거하는 코드가 없다. RUNTIME_STARTUP §22)*
+- [x] An installed Waybar is not removed or stopped by us.
+- [x] A running notification daemon is not stopped, masked or uninstalled by us.
+- [x] An installed lock helper is not removed or stopped by us.
 - [x] Rebuild against a newer upstream release is automated.
 - [x] Failed updates do not install.
 - [x] Previous working package can be rolled back.
 
-Evidence ledger: `docs/RC_GAP_INVENTORY.md` (측정됨 / 미검증 / 추론됨 구분). 라이브
-실측 기록은 `docs/RUNTIME_STARTUP.md` §12–§22. **21/21 측정됨** — Waybar 공존은
-2026-08-17 waybar 설치 후 §17.6 에서, lock 공존은 2026-08-20 §22 에서 해소됐다.
+전 항목 측정됨(v1.0 기준). 항목별 증거 원장과 실측 기록은 태그 `v1.0.2` 의
+`docs/RC_GAP_INVENTORY.md`·`docs/V1_ACCEPTANCE.md`·`docs/RUNTIME_STARTUP.md` §12–§22 에 있다.
 
-§22 가 함께 드러낸 것: ext-session-lock 은 클라이언트 하나만 쥔다. 거부당할 때
-hyprlock 은 살아남지만 quickshell 은 프로토콜 오류로 **죽는다**. 업스트림의
-stranded-lock 회수 경로(`omarchy-hyprland-session-locked`)를 스테이징하면 hyprlock
-잠금 중 셸 재시작마다 셸이 사망하므로, 그 헬퍼는 의도적으로 올리지 않는다
-(§43 분류: DISABLED — 공존 위험. 테스트가 고정: `test_staged_session_helpers.sh`).
-0.1.2 release (cachy-omarchy-overlay 0.1.2-1) 시점 기준. R07 자동 복구는
-systemd 유닛 제거(4c5731b)로 더 이상 shipped feature 가 아님(§16.6) — 이는 §61 의
-명시 항목이 아님.
+잠금 공존 실측(§22)이 남긴 결정: ext-session-lock 은 클라이언트 하나만 쥐고, 거부당하면
+quickshell 은 프로토콜 오류로 죽는다. 그래서 업스트림 stranded-lock 회수 헬퍼
+(`omarchy-hyprland-session-locked`)는 올리지 않는다(`test_staged_session_helpers.sh` 가 고정).
 
 ---
 
 # 62. Update UX
 
-Desired eventual user command:
-
-```bash
-cachy-omarchy-update
-```
-
-Output:
-
-```text
-Checking Omarchy upstream...
-
-Installed runtime:
-  4.0.0-2
-
-Latest supported upstream:
-  4.0.1
-
-Preparing build...
-  source      OK
-  patches     OK
-  package     OK
-  audit       OK
-  smoke test  OK
-
-New package is ready:
-  cachy-omarchy-shell-4.0.1-1
-
-Run with --install to upgrade.
-```
+보류. 사용자용 `cachy-omarchy-update` 는 만들지 않았다. 업데이트는 저장소의
+`bin/check-upstream` → `bin/update-upstream` → `bin/install-packages` 로 한다(§29–§33).
 
 ---
 
 # 63. CI / Automation
 
-Future repository CI should:
+`.github/workflows/ci.yml` 이 push·PR 마다 CachyOS 컨테이너에서 두 lane 을 돈다:
 
-```text
-check upstream releases
-build packages
-run package audit
-run static tests
-publish build artifacts
-```
+- **tests** — 핀 커밋으로 두 패키지를 빌드하고 `bin/test-packages` 로 전체 스위트를
+  돌린다. 허용목록 밖의 `skip:` 은 실패다.
+- **resolve** — 로컬 pacman 저장소로 실제 설치 트랜잭션을 돌려 의존 선언이 충분한지
+  증명하고, headless `cachy-omarchy-init` 과 폐쇄 스캐너를 설치 트리에 돌린다.
 
-A scheduled upstream check may open an update PR.
-
-The CI must **not** silently publish a release when runtime tests are required
-but unavailable.
+CI 는 릴리스를 발행하지 않는다. 업스트림 새 릴리스 감지·PR 자동화는 없다.
 
 ---
 
 # 64. Future Local Repository
 
-Once stable, packages may be served through a small pacman repository.
-
-Example concept:
-
-```text
-[cachy-omarchy]
-Server = ...
-```
-
-But this is explicitly deferred until:
-
-- package boundaries are stable;
-- signing is implemented;
-- update tests are reliable.
-
-Initial distribution is local `.pkg.tar.zst`.
+보류. 배포는 로컬 `.pkg.tar.zst` 다. pacman 저장소는 패키지 경계가 안정되고
+서명(§65)이 갖춰진 뒤에만 검토한다.
 
 ---
 
 # 65. Signing
 
-Future published packages should be signed.
-
-Do not copy the upstream Omarchy repository's trust configuration blindly.
-
-A public package repository requires:
-
-```text
-own signing key
-documented trust bootstrap
-signed database/packages
-```
-
-This is out of scope for v0.1 local builds.
+보류. 공개 저장소를 만든다면 자체 서명 키, 문서화된 신뢰 부트스트랩, 서명된
+DB·패키지가 필요하다. 업스트림 Omarchy 저장소의 신뢰 설정을 그대로 복사하지 않는다.
 
 ---
 
@@ -2484,7 +2175,7 @@ Any AI/code agent implementing this specification MUST:
 
 1. Read the entire SPEC.
 2. Treat all earlier Walker/custom-shell specs as obsolete.
-3. Start with Milestone 0.
+3. (Milestones 0–10 are complete; see §53–§60.)
 4. Do not reimplement the launcher before proving upstream cannot be reused.
 5. Never add `omarchy-settings` as a dependency.
 6. Never add Limine merely because official Omarchy depends on it.
@@ -2511,172 +2202,37 @@ Any AI/code agent implementing this specification MUST:
 
 # 68. First Coding-Agent Prompt
 
-```text
-Read SPEC.md completely.
-
-All previous Walker and custom coo-shell architecture is obsolete.
-
-Implement Milestone 0 only.
-
-Audit the pinned Omarchy Quattro release and produce:
-
-- docs/PACKAGE_AUDIT.md
-- docs/RUNTIME_DEPENDENCIES.md
-- docs/COMMAND_AUDIT.md
-
-Focus on determining the minimum safe subset needed to run the original
-Omarchy Quattro `omarchy.menu` on CachyOS.
-
-Inspect:
-- official omarchy PKGBUILD
-- official omarchy-settings PKGBUILD
-- omarchy-settings.install
-- shell/
-- bin/omarchy-shell
-- every helper invoked by the menu/shell startup path
-
-Classify dependencies as:
-- REQUIRED
-- OPTIONAL
-- DISABLE
-- UNSAFE
-
-Classify source adaptations as:
-- NONE
-- ENVIRONMENT
-- WRAPPER
-- PATCH
-- REIMPLEMENT
-
-Do not implement a custom launcher.
-Do not install omarchy or omarchy-settings.
-Do not modify the host system.
-Record the exact upstream version and commit used.
-```
+완료된 마일스톤용 코딩 에이전트 지시였다. 원문은 태그 `v1.0.2` 의 `SPEC.md` 에 있다(`git show v1.0.2:SPEC.md`).
 
 ---
 
 # 69. Second Coding-Agent Prompt
 
-```text
-Read SPEC.md and all Milestone 0 audit documents.
-
-Implement Milestone 1 only.
-
-Create packages/cachy-omarchy-shell/PKGBUILD.
-
-Requirements:
-- build from exact commit in upstream.lock
-- package only audited runtime files
-- no omarchy-settings dependency
-- no Limine/Snapper/SDDM dependency unless audit proves a runtime requirement
-- no forbidden /etc paths
-- do not install the package yet
-
-Add package tests:
-- forbidden path audit
-- lock/pkgver consistency
-- expected shell files
-- expected menu plugin
-- dependency assertions
-
-Build locally and report exact results.
-```
+완료된 마일스톤용 코딩 에이전트 지시였다. 원문은 태그 `v1.0.2` 의 `SPEC.md` 에 있다(`git show v1.0.2:SPEC.md`).
 
 ---
 
 # 70. Third Coding-Agent Prompt
 
-```text
-Read SPEC.md and audit documents.
-
-Implement Milestone 2.
-
-Goal:
-Run the packaged original Omarchy Quattro shell on CachyOS.
-
-Use, in preference order:
-1. environment variables
-2. controlled compatibility PATH
-3. wrapper scripts
-4. minimal patches
-
-Do not build a new Quickshell host.
-
-Add:
-- cachy-omarchy-shell wrapper
-- user systemd service
-- IPC ping test
-
-Do not enable bar/notifications/lock/OSD unless required for shell startup.
-If upstream cannot start without one of these, document the dependency before
-changing scope.
-```
+완료된 마일스톤용 코딩 에이전트 지시였다. 원문은 태그 `v1.0.2` 의 `SPEC.md` 에 있다(`git show v1.0.2:SPEC.md`).
 
 ---
 
 # 71. Fourth Coding-Agent Prompt
 
-```text
-Implement Milestone 3 only.
-
-Use the running packaged upstream shell.
-
-Create:
-- cachy-omarchy-launcher
-- Hyprland integration for SUPER+SPACE
-
-Invoke the original upstream `omarchy.menu` through its IPC path.
-
-Audit every Omarchy-specific command visible from the launcher:
-- safe commands may remain
-- adaptable commands get wrappers
-- unsafe/full-OS commands are disabled
-
-Do not replace the menu UI with custom QML.
-```
+완료된 마일스톤용 코딩 에이전트 지시였다. 원문은 태그 `v1.0.2` 의 `SPEC.md` 에 있다(`git show v1.0.2:SPEC.md`).
 
 ---
 
 # 72. Fifth Coding-Agent Prompt
 
-```text
-Implement Milestones 4 and 5.
-
-Add SUPER+K keybinding UI, preferring upstream behavior.
-
-Package all CachyOS-specific integration as cachy-omarchy-overlay.
-
-The end state must be installable through pacman packages rather than scripts
-copying files into /usr.
-```
+완료된 마일스톤용 코딩 에이전트 지시였다. 원문은 태그 `v1.0.2` 의 `SPEC.md` 에 있다(`git show v1.0.2:SPEC.md`).
 
 ---
 
 # 73. Sixth Coding-Agent Prompt
 
-```text
-Implement Milestones 6 and 7.
-
-Create the upstream update/rebuild pipeline:
-
-check-upstream
-update-upstream
-build-packages
-test-packages
-install-packages
-rollback
-
-Rules:
-- exact upstream commit pin
-- patch failure blocks install
-- build failure blocks install
-- package audit failure blocks install
-- runtime test failure blocks install
-- keep previous known-good package
-- reset pkgrel to 1 when upstream pkgver changes
-- allow pkgrel bump for packaging-only fixes
-```
+완료된 마일스톤용 코딩 에이전트 지시였다. 원문은 태그 `v1.0.2` 의 `SPEC.md` 에 있다(`git show v1.0.2:SPEC.md`).
 
 ---
 
