@@ -6,10 +6,11 @@ REPO_ROOT="${REPO_ROOT:?}"
 source "$REPO_ROOT/tests/lib/assert.sh"
 source "$REPO_ROOT/lib/runtime.sh"
 
+# 옵트인 게이트가 먼저다 — 기본 실행은 허용된 사유 하나로만 skip 한다.
+[[ ${COO_RUN_LIVE:-0} == 1 ]] || { echo "skip: 라이브 키 주입 (COO_RUN_LIVE=1 필요)"; exit 0; }
 command -v jq >/dev/null || { echo "skip: jq 없음"; exit 0; }
 command -v hyprctl >/dev/null || { echo "skip: hyprctl 없음"; exit 0; }
 command -v wtype >/dev/null || { echo "skip: wtype 없음 (Escape)"; exit 0; }
-[[ ${COO_RUN_LIVE:-0} == 1 ]] || { echo "skip: 라이브 키 주입 (COO_RUN_LIVE=1 필요)"; exit 0; }
 coo_live_runtime_usable || { echo "skip: 라이브 Wayland 런타임 없음 (quickshell/qs/systemd-cat 사용 불가 또는 WAYLAND_DISPLAY 소켓 없음)"; exit 0; }
 coo_pkg_artifact >/dev/null || { echo "skip: build/*.pkg.tar.zst 없음"; exit 0; }
 
