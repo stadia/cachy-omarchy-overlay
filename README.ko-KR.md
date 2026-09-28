@@ -168,8 +168,8 @@ bin/rollback                 # 이전 핀으로 복귀
 
 `xdg-terminal-exec` 는 여전히 AUR 전용 optdepend — fallback 어댑터는 만들지
 않는다. 크래시한 `hyprlock` 이 stranded 시킨 잠금을 복구하는 것은 범위 밖이다
-(`docs/RUNTIME_STARTUP.md` §22.4). 릴리스 이력은 git 태그(`v0.1.2`부터
-`v1.0.1`까지)에 있다.
+(`docs/RUNTIME_STARTUP.md` §22.4). 릴리스 이력은 git 태그
+(`git tag`)에 있다.
 
 ## 라이선스
 
