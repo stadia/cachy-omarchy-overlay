@@ -694,9 +694,9 @@ assert_eq "$code" "0" "U02 update validates and publishes candidate"
 # The nested candidate suite is the only record of why it rejected the pin.
 (( code )) && printf '%s\n' "$out" | grep -E '^(FAIL|SKIP|skip:|error:|warn:)' | sed 's/^/      candidate: /'
 assert_eq "$(sort -u "$candidate_source_log")" "$fixture_commit" "U02 candidate build uses the newly discovered commit"
-assert_contains "$out" "PASS tests/runtime/test_m3_docs.sh" "candidate default suite runs M3 docs test"
+assert_contains "$out" "PASS tests/runtime/test_wrapper.sh" "candidate default suite runs runtime wrapper test"
 assert_contains "$out" "PASS tests/package/test_package_files.sh" "candidate default suite reaches package files test"
-assert_contains "$out" "PASS tests/runtime/test_support_contract.sh" "candidate default suite reaches support contract test"
+assert_contains "$out" "PASS tests/runtime/test_doctor.sh" "candidate default suite reaches doctor test"
 updated_lock=$(cat "$root/upstream.lock")
 updated_pkg=$(cat "$root/packages/cachy-omarchy-shell/PKGBUILD")
 assert_contains "$updated_lock" "OMARCHY_VERSION=$next_ver" "U02 lock version updates"

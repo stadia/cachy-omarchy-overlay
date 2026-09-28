@@ -96,8 +96,7 @@ WARNs on its existence (`docs/RUNTIME_STARTUP.md`, `docs/RC_GAP_INVENTORY.md`).
 
 ### Support scope
 
-Lua toggle files apply only with a `hyprland.lua` config —
-**Lua toggle 파일은 hyprland.lua 설정에서만 적용된다.** With a `hyprland.conf`
+**Lua toggle files apply only with a `hyprland.lua` config.** With a `hyprland.conf`
 setup, install/shell/launcher/theme all work, but those Lua toggle files are
 silently ignored because `.conf` does not execute Lua files. This does not
 claim laptop-lid support: the overlay does not stage upstream's lid-switch
