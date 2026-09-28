@@ -92,7 +92,7 @@ file is absent, every lookup infers the city from the client IP via wttr.in and
 does not persist it. To disable the widget, remove `omarchy.weather` from the
 bar layout in `~/.config/omarchy/shell.json`. Creating that file does not
 deep-merge: package defaults are ignored wholesale, and `cachy-omarchy-doctor`
-WARNs on its existence (`docs/RUNTIME_STARTUP.md`, `docs/RC_GAP_INVENTORY.md`).
+WARNs on its existence (`docs/RUNTIME_STARTUP.md`).
 
 ### Support scope
 

@@ -26,6 +26,6 @@ Patch: `0002-cancel-polkit-flow-before-session-lock.patch`
 
 Reason: An active Polkit authentication flow can leave the locked session waiting indefinitely.
 
-Upstream issue: not filed; local v1.0 acceptance evidence is `docs/V1_ACCEPTANCE.md §polkit`.
+Upstream issue: not filed; v1.0 acceptance evidence is in `git show v1.0.2:docs/V1_ACCEPTANCE.md` (§polkit).
 
 Can remove when: an upstream fix is verified to cancel an active Polkit flow before the session lock becomes secure.

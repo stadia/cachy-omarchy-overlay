@@ -88,7 +88,7 @@ helper 와 런타임 의존성(`jq`, `wl-clipboard`, `wtype`, `wireplumber`,
 않는다. 위젯을 끄려면 `~/.config/omarchy/shell.json` bar layout 에서
 `omarchy.weather` 를 제거한다. 그 파일을 만들면 딥머지가 없다 — 패키지
 기본값이 통째로 무시되고, `cachy-omarchy-doctor` 가 존재 시 WARN 한다
-(`docs/RUNTIME_STARTUP.md`, `docs/RC_GAP_INVENTORY.md`).
+(`docs/RUNTIME_STARTUP.md`).
 
 ### 지원 범위
 

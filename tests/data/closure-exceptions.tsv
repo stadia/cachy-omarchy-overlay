@@ -15,7 +15,9 @@
 # 안 되며, STALE_EXCEPTION 이 이를 강제한다). milestone=0.12.0 은 다음
 # 마일스톤 후보, milestone=backlog 은 가져올 수 있지만 일정 약속이 없는 행이라는
 # 뜻이며, 어느 값이든 스캐너가 읽지 않는 사람용 주석이다.
-# 각 값의 선정 근거와 전체 순위 해석은 docs/CLOSURE_PRIORITY.md 를 참조한다.
+# backlog 행은 "지금 없어서 깨지는 결손"이 아니라 "새 기능 표면을 채택할지"의
+# 결정이다 — 마일스톤에 얹지 않고 채택 여부를 따로 정한다. 과거 순위 근거는
+# `git show v1.0.2:docs/CLOSURE_PRIORITY.md`.
 #
 # STALE_EXCEPTION: closure_check.py 가 매 실행마다 이 파일의 모든 행을
 # 검사해, 이미 스테이징됐거나 더는 도달 불가능한 행을 위반으로 보고한다
