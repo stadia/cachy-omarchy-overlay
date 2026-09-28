@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # PreToolUse hook: forbid Edit/Write/MultiEdit to the user's LIVE Hyprland
 # config. This is the project's #1 safety rule (~/.config/hypr/** is never
-# edited directly -- only the project overlay at ~/.config/cachy-omarchy-overlay/
-# and sandbox fixtures under tests/). Enforced mechanically so no session,
+# edited directly -- only the project's own copies under ~/.config/cachy-omarchy/
+# and sandbox HOMEs created by tests/test.sh). Enforced mechanically so no session,
 # human-driven or subagent, can brick the user's desktop config by accident.
 #
 # Fails OPEN: any parse error or missing file_path -> exit 0 (allow). Only an
@@ -23,7 +23,7 @@ esac
 case "$abs" in
   "$HOME"/.config/hypr/*)
     printf '차단: 사용자 Hyprland 설정(%s)은 직접 편집할 수 없습니다.\n' "$abs" >&2
-    printf '      프로젝트 오버레이(~/.config/cachy-omarchy-overlay/hypr/) 또는 테스트 픽스처(tests/fixtures/hypr/)를 사용하세요.\n' >&2
+    printf '      프로젝트 사본(~/.config/cachy-omarchy/hypr/) 또는 샌드박스 HOME(./tests/test.sh)을 사용하세요.\n' >&2
     exit 2
     ;;
 esac

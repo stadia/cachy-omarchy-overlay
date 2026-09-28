@@ -8,12 +8,14 @@ source "$REPO_ROOT/tests/lib/sandbox.sh"
 
 only=${1:-}
 failed=0
+skipped=0
 total=0
 test_list=$(mktemp "${TMPDIR:-/tmp}/coo-test-list-XXXXXX") || {
   printf 'error: could not create test discovery list\n' >&2
   exit 1
 }
-trap 'rm -f "$test_list"' EXIT
+test_out=$(mktemp "${TMPDIR:-/tmp}/coo-test-out-XXXXXX") || exit 1
+trap 'rm -f "$test_list" "$test_out"' EXIT
 if ! find "$REPO_ROOT/tests" -name 'test_*.sh' -type f -print | sort > "$test_list"; then
   printf 'error: test discovery failed\n' >&2
   exit 1
@@ -37,9 +39,18 @@ while IFS= read -r t; do
      XDG_CACHE_HOME="$sandbox/.cache" \
      COO_TEST_SANDBOX="$sandbox" \
      COO_PAM_LOCK_FILE="$sandbox/pam/omarchy-lock-password" \
-     bash "$t"; then
-    printf 'PASS %s\n' "${t#"$REPO_ROOT"/}"
+     bash "$t" >"$test_out" 2>&1; then
+    cat "$test_out"
+    # A file that exits 0 after announcing `skip:` did not verify what it
+    # names. Say so, so a skip never reads as a pass.
+    if grep -q '^skip:' "$test_out"; then
+      printf 'SKIP %s\n' "${t#"$REPO_ROOT"/}"
+      skipped=$((skipped + 1))
+    else
+      printf 'PASS %s\n' "${t#"$REPO_ROOT"/}"
+    fi
   else
+    cat "$test_out"
     printf 'FAIL %s\n' "${t#"$REPO_ROOT"/}"
     failed=$((failed + 1))
   fi
@@ -50,7 +61,9 @@ while IFS= read -r t; do
   rm -rf "$sandbox"
 done < "$test_list"
 
-printf '\n%d/%d test files passed\n' "$((total - failed))" "$total"
+# Skipped files verified nothing, so they are not counted as passed.
+printf '\n%d/%d test files passed, %d skipped, %d failed\n' \
+  "$((total - failed - skipped))" "$total" "$skipped" "$failed"
 if [[ $total -eq 0 ]]; then
   printf 'error: no test files matched%s\n' "${only:+ filter: $only}" >&2
   exit 1

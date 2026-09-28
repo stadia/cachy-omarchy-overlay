@@ -167,7 +167,7 @@ CachyOS
 │
 └── cachy-omarchy-overlay
      ├── launch wrappers
-     ├── user service
+     ├── Hyprland autostart
      ├── Hyprland bindings
      ├── compatibility environment
      └── update/build tooling
@@ -928,7 +928,7 @@ Benefits:
 
 ---
 
-# 17. User Service
+# 17. Shell Autostart
 
 The shell is launched by Hyprland autostart, not a systemd user unit:
 
@@ -944,7 +944,7 @@ There is no `Restart=on-failure` (R07 auto-recovery is not provided; recovery is
 manual `--restart`). Migration from the former systemd unit requires
 `cachy-omarchy-bindings --force` to refresh the live bindings copy.
 
-The service must not:
+The overlay must not:
 
 - start a second Hyprland;
 - stop, mask, disable or uninstall a running Waybar, notification daemon or
@@ -1641,7 +1641,6 @@ cachy-omarchy-shell package
 cachy-omarchy-overlay package
 OMARCHY_PATH compatibility root
 shell.qml
-shell service
 Quickshell process
 IPC ping
 omarchy.menu availability
@@ -1653,8 +1652,8 @@ keybinding invocation
 It should also report installed package versions:
 
 ```text
-Upstream Omarchy runtime: 4.0.1-1
-Overlay integration:      0.2.0-1
+Upstream Omarchy runtime: 4.0.4-1
+Overlay integration:      1.0.2-1
 ```
 
 ---
@@ -1664,7 +1663,7 @@ Overlay integration:      0.2.0-1
 Runtime logs:
 
 ```text
-journalctl --user -u cachy-omarchy-shell
+journalctl --user -t cachy-omarchy-shell
 ```
 
 Optional user log directory:
@@ -1832,7 +1831,7 @@ Test:
 Inside a Hyprland/Wayland session:
 
 ```text
-service starts
+shell starts
 IPC responds
 menu plugin exists
 menu can open
@@ -1884,7 +1883,7 @@ R03 menu plugin is discoverable
 R04 launcher toggles
 R05 Escape closes launcher
 R06 application can be launched
-R07 restarting service recovers
+R07 cachy-omarchy-shell --restart recovers
 R08 absence of Waybar modification
 R09 no notification daemon is stopped, masked or uninstalled by us
 R10 no lock helper is stopped, masked or uninstalled by us

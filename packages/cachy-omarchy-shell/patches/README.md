@@ -1,7 +1,8 @@
 # Maintained runtime patches
 
-`bin/update-upstream` applies these maintained runtime patches to its disposable
-candidate source in lexicographic filename order. Each patch is a git-format patch
+`PKGBUILD` `prepare()` applies these maintained runtime patches to the pinned
+source in lexicographic filename order (`bin/update-upstream` only checks that they
+still apply to a candidate pin). Each patch is a git-format patch
 against the commit pinned by `packages/cachy-omarchy-shell/PKGBUILD:_commit`.
 
 ## Plugin watcher cleanup
@@ -15,7 +16,7 @@ logout). The patch therefore carries two devices: the QML-side `stopLocalPluginW
 clean engine teardown, and `setpriv --pdeathsig TERM --` on the watcher command so the kernel
 reaps it whichever way the shell dies. Runtime evidence: `tests/runtime/test_reload_watcher_reap.sh`.
 
-Upstream issue: not filed; local v1.0 acceptance evidence is `docs/V1_ACCEPTANCE.md §polkit`.
+Upstream issue: not filed.
 
 Can remove when: Quickshell/upstream guarantees child Process cleanup and this patch no longer applies.
 

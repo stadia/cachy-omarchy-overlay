@@ -19,17 +19,27 @@ source "$REPO_ROOT/tests/lib/assert.sh"
 # Called through `$(...)`, so the marker is spawned by a subshell and is
 # orphaned the moment that subshell exits -- the same state the shell's
 # inotifywait ends up in.  It is therefore nobody's child and `wait` cannot be
-# used on it; liveness is polled with `kill -0` instead.
+# used on it; liveness is polled through /proc instead.
 spawn_marker() { # $1 = path to carry
   bash -c 'exec -a "$0" sleep 300' "$1" >/dev/null 2>&1 &
   printf '%s\n' "$!"
+}
+
+# A killed orphan is only reaped by PID 1.  In a container whose PID 1 never
+# calls wait() (GitHub Actions runs `tail -f /dev/null`) it stays a zombie:
+# `kill -0` still succeeds, but it runs nothing.  Count zombies as gone.
+is_alive() { # $1 = pid
+  local stat
+  { stat=$(<"/proc/$1/stat"); } 2>/dev/null || return 1
+  stat=${stat##*) }
+  [[ ${stat:0:1} != Z ]]
 }
 
 # Bounded poll for a PID to disappear.  0 = gone, 1 = still alive.
 await_gone() { # $1 = pid
   local i
   for (( i = 0; i < 20; i++ )); do
-    kill -0 "$1" 2>/dev/null || return 0
+    is_alive "$1" || return 0
     sleep 0.1
   done
   return 1
@@ -57,8 +67,8 @@ source "$REPO_ROOT/tests/lib/sandbox.sh"
 work=$(mktemp -d "${TMPDIR:-/tmp}/coo-test-reapXXXXXX")
 marker=$(spawn_marker "$work/watcher")
 # The marker must actually be running, or the kill below proves nothing.
-for _ in $(seq 20); do kill -0 "$marker" 2>/dev/null && break; sleep 0.1; done
-kill -0 "$marker" 2>/dev/null && spawned=0 || spawned=1
+for _ in $(seq 20); do is_alive "$marker" && break; sleep 0.1; done
+is_alive "$marker" && spawned=0 || spawned=1
 assert_eq "$spawned" "0" "marker process is running before the reap"
 
 coo_reap_sandbox_procs "$work"
@@ -85,7 +95,7 @@ for bad in "" "/" "/tmp" "/home/nobody" "$outsider_dir"; do
   code=0; coo_reap_sandbox_procs "$bad" >/dev/null 2>&1 || code=$?
   assert_eq "$code" "2" "reaper refuses non-sandbox path: ${bad:-<empty>}"
 done
-kill -0 "$outsider" 2>/dev/null && alive=0 || alive=1
+is_alive "$outsider" && alive=0 || alive=1
 assert_eq "$alive" "0" "a refused path kills nothing"
 kill -KILL "$outsider" 2>/dev/null
 rm -rf "$outsider_dir"
@@ -103,7 +113,9 @@ leaked=$(<"$outfile")
 assert_eq "$(printf '%s' "$leaked" | grep -cE '^[0-9]+$')" "1" \
   "fixture run reported the PID it stranded (got: ${leaked:-<empty>})"
 if [[ $leaked =~ ^[0-9]+$ ]]; then
-  kill -0 "$leaked" 2>/dev/null && survived=1 || survived=0
+  # The reaper stops watching once the command line is gone, which the kernel
+  # clears before the process finishes exiting. Poll, like the check above.
+  survived=0; await_gone "$leaked" || survived=1
   assert_eq "$survived" "0" "runner reaps a process stranded inside a test sandbox"
   # Never let a failing run become the leak it is testing for.
   (( survived )) && kill -KILL "$leaked" 2>/dev/null

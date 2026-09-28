@@ -175,7 +175,7 @@ file only.
 `xdg-terminal-exec` stays an AUR-only optdepend — no fallback adapter is shipped.
 Recovering a lock stranded by a crashed `hyprlock` is out of scope
 (`docs/RUNTIME_STARTUP.md` §22.4). Release history is in the git tags
-(`v0.1.2` through `v1.0.1`).
+(`git tag`).
 
 ## License
 

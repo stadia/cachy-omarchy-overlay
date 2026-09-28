@@ -23,7 +23,7 @@ description: 끊긴 컨트롤러 세션을 이어받을 때 SDD 워크스페이�
    git branch --show-current
    git log --oneline | head -15
    ./tests/test.sh          # 기대: 전부 PASS
-   systemctl --user status coo-shell.service --no-pager
+   pgrep -af 'quickshell -n -p'   # 셸은 Hyprland autostart 로 뜬다 — systemd 유닛 없음
    ```
 
 4. **재디스패치 금지 규칙:** 원장에서 `Task <N>: complete`인 태스크는 다시 실행하지 않는다.
@@ -36,5 +36,5 @@ description: 끊긴 컨트롤러 세션을 이어받을 때 SDD 워크스페이�
 
 ## 안전
 - 이 스킬은 읽기 + `./tests/test.sh` 실행만 한다. 코드 수정·커밋·라이브 세션 변경은 하지 않는다.
-- 라이브 테스트는 `COO_SHELL_PATH=$PWD/shell` 환경에서만; 사용자 세션 Hyprland에 무격리 `hyprctl`/`pkill` 금지.
+- 라이브 테스트(`COO_RUN_LIVE=1`)는 러너의 샌드박스 HOME 안에서만; 사용자 세션 Hyprland에 무격리 `hyprctl`/`pkill` 금지.
 - 산출물 보고는 한국어.

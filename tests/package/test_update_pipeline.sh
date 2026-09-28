@@ -691,6 +691,8 @@ overlay_pkgver_before_update=$(grep -m1 '^pkgver=' "$root/packages/cachy-omarchy
 code=0
 out=$(WAYLAND_DISPLAY= COO_UPDATE_PIPELINE_NESTED=1 COO_REPO_ROOT="$root" COO_GIT_BIN="$fake/git" COO_STATE_DIR="$update_state" COO_BUILD_DIR="$update_build" COO_OMARCHY_GIT="$old_source_fixture" COO_EXPECT_UPSTREAM_COMMIT="$fixture_commit" COO_CANDIDATE_SOURCE_LOG="$candidate_source_log" COO_TOOL_LOG="$log" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_FAKE_SHELL_ARTIFACT="$u02_shell_fixture" COO_FAKE_OVERLAY_ARTIFACT="$u02_overlay_fixture" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$pac_update" "$root/bin/update-upstream" 2>&1) || code=$?
 assert_eq "$code" "0" "U02 update validates and publishes candidate"
+# The nested candidate suite is the only record of why it rejected the pin.
+(( code )) && printf '%s\n' "$out" | grep -E '^(FAIL|SKIP|skip:|error:|warn:)' | sed 's/^/      candidate: /'
 assert_eq "$(sort -u "$candidate_source_log")" "$fixture_commit" "U02 candidate build uses the newly discovered commit"
 assert_contains "$out" "PASS tests/runtime/test_m3_docs.sh" "candidate default suite runs M3 docs test"
 assert_contains "$out" "PASS tests/package/test_package_files.sh" "candidate default suite reaches package files test"
