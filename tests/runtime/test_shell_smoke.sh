@@ -8,6 +8,7 @@ set -uo pipefail
 REPO_ROOT="${REPO_ROOT:?}"
 source "$REPO_ROOT/tests/lib/assert.sh"
 source "$REPO_ROOT/lib/runtime.sh"
+source "$REPO_ROOT/tests/lib/qml_errors.sh"
 
 command -v jq >/dev/null || { echo "skip: jq 없음"; exit 0; }
 coo_live_runtime_usable || { echo "skip: 라이브 Wayland 런타임 없음 (quickshell/qs/systemd-cat 사용 불가 또는 WAYLAND_DISPLAY 소켓 없음)"; exit 0; }
@@ -271,8 +272,9 @@ fi
 # 로그를 실제로 수집했다는 증거. 이게 없으면 아래 "오류 0줄" 은 공짜다.
 assert_eq "$(grep -c "Configuration Loaded" "$journal_log")" "1" "기동 로그를 저널에서 수집했다"
 
-errs=$(grep -ciE "ReferenceError|TypeError|is not a type|Cannot assign|unavailable" "$journal_log")
+errs=$(coo_count_qml_errors "$journal_log")
 assert_eq "$errs" "0" "기동 로그에 QML 오류 없음"
+coo_report_known_qml_burst "$journal_log"
 
 fatal=$(grep -cE "ERROR" "$journal_log")
 assert_eq "$fatal" "0" "기동 로그에 ERROR 레벨 없음"
