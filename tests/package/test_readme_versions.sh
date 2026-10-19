@@ -12,14 +12,6 @@ set -uo pipefail
 REPO_ROOT="${REPO_ROOT:?}"
 source "$REPO_ROOT/tests/lib/assert.sh"
 
-# 업데이트 파이프라인 중첩 픽스처는 후보 트리에서 pkgver 를 새 핀으로 올리고
-# overlay README 를 복사하지도 않는다. 이 대조는 실제 저장소에서만 유효하다
-# (tests/runtime/test_weather_helpers.sh 와 같은 가드).
-if [[ -n ${COO_UPDATE_PIPELINE_NESTED:-} ]]; then
-  printf 'note: 중첩 업데이트 픽스처 — README 버전 대조 생략\n'
-  exit 0
-fi
-
 pkg_version() {
   local pkgbuild=$REPO_ROOT/packages/$1/PKGBUILD ver rel
   ver=$(grep -m1 '^pkgver=' "$pkgbuild" | cut -d= -f2 | tr -d "'\"")

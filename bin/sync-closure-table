@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Regenerate the closure table embedded in docs/RUNTIME_DEPENDENCIES.md from
+# the current build/ artifacts. test_dependency_closure.sh asserts the doc
+# matches; run this (update-upstream does) after a change moves the table.
+set -euo pipefail
+
+repo_root=${COO_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}
+doc=$repo_root/docs/RUNTIME_DEPENDENCIES.md
+fail() { printf 'error: %s\n' "$1" >&2; exit 1; }
+case ${1:-} in
+  --help) printf 'Usage: sync-closure-table\n'; exit 0 ;;
+  '') ;;
+  *) fail "unknown argument: $1" ;;
+esac
+
+export REPO_ROOT=$repo_root
+# shellcheck disable=SC1091
+source "$repo_root/lib/runtime.sh"
+work=$(mktemp -d "${TMPDIR:-/tmp}/coo-closure-XXXXXX")
+trap 'rm -rf "$work"' EXIT
+coo_extract_pkg "$work/tree" || fail 'no current shell artifact in build/ (run bin/build-packages)'
+coo_extract_overlay "$work/tree/overlay" || fail 'no current overlay artifact in build/ (run bin/build-packages)'
+"$repo_root/bin/list-upstream-helpers" >"$work/helpers"
+python3 "$repo_root/tests/runtime/closure_check.py" \
+  --tree "$work/tree" --repo "$repo_root" \
+  --map "$repo_root/tests/data/command-packages.tsv" \
+  --upstream-helpers "$work/helpers" \
+  --exceptions "$repo_root/tests/data/closure-exceptions.tsv" --emit-table >"$work/table" ||
+  fail 'closure_check could not emit the table (run the closure test for the findings)'
+grep -q 'CLOSURE_BEGIN' "$doc" && grep -q 'CLOSURE_END' "$doc" || fail "closure markers missing in $doc"
+awk -v table="$work/table" '
+  /CLOSURE_BEGIN/ { print; while ((getline line < table) > 0) print line; skip = 1; next }
+  /CLOSURE_END/ { skip = 0 }
+  !skip { print }
+' "$doc" >"$work/doc.new"
+cat "$work/doc.new" >"$doc"
+printf 'synced: %s\n' "$doc"
