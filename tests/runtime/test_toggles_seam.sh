@@ -160,7 +160,7 @@ WARN_TXT="omarchy hypr toggles are not applied"
 run_doctor_seam() {
   local hypr=$1 omarchy_state=$2
   HOME="$ddir/home" COO_HYPR_DIR="$hypr" COO_CONFIG_DIR="$ddir/home/.config/cachy-omarchy" \
-    COO_OMARCHY_STATE_DIR="$omarchy_state" COO_STATE_DIR="$ddir/home/.local/state/cachy-omarchy" \
+    COO_OMARCHY_STATE_DIR="$omarchy_state" \
     COO_OMARCHY_CONFIG_DIR="$ddir/home/.config/omarchy" \
     "$REPO_ROOT/overlay/bin/cachy-omarchy-doctor" 2>&1
 }

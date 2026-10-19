@@ -1,176 +1,89 @@
 #!/usr/bin/env bash
-# Build and audit both packages without installing them (SPEC §27, §33).
+# Build and audit both packages into build/ without installing them (SPEC §27).
 set -euo pipefail
 
 repo_root=${COO_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}
 build_dir=${COO_BUILD_DIR:-$repo_root/build}
-state_dir=${COO_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/cachy-omarchy}
 makepkg_bin=${COO_MAKEPKG_BIN:-makepkg}
-makechrootpkg_bin=${COO_MAKECHROOTPKG_BIN:-makechrootpkg}
 bsdtar_bin=${COO_BSDTAR_BIN:-bsdtar}
-sha256_bin=${COO_SHA256_BIN:-sha256sum}
 install_bin=${COO_INSTALL_BIN:-install}
-mv_bin=${COO_MV_BIN:-mv}
-tar_bin=${COO_TAR_BIN:-tar}
-git_bin=${COO_GIT_BIN:-git}
-clean=0
-clean_chroot_dir=${COO_CLEAN_CHROOT_DIR:-}
-clean_omarchy_source=${COO_CLEAN_OMARCHY_SOURCE:-$repo_root/build/omarchy}
 
 usage() {
   cat <<'USAGE'
-Usage: build-packages [--clean]
+Usage: build-packages
 
-Build shell and overlay packages without installing them. --clean stages
-transient source tarballs in each bind-mounted package context and invokes
-makechrootpkg. Set COO_CLEAN_CHROOT_DIR to an existing clean-chroot root.
+Build shell and overlay packages into build/ without installing them.
 This command never passes makepkg -i.
 USAGE
 }
 
 while (($#)); do
   case $1 in
-    --clean) clean=1 ;;
     -h|--help) usage; exit 0 ;;
     *) printf 'error: unknown argument: %s\n' "$1" >&2; usage >&2; exit 2 ;;
   esac
   shift
 done
 
-lock=$repo_root/upstream.lock
-shell_pkg=$repo_root/packages/cachy-omarchy-shell/PKGBUILD
-overlay_pkg=$repo_root/packages/cachy-omarchy-overlay/PKGBUILD
 fail() { printf 'error: %s\n' "$1" >&2; exit 1; }
-[[ -f $lock && -f $shell_pkg && -f $overlay_pkg ]] || fail 'repository package metadata is incomplete'
-# shellcheck disable=SC1090
-source "$lock"
-[[ $OMARCHY_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && $OMARCHY_COMMIT =~ ^[0-9a-fA-F]{40}$ ]] || fail 'invalid upstream.lock'
-
-pkg_field() { grep -m1 -E "^$2=" "$1" | cut -d= -f2- | tr -d "'\""; }
-shell_rel=$(pkg_field "$shell_pkg" pkgrel)
-overlay_ver=$(pkg_field "$overlay_pkg" pkgver)
-overlay_rel=$(pkg_field "$overlay_pkg" pkgrel)
-[[ $shell_rel =~ ^[0-9]+$ && $overlay_ver =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && $overlay_rel =~ ^[0-9]+$ ]] || fail 'invalid PKGBUILD version metadata'
-
-if (( clean )); then
-  [[ -n $clean_chroot_dir ]] || fail '--clean requires COO_CLEAN_CHROOT_DIR (a prepared makechrootpkg root)'
-  [[ -d $clean_chroot_dir ]] || fail "clean chroot root is not a directory: $clean_chroot_dir"
-  command -v "$makechrootpkg_bin" >/dev/null 2>&1 || fail "makechrootpkg unavailable: $makechrootpkg_bin"
-  command -v "$git_bin" >/dev/null 2>&1 || fail "git unavailable: $git_bin"
-  [[ -d $clean_omarchy_source && ${clean_omarchy_source##*/} == omarchy ]] || fail "--clean requires the pinned local upstream tree named omarchy: $clean_omarchy_source"
-  clean_head=$("$git_bin" -C "$clean_omarchy_source" rev-parse --verify 'HEAD^{commit}') \
-    || fail "--clean upstream tree has no readable HEAD commit: $clean_omarchy_source"
-  [[ $clean_head == "$OMARCHY_COMMIT" ]] \
-    || fail "--clean upstream HEAD does not match upstream.lock: $clean_head"
-  clean_status=$("$git_bin" -C "$clean_omarchy_source" status --porcelain --untracked-files=no) \
-    || fail "--clean cannot inspect upstream worktree: $clean_omarchy_source"
-  [[ -z $clean_status ]] || fail '--clean upstream worktree is not clean'
-fi
+# shellcheck disable=SC1091
+source "$repo_root/bin/package-names.sh"
+coo_current_artifacts "$repo_root" || exit 1
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/coo-build-XXXXXX")
-mkdir -p "$build_dir" "$state_dir/validated-builds"
-# Candidate release lives under state so the final candidate→release rename is
-# same-filesystem. The flat build dir is convenience only, never validation.
-stage=$(mktemp -d "$state_dir/validated-builds/.candidate-XXXXXX")
-trap 'rm -rf "$work" "$stage"' EXIT
+trap 'rm -rf "$work"' EXIT
 pkgdest=$work/pkgdest
-mkdir -p "$pkgdest" "$stage/artifacts"
+mkdir -p "$pkgdest"
 
 run_makepkg() {
-  local dir=$1
-  ( cd "$dir"
+  ( cd "$1"
     PKGDEST="$pkgdest" COO_OMARCHY_GIT="${COO_OMARCHY_GIT:-$repo_root/build/omarchy}" \
       "$makepkg_bin" --nodeps
   )
 }
+run_makepkg "$repo_root/packages/cachy-omarchy-shell"
+run_makepkg "$repo_root/packages/cachy-omarchy-overlay"
 
-stage_clean_package() {
-  local name=$1 source_dir=$2 clean_dir=$work/clean-$name
-  mkdir -p "$clean_dir"
-  cp -a "$source_dir/." "$clean_dir/"
-  case $name in
-    cachy-omarchy-shell)
-      "$git_bin" -C "$clean_omarchy_source" archive --format=tar --prefix=omarchy/ "$OMARCHY_COMMIT" >"$clean_dir/clean-omarchy.tar"
-      "$tar_bin" -C "$repo_root" -cf "$clean_dir/clean-overlay-defaults.tar" overlay/defaults
-      ;;
-    cachy-omarchy-overlay)
-      "$tar_bin" -C "$repo_root" -cf "$clean_dir/clean-overlay.tar" overlay
-      ;;
-    *) fail "unknown clean package: $name" ;;
-  esac
-  printf '%s\n' "$clean_dir"
-}
-
-run_clean_package() {
-  local name=$1 source_dir=$2 clean_dir artifact
-  clean_dir=$(stage_clean_package "$name" "$source_dir")
-  # makechrootpkg bind-mounts only $PWD. All package inputs are therefore
-  # transient archives below $clean_dir; no tracked overlay copy is created.
-  ( cd "$clean_dir"
-    "$makechrootpkg_bin" -r "$clean_chroot_dir" -- --nodeps
-  )
-  artifact=$(find "$clean_dir" -maxdepth 1 -type f -name "$name-*.pkg.tar.zst" -print -quit)
-  [[ -n $artifact ]] || fail "clean build artifact missing: $name"
-  "$install_bin" -m 644 "$artifact" "$pkgdest/${artifact##*/}"
-}
-
-if (( clean )); then
-  run_clean_package cachy-omarchy-shell "$repo_root/packages/cachy-omarchy-shell"
-  run_clean_package cachy-omarchy-overlay "$repo_root/packages/cachy-omarchy-overlay"
-else
-  run_makepkg "$repo_root/packages/cachy-omarchy-shell"
-  run_makepkg "$repo_root/packages/cachy-omarchy-overlay"
-fi
-
-shell_name="cachy-omarchy-shell-${OMARCHY_VERSION}-${shell_rel}-any.pkg.tar.zst"
-overlay_name="cachy-omarchy-overlay-${overlay_ver}-${overlay_rel}-any.pkg.tar.zst"
-for name in "$shell_name" "$overlay_name"; do
+for name in "$COO_SHELL_ARTIFACT" "$COO_OVERLAY_ARTIFACT"; do
   [[ -f $pkgdest/$name ]] || fail "expected artifact missing: $name"
 done
 [[ $(find "$pkgdest" -maxdepth 1 -type f -name '*.pkg.tar.zst' | wc -l) -eq 2 ]] || fail 'ambiguous build artifacts'
 
 audit() {
-  local archive=$1 listing
-  listing=$($bsdtar_bin -tf "$archive") || return 1
-  if grep -Eq '(^|/)(etc|boot|efi)(/|$)|usr/lib/systemd/system/' <<<"$listing"; then
-    return 1
-  fi
+  local listing
+  listing=$("$bsdtar_bin" -tf "$1") || return 1
+  local status=0
+  grep -Eq '(^|/)(etc|boot|efi)(/|$)|usr/lib/systemd/system/' <<<"$listing" || status=$?
+  # 1 = no forbidden path; 0 = found one; anything else = grep itself broke.
+  (( status == 1 ))
 }
-audit "$pkgdest/$shell_name" || fail "archive audit failed: $shell_name"
-audit "$pkgdest/$overlay_name" || fail "archive audit failed: $overlay_name"
-
-# Stage exact copies and checksums in an unreferenced candidate release.
-for name in "$shell_name" "$overlay_name"; do
-  "$install_bin" -m 644 "$pkgdest/$name" "$stage/artifacts/$name"
-done
-release_name="release-${OMARCHY_VERSION}-${OMARCHY_COMMIT:0:12}-${stage##*/.candidate-}"
-release_rel="validated-builds/$release_name"
-manifest_tmp=$stage/validated-build.manifest
-{
-  printf 'RELEASE=%s\n' "$release_rel"
-  printf 'OMARCHY_VERSION=%s\n' "$OMARCHY_VERSION"
-  printf 'OMARCHY_COMMIT=%s\n' "$OMARCHY_COMMIT"
-  for name in "$shell_name" "$overlay_name"; do
-    sum=$($sha256_bin "$stage/artifacts/$name" | awk '{print $1}')
-    [[ $sum =~ ^[0-9a-fA-F]{64}$ ]] || exit 1
-    printf 'ARTIFACT=%s %s\n' "$name" "$sum"
-  done
-} >"$manifest_tmp"
-
-# Freeze a complete immutable-by-contract release before convenience
-# publication. This pipeline never mutates a release after this rename.
-release_dir="$state_dir/$release_rel"
-"$mv_bin" "$stage" "$release_dir"
-stage=""
-
-# Flat build artifacts are convenience copies only. A failure here leaves the
-# previous pointer unchanged and the immutable new release unreferenced.
-for name in "$shell_name" "$overlay_name"; do
-  "$install_bin" -m 644 "$release_dir/artifacts/$name" "$build_dir/$name"
+for name in "$COO_SHELL_ARTIFACT" "$COO_OVERLAY_ARTIFACT"; do
+  audit "$pkgdest/$name" || fail "archive audit failed: $name"
 done
 
-# This atomic same-directory rename is the sole validation commit point.
-pointer_tmp=$(mktemp "$state_dir/.validated-build.manifest-XXXXXX")
-cp "$release_dir/validated-build.manifest" "$pointer_tmp"
-"$mv_bin" "$pointer_tmp" "$state_dir/validated-build.manifest"
-printf 'validated build: %s\n' "$state_dir/validated-build.manifest"
+# Nothing reaches build/ under a current name until both packages built,
+# passed the audit and were fully copied: copy each to a hidden temp name in
+# build/ (same filesystem), then rename both into place. Older versions stay
+# there: bin/rollback installs from them. The two renames are not atomic
+# together: if the second fails, build/ can hold a new shell beside an old
+# overlay of the same version that were never verified as a pair.
+mkdir -p "$build_dir"
+staged=()
+trap 'rm -rf "$work"; rm -f "${staged[@]}"' EXIT
+# mktemp gives each invocation its own temp name, so overlapping builds cannot
+# rename or remove each other's half-copied file.
+declare -A tmp_of
+for name in "$COO_SHELL_ARTIFACT" "$COO_OVERLAY_ARTIFACT"; do
+  tmp_of[$name]=$(mktemp "$build_dir/.$name.XXXXXX") || fail "could not create a temp file in $build_dir"
+  staged+=("${tmp_of[$name]}")
+  "$install_bin" -m 644 "$pkgdest/$name" "${tmp_of[$name]}" || fail "could not copy $name into $build_dir"
+done
+# Serialize the final renames: two publishers of the same names must not
+# interleave into a shell from one build beside an overlay from another.
+exec {publish_lock}>"$build_dir/.publish.lock" || fail "could not open $build_dir/.publish.lock"
+flock -w 60 "$publish_lock" || fail "timed out waiting for another publisher of $build_dir"
+for name in "$COO_SHELL_ARTIFACT" "$COO_OVERLAY_ARTIFACT"; do
+  mv -f "${tmp_of[$name]}" "$build_dir/$name" ||
+    fail "partial publish: $name not renamed; build/ may hold a mixed pair, rerun bin/build-packages"
+  printf 'built: %s\n' "$build_dir/$name"
+done

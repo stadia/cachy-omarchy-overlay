@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# M6 U01/U06/U07 foundation: fake tools only, never network or pacman.
+# update-upstream / check-upstream / bump-pkgrel pipeline: fake tools only, never network or pacman.
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/assert.sh"
 
@@ -112,7 +112,6 @@ done < <(git -C "$REPO_ROOT" ls-files -z packages/cachy-omarchy-shell packages/c
 # shell artifact fails on every run -- not only when the live tree disagrees.
 shell_pkgrel_pin=5
 sed -i "s/^pkgrel=.*/pkgrel=${shell_pkgrel_pin}/" "$root/packages/cachy-omarchy-shell/PKGBUILD"
-shell_pkgrel_pin=$(grep -m1 '^pkgrel=' "$root/packages/cachy-omarchy-shell/PKGBUILD" | cut -d= -f2 | tr -d "'\"")
 
 # Same hermetic problem, one package over: the overlay's own pkgver evolves
 # independently of upstream/shell state (PKGBUILD's own comment: "업스트림
@@ -124,9 +123,6 @@ shell_pkgrel_pin=$(grep -m1 '^pkgrel=' "$root/packages/cachy-omarchy-shell/PKGBU
 # run -- not only when the live tree happens to still agree with it.
 overlay_pkgver_pin=0.9.9
 sed -i "s/^pkgver=.*/pkgver=${overlay_pkgver_pin}/" "$root/packages/cachy-omarchy-overlay/PKGBUILD"
-overlay_pkgver_pin=$(grep -m1 '^pkgver=' "$root/packages/cachy-omarchy-overlay/PKGBUILD" | cut -d= -f2 | tr -d "'\"")
-overlay_pkgrel_pin=$(grep -m1 '^pkgrel=' "$root/packages/cachy-omarchy-overlay/PKGBUILD" | cut -d= -f2 | tr -d "'\"")
-overlay_artifact_pin="cachy-omarchy-overlay-${overlay_pkgver_pin}-${overlay_pkgrel_pin}-any.pkg.tar.zst"
 
 # The candidate invokes the repository's default test runner. Copy every
 # tracked executable input rather than maintaining a hand-picked list: a new
@@ -223,108 +219,24 @@ cat >"$fake/bsdtar" <<'EOF'
 #!/usr/bin/env bash
 if [[ ${COO_FAKE_AUDIT_FAIL:-0} == 1 ]]; then echo etc/os-release; else echo usr/share/cachy-omarchy/ok; fi
 EOF
-cat >"$fake/sha256sum" <<'EOF'
-#!/usr/bin/env bash
-[[ ${COO_FAKE_SHA_FAIL:-0} != 1 ]] || exit 9
-/usr/bin/sha256sum "$@"
-EOF
-cat >"$fake/install" <<'EOF'
-#!/usr/bin/env bash
-[[ ${COO_FAKE_COPY_FAIL:-0} != 1 ]] || exit 8
-/usr/bin/install "$@"
-EOF
 cat >"$fake/mv" <<'EOF'
 #!/usr/bin/env bash
-last=${!#}
-if [[ ${COO_FAKE_POINTER_FAIL:-0} == 1 && $last == */validated-build.manifest ]]; then exit 10; fi
 if [[ ${COO_FAKE_METADATA_PKG_MV_FAIL:-0} == 1 && ${COO_UPDATE_METADATA_PUBLISH:-} == pkg ]]; then exit 13; fi
-if [[ ${COO_FAKE_INSTALLED_MV_FAIL:-0} == 1 && ${COO_INSTALL_FINALIZE:-0} == 1 && $last == */installed-build.manifest ]]; then exit 14; fi
-if [[ ${COO_FAKE_ARCHIVE_MV_FAIL:-0} == 1 && $last == */packages/previous-* ]]; then exit 12; fi
 /usr/bin/mv "$@"
 EOF
 cat >"$fake/pacman" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$COO_PACMAN_LOG"
-[[ ${COO_FAKE_PACMAN_FAIL:-0} != 1 ]] || exit 11
-EOF
-# Records exactly the argv it was invoked with, then exits 0 without exec'ing
-# anything -- proves the shape of the constructed command (privilege fix)
-# without ever touching a real sudo or a real pacman.
-cat >"$fake/sudo" <<'EOF'
-#!/usr/bin/env bash
-printf 'sudo %s\n' "$*" >>"$COO_SUDO_LOG"
 EOF
 cat >"$fake/test-runner" <<'EOF'
 #!/usr/bin/env bash
-[[ -n ${COO_TEST_LOG:-} ]] && printf 'runner\n' >>"$COO_TEST_LOG"
 case ${COO_FAKE_TEST_MODE:-pass} in
   pass) printf 'all test coverage ran\n' ;;
   skip) printf 'skip: installed tree absent\n' ;;
   fail) printf 'FAIL: runtime\n'; exit 9 ;;
 esac
 EOF
-cat >"$fake/smoke" <<'EOF'
-#!/usr/bin/env bash
-printf 'smoke\n' >>"$COO_PACMAN_LOG"
-EOF
 chmod +x "$fake"/*
-
-# M7 RC doctor fixture reads only the fake-lane state.  It deliberately has no
-# access to the caller's packages, session, or user configuration.
-doctor_root=$COO_TEST_SANDBOX/doctor-root
-doctor_prefix=$doctor_root/usr/share/cachy-omarchy
-doctor_compat=$doctor_root/usr/lib/cachy-omarchy/compat/bin
-doctor_fake=$COO_TEST_SANDBOX/doctor-fake
-mkdir -p "$doctor_prefix/upstream/shell" "$doctor_prefix/upstream/default/omarchy" \
-  "$doctor_compat" "$doctor_root/usr/bin" "$doctor_root/usr/lib/systemd/user" "$doctor_fake"
-printf '// fixture shell\n' >"$doctor_prefix/upstream/shell/shell.qml"
-printf '{}\n' >"$doctor_prefix/upstream/default/omarchy/omarchy-menu.jsonc"
-for command in cachy-omarchy-shell cachy-omarchy-bindings cachy-omarchy-keybindings; do
-  printf '#!/usr/bin/env bash\nexit 0\n' >"$doctor_root/usr/bin/$command"
-  chmod +x "$doctor_root/usr/bin/$command"
-done
-printf '#!/usr/bin/env bash\nexit 0\n' >"$doctor_compat/omarchy-shell"
-chmod +x "$doctor_compat/omarchy-shell"
-mkdir -p "$doctor_prefix/upstream/bin"
-printf '#!/usr/bin/env bash\nexit 0\n' >"$doctor_prefix/upstream/bin/omarchy-theme-set"
-chmod +x "$doctor_prefix/upstream/bin/omarchy-theme-set"
-ln -s ../share/cachy-omarchy/upstream/bin/omarchy-theme-set "$doctor_root/usr/bin/omarchy-theme-set"
-printf '#!/usr/bin/env bash\nexit 0\n' >"$doctor_prefix/upstream/bin/omarchy-menu"
-chmod +x "$doctor_prefix/upstream/bin/omarchy-menu"
-ln -s ../share/cachy-omarchy/upstream/bin/omarchy-menu "$doctor_root/usr/bin/omarchy-menu"
-ln -s ../lib/cachy-omarchy/compat/bin/omarchy-shell "$doctor_root/usr/bin/omarchy-shell"
-cat >"$doctor_fake/pacman" <<'EOF'
-#!/usr/bin/env bash
-case ${1:-} in
-  -Q)
-    case ${2:-} in
-      cachy-omarchy-shell|cachy-omarchy-overlay) printf '%s 0.1.0-1\n' "$2"; exit 0 ;;
-      omarchy|omarchy-settings) exit 1 ;;
-      *) exit 1 ;;
-    esac
-    ;;
-  *) exit 2 ;;
-esac
-EOF
-for command in pgrep hyprctl quickshell uwsm-app; do printf '#!/usr/bin/env bash\nexit 1\n' >"$doctor_fake/$command"; done
-chmod +x "$doctor_fake"/*
-printf 'ID=arch\n' >"$doctor_root/os-release"
-# The lock-screen PAM service lives outside every package prefix, so pin it to
-# the fixture as well -- the fake lane must not read the real /etc/pam.d.
-doctor_pam=$doctor_root/pam/omarchy-lock-password
-mkdir -p "$(dirname "$doctor_pam")"
-printf '#%%PAM-1.0\n' >"$doctor_pam"
-run_rc_doctor() {
-  local state=$1
-  PATH="$doctor_fake:/usr/bin:/bin" WAYLAND_DISPLAY= OMARCHY_PATH="$doctor_prefix/upstream" \
-    COO_OS_RELEASE="$doctor_root/os-release" COO_PREFIX_ROOT="$doctor_prefix" COO_COMPAT_BIN="$doctor_compat" \
-    COO_HYPR_DIR="$COO_TEST_SANDBOX/doctor-hypr" COO_CONFIG_DIR="$COO_TEST_SANDBOX/doctor-config" \
-    COO_OMARCHY_CONFIG_DIR="$COO_TEST_SANDBOX/doctor-omarchy" COO_STATE_DIR="$state" \
-    COO_OMARCHY_PATH="$doctor_prefix/upstream" COO_OMARCHY_STATE_DIR="$COO_TEST_SANDBOX/doctor-omarchy-state" \
-    COO_PAM_LOCK_FILE="$doctor_pam" \
-    COO_SHA256_BIN=sha256sum COO_IPC_TIMEOUT=2s \
-    "$REPO_ROOT/overlay/bin/cachy-omarchy-doctor" 2>&1
-}
 
 # U01: discovery is read-only and does not invoke build tools.
 lock_before=$(sha256sum "$root/upstream.lock")
@@ -340,301 +252,6 @@ assert_eq "$code" "0" "lightweight tag check exits cleanly"
 assert_contains "$out" "4444444444444444444444444444444444444444" "lightweight tag uses direct commit"
 [[ -e $log ]] && invoked=1 || invoked=0
 assert_eq "$invoked" "0" "U01 does not build or install"
-
-# Successful pair build writes both checksums and preserves shell→overlay order.
-COO_TOOL_LOG="$log" COO_REPO_ROOT="$root" COO_BUILD_DIR="$COO_TEST_SANDBOX/build" COO_STATE_DIR="$COO_TEST_SANDBOX/state" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_SHA256_BIN="$fake/sha256sum" "$root/bin/build-packages" >/dev/null
-assert_eq "$(tr '\n' ' ' <"$log")" "cachy-omarchy-shell cachy-omarchy-overlay " "build order is shell then overlay"
-manifest=$COO_TEST_SANDBOX/state/validated-build.manifest
-assert_file_exists "$manifest" "validated manifest exists"
-manifest_src=$(cat "$manifest")
-assert_contains "$manifest_src" "OMARCHY_COMMIT=$pin_commit" "manifest binds commit"
-assert_contains "$manifest_src" "$overlay_artifact_pin" "manifest binds overlay artifact"
-release=$(awk -F= '$1 == "RELEASE" { print $2 }' "$manifest")
-# Derived from the fixture's own (hermetically pinned) PKGBUILD, not a
-# hardcoded pkgrel -- see shell_pkgrel_pin above.
-shell_artifact_pin="cachy-omarchy-shell-${pin_ver}-${shell_pkgrel_pin}-any.pkg.tar.zst"
-assert_file_exists "$COO_TEST_SANDBOX/state/$release/artifacts/$shell_artifact_pin" "manifest points to immutable shell release"
-
-# U06: failed build publishes neither artifacts nor a manifest.
-rm -f "$log"
-code=0
-out=$(COO_TOOL_LOG="$log" COO_FAKE_BUILD_FAIL=1 COO_REPO_ROOT="$root" COO_BUILD_DIR="$COO_TEST_SANDBOX/fail-build" COO_STATE_DIR="$COO_TEST_SANDBOX/fail-state" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" "$root/bin/build-packages" 2>&1) || code=$?
-assert_eq "$code" "7" "U06 build failure blocks publication"
-[[ -e $COO_TEST_SANDBOX/fail-state/validated-build.manifest ]] && published=1 || published=0
-assert_eq "$published" "0" "U06 no manifest after failure"
-
-# U07: audit failure publishes neither artifacts nor manifest.
-code=0
-out=$(COO_FAKE_AUDIT_FAIL=1 COO_REPO_ROOT="$root" COO_BUILD_DIR="$COO_TEST_SANDBOX/audit-build" COO_STATE_DIR="$COO_TEST_SANDBOX/audit-state" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" "$root/bin/build-packages" 2>&1) || code=$?
-assert_eq "$code" "1" "U07 audit failure blocks publication"
-[[ -e $COO_TEST_SANDBOX/audit-state/validated-build.manifest ]] && published=1 || published=0
-assert_eq "$published" "0" "U07 no manifest after audit failure"
-
-# Transaction regression: checksum/copy failure leaves an old validated pair untouched.
-trans_build=$COO_TEST_SANDBOX/transaction-build
-trans_state=$COO_TEST_SANDBOX/transaction-state
-mkdir -p "$trans_build" "$trans_state/validated-builds/old/artifacts"
-printf 'old-shell' >"$trans_build/cachy-omarchy-shell-3.9.9-1-any.pkg.tar.zst"
-printf 'old-overlay' >"$trans_build/cachy-omarchy-overlay-0.0.9-1-any.pkg.tar.zst"
-printf 'old-shell' >"$trans_state/validated-builds/old/artifacts/cachy-omarchy-shell-3.9.9-1-any.pkg.tar.zst"
-printf 'old-overlay' >"$trans_state/validated-builds/old/artifacts/cachy-omarchy-overlay-0.0.9-1-any.pkg.tar.zst"
-printf 'RELEASE=validated-builds/old\nARTIFACT=old old\n' >"$trans_state/validated-build.manifest"
-old_pointer=$(cat "$trans_state/validated-build.manifest")
-old_sum=$(sha256sum "$trans_build"/* "$trans_state/validated-builds/old/artifacts"/* "$trans_state/validated-build.manifest")
-code=0
-out=$(COO_TOOL_LOG="$log" COO_FAKE_SHA_FAIL=1 COO_REPO_ROOT="$root" COO_BUILD_DIR="$trans_build" COO_STATE_DIR="$trans_state" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_SHA256_BIN="$fake/sha256sum" COO_INSTALL_BIN="$fake/install" "$root/bin/build-packages" 2>&1) || code=$?
-assert_eq "$code" "9" "checksum failure blocks publication"
-assert_eq "$(sha256sum "$trans_build"/* "$trans_state/validated-builds/old/artifacts"/* "$trans_state/validated-build.manifest")" "$old_sum" "checksum failure preserves old pair and manifest"
-code=0
-out=$(COO_TOOL_LOG="$log" COO_FAKE_COPY_FAIL=1 COO_REPO_ROOT="$root" COO_BUILD_DIR="$trans_build" COO_STATE_DIR="$trans_state" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_SHA256_BIN="$fake/sha256sum" COO_INSTALL_BIN="$fake/install" "$root/bin/build-packages" 2>&1) || code=$?
-assert_eq "$code" "8" "copy failure blocks publication"
-assert_eq "$(sha256sum "$trans_build"/* "$trans_state/validated-builds/old/artifacts"/* "$trans_state/validated-build.manifest")" "$old_sum" "copy failure preserves old pair and manifest"
-code=0
-out=$(COO_TOOL_LOG="$log" COO_FAKE_EXTRA=1 COO_REPO_ROOT="$root" COO_BUILD_DIR="$COO_TEST_SANDBOX/ambiguous-build" COO_STATE_DIR="$COO_TEST_SANDBOX/ambiguous-state" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" "$root/bin/build-packages" 2>&1) || code=$?
-assert_eq "$code" "1" "ambiguous artifacts are rejected"
-assert_contains "$out" "ambiguous build artifacts" "extra artifact reaches ambiguity guard"
-[[ -e $COO_TEST_SANDBOX/ambiguous-state/validated-build.manifest ]] && published=1 || published=0
-assert_eq "$published" "0" "ambiguous artifacts publish no manifest"
-
-# Pointer rename is final commit: failure preserves the old pointer/release.
-code=0
-out=$(COO_TOOL_LOG="$log" COO_FAKE_POINTER_FAIL=1 COO_REPO_ROOT="$root" COO_BUILD_DIR="$trans_build" COO_STATE_DIR="$trans_state" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_MV_BIN="$fake/mv" "$root/bin/build-packages" 2>&1) || code=$?
-assert_eq "$code" "10" "manifest replacement failure blocks validation commit"
-assert_eq "$(cat "$trans_state/validated-build.manifest")" "$old_pointer" "pointer failure preserves old manifest"
-assert_file_exists "$trans_state/validated-builds/old/artifacts/cachy-omarchy-shell-3.9.9-1-any.pkg.tar.zst" "pointer failure preserves referenced old release"
-
-# Dynamic shell version comes from fixture lock/PKGBUILD, not hard-coded names.
-dyn=$COO_TEST_SANDBOX/dynamic-repo
-cp -a "$root" "$dyn"
-# Independence is a relation (before vs. after a shell-only bump), not a
-# literal -- capture the overlay's pkgver here, before anything touches this
-# checkout, so it can be compared against itself post-build below.
-dyn_overlay_ver_before=$(grep -m1 '^pkgver=' "$dyn/packages/cachy-omarchy-overlay/PKGBUILD" | cut -d= -f2 | tr -d "'\"")
-sed -i "s/OMARCHY_VERSION=$pin_ver_re/OMARCHY_VERSION=$next_ver/; s/$pin_commit/5555555555555555555555555555555555555555/" "$dyn/upstream.lock"
-sed -i "s/pkgver=$pin_ver_re/pkgver=$next_ver/; s/_commit='[0-9a-f]*'/_commit='5555555555555555555555555555555555555555'/" "$dyn/packages/cachy-omarchy-shell/PKGBUILD"
-COO_TOOL_LOG="$log" COO_REPO_ROOT="$dyn" COO_BUILD_DIR="$COO_TEST_SANDBOX/dynamic-build" COO_STATE_DIR="$COO_TEST_SANDBOX/dynamic-state" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" "$dyn/bin/build-packages" >/dev/null
-dynamic_manifest=$(cat "$COO_TEST_SANDBOX/dynamic-state/validated-build.manifest")
-assert_contains "$dynamic_manifest" "OMARCHY_VERSION=$next_ver" "dynamic lock version reaches manifest"
-# Read the expected name back out of the dynamic fixture's own PKGBUILD
-# (the sed above only touches pkgver, so pkgrel is inherited) instead of
-# hardcoding it, so this label is actually true.
-dyn_shell_ver=$(grep -m1 '^pkgver=' "$dyn/packages/cachy-omarchy-shell/PKGBUILD" | cut -d= -f2 | tr -d "'\"")
-dyn_shell_rel=$(grep -m1 '^pkgrel=' "$dyn/packages/cachy-omarchy-shell/PKGBUILD" | cut -d= -f2 | tr -d "'\"")
-assert_contains "$dynamic_manifest" "cachy-omarchy-shell-${dyn_shell_ver}-${dyn_shell_rel}-any.pkg.tar.zst" "dynamic shell artifact name is used"
-# "Independent" means a shell-only upstream bump leaves the overlay's own
-# pkgver exactly as it was before the bump -- a before/after comparison, not
-# a hardcoded literal. This fails if a shell bump ever does change it, and
-# passes at whatever overlay pkgver the fixture happens to carry.
-dyn_overlay_ver_after=$(grep -m1 '^pkgver=' "$dyn/packages/cachy-omarchy-overlay/PKGBUILD" | cut -d= -f2 | tr -d "'\"")
-assert_eq "$dyn_overlay_ver_after" "$dyn_overlay_ver_before" "overlay version remains independent"
-dyn_overlay_rel=$(grep -m1 '^pkgrel=' "$dyn/packages/cachy-omarchy-overlay/PKGBUILD" | cut -d= -f2 | tr -d "'\"")
-assert_contains "$dynamic_manifest" "cachy-omarchy-overlay-${dyn_overlay_ver_after}-${dyn_overlay_rel}-any.pkg.tar.zst" "dynamic overlay artifact name is used"
-
-# U08: testing requires a current manifest first, and any skip is a failure.
-missing_state=$COO_TEST_SANDBOX/missing-state
-code=0
-out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$missing_state" COO_TEST_RUNNER="$fake/test-runner" "$root/bin/test-packages" 2>&1) || code=$?
-assert_eq "$code" "1" "U08 missing manifest blocks tests before false green"
-assert_contains "$out" "validated manifest missing" "U08 reports missing manifest"
-
-# Strict parser regression: an empty singleton must still count as present,
-# so a later valid duplicate cannot reach the runner.
-manifest_backup=$(cat "$COO_TEST_SANDBOX/state/validated-build.manifest")
-printf 'RELEASE=\n%s\n' "$manifest_backup" >"$COO_TEST_SANDBOX/state/validated-build.manifest"
-runner_log=$COO_TEST_SANDBOX/runner.log
-rm -f "$runner_log"
-code=0
-out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$COO_TEST_SANDBOX/state" COO_TEST_RUNNER="$fake/test-runner" COO_TEST_LOG="$runner_log" "$root/bin/test-packages" 2>&1) || code=$?
-assert_eq "$code" "1" "duplicate empty RELEASE blocks manifest"
-assert_contains "$out" "duplicate RELEASE" "duplicate empty RELEASE is diagnosed"
-[[ -e $runner_log ]] && runner_called=1 || runner_called=0
-assert_eq "$runner_called" "0" "malformed manifest invokes no runner"
-printf '%s\n' "$manifest_backup" >"$COO_TEST_SANDBOX/state/validated-build.manifest"
-
-code=0
-out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$COO_TEST_SANDBOX/state" COO_TEST_RUNNER="$fake/test-runner" COO_FAKE_TEST_MODE=skip "$root/bin/test-packages" 2>&1) || code=$?
-assert_eq "$code" "1" "U08 skipped installed-tree coverage fails"
-assert_contains "$out" "skip:" "U08 preserves runner skip evidence"
-code=0
-out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$COO_TEST_SANDBOX/state" COO_TEST_RUNNER="$fake/test-runner" COO_FAKE_TEST_MODE=fail "$root/bin/test-packages" 2>&1) || code=$?
-assert_eq "$code" "9" "U08 failed runner blocks validation"
-out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$COO_TEST_SANDBOX/state" COO_TEST_RUNNER="$fake/test-runner" COO_FAKE_TEST_MODE=pass "$root/bin/test-packages" 2>&1); code=$?
-assert_eq "$code" "0" "U08 non-skipped runner passes"
-
-# Seed a complete prior installed pair. It must be archived before fake pacman.
-prior=$COO_TEST_SANDBOX/state/packages/previous-old
-mkdir -p "$prior/artifacts"
-old_shell=cachy-omarchy-shell-3.9.9-1-any.pkg.tar.zst
-old_overlay=cachy-omarchy-overlay-0.0.9-1-any.pkg.tar.zst
-printf old-shell >"$prior/artifacts/$old_shell"
-printf old-overlay >"$prior/artifacts/$old_overlay"
-old_shell_sum=$(sha256sum "$prior/artifacts/$old_shell" | awk '{print $1}')
-old_overlay_sum=$(sha256sum "$prior/artifacts/$old_overlay" | awk '{print $1}')
-cat >"$prior/validated-build.manifest" <<EOF
-RELEASE=packages/previous-old
-OMARCHY_VERSION=3.9.9
-OMARCHY_COMMIT=9999999999999999999999999999999999999999
-ARTIFACT=$old_shell $old_shell_sum
-ARTIFACT=$old_overlay $old_overlay_sum
-EOF
-cp "$prior/validated-build.manifest" "$COO_TEST_SANDBOX/state/installed-build.manifest"
-paclog=$COO_TEST_SANDBOX/pacman.log
-: >"$paclog"
-code=0
-out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$COO_TEST_SANDBOX/state" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$root/bin/install-packages" 2>&1) || code=$?
-assert_eq "$code" "1" "explicit install refusal blocks pacman"
-assert_eq "$(wc -l <"$paclog")" "0" "refused install invokes no pacman"
-
-# The archive rename is a hard precondition: a failed archive must block pacman.
-: >"$paclog"
-code=0
-out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$COO_TEST_SANDBOX/state" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" COO_MV_BIN="$fake/mv" COO_FAKE_ARCHIVE_MV_FAIL=1 "$root/bin/install-packages" --install 2>&1) || code=$?
-assert_eq "$code" "1" "archive rename failure blocks install"
-assert_eq "$(wc -l <"$paclog")" "0" "archive rename failure invokes no pacman"
-
-COO_REPO_ROOT="$root" COO_STATE_DIR="$COO_TEST_SANDBOX/state" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$root/bin/install-packages" --install >/dev/null
-assert_contains "$(cat "$paclog")" "-U" "U09 install calls fake pacman explicitly"
-assert_contains "$(cat "$paclog")" "$shell_artifact_pin" "U09 installs exact current shell"
-assert_eq "$(cat "$prior/artifacts/$old_shell")" "old-shell" "U09 previous shell remains archived"
-assert_eq "$(cat "$prior/artifacts/$old_overlay")" "old-overlay" "U09 previous overlay remains archived"
-assert_file_exists "$COO_TEST_SANDBOX/state/installed-build.manifest" "U09 finalizes installed build pointer"
-code=0
-out=$(run_rc_doctor "$COO_TEST_SANDBOX/state") || code=$?
-assert_eq "$code" "0" "U09 installed pair is doctor-healthy"
-assert_contains "$out" "PASS: installed artifact/manifest ($pin_ver" "U09 doctor reads installed pair"
-archived_count=$(find "$COO_TEST_SANDBOX/state/packages" -name validated-build.manifest | wc -l)
-[[ $archived_count -ge 2 ]] && archived=0 || archived=1
-assert_eq "$archived" "0" "U09 install archives prior validated pair"
-
-# U10: rollback uses exactly the newest complete archived pair and optional smoke.
-: >"$paclog"
-COO_REPO_ROOT="$root" COO_STATE_DIR="$COO_TEST_SANDBOX/state" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" COO_ROLLBACK_SMOKE_BIN="$fake/smoke" "$root/bin/rollback" >/dev/null
-rollback_line=$(head -n1 "$paclog")
-assert_contains "$rollback_line" "-U" "U10 rollback invokes fake pacman with -U"
-assert_contains "$rollback_line" "cachy-omarchy-shell-3.9.9-1-any.pkg.tar.zst" "U10 rollback selects prior shell only"
-assert_contains "$rollback_line" "cachy-omarchy-overlay-0.0.9-1-any.pkg.tar.zst" "U10 rollback selects prior overlay only"
-assert_eq "$(tail -n1 "$paclog")" "smoke" "U10 smoke runs only after pacman"
-assert_contains "$(cat "$COO_TEST_SANDBOX/state/installed-build.manifest")" "OMARCHY_VERSION=3.9.9" "U10 rollback records the installed prior pair"
-code=0
-out=$(run_rc_doctor "$COO_TEST_SANDBOX/state") || code=$?
-assert_eq "$code" "0" "U10 rolled-back pair is doctor-healthy"
-assert_contains "$out" "PASS: installed artifact/manifest (3.9.9" "U10 doctor reflects rolled-back pair"
-
-# Privilege handling (release-blocking defect): install-packages/rollback must
-# elevate only the pacman transaction (SPEC §37's documented `sudo pacman -U
-# ...`), never require the whole script to run as root. Before the fix,
-# "$pacman_bin" -U ... was a single literal word "pacman" with no sudo
-# involved at all, so this asserts the *shape* of the constructed command --
-# not merely that the script exits 0 -- which is exactly what the old code
-# fails to produce. $fake is prepended to PATH for these calls; every other
-# fake tool in it is a transparent pass-through by default (see fake/mv,
-# fake/install, fake/sha256sum above), so only "sudo" resolution is actually
-# exercised here. Must run before update-upstream/bump-pkgrel below mutate
-# $root's checkout out from under this pinned validated-build.manifest.
-priv_state=$COO_TEST_SANDBOX/priv-state
-cp -a "$COO_TEST_SANDBOX/state" "$priv_state"
-mapfile -t priv_artifacts < <(sed -n 's/^ARTIFACT=\([^ ]*\) .*/\1/p' "$priv_state/validated-build.manifest")
-assert_eq "${#priv_artifacts[@]}" "2" "privilege fixture manifest names exactly two artifacts"
-
-sudo_log=$COO_TEST_SANDBOX/sudo.log
-: >"$sudo_log"
-code=0
-out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$priv_state" COO_SUDO_LOG="$sudo_log" PATH="$fake:$PATH" "$root/bin/install-packages" --install 2>&1) || code=$?
-assert_eq "$code" "0" "install-packages succeeds as a normal user with no COO_PACMAN_BIN override"
-sudo_line=$(cat "$sudo_log")
-assert_contains "$sudo_line" "sudo pacman -U" "install-packages elevates only the pacman transaction via sudo"
-assert_contains "$sudo_line" "${priv_artifacts[0]}" "sudo pacman invocation names the current shell artifact"
-assert_contains "$sudo_line" "${priv_artifacts[1]}" "sudo pacman invocation names the current overlay artifact"
-
-# COO_PACMAN_BIN must still bypass sudo entirely and unchanged (five other
-# call sites in this file rely on exactly this override behavior).
-priv_state_override=$COO_TEST_SANDBOX/priv-state-override
-cp -a "$COO_TEST_SANDBOX/state" "$priv_state_override"
-: >"$sudo_log"
-: >"$paclog"
-COO_REPO_ROOT="$root" COO_STATE_DIR="$priv_state_override" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" COO_SUDO_LOG="$sudo_log" PATH="$fake:$PATH" "$root/bin/install-packages" --install >/dev/null
-assert_eq "$(wc -l <"$sudo_log")" "0" "COO_PACMAN_BIN override never touches sudo"
-assert_contains "$(cat "$paclog")" "-U" "COO_PACMAN_BIN override still invokes pacman directly"
-
-# rollback must exhibit the same elevation shape as install-packages.
-priv_rollback_state=$COO_TEST_SANDBOX/priv-rollback-state
-cp -a "$COO_TEST_SANDBOX/state" "$priv_rollback_state"
-: >"$sudo_log"
-code=0
-out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$priv_rollback_state" COO_SUDO_LOG="$sudo_log" PATH="$fake:$PATH" "$root/bin/rollback" 2>&1) || code=$?
-assert_eq "$code" "0" "rollback succeeds as a normal user with no COO_PACMAN_BIN override"
-assert_contains "$(cat "$sudo_log")" "sudo pacman -U" "rollback elevates only the pacman transaction via sudo"
-
-# M7 follow-up: rollback finalization failure is ambiguous after pacman, so its
-# pending marker must block all later package-manager actions and doctor must
-# fail closed rather than trusting the previous installed pointer.
-rollback_pending_state=$COO_TEST_SANDBOX/rollback-pending-state
-cp -a "$COO_TEST_SANDBOX/state" "$rollback_pending_state"
-rm -f "$rollback_pending_state/install-pending.manifest"
-: >"$paclog"
-code=0
-out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$rollback_pending_state" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" COO_MV_BIN="$fake/mv" COO_FAKE_INSTALLED_MV_FAIL=1 "$root/bin/rollback" 2>&1) || code=$?
-assert_eq "$code" "14" "rollback finalization failure is reported"
-assert_eq "$(wc -l <"$paclog")" "1" "rollback finalization failure ran pacman once"
-assert_file_exists "$rollback_pending_state/install-pending.manifest" "rollback finalization failure retains pending marker"
-code=0
-out=$(run_rc_doctor "$rollback_pending_state") || code=$?
-assert_eq "$code" "1" "rollback pending state fails doctor"
-assert_contains "$out" "FAIL: incomplete install state" "rollback pending state is explicit"
-: >"$paclog"
-code=0
-out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$rollback_pending_state" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$root/bin/install-packages" --install 2>&1) || code=$?
-assert_eq "$code" "1" "rollback pending state blocks install"
-assert_eq "$(wc -l <"$paclog")" "0" "rollback pending install invokes no pacman"
-code=0
-out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$rollback_pending_state" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$root/bin/rollback" 2>&1) || code=$?
-assert_eq "$code" "1" "rollback pending state blocks another rollback"
-assert_eq "$(wc -l <"$paclog")" "0" "rollback pending rollback invokes no pacman"
-
-# Dangling state pointers count as state that cannot be trusted, not absence.
-# The fixture validates both the pending guard and installed pointer before any
-# fake pacman invocation.
-dangling_state=$COO_TEST_SANDBOX/dangling-state
-cp -a "$COO_TEST_SANDBOX/state" "$dangling_state"
-rm -f "$dangling_state/install-pending.manifest"
-ln -s missing-pending.manifest "$dangling_state/install-pending.manifest"
-code=0
-out=$(run_rc_doctor "$dangling_state") || code=$?
-assert_eq "$code" "1" "dangling pending marker fails doctor"
-assert_contains "$out" "FAIL: incomplete install state" "dangling pending marker is explicit"
-: >"$paclog"
-code=0
-out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$dangling_state" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$root/bin/install-packages" --install 2>&1) || code=$?
-assert_eq "$code" "1" "dangling pending marker blocks install"
-assert_eq "$(wc -l <"$paclog")" "0" "dangling pending install invokes no pacman"
-code=0
-out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$dangling_state" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$root/bin/rollback" 2>&1) || code=$?
-assert_eq "$code" "1" "dangling pending marker blocks rollback"
-assert_eq "$(wc -l <"$paclog")" "0" "dangling pending rollback invokes no pacman"
-rm -f "$dangling_state/install-pending.manifest" "$dangling_state/installed-build.manifest"
-ln -s missing-installed.manifest "$dangling_state/installed-build.manifest"
-code=0
-out=$(run_rc_doctor "$dangling_state") || code=$?
-assert_eq "$code" "1" "dangling installed pointer fails doctor"
-assert_contains "$out" "FAIL: installed artifact/manifest mismatch" "dangling installed pointer is explicit"
-: >"$paclog"
-code=0
-out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$dangling_state" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$root/bin/install-packages" --install 2>&1) || code=$?
-assert_eq "$code" "1" "dangling installed pointer blocks install"
-assert_eq "$(wc -l <"$paclog")" "0" "dangling installed pointer invokes no pacman"
-
-# Missing/corrupt prior state must not invoke pacman.
-: >"$paclog"
-code=0
-out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$COO_TEST_SANDBOX/no-prior" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$root/bin/rollback" 2>&1) || code=$?
-assert_eq "$code" "1" "U10 missing prior state fails safely"
-assert_eq "$(wc -l <"$paclog")" "0" "missing prior invokes no pacman"
-mkdir -p "$COO_TEST_SANDBOX/corrupt-state/packages/previous-z/artifacts"
-printf 'RELEASE=packages/previous-z\nOMARCHY_VERSION=3.9.9\nOMARCHY_COMMIT=9999999999999999999999999999999999999999\nARTIFACT=bad.pkg.tar.zst deadbeef\nARTIFACT=bad2.pkg.tar.zst deadbeef\n' >"$COO_TEST_SANDBOX/corrupt-state/packages/previous-z/validated-build.manifest"
-code=0
-out=$(COO_REPO_ROOT="$root" COO_STATE_DIR="$COO_TEST_SANDBOX/corrupt-state" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$root/bin/rollback" 2>&1) || code=$?
-assert_eq "$code" "1" "U10 corrupt prior state fails safely"
-assert_eq "$(wc -l <"$paclog")" "0" "corrupt prior invokes no pacman"
 
 # U01 update no-op: discovery must not mutate metadata or invoke packaging tools.
 update_lock_before=$(sha256sum "$root/upstream.lock")
@@ -672,7 +289,6 @@ else
   printf 'ok:   U02 caller source differs from the newly discovered commit\n'
 fi
 
-update_state=$COO_TEST_SANDBOX/update-state
 update_build=$COO_TEST_SANDBOX/update-build
 pac_update=$COO_TEST_SANDBOX/update-pacman.log
 candidate_source_log=$COO_TEST_SANDBOX/candidate-source.log
@@ -686,7 +302,7 @@ candidate_source_log=$COO_TEST_SANDBOX/candidate-source.log
 # though nothing about independence changed.
 overlay_pkgver_before_update=$(grep -m1 '^pkgver=' "$root/packages/cachy-omarchy-overlay/PKGBUILD")
 code=0
-out=$(WAYLAND_DISPLAY= COO_UPDATE_PIPELINE_NESTED=1 COO_REPO_ROOT="$root" COO_GIT_BIN="$fake/git" COO_STATE_DIR="$update_state" COO_BUILD_DIR="$update_build" COO_OMARCHY_GIT="$old_source_fixture" COO_EXPECT_UPSTREAM_COMMIT="$fixture_commit" COO_CANDIDATE_SOURCE_LOG="$candidate_source_log" COO_TOOL_LOG="$log" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_FAKE_SHELL_ARTIFACT="$u02_shell_fixture" COO_FAKE_OVERLAY_ARTIFACT="$u02_overlay_fixture" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$pac_update" "$root/bin/update-upstream" 2>&1) || code=$?
+out=$(WAYLAND_DISPLAY= COO_UPDATE_PIPELINE_NESTED=1 COO_REPO_ROOT="$root" COO_GIT_BIN="$fake/git" COO_BUILD_DIR="$update_build" COO_OMARCHY_GIT="$old_source_fixture" COO_EXPECT_UPSTREAM_COMMIT="$fixture_commit" COO_CANDIDATE_SOURCE_LOG="$candidate_source_log" COO_TOOL_LOG="$log" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_FAKE_SHELL_ARTIFACT="$u02_shell_fixture" COO_FAKE_OVERLAY_ARTIFACT="$u02_overlay_fixture" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$pac_update" "$root/bin/update-upstream" 2>&1) || code=$?
 assert_eq "$code" "0" "U02 update validates and publishes candidate"
 # The nested candidate suite is the only record of why it rejected the pin.
 (( code )) && printf '%s\n' "$out" | grep -E '^(FAIL|SKIP|skip:|error:|warn:)' | sed 's/^/      candidate: /'
@@ -722,15 +338,15 @@ expected_fixture_names=$(git -C "$fixture_upstream" ls-tree --name-only HEAD -- 
 assert_eq "$inventory_names_actual" "$expected_fixture_names" "U02 inventory content is exactly the fixture repository's real bin/ tree"
 assert_eq "$(grep -m1 '^pkgver=' "$root/packages/cachy-omarchy-overlay/PKGBUILD")" "$overlay_pkgver_before_update" "U02 overlay version is independent"
 assert_eq "$(wc -l <"$pac_update")" "0" "U02 update never invokes pacman"
+# The validated candidate artifacts are copied next to the older builds
+# (bin/rollback installs from build/). Names come from the updated metadata.
+u02_names=$(source "$root/bin/package-names.sh" && coo_current_artifacts "$root" &&
+  printf '%s\n' "$COO_SHELL_ARTIFACT" "$COO_OVERLAY_ARTIFACT")
+for name in $u02_names; do
+  assert_file_exists "$update_build/$name" "U02 copies candidate artifact into build/: $name"
+done
+assert_eq "$(find "$update_build" -maxdepth 1 -type f -name '*.pkg.tar.zst' | wc -l)" "2" "U02 build/ receives exactly the two candidate artifacts"
 assert_contains "$out" "UPSTREAM.md requires human" "UPSTREAM.md deferred with explicit reason"
-
-# M7 U02 linkage: a successful candidate update leaves a checksum-valid
-# manifest that the read-only doctor reports as healthy.  It is not installed.
-code=0
-out=$(run_rc_doctor "$update_state") || code=$?
-assert_eq "$code" "0" "U02 update manifest is doctor-healthy"
-assert_contains "$out" "PASS: validated artifact/manifest ($next_ver" "U02 doctor reads updated manifest"
-assert_contains "$out" "WARN: installed artifact/manifest not present" "U02 doctor distinguishes uninstalled build"
 
 # U04 is explicit local packaging revision only: no lock or version mutation.
 lock_before_bump=$(sha256sum "$root/upstream.lock")
@@ -754,7 +370,7 @@ for mode in patch build audit test; do
   before_pkg=$(sha256sum "$failroot/packages/cachy-omarchy-shell/PKGBUILD")
   fail_pac=$COO_TEST_SANDBOX/fail-$mode-pacman.log
   : >"$fail_pac"
-  envs=(COO_REPO_ROOT="$failroot" COO_GIT_BIN="$fake/git" COO_STATE_DIR="$COO_TEST_SANDBOX/fail-$mode-state" COO_BUILD_DIR="$COO_TEST_SANDBOX/fail-$mode-build" COO_TOOL_LOG="$log" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_TEST_RUNNER="$fake/test-runner" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$fail_pac")
+  envs=(COO_REPO_ROOT="$failroot" COO_GIT_BIN="$fake/git" COO_BUILD_DIR="$COO_TEST_SANDBOX/fail-$mode-build" COO_TOOL_LOG="$log" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_TEST_RUNNER="$fake/test-runner" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$fail_pac")
   # Exit code alone is not proof of *which* stage failed -- fix round 2 found
   # this file trusting a bare "exit 1" from three different stages at once,
   # passing even when the earlier inventory-fetch step aborted before ever
@@ -779,22 +395,18 @@ for mode in patch build audit test; do
   assert_eq "$(sha256sum "$failroot/upstream.lock")" "$before_lock" "U$mode failure preserves lock"
   assert_eq "$(sha256sum "$failroot/packages/cachy-omarchy-shell/PKGBUILD")" "$before_pkg" "U$mode failure preserves PKGBUILD"
   assert_eq "$(wc -l <"$fail_pac")" "0" "U$mode failure invokes no pacman"
+  assert_eq "$(find "$COO_TEST_SANDBOX/fail-$mode-build" -name '*.pkg.tar.zst' 2>/dev/null | wc -l)" "0" "U$mode failure copies no artifact into build/"
 done
 
-# Metadata publication is a transaction boundary: a failed second rename must
-# leave both tracked inputs and the old authoritative pointer/release intact.
+# Metadata publication is a transaction boundary: a failed second rename must leave both tracked inputs intact.
 pubroot=$COO_TEST_SANDBOX/metadata-publish-repo
 cp -a "$root" "$pubroot"
 sed -i "s/OMARCHY_VERSION=$next_ver_re/OMARCHY_VERSION=$pin_ver/; s/OMARCHY_COMMIT=$fixture_commit/OMARCHY_COMMIT=$pin_commit/; s/OMARCHY_TAG=v$next_ver_re/OMARCHY_TAG=v$pin_ver/" "$pubroot/upstream.lock"
 sed -i "s/pkgver=$next_ver_re/pkgver=$pin_ver/; s/pkgrel=2/pkgrel=1/; s/_commit='$fixture_commit'/_commit='$pin_commit'/" "$pubroot/packages/cachy-omarchy-shell/PKGBUILD"
-pub_state=$COO_TEST_SANDBOX/metadata-publish-state
-cp -a "$COO_TEST_SANDBOX/state" "$pub_state"
 pub_lock_before=$(sha256sum "$pubroot/upstream.lock")
 pub_pkg_before=$(sha256sum "$pubroot/packages/cachy-omarchy-shell/PKGBUILD")
-pub_pointer_before=$(cat "$pub_state/validated-build.manifest")
-pub_old_release=$(awk -F= '$1 == "RELEASE" { print $2; exit }' "$pub_state/validated-build.manifest")
 code=0
-out=$(COO_REPO_ROOT="$pubroot" COO_GIT_BIN="$fake/git" COO_STATE_DIR="$pub_state" COO_BUILD_DIR="$COO_TEST_SANDBOX/metadata-publish-build" COO_TOOL_LOG="$log" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_TEST_RUNNER="$fake/test-runner" COO_MV_BIN="$fake/mv" COO_FAKE_METADATA_PKG_MV_FAIL=1 "$pubroot/bin/update-upstream" 2>&1) || code=$?
+out=$(COO_REPO_ROOT="$pubroot" COO_GIT_BIN="$fake/git" COO_BUILD_DIR="$COO_TEST_SANDBOX/metadata-publish-build" COO_TOOL_LOG="$log" COO_MAKEPKG_BIN="$fake/makepkg" COO_BSDTAR_BIN="$fake/bsdtar" COO_TEST_RUNNER="$fake/test-runner" COO_MV_BIN="$fake/mv" COO_FAKE_METADATA_PKG_MV_FAIL=1 "$pubroot/bin/update-upstream" 2>&1) || code=$?
 assert_eq "$code" "1" "metadata second rename failure aborts update"
 # Same reasoning as the U05-U08 loop: exit 1 alone does not distinguish this
 # from an earlier, unrelated abort (e.g. the inventory fetch failing first).
@@ -802,40 +414,5 @@ assert_contains "$out" "could not publish shell PKGBUILD; upstream.lock restored
   "metadata second rename failure fails at its own stage, not earlier"
 assert_eq "$(sha256sum "$pubroot/upstream.lock")" "$pub_lock_before" "metadata failure restores lock"
 assert_eq "$(sha256sum "$pubroot/packages/cachy-omarchy-shell/PKGBUILD")" "$pub_pkg_before" "metadata failure preserves PKGBUILD"
-assert_eq "$(cat "$pub_state/validated-build.manifest")" "$pub_pointer_before" "metadata failure preserves old manifest pointer"
-assert_file_exists "$pub_state/$pub_old_release/artifacts/$shell_artifact_pin" "metadata failure preserves old referenced release"
-
-# A pacman-success/final-pointer-failure state is explicitly pending. Neither
-# a new install nor rollback may trust the stale installed pointer afterwards.
-postroot=$COO_TEST_SANDBOX/post-pacman-repo
-cp -a "$root" "$postroot"
-sed -i "s/OMARCHY_VERSION=$next_ver_re/OMARCHY_VERSION=$pin_ver/; s/OMARCHY_COMMIT=$fixture_commit/OMARCHY_COMMIT=$pin_commit/; s/OMARCHY_TAG=v$next_ver_re/OMARCHY_TAG=v$pin_ver/" "$postroot/upstream.lock"
-# poststate below still carries the never-touched original validated
-# manifest from the very first build (pinned to shell_pkgrel_pin), so
-# postroot's checkout must reconstruct that exact pin -- a hardcoded "1"
-# here would silently diverge from it and break install-packages'
-# cross-check between the manifest and this checkout.
-sed -i "s/pkgver=$next_ver_re/pkgver=$pin_ver/; s/pkgrel=2/pkgrel=${shell_pkgrel_pin}/; s/_commit='$fixture_commit'/_commit='$pin_commit'/" "$postroot/packages/cachy-omarchy-shell/PKGBUILD"
-poststate=$COO_TEST_SANDBOX/post-pacman-state
-cp -a "$COO_TEST_SANDBOX/state" "$poststate"
-: >"$paclog"
-code=0
-out=$(COO_REPO_ROOT="$postroot" COO_STATE_DIR="$poststate" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" COO_MV_BIN="$fake/mv" COO_FAKE_INSTALLED_MV_FAIL=1 "$postroot/bin/install-packages" --install 2>&1) || code=$?
-assert_eq "$code" "14" "post-pacman installed pointer failure is reported"
-assert_file_exists "$poststate/install-pending.manifest" "post-pacman failure leaves explicit pending state"
-assert_eq "$(wc -l <"$paclog")" "1" "post-pacman failure ran pacman exactly once"
-code=0
-out=$(run_rc_doctor "$poststate") || code=$?
-assert_eq "$code" "1" "pending post-pacman state fails doctor"
-assert_contains "$out" "FAIL: incomplete install state" "pending doctor diagnosis requires operator recovery"
-: >"$paclog"
-code=0
-out=$(COO_REPO_ROOT="$postroot" COO_STATE_DIR="$poststate" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$postroot/bin/install-packages" --install 2>&1) || code=$?
-assert_eq "$code" "1" "pending install blocks another install"
-assert_eq "$(wc -l <"$paclog")" "0" "pending install blocks further pacman"
-code=0
-out=$(COO_REPO_ROOT="$postroot" COO_STATE_DIR="$poststate" COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$postroot/bin/rollback" 2>&1) || code=$?
-assert_eq "$code" "1" "pending install blocks rollback"
-assert_eq "$(wc -l <"$paclog")" "0" "pending rollback invokes no pacman"
 
 exit "$ASSERT_FAILURES"

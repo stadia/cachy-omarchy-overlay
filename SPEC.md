@@ -659,12 +659,8 @@ must be an explicit architecture decision.
 
 ## 9.5 User State
 
-```text
-~/.local/state/cachy-omarchy/
-├── logs/
-├── backups/
-└── update/
-```
+없음. 0.x 가 쓰던 `~/.local/state/cachy-omarchy/{logs,backups,update}` 는 미사용
+잔재이며 어떤 코드도 읽거나 쓰지 않는다(§36). 지워도 된다.
 
 ---
 
@@ -746,7 +742,7 @@ cachy-omarchy-overlay/
 │   └── uwsm/10-cachy-omarchy         # 세션 환경 드롭인 (§45)
 ├── bin/                              # check-upstream, update-upstream, build-packages,
 │                                     # test-packages, install-packages, rollback,
-│                                     # bump-pkgrel, ci-resolve-install, validated-build.sh
+│                                     # bump-pkgrel, ci-resolve-install, package-names.sh
 ├── lib/runtime.sh                    # 테스트용 아티팩트 추출 헬퍼
 ├── tests/                            # test.sh 러너, lib/, data/, package/, runtime/
 ├── docs/                             # COMMAND_AUDIT, RUNTIME_DEPENDENCIES, RUNTIME_STARTUP
@@ -1198,6 +1194,10 @@ supported for local development.
 
 Use a clean chroot / containerized Arch package build environment.
 
+이 요구는 CI 의 `cachyos` 컨테이너 lane 이 충족한다(깨끗한 빌드 환경).
+`bin/ci-resolve-install` 은 depends 해석만 검증한다. 로컬 `bin/build-packages`
+는 호스트 makepkg 이며 chroot 를 쓰지 않는다.
+
 Reason:
 
 - prevents accidental host dependency leakage;
@@ -1472,38 +1472,28 @@ Independent semantic version:
 
 # 36. Rollback
 
-Every successful build/install workflow must preserve enough information to
-roll back.
-
-Preferred package cache:
-
-```text
-~/.local/state/cachy-omarchy/packages/
-```
-
-or rely on the pacman cache when reliable.
-
-Rollback command:
+`bin/build-packages` 는 결과를 `build/` 에 버전별 파일 이름으로 남기고 지우지
+않는다. 그 파일들이 rollback 원천이다.
 
 ```bash
 ./bin/rollback
 ```
 
-Conceptually:
-
-```text
-current 4.0.1-1
-        ↓
-select previous tested build
-        ↓
-pacman -U 4.0.0-2
-        ↓
-restart shell
-        ↓
-smoke test
-```
+패키지마다 `pacman -Q` 로 설치 버전을 읽고, `build/` 에서 그보다 낮은 가장 새
+버전을 `vercmp` 로 골라 `pacman -U` 한다. 더 낮은 버전이 없는 패키지는 그대로
+둔다(overlay 는 독립 버전이라 흔하다). 둘 다 없으면 아무것도 하지 않고 실패한다.
+대상은 `build/` 에 있는 바로 아래 버전이며, 한 번도 설치한 적 없는 빌드일 수
+있다. 다시 실행하면 한 단계씩 더 내려간다. 원치 않는 버전은 `build/` 에서 그
+아티팩트를 지워 후보에서 뺀다.
+`COO_ROLLBACK_SMOKE_BIN` 을 주면 pacman 뒤에 실행하며, 실패하면 다운그레이드는
+이미 끝났다는 오류로 종료한다. 두 패키지 중 하나라도 설치돼 있지 않으면
+rollback 전체가 실패한다. rollback 뒤에는 `cachy-omarchy-shell --restart` 로
+셸을 다시 시작한다.
 
 Rollback must not restore unrelated CachyOS system files.
+
+0.x 의 `~/.local/state/cachy-omarchy/{validated-builds,packages}` 와
+`*.manifest` 는 더 이상 쓰지도 읽지도 않는다. 지워도 된다.
 
 ---
 
@@ -1514,13 +1504,13 @@ Initial developer installation:
 ```bash
 ./bin/build-packages
 ./bin/test-packages
-./bin/install-packages
+./bin/install-packages --install
 ```
 
-Eventually:
+`install-packages --install` 은 `build/` 의 현재 버전 두 파일로 아래 명령을 실행한다:
 
 ```bash
-sudo pacman -U   build/cachy-omarchy-shell-*.pkg.tar.zst   build/cachy-omarchy-overlay-*.pkg.tar.zst
+sudo pacman -U build/cachy-omarchy-shell-<ver>-<rel>-any.pkg.tar.zst build/cachy-omarchy-overlay-<ver>-<rel>-any.pkg.tar.zst
 ```
 
 No install script should blindly copy files into `/usr`.
@@ -1609,11 +1599,7 @@ Runtime logs:
 journalctl --user -t cachy-omarchy-shell
 ```
 
-Optional user log directory:
-
-```text
-~/.local/state/cachy-omarchy/logs/
-```
+사용자 로그 디렉터리는 없다(§9.5).
 
 Do not log:
 

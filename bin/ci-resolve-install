@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 깨끗한 시스템에서 PKGBUILD 의 depends 선언이 충분한지 증명한다.
 #
-# 기존 clean build(bin/build-packages --clean)는 의존 검사를 건너뛰므로
+# 빌드(bin/build-packages)는 makepkg 에 의존 검사 생략 옵션을 줘서 의존을 안 보므로
 # 이 스크립트가 실제 pacman 트랜잭션으로 그 구멍을 메운다.
 set -uo pipefail
 

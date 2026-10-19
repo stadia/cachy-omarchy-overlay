@@ -14,25 +14,9 @@ depends=('cachy-omarchy-shell' 'bash')
 # 적응 카피 6개). 상호 배타가 의도다. provides 는 하지 않는다.
 conflicts=('omarchy')
 
-# bin/build-packages --clean creates this source archive only in its temporary
-# context. No overlay copy is tracked under packages/, so overlay/ remains the
-# single source of truth for normal and clean builds alike.
-if [[ -f $startdir/clean-overlay.tar ]]; then
-  source=('clean-overlay.tar')
-  sha256sums=('SKIP')
-  _clean_context=1
-else
-  source=()
-  sha256sums=()
-  _clean_context=0
-fi
+source=()
+sha256sums=()
 
 package() {
-  if (( _clean_context )); then
-    bash "$startdir/stage-overlay.sh" "$srcdir/overlay" "$pkgdir"
-  else
-    # Direct makepkg keeps the developer repository layout. A clean chroot
-    # must use the temporary source archive produced by build-packages --clean.
-    bash "$startdir/stage-overlay.sh" "$startdir/../../overlay" "$pkgdir"
-  fi
+  bash "$startdir/stage-overlay.sh" "$startdir/../../overlay" "$pkgdir"
 }

@@ -1048,7 +1048,7 @@ def main():
             continue
         package, klass, rationale = entry
         table.append((cmd, package, klass, rationale))
-        # AUR: real package, but repo-less — pacman -U (bin/install-packages:55)
+        # AUR: real package, but repo-less — pacman -U (bin/install-packages)
         # resolves depends against repos and already-installed packages only,
         # never AUR, so declaring it in `depends` would make our own package
         # uninstallable via its own install path. It still has to show up

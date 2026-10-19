@@ -17,7 +17,7 @@ state=$COO_TEST_SANDBOX/state
 fake_bin=$COO_TEST_SANDBOX/fake-bin
 # A caller may export doctor or former fixture controls. Keep the fixture
 # baseline hermetic; only the namespaced controls below enable special cases.
-unset COO_IPC_TIMEOUT COO_TEST_DOCTOR_SHA256_BIN \
+unset COO_IPC_TIMEOUT \
   COO_FAKE_PROCESS COO_FAKE_PING_FAIL COO_FAKE_OFFICIAL_PRESENT COO_TEST_WAYLAND_DISPLAY \
   TEST_DOCTOR_PROCESS TEST_DOCTOR_PING_FAIL TEST_DOCTOR_OFFICIAL_PRESENT \
   TEST_DOCTOR_WAYLAND_DISPLAY \
@@ -108,15 +108,10 @@ run_doctor() {
   PATH="$fake_bin:/usr/bin:/bin" WAYLAND_DISPLAY="${TEST_DOCTOR_WAYLAND_DISPLAY:-}" \
     OMARCHY_PATH="$prefix/upstream" \
     COO_PACMAN_LOG="$pacman_log" COO_PREFIX_ROOT="$prefix" COO_COMPAT_BIN="$compat" COO_HYPR_DIR="$hypr" \
-    COO_CONFIG_DIR="$config" COO_OMARCHY_CONFIG_DIR="$user_config" COO_STATE_DIR="$state" \
+    COO_CONFIG_DIR="$config" COO_OMARCHY_CONFIG_DIR="$user_config" \
     COO_OMARCHY_PATH="$prefix/upstream" COO_OS_RELEASE="$os_release" \
     COO_OMARCHY_STATE_DIR="$omarchy_state" \
-    COO_PAM_LOCK_FILE="${COO_TEST_DOCTOR_PAM_LOCK_FILE:-$pam_lock}" \
-    COO_SHA256_BIN="${COO_TEST_DOCTOR_SHA256_BIN:-sha256sum}" "$DOCTOR" 2>&1
-}
-
-run_doctor_with_sha() {
-  COO_TEST_DOCTOR_SHA256_BIN=$1 run_doctor
+    COO_PAM_LOCK_FILE="${COO_TEST_DOCTOR_PAM_LOCK_FILE:-$pam_lock}" "$DOCTOR" 2>&1
 }
 
 printf 'do not modify\n' >"$config/sentinel"
@@ -146,9 +141,9 @@ assert_contains "$out" "omarchy-apply-lock" "missing lock PAM service names the 
 # Every doctor override except deliberately injected COO_IPC_TIMEOUT is pinned
 # by run_doctor. Hostile inherited values must not redirect this fixture.
 out_hostile=$(COO_PREFIX_ROOT=/hostile COO_COMPAT_BIN=/hostile COO_HYPR_DIR=/hostile \
-  COO_CONFIG_DIR=/hostile COO_STATE_DIR=/hostile COO_OMARCHY_CONFIG_DIR=/hostile \
+  COO_CONFIG_DIR=/hostile COO_OMARCHY_CONFIG_DIR=/hostile \
   COO_OMARCHY_PATH=/hostile COO_OS_RELEASE=/hostile COO_OMARCHY_STATE_DIR=/hostile \
-  COO_SHA256_BIN=missing-sha256 run_doctor); hostile_code=$?
+  run_doctor); hostile_code=$?
 assert_eq "$hostile_code" "0" "hostile doctor overrides cannot corrupt fixture health"
 assert_contains "$out_hostile" "PASS: shell.qml ($prefix/upstream/shell/shell.qml)" \
   "fixture keeps its own OMARCHY_PATH despite hostile override"
@@ -185,8 +180,8 @@ out_empty=$(PATH="$fake_bin:/usr/bin:/bin" WAYLAND_DISPLAY="${TEST_DOCTOR_WAYLAN
   OMARCHY_PATH="$empty_prefix/upstream" \
   COO_PACMAN_LOG="$pacman_log" COO_PREFIX_ROOT="$empty_prefix" COO_COMPAT_BIN="$compat" \
   COO_HYPR_DIR="$hypr" COO_CONFIG_DIR="$config" COO_OMARCHY_CONFIG_DIR="$user_config" \
-  COO_STATE_DIR="$state" COO_OMARCHY_PATH="$empty_prefix/upstream" COO_OS_RELEASE="$os_release" \
-  COO_OMARCHY_STATE_DIR="$omarchy_state" COO_SHA256_BIN=sha256sum "$DOCTOR" 2>&1); empty_code=$?
+  COO_OMARCHY_PATH="$empty_prefix/upstream" COO_OS_RELEASE="$os_release" \
+  COO_OMARCHY_STATE_DIR="$omarchy_state" "$DOCTOR" 2>&1); empty_code=$?
 assert_contains "$out_empty" "FAIL: no omarchy-* commands exposed" "빈 노출은 FAIL"
 [[ $empty_code -ne 0 ]] && empty_nonzero=0 || empty_nonzero=1
 assert_eq "$empty_nonzero" "0" "빈 노출은 nonzero exit"
@@ -195,9 +190,9 @@ out_nosession=$(PATH="$fake_bin:/usr/bin:/bin" \
   WAYLAND_DISPLAY="${TEST_DOCTOR_WAYLAND_DISPLAY:-}" \
   COO_PACMAN_LOG="$pacman_log" COO_PREFIX_ROOT="$prefix" COO_COMPAT_BIN="$compat" \
   COO_HYPR_DIR="$hypr" COO_CONFIG_DIR="$config" \
-  COO_OMARCHY_CONFIG_DIR="$user_config" COO_STATE_DIR="$state" \
+  COO_OMARCHY_CONFIG_DIR="$user_config" \
   COO_OMARCHY_PATH="$prefix/upstream" COO_OS_RELEASE="$os_release" \
-  COO_OMARCHY_STATE_DIR="$omarchy_state" COO_SHA256_BIN=sha256sum \
+  COO_OMARCHY_STATE_DIR="$omarchy_state" \
   env -u OMARCHY_PATH "$DOCTOR" 2>&1); nocode=$?
 assert_contains "$out_nosession" "FAIL: OMARCHY_PATH not in session environment" \
   "세션 변수가 없으면 FAIL"
@@ -311,76 +306,27 @@ out=$(TEST_DOCTOR_OFFICIAL_PRESENT=omarchy-settings run_doctor); code=$?
 assert_eq "$code" 1 "official omarchy-settings presence fails"
 assert_contains "$out" "FAIL: official package present: omarchy-settings" "official omarchy-settings presence is explicit"
 
-printf 'pending\n' >"$state/install-pending.manifest"
-out=$(run_doctor); code=$?
-assert_eq "$code" 1 "pending install fails closed"
-assert_contains "$out" "FAIL: incomplete install state" "pending install is explicit"
-rm -f "$state/install-pending.manifest"
-
-printf 'not a manifest\n' >"$state/validated-build.manifest"
-out=$(run_doctor); code=$?
-assert_eq "$code" 1 "malformed manifest fails without false green"
-assert_contains "$out" "FAIL: artifact/manifest mismatch" "manifest mismatch is explicit"
-rm -f "$state/validated-build.manifest"
-
-release=validated-builds/fixture
-artifact_dir=$state/$release/artifacts
-mkdir -p "$artifact_dir"
-printf shell >"$artifact_dir/cachy-omarchy-shell-4.0.0-1-any.pkg.tar.zst"
-printf overlay >"$artifact_dir/cachy-omarchy-overlay-0.1.0-1-any.pkg.tar.zst"
-shell_sum=$(sha256sum "$artifact_dir/cachy-omarchy-shell-4.0.0-1-any.pkg.tar.zst" | awk '{print $1}')
-overlay_sum=$(sha256sum "$artifact_dir/cachy-omarchy-overlay-0.1.0-1-any.pkg.tar.zst" | awk '{print $1}')
-write_valid_manifest() {
-  cat >"$state/validated-build.manifest" <<EOF
-RELEASE=$release
-OMARCHY_VERSION=4.0.0
-OMARCHY_COMMIT=1111111111111111111111111111111111111111
-ARTIFACT=cachy-omarchy-shell-4.0.0-1-any.pkg.tar.zst $shell_sum
-ARTIFACT=cachy-omarchy-overlay-0.1.0-1-any.pkg.tar.zst $overlay_sum
-EOF
-}
-write_valid_manifest
-out=$(run_doctor); code=$?
-assert_eq "$code" 0 "strict valid manifest passes"
-assert_contains "$out" "PASS: validated artifact/manifest" "valid manifest is reported validated"
-cp "$state/validated-build.manifest" "$state/installed-build.manifest"
-out=$(run_doctor); code=$?
-assert_eq "$code" 0 "valid installed manifest passes"
-assert_contains "$out" "PASS: installed artifact/manifest" "installed manifest is reported separately"
-printf 'broken installed pointer\n' >"$state/installed-build.manifest"
-out=$(run_doctor); code=$?
-assert_eq "$code" 1 "malformed installed manifest fails"
-assert_contains "$out" "FAIL: installed artifact/manifest mismatch" "installed mismatch is explicit"
-rm -f "$state/installed-build.manifest"
-printf 'ARTIFACT=cachy-omarchy-shell-4.0.0-1-any.pkg.tar.zst %s\n' "$shell_sum" >>"$state/validated-build.manifest"
-out=$(run_doctor); code=$?
-assert_eq "$code" 1 "duplicate shell artifact fails"
-assert_contains "$out" "FAIL: artifact/manifest mismatch" "duplicate artifact is explicit"
-write_valid_manifest
-printf 'ARTIFACT=cachy-omarchy-unknown-1.0.0-1-any.pkg.tar.zst %s\n' "$shell_sum" >>"$state/validated-build.manifest"
-out=$(run_doctor); code=$?
-assert_eq "$code" 1 "unknown artifact type fails"
-assert_contains "$out" "FAIL: artifact/manifest mismatch" "unknown artifact is explicit"
-write_valid_manifest
-printf 'UNEXPECTED=value\n' >>"$state/validated-build.manifest"
-out=$(run_doctor); code=$?
-assert_eq "$code" 1 "unknown manifest field fails"
-assert_contains "$out" "FAIL: artifact/manifest mismatch" "unknown manifest field is explicit"
-cat >"$state/validated-build.manifest" <<EOF
-RELEASE=$release
-OMARCHY_VERSION=4.0.0
-OMARCHY_COMMIT=1111111111111111111111111111111111111111
-ARTIFACT=wrong-shell-4.0.0-1-any.pkg.tar.zst $shell_sum
-ARTIFACT=wrong-overlay-0.1.0-1-any.pkg.tar.zst $overlay_sum
-EOF
-out=$(run_doctor); code=$?
-assert_eq "$code" 1 "two valid-looking wrong package names fail"
-assert_contains "$out" "FAIL: artifact/manifest mismatch" "wrong package names are explicit"
-write_valid_manifest
-out=$(run_doctor_with_sha missing-sha256); code=$?
-assert_eq "$code" 1 "manifest without checksum tool cannot pass"
-assert_contains "$out" "FAIL: artifact/manifest mismatch" "missing checksum tool is explicit"
-rm -rf "$state/$release" "$state/validated-build.manifest"
+# 0.x 개발 도구가 남긴 상태(매니페스트·pending 마커·릴리스 복사본)는 배포된
+# doctor 의 관심사가 아니다. 남아 있어도 판정과 출력에 영향이 없어야 한다.
+# 0.x 도구가 쓰던 기본 위치($XDG_STATE_HOME/cachy-omarchy, 샌드박스 안)에
+# 심는다. 두 번째 실행은 pending 마커를 끊어진 심링크로 바꿔 본다.
+legacy_state=${XDG_STATE_HOME:?}/cachy-omarchy
+for pending_kind in file dangling-symlink; do
+  mkdir -p "$legacy_state/validated-builds/old/artifacts"
+  rm -f "$legacy_state/install-pending.manifest"
+  if [[ $pending_kind == file ]]; then
+    printf 'pending\n' >"$legacy_state/install-pending.manifest"
+  else
+    ln -s "$legacy_state/missing-target" "$legacy_state/install-pending.manifest"
+  fi
+  printf 'not a manifest\n' >"$legacy_state/validated-build.manifest"
+  printf 'not a manifest\n' >"$legacy_state/installed-build.manifest"
+  out=$(run_doctor); code=$?
+  assert_eq "$code" 0 "legacy state is ignored ($pending_kind)"
+  [[ $out == *manifest* || $out == *"install state"* ]] && mentioned=1 || mentioned=0
+  assert_eq "$mentioned" 0 "legacy state is not reported ($pending_kind)"
+done
+rm -rf "$legacy_state"
 
 printf '{}\n' >"$user_config/shell.json"
 out=$(run_doctor); code=$?

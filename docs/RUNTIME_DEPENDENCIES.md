@@ -80,7 +80,7 @@
   tesseract 등)은 계속 `optdepends` 다.
 - **AUR** — 실제 Arch 패키지가 존재하지만 공식 리포가 아니라 AUR 에만 있다.
   `pacman -U` 는 `depends` 를 리포/이미 설치된 패키지로만 해결하므로
-  (`bin/install-packages:55`), AUR 전용 패키지를 `depends` 에 넣으면 우리
+  (`bin/install-packages`), AUR 전용 패키지를 `depends` 에 넣으면 우리
   패키지 자체가 설치 불가해진다 — HARD 성격이라도 `optdepends` 로 내린다
   (예: `xdg-terminal-exec`).
 - **UNPACKAGED** — 공식 리포에도 AUR 에도 제공자가 없다. 선언할 곳이 없으므로
@@ -204,7 +204,7 @@
 | `top` | `procps-ng` | HARD | procps-ng 가 제공(pacman -Ql 실측) — omarchy-system-stats CPU 통계 경로. procps-ng 는 이미 depends |
 | `touch` | `coreutils` | BASE | 기반 |
 | `tr` | `coreutils` | BASE | 기반 |
-| `ttfx` | `ttfx` | AUR | 스크린세이버 효과 렌더러(omarchy-screensaver 가 exec 한다). 리포 무결과(pacman -Ss ttfx 0건, 2026-08-23 실측)로 AUR 전용 — depends 에 두면 pacman -U 가 해결하지 못해 우리 패키지 자체가 설치 불가해진다(bin/install-packages:55). 부재는 omarchy-launch-screensaver 첫 줄의 omarchy-cmd-missing 가드가 exit 1 로 흡수한다 |
+| `ttfx` | `ttfx` | AUR | 스크린세이버 효과 렌더러(omarchy-screensaver 가 exec 한다). 리포 무결과(pacman -Ss ttfx 0건, 2026-08-23 실측)로 AUR 전용 — depends 에 두면 pacman -U 가 해결하지 못해 우리 패키지 자체가 설치 불가해진다(bin/install-packages). 부재는 omarchy-launch-screensaver 첫 줄의 omarchy-cmd-missing 가드가 exit 1 로 흡수한다 |
 | `tty` | `coreutils` | BASE | omarchy-screensaver 가 pty 리사이즈를 기다리기 전에 자기 tty 를 확인한다 |
 | `update-desktop-database` | `desktop-file-utils` | OPT | webapp 제거 후 desktop DB 갱신(omarchy-webapp-remove) — 이전에는 BASE 로 적혀 있었으나 선언된 depends 의 전이 폐포에도 base/base-devel 에도 없다(BASE 정당성 검사 실측) |
 | `upower` | `upower` | HARD | Power 패널 구동 기계 — Panel.qml:210이 omarchy-battery-status --shell을 무조건 실행 |
@@ -218,7 +218,7 @@
 | `xargs` | `findutils` | BASE | 기반 |
 | `xdg-mime` | `xdg-utils` | HARD | 이미 depends |
 | `xdg-settings` | `xdg-utils` | HARD | 이미 depends |
-| `xdg-terminal-exec` | `xdg-terminal-exec` | AUR | 터미널 실행의 구동 기계(HARD 성격) — omarchy-launch-tui/omarchy-launch-terminal/omarchy-launch-floating-terminal-with-presentation 전부 이것 없이는 실패한다. 그럼에도 리포엔 없고 AUR 전용(pacman -Si 0건, AUR RPC info 1건 실측)이라 depends 로 못 두고 optdepends 로 내린다 — pacman -U 는 depends 를 리포/설치된 패키지로만 해결하므로(bin/install-packages:55) AUR 전용을 depends 에 넣으면 우리 패키지 자체가 설치 불가해진다. xdg-utils 는 이 바이너리를 제공하지 않는다(pacman -Ql 실측). |
+| `xdg-terminal-exec` | `xdg-terminal-exec` | AUR | 터미널 실행의 구동 기계(HARD 성격) — omarchy-launch-tui/omarchy-launch-terminal/omarchy-launch-floating-terminal-with-presentation 전부 이것 없이는 실패한다. 그럼에도 리포엔 없고 AUR 전용(pacman -Si 0건, AUR RPC info 1건 실측)이라 depends 로 못 두고 optdepends 로 내린다 — pacman -U 는 depends 를 리포/설치된 패키지로만 해결하므로(bin/install-packages) AUR 전용을 depends 에 넣으면 우리 패키지 자체가 설치 불가해진다. xdg-utils 는 이 바이너리를 제공하지 않는다(pacman -Ql 실측). |
 | `xkbcli` | `libxkbcommon` | BASE | 이미 선언된 의존의 전이 의존(§4.2 개정) |
 | `zbarimg` | `zbar` | OPT | QR 코드 스캔 메뉴 항목 |
 
