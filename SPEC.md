@@ -145,6 +145,7 @@ Omarchy Quattro runtime**.
 A CachyOS user should be able to install a small set of packages:
 
 ```text
+cachy-omarchy-shell
 cachy-omarchy-overlay
 ```
 
@@ -520,6 +521,9 @@ Owns CachyOS-specific integration.
 Expected content:
 
 ```text
+/usr/bin/cachy-omarchy-bindings
+/usr/bin/cachy-omarchy-init
+/usr/bin/cachy-omarchy-doctor
 
 /usr/share/cachy-omarchy/defaults/
 ```
@@ -527,6 +531,7 @@ Expected content:
 It may depend on:
 
 ```text
+cachy-omarchy-shell
 ```
 
 It should evolve independently from the upstream version.
@@ -552,6 +557,7 @@ our CachyOS integration
 Splitting them gives:
 
 ```text
+cachy-omarchy-shell
     ↑
 changes whenever Omarchy changes
 
