@@ -1,7 +1,7 @@
 # Maintainer: Cachy Omarchy Overlay
 pkgname=cachy-omarchy-shell
-pkgver=4.0.4
-pkgrel=7
+pkgver=4.0.5
+pkgrel=1
 pkgdesc='Pinned Omarchy Quattro shell runtime for CachyOS (no omarchy-settings)'
 arch=('any')
 url='https://github.com/basecamp/omarchy'
@@ -54,7 +54,7 @@ license=('MIT')
 #   AUR class(xdg-terminal-exec/ttfx/dropbox-cli/tensaku)는 여전히 depends 에
 #   둘 수 없다 — pacman -U 가 리포/설치된 패키지로만 해결한다(bin/install-packages).
 depends=('quickshell' 'hyprland' 'uwsm' 'inotify-tools' 'libvips' 'procps-ng'
-         'psmisc' 'jq' 'wl-clipboard' 'wtype' 'wireplumber' 'pipewire-pulse'
+         'psmisc' 'jq' 'wl-clipboard' 'wtype' 'wireplumber' 'pipewire' 'pipewire-pulse'
          'xdg-utils' 'git' 'grim' 'gum' 'hyprsunset' 'libpulse'
          'perl' 'slurp' 'sudo' 'upower' 'which' 'diffutils' 'lua'
          # 테마 훅·하드웨어 제어·메뉴/패널 대상 — v0.12.1 에서 optdepends 에서 승격.
@@ -103,7 +103,7 @@ optdepends=(
   'v4l-utils: 웹캠/캡처 장치 진단 메뉴 항목'
   'zbar: QR/바코드 스캔 메뉴 항목'
 )
-_commit='c668141e9c42b13c80c9ca4ea108e11708c5e8a5'
+_commit='94a8fbc2d67eec5673c7f16b8c5e8a9c8452ffdc'
 
 # Maintained runtime patches (PATCHES.md) are ordinary makepkg sources:
 # makepkg checks their sha256sums (`updpkgsums` refreshes them) and fails the

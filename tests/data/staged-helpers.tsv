@@ -63,6 +63,8 @@ absent	omarchy-system-factory-reset-finish	Omarchy ISO @factory assumption
 absent-data	default/systemd/user/omarchy-crash-watch.service	other user unit templates stay out
 linked	omarchy-bar-text-color	transparent bar text contrast; Bar.qml calls it
 verbatim	omarchy-cmd-missing	idle -> screensaver -> lock -> wake chain
+verbatim	omarchy-cmd-default-browser	launch-browser / launch-webapp (4.0.5)
+verbatim	omarchy-cmd-browser-handoff	launch-browser / launch-webapp (4.0.5)
 verbatim	omarchy-hw-laptop-closed	idle -> screensaver -> lock -> wake chain
 verbatim	omarchy-hw-external-monitors	idle -> screensaver -> lock -> wake chain
 verbatim	omarchy-hw-clamshell	idle -> screensaver -> lock -> wake chain
@@ -109,6 +111,7 @@ verbatim	omarchy-hyprland-window-close-all	menu style.bar and session lifecycle
 verbatim	omarchy-state	menu style.bar and session lifecycle
 verbatim	omarchy-toggle-bar	menu style.bar and session lifecycle
 absent	omarchy-hyprland-session-locked	unsafe: stranded-lock recovery crashes quickshell (RUNTIME_STARTUP §22)
+absent	omarchy-hyprland-session-lock-stranded	unsafe: wraps session-locked (4.0.5); stranded-lock recovery crashes quickshell
 exec	omarchy-theme-set	theme chain, Tier A
 exec	omarchy-theme-set-templates	theme chain, Tier A
 exec	omarchy-theme-color	theme chain, Tier A

@@ -12,6 +12,7 @@ uwsm-app	uwsm	HARD	이미 depends(uwsm)
 wtype	wtype	HARD	이미 depends
 wl-copy	wl-clipboard	HARD	이미 depends
 wpctl	wireplumber	HARD	오디오 입력/싱크 헬퍼 구동 기계 — wireplumber 이미 depends
+pw-link	pipewire	HARD	4.0.5 omarchy-audio-output-sink 가 링크 상태를 읽는다 — wireplumber/pipewire-pulse 가 pipewire 를 끌어오므로 이미 설치돼 있다
 xdg-mime	xdg-utils	HARD	이미 depends
 xdg-settings	xdg-utils	HARD	이미 depends
 xdg-terminal-exec	xdg-terminal-exec	AUR	터미널 실행의 구동 기계(HARD 성격) — omarchy-launch-tui/omarchy-launch-terminal/omarchy-launch-floating-terminal-with-presentation 전부 이것 없이는 실패한다. 그럼에도 리포엔 없고 AUR 전용(pacman -Si 0건, AUR RPC info 1건 실측)이라 depends 로 못 두고 optdepends 로 내린다 — pacman -U 는 depends 를 리포/설치된 패키지로만 해결하므로(bin/install-packages) AUR 전용을 depends 에 넣으면 우리 패키지 자체가 설치 불가해진다. xdg-utils 는 이 바이너리를 제공하지 않는다(pacman -Ql 실측).
