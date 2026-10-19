@@ -218,6 +218,12 @@ out=$(run_update) && code=0 || code=$?
 assert_eq "$failed" "1" "a non-clone build/omarchy makes the update fail"
 assert_contains "$out" "is not a git clone" "a non-clone build/omarchy is named in the refusal"
 assert_eq "$(cat "$root/build/omarchy/partial")" "keep me" "a non-clone build/omarchy keeps its contents"
+rm -f "$root/build/omarchy/partial"
+out=$(run_update) && code=0 || code=$?
+[[ $code != 0 ]] && failed=1 || failed=0
+assert_eq "$failed" "1" "an empty build/omarchy makes the update fail"
+[[ -d $root/build/omarchy ]] && kept=1 || kept=0
+assert_eq "$kept" "1" "an empty build/omarchy is not removed"
 
 # --- an artifact already under the candidate's name survives a failed run ---
 reset_repo
