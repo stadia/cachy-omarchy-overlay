@@ -145,7 +145,6 @@ Omarchy Quattro runtime**.
 A CachyOS user should be able to install a small set of packages:
 
 ```text
-cachy-omarchy-shell
 cachy-omarchy-overlay
 ```
 
@@ -521,8 +520,6 @@ Owns CachyOS-specific integration.
 Expected content:
 
 ```text
-/usr/bin/cachy-omarchy-shell
-/usr/bin/cachy-omarchy-launcher
 
 /usr/share/cachy-omarchy/defaults/
 ```
@@ -530,7 +527,6 @@ Expected content:
 It may depend on:
 
 ```text
-cachy-omarchy-shell
 ```
 
 It should evolve independently from the upstream version.
@@ -556,7 +552,6 @@ our CachyOS integration
 Splitting them gives:
 
 ```text
-cachy-omarchy-shell
     ↑
 changes whenever Omarchy changes
 
@@ -637,8 +632,6 @@ must be an explicit architecture decision.
 ## 9.3 Executables
 
 ```text
-/usr/bin/cachy-omarchy-shell
-/usr/bin/cachy-omarchy-launcher
 /usr/bin/cachy-omarchy-bindings
 /usr/bin/cachy-omarchy-init
 /usr/bin/cachy-omarchy-doctor
@@ -828,7 +821,7 @@ UNSAFE
 Desired public command:
 
 ```bash
-cachy-omarchy-launcher
+omarchy-menu toggle
 ```
 
 Expected logical behavior:
@@ -889,8 +882,8 @@ The shell is launched by Hyprland autostart, not a systemd user unit:
                                              relaunches if Qt dies, up to 5 times a minute)
 ```
 
-`omarchy-launch-shell` is foreground (Hyprland `exec` forks it). `cachy-omarchy-shell --restart`
-(also `omarchy-restart-shell`) refuses while the session is locked, stops the running shell
+`omarchy-launch-shell` is foreground (Hyprland `exec` forks it). `omarchy-restart-shell`
+refuses while the session is locked, stops the running shell
 with `quickshell kill` (a clean exit, so the supervisor does not double-start it) and
 relaunches through Hyprland. IPC is the upstream `omarchy-shell`.
 
@@ -962,7 +955,7 @@ reduces a real dependency or conflict.
 Initial bindings:
 
 ```text
-SUPER + SPACE -> cachy-omarchy-launcher
+SUPER + SPACE -> omarchy-menu toggle (upstream)
 SUPER + K     -> omarchy-menu-keybindings (upstream helper, patched: shell package patch 0003)
 ```
 
@@ -1501,7 +1494,7 @@ Independent semantic version:
 아티팩트를 지워 후보에서 뺀다.
 `COO_ROLLBACK_SMOKE_BIN` 을 주면 pacman 뒤에 실행하며, 실패하면 다운그레이드는
 이미 끝났다는 오류로 종료한다. 두 패키지 중 하나라도 설치돼 있지 않으면
-rollback 전체가 실패한다. rollback 뒤에는 `cachy-omarchy-shell --restart` 로
+rollback 전체가 실패한다. rollback 뒤에는 `omarchy-restart-shell` 로
 셸을 다시 시작한다.
 
 Rollback must not restore unrelated CachyOS system files.
@@ -1564,8 +1557,6 @@ never overwritten (§6.6).
 Minimum commands:
 
 ```text
-cachy-omarchy-shell
-cachy-omarchy-launcher
 cachy-omarchy-bindings
 cachy-omarchy-init
 cachy-omarchy-doctor
@@ -1825,7 +1816,7 @@ R03 menu plugin is discoverable
 R04 launcher toggles
 R05 Escape closes launcher
 R06 application can be launched
-R07 cachy-omarchy-shell --restart recovers
+R07 omarchy-restart-shell recovers
 R08 absence of Waybar modification
 R09 no notification daemon is stopped, masked or uninstalled by us
 R10 no lock helper is stopped, masked or uninstalled by us

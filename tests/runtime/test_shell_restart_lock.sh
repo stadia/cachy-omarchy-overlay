@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# --restart 는 세션이 잠긴 동안 셸을 죽이면 안 된다. 계약(허용 목록): 스키마가
+# omarchy-restart-shell 은 세션이 잠긴 동안 셸을 죽이면 안 된다. 계약(허용 목록): 스키마가
 # 온전한(locked/secure/requested 세 키가 다 있는) "unlocked" 응답, 그리고 보존할
 # 락이 확실히 없는 두 경우("is not running" = 셸 미실행, "Target not found." =
 # lock 플러그인 부재)만 진행한다. 기동 중·무응답·알 수 없는 오류·파싱 불가·키 누락은
@@ -12,7 +12,7 @@ set -uo pipefail
 REPO_ROOT="${REPO_ROOT:?}"
 source "$REPO_ROOT/tests/lib/assert.sh"
 
-W="$REPO_ROOT/overlay/bin/cachy-omarchy-shell"
+W="$REPO_ROOT/overlay/compat/bin/omarchy-restart-shell"
 assert_file_exists "$W" "래퍼 존재"
 
 fake="$COO_TEST_SANDBOX/restart-lock"
@@ -67,7 +67,7 @@ run_restart() {
     STUB_LOCK_ERR="${3:-}" \
     STUB_LOCK_EXIT="${2:-0}" \
     STUB_HYPR_FAIL="${STUB_HYPR_FAIL:-}" STUB_PGREP_ALIVE="${STUB_PGREP_ALIVE:-0}" \
-    "$W" --restart
+    "$W"
 }
 
 killed() { grep -q '^quickshell kill' "$calls"; }
@@ -120,7 +120,7 @@ assert_eq "$(( kill_line < launch_line ? 1 : 0 ))" "1" "정상 종료가 재기�
 assert_contains "$(grep '^quickshell kill' "$calls" | head -1)" "-p $fake/upstream/shell --any-display" "kill 은 이 트리의 셸만 겨냥한다"
 
 # OMARCHY_PATH 가 없는 곳을 가리키면 조용히 성공하지 말고 무엇이 없는지 말한다.
-out=$(COO_OMARCHY_PATH=/nonexistent "$W" --restart 2>&1); code=$?
+out=$(COO_OMARCHY_PATH=/nonexistent "$W" 2>&1); code=$?
 assert_eq "$code" "1" "잘못된 OMARCHY_PATH → exit 1"
 assert_contains "$out" "shell.qml" "오류가 무엇이 없는지 말해준다"
 
@@ -156,7 +156,7 @@ assert_contains "$out" "did not become ready" "준비되지 않았다고 말한�
 
 out=$("$W" --help 2>&1); code=$?
 assert_eq "$code" "0" "--help → exit 0"
-assert_contains "$out" "--restart" "--help 가 --restart 를 안내한다"
+assert_contains "$out" "omarchy-restart-shell" "--help 가 사용법을 안내한다"
 out=$("$W" --bogus 2>&1); code=$?
 assert_eq "$code" "1" "알 수 없는 인자 → exit 1"
 

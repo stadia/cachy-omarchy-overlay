@@ -42,8 +42,9 @@ mkdir -p "$root/usr/share/cachy-omarchy/upstream/bin"
 printf '#!/usr/bin/env bash\nexit 0\n' >"$root/usr/share/cachy-omarchy/upstream/bin/omarchy-menu-keybindings"
 chmod +x "$root/usr/share/cachy-omarchy/upstream/bin/omarchy-menu-keybindings"
 ln -s ../share/cachy-omarchy/upstream/bin/omarchy-menu-keybindings "$root/usr/bin/omarchy-menu-keybindings"
-printf '#!/usr/bin/env bash\nexit 0\n' >"$root/usr/bin/cachy-omarchy-shell"
-chmod +x "$root/usr/bin/cachy-omarchy-shell"
+printf '#!/usr/bin/env bash\nexit 0\n' >"$compat/omarchy-restart-shell"
+chmod +x "$compat/omarchy-restart-shell"
+ln -s ../lib/cachy-omarchy/compat/bin/omarchy-restart-shell "$root/usr/bin/omarchy-restart-shell"
 cat >"$fake_bin/pgrep" <<'EOF'
 #!/usr/bin/env bash
 [[ ${TEST_DOCTOR_PROCESS:-0} == 1 ]]

@@ -5,7 +5,7 @@
 #
 # 안전: 사용자 세션의 셸은 절대 건드리지 않는다. 추출 트리를 OMARCHY_PATH 로
 # 삼아 우리 인스턴스를 따로 띄우고, 재시작은 그 경로의 quickshell kill 과
-# omarchy-launch-shell 재기동으로 흉내 낸다(cachy-omarchy-shell --restart 는 Hyprland
+# omarchy-launch-shell 재기동으로 흉내 낸다(omarchy-restart-shell 는 Hyprland
 # 환경으로 사용자 셸을 띄우므로 쓰지 않는다)
 # (`quickshell -n -p $OMARCHY_PATH/shell`).
 set -uo pipefail

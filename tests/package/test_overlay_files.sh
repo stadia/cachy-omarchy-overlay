@@ -12,8 +12,6 @@ coo_extract_overlay "$dest"
 assert_eq "$?" "0" "오버레이 추출 성공"
 
 for p in \
-  usr/bin/cachy-omarchy-shell \
-  usr/bin/cachy-omarchy-launcher \
   usr/bin/cachy-omarchy-bindings \
   usr/bin/cachy-omarchy-init \
   usr/bin/cachy-omarchy-doctor \
@@ -34,7 +32,7 @@ done
 assert_eq "$c" "0" "bindings.conf 는 설치되지 않는다 (Lua 전용)"
 
 # 공개 명령은 실행 가능해야 한다.
-for b in shell launcher bindings init doctor; do
+for b in bindings init doctor; do
   [[ -x "$dest/usr/bin/cachy-omarchy-$b" ]] && x=0 || x=1
   assert_eq "$x" "0" "실행 가능: cachy-omarchy-$b"
 done

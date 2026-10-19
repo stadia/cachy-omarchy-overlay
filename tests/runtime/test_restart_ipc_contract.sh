@@ -15,7 +15,7 @@ if ! coo_extract_pkg "$tree"; then
   exit 1
 fi
 client="$(coo_upstream_root "$tree")/bin/omarchy-shell"
-wrapper="$REPO_ROOT/overlay/bin/cachy-omarchy-shell"
+wrapper="$REPO_ROOT/overlay/compat/bin/omarchy-restart-shell"
 assert_file_exists "$client" "스테이징된 업스트림 omarchy-shell"
 
 for phrase in "omarchy-shell is not running" "omarchy-shell is not responding" \

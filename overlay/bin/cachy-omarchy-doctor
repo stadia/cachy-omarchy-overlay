@@ -145,7 +145,7 @@ check_file "omarchy.menu availability" "$OMARCHY_PATH/default/omarchy/omarchy-me
 # 패키지) pcall 이 삼켜 toggle 이 조용히 꺼지고 configerrors 도 비어 있다 —
 # 다른 어디에도 신호가 없어서 FAIL 이다.
 check_file "toggles seam bootstrap" "$OMARCHY_PATH/default/hypr/bootstrap.lua"
-check_executable "shell wrapper" "$BIN_DIR/cachy-omarchy-shell"
+check_executable "shell restart" "$BIN_DIR/omarchy-restart-shell"
 check_executable "launcher invocation" "$BIN_DIR/omarchy-menu"
 check_executable "binding helper" "$BIN_DIR/cachy-omarchy-bindings"
 check_executable "keybinding invocation" "$BIN_DIR/omarchy-menu-keybindings"
