@@ -12,7 +12,7 @@ tools: Read, Bash, Grep, Glob
 2. **Lua 안전.** 블록은 `pcall(dofile, "<경로>")` 만 쓴다(무방비 `dofile` 금지 — 실패 시 사용자 설정 전체가 죽는다). Lua 마커는 `--`(`#` 은 길이 연산자). 경로의 `"`·`\` 이스케이프.
 3. **사용자 사본 보존.** `~/.config/cachy-omarchy/hypr/bindings.lua` 가 이미 있으면 덮어쓰지 않는다. `--force` 일 때만 `/usr/share/cachy-omarchy/hypr/` 정본으로 새로고침한다.
 4. **충돌 처리.** SUPER+SPACE/SUPER+K 충돌 감지 시 `--force` 없이는 경고하고 주입하지 않는다(exit 0 + 메시지). 오탐·미탐 정규식 확인.
-5. **bindings.lua 계약.** 바인딩·description·셸 autostart(`hyprland.start`)가 SPEC 계약을 지키는가. hyprland.conf 는 지원하지 않는다(SPEC §76).
+5. **bindings.lua 계약.** 바인딩·description·셸 autostart(`hyprland.start`)가 SPEC 계약을 지키는가. hyprland.conf 는 지원하지 않는다(SPEC §76): conf 전용 환경에서는 `hyprland.conf` 를 한 바이트도 건드리지 않고 거부하며 `~/.config/cachy-omarchy/` 에 아무것도 만들지 않는다.
 6. **라이브 세션 불간섭.** `hyprctl reload/dispatch/keyword`, `pkill`/`killall`, `sudo` 금지. 검증용 중첩 Hyprland 는 `env -u HYPRLAND_INSTANCE_SIGNATURE` 로 격리하고, 파싱 확인은 `Hyprland --verify-config -c <임시 파일>` 로 한다.
 7. **무한 대기 금지.** 모든 폴링·재시도는 bounded.
 

@@ -214,12 +214,38 @@ assert_contains "$out" "PASS: theme: tokyo-night" "테마 존재는 PASS"
 mv "$hypr/hyprland.lua" "$hypr/hyprland.lua.bak"
 printf 'monitor=,preferred,auto,1\n' >"$hypr/hyprland.conf"
 out=$(run_doctor); code=$?
-assert_contains "$out" "WARN: hyprland.conf is not supported (Lua only)" "conf 전용 구성은 WARN"
+assert_contains "$out" "FAIL: hyprland.conf is not supported (Lua only)" "conf 전용 구성은 FAIL"
+assert_eq "$code" "1" "conf 전용 구성은 doctor 가 실패로 끝난다"
+assert_contains "$out" "(hyprland.conf unsupported)" "conf 전용이면 충돌 측정 불가 사유를 구분한다"
+printf '# >>> cachy-omarchy >>>\nsource = %s/bindings.conf\n# <<< cachy-omarchy <<<\n' "$config/hypr" >>"$hypr/hyprland.conf"
+out=$(run_doctor); code=$?
+assert_contains "$out" "WARN: stale cachy-omarchy block in hyprland.conf" "남은 conf 블록을 알린다"
 mv "$hypr/hyprland.lua.bak" "$hypr/hyprland.lua"
 out=$(run_doctor); code=$?
 [[ $out == *"hyprland.conf is not supported"* ]] && w=1 || w=0
-assert_eq "$w" "0" "lua 가 있으면 conf WARN 을 내지 않는다"
+assert_eq "$w" "0" "lua 가 있으면 conf 비지원 FAIL 을 내지 않는다"
+assert_contains "$out" "WARN: stale cachy-omarchy block in hyprland.conf" "lua 와 공존해도 남은 conf 블록을 알린다"
 rm -f "$hypr/hyprland.conf"
+
+# lua 의 mainMod .. " + K" 형태도 충돌이다(bindings 와 같은 판정).
+cp "$hypr/hyprland.lua" "$hypr/hyprland.lua.bak"
+printf 'hl.bind(mainMod .. " + K", hl.dsp.exec_cmd("x"))\n' >>"$hypr/hyprland.lua"
+out=$(run_doctor); code=$?
+assert_contains "$out" "FAIL: Hyprland binding conflict" "mainMod .. \" + K\" 충돌을 잡는다"
+mv "$hypr/hyprland.lua.bak" "$hypr/hyprland.lua"
+
+# 보존된 구형 bindings.lua 에 hyprland.start 가 없으면 셸이 뜨지 않는다.
+mkdir -p "$config/hypr"
+cp "$hypr/hyprland.lua" "$hypr/hyprland.lua.bak"
+printf -- '-- >>> cachy-omarchy >>>\npcall(dofile, "x")\n-- <<< cachy-omarchy <<<\n' >>"$hypr/hyprland.lua"
+printf 'hl.bind("SUPER + F1", hl.dsp.exec_cmd("x"))\n' >"$config/hypr/bindings.lua"
+out=$(run_doctor); code=$?
+assert_contains "$out" "FAIL: shell autostart missing from $config/hypr/bindings.lua" "hyprland.start 없는 구형 bindings.lua 를 잡는다"
+printf 'hl.on("hyprland.start", function() end)\n' >>"$config/hypr/bindings.lua"
+out=$(run_doctor); code=$?
+assert_contains "$out" "PASS: shell autostart declared (bindings.lua)" "hyprland.start 가 있으면 통과한다"
+rm -f "$config/hypr/bindings.lua"
+mv "$hypr/hyprland.lua.bak" "$hypr/hyprland.lua"
 
 out=$(run_doctor); code=$?
 

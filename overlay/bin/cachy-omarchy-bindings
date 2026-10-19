@@ -68,12 +68,12 @@ strip_block() {
 }
 
 has_space_conflict() {
-  grep -qiE 'SUPER[[:space:]]*\+[[:space:]]*space|[[:space:]]space["'\'']|,\s*SPACE[[:space:],]' <<<"$1"
+  grep -qiE 'SUPER[[:space:]]*\+[[:space:]]*space|[[:space:]]space["'\'']' <<<"$1"
 }
 
 has_k_conflict() {
   awk '
-    /^[[:space:]]*(#|--)/ { next }
+    /^[[:space:]]*--/ { next }
     /^[[:space:]]*hl\.bind[[:space:]]*\([[:space:]]*["\047]SUPER[[:space:]]*\+[[:space:]]*K["\047]/ { found=1; exit }
     /^[[:space:]]*hl\.bind[[:space:]]*\([[:space:]]*mainMod[[:space:]]*\.\.[[:space:]]*["\047][[:space:]]*\+[[:space:]]*K["\047]/ { found=1; exit }
     END { exit !found }
@@ -84,7 +84,7 @@ install_overlay() {
   [[ -n $SRC_HYPR && -f $SRC_HYPR/bindings.lua ]] \
     || fail "바인딩 소스를 찾을 수 없다: ${SRC_HYPR:-<미해석>} (COO_SRC_HYPR 로 지정 가능)"
   mkdir -p "$DEST_HYPR"
-  # 이 파일들은 SPEC §6.6 상 "사용자 라이브 설정"이다(정본은
+  # 이 파일은 SPEC §6.6 상 "사용자 라이브 설정"이다(정본은
   # /usr/share/cachy-omarchy/hypr/ 에 있다) — 기본은 존재하는 파일을 덮어쓰지
   # 않는다. --force 는 예외적으로 "정본으로 새로고침"을 의미한다.
   local f=bindings.lua
@@ -110,7 +110,7 @@ inject() {
   fi
   (( FORCE )) || return 0
   # --force 재주입: 관리 블록을 새 스니펫으로 교체한다 (스니펫 생성 규칙이
-  # 바뀌었을 때 따라오는 길 — 예: 테마 source 줄). 이 스크립트가 사용자
+  # 바뀌었을 때 따라오는 길). 이 스크립트가 사용자
   # 설정을 덮어쓰는 유일한 경로이고 set -e 가 없으므로, 원자적으로 간다:
   # 임시 파일에 쓰고 → 성공 확인 후 → mv. 실패하면 원본을 한 바이트도
   # 건드리지 않는다. 블록은 제자리에서 교체한다 (끝으로 밀지 않는다).
@@ -158,10 +158,9 @@ case ${1:-} in
   *) printf 'error: 알 수 없는 인자: %s\n' "$1" >&2; usage >&2; exit 1 ;;
 esac
 
-install_overlay
-
 target=$HYPR_DIR/hyprland.lua
 [[ -f $target ]] || fail "Hyprland 설정을 찾을 수 없다: $target (hyprland.conf 는 지원하지 않는다 — Lua 설정 전용)"
+install_overlay
 begin=$LUA_BEGIN
 end=$LUA_END
 snippet=$(lua_snippet)

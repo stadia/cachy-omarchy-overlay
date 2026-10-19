@@ -970,9 +970,12 @@ installs a managed block:
 
 ```lua
 -- >>> cachy-omarchy >>>
-pcall(dofile, "~/.config/cachy-omarchy/hypr/bindings.lua")
+pcall(dofile, "/home/<user>/.config/cachy-omarchy/hypr/bindings.lua")
 -- <<< cachy-omarchy <<<
 ```
+
+The path is absolute (`dofile` does not expand `~`, and `pcall` would swallow
+the failure), with `"` and `\` escaped.
 
 Conflict detection is mandatory.
 
@@ -2313,11 +2316,20 @@ That is the architecture going forward.
 모두 적용되지 않기 때문이다(2026-08-23 중첩 Hyprland 실측: `source = ...*.lua`
 는 파싱되지만 일반 config 키워드 줄로 취급돼 조용히 버려진다).
 
-conf 만 있는 환경에서는 `cachy-omarchy-bindings` 가 실패하고,
-`cachy-omarchy-doctor` 가 WARN 하며 `cachy-omarchy-init` 이 설치 시점에 같은
-경계를 고지한다. 이전 버전이 만든 `~/.config/cachy-omarchy/hypr/bindings.conf`
+conf 만 있는 환경에서는 `cachy-omarchy-bindings` 와 `cachy-omarchy-init` 이
+아무것도 쓰기 전에 실패하고 `cachy-omarchy-doctor` 가 FAIL 한다. 이전 버전이 만든 `~/.config/cachy-omarchy/hypr/bindings.conf`
 는 사용자 파일이므로 지우지 않는다.
 
 Lua toggle 파일을 쓴다고 해서 노트북 뚜껑 동작을 지원한다는 뜻은 아니다. 이
 오버레이는 upstream lid-switch 바인딩을 스테이징하지 않으며, clamshell helper 가
 출하돼도 뚜껑을 닫는 동작으로 도달하지 않는다(`README.md`의 Session lifecycle).
+
+**업그레이드 (conf 사용자).** 이전 버전이 `hyprland.conf` 에 넣은 관리 블록
+(`# >>> cachy-omarchy >>>`)은 사용자 사본 `~/.config/cachy-omarchy/hypr/bindings.conf`
+를 source 하므로 업그레이드 직후에도 그대로 동작하지만, 더는 아무도 관리하지
+않는다(정본이 사라져 `--force` 로 새로고침할 수 없다). ① `hyprland.lua` 로
+옮기고 ② `cachy-omarchy-bindings` 를 다시 실행한 뒤 ③ conf 의 블록과
+`bindings.conf` 사본을 직접 지운다. `cachy-omarchy-doctor` 가 남은 블록을 WARN
+한다(읽기 전용 안내). 이 도구는 `hyprland.conf` 도 `bindings.conf` 도 수정하거나
+지우지 않는다.
+

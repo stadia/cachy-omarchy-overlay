@@ -54,6 +54,13 @@ while (( $# )); do
   shift
 done
 
+# 0) 지원 계약: hyprland.conf 는 지원하지 않는다(Lua 설정 전용, SPEC §76).
+#    바인딩 설치(3절)가 어차피 실패하므로, 테마 시드·PAM 이 적용된 채 반쯤
+#    설치되지 않도록 아무것도 쓰기 전에 실패한다. --dry-run 도 같다.
+if [[ -f $HYPR_DIR/hyprland.conf && ! -f $HYPR_DIR/hyprland.lua ]]; then
+  fail "hyprland.conf 는 지원하지 않는다(Lua 설정 전용). $HYPR_DIR/hyprland.lua 가 필요하다 — 아무것도 설치하지 않았다."
+fi
+
 # 1) bar 토글은 만들지 않는다. M8 원칙 0 — cachy-omarchy 를 설치한다는 것은
 #    omarchy 가 주는 것을 쓰겠다는 의사이므로 업스트림 기본값(바 표시)이
 #    기본이다. 바를 끄고 싶으면 사용자가 직접 토글을 만든다:
@@ -112,12 +119,6 @@ else
   note "잠금 화면 PAM 설정을 만든다: $PAM_LOCK_FILE (root 권한이 필요해 sudo 암호를 물을 수 있다)"
   "$APPLY_LOCK" \
     || note "note: 잠금 화면 PAM 설정 실패 — 나중에 omarchy-apply-lock 을 직접 실행할 수 있다"
-fi
-
-# 2.7) 지원 계약 고지: hyprland.conf 는 지원하지 않는다(Lua 설정 전용).
-#    설치를 막지는 않지만, 바인딩 주입 단계가 실패하기 전에 이유를 알린다.
-if [[ -f $HYPR_DIR/hyprland.conf && ! -f $HYPR_DIR/hyprland.lua ]]; then
-  note "참고: hyprland.conf 는 지원하지 않는다(Lua 설정 전용). $HYPR_DIR/hyprland.lua 가 필요하다."
 fi
 
 # 3) Hyprland 바인딩. 충돌 감지와 --force 정책을 재구현하지 않고 위임한다

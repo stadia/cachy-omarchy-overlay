@@ -183,7 +183,6 @@ esac
    없이 갱신되지 않는다. 해결: `cachy-omarchy-bindings --force` 로 정본 새로고침
    후 재로그인(또는 수동 `cachy-omarchy-shell --run`). `hyprctl reload` 만으로는
    `hyprland.start` 가 재발화하지 않으므로 셸이 뜨지 않는 게 정상이다.
-   `hyprland.conf` 는 지원하지 않는다(SPEC §76).
    참고: `hyprland.start` 트리거의 1회 발화는 **실측됐다** — 재로그인 후 라이브 셸의
    부모가 곧 `Hyprland` 인 것을 확인했다(§16.1). 이 문단의 "아직 실측되지 않았다"는
    그 이전 기록이다. 정적 테스트가 이벤트 이름 존재만 검증한다는 점은 그대로다. 또, 과거에
