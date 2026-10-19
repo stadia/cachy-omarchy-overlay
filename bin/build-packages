@@ -78,6 +78,10 @@ for name in "$COO_SHELL_ARTIFACT" "$COO_OVERLAY_ARTIFACT"; do
   staged+=("${tmp_of[$name]}")
   "$install_bin" -m 644 "$pkgdest/$name" "${tmp_of[$name]}" || fail "could not copy $name into $build_dir"
 done
+# Serialize the final renames: two publishers of the same names must not
+# interleave into a shell from one build beside an overlay from another.
+exec {publish_lock}>"$build_dir/.publish.lock" || fail "could not open $build_dir/.publish.lock"
+flock -w 60 "$publish_lock" || fail "timed out waiting for another publisher of $build_dir"
 for name in "$COO_SHELL_ARTIFACT" "$COO_OVERLAY_ARTIFACT"; do
   mv -f "${tmp_of[$name]}" "$build_dir/$name" ||
     fail "partial publish: $name not renamed; build/ may hold a mixed pair, rerun bin/build-packages"
