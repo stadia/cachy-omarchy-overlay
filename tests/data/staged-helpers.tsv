@@ -1,5 +1,5 @@
 # kind	path	note
-# path is a helper name under bin/ (staged/exec/verbatim/linked/exists/absent) or a path relative to the
+# path is a helper name under bin/ (exec/verbatim/linked/exists/absent) or a path relative to the
 # staged upstream root (data/absent-data).
 # exists = present | exec = present and executable | verbatim = exec and byte-identical to the pin
 # linked = verbatim and /usr/bin/<name> resolves to the staged file | absent = must not be staged
@@ -83,7 +83,7 @@ verbatim	omarchy-osd	M10 utility plugins
 verbatim	omarchy-audio-output-volume	M10 utility plugins
 verbatim	omarchy-audio-input-mute	M10 utility plugins
 verbatim	omarchy-brightness-keyboard-mute	M10 utility plugins
-exists	omarchy-menu-images	earlier stage dependency
+exec	omarchy-menu-images	earlier stage dependency
 linked	omarchy-restart-gum	gum presentation layer
 linked	omarchy-show-logo	gum presentation layer
 linked	omarchy-show-done	gum presentation layer
@@ -136,7 +136,7 @@ absent	omarchy-theme-bg-install	Tier C: /etc writes, hardware-only, dev tools (c
 absent	omarchy-plymouth-set-by-theme	Tier C: /etc writes, hardware-only, dev tools (compat shims live in the overlay)
 absent	omarchy-theme-set-browser	Tier C: /etc writes, hardware-only, dev tools (compat shims live in the overlay)
 absent	omarchy-theme-set-keyboard	Tier C: /etc writes, hardware-only, dev tools (compat shims live in the overlay)
-absent	omarchy-theme-set-hermes	Tier C: /etc writes, hardware-only, dev tools (compat shims live in the overlay)
+absent	omarchy-theme-set-hermes	AUR/install-chain boundary: needs hermes-desktop from the AUR and the unstaged omarchy-install-hermes-cli (closure-exceptions.tsv)
 absent	omarchy-theme-set-keyboard-asus-rog	Tier C: /etc writes, hardware-only, dev tools (compat shims live in the overlay)
 absent	omarchy-theme-set-keyboard-f16	Tier C: /etc writes, hardware-only, dev tools (compat shims live in the overlay)
 absent	omarchy-dev-theme-preview	Tier C: /etc writes, hardware-only, dev tools (compat shims live in the overlay)

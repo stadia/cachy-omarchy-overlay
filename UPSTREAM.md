@@ -13,7 +13,7 @@
 | Channel | stable |
 | Source license | MIT (Copyright David Heinemeier Hansson) |
 | Known compatibility patches | `0001-stop-plugin-watcher-on-shell-exit.patch` (Quickshell `Io.Process` orphan cleanup, `docs/RUNTIME_STARTUP.md` §"역사 기록"), `0002-cancel-polkit-flow-before-session-lock.patch` (Polkit 인증 흐름을 세션 잠금 전에 취소) |
-| Last tested CachyOS environment | CachyOS, kernel 7.2.5-1-cachyos, Hyprland 0.56.2, Quickshell 0.3.1. `omarchy`/`omarchy-settings` 미설치. 2026-09-28 `bin/update-upstream` candidate build, nested suite 76/76, transactional publish + 실저장소 재빌드 후 `./tests/test.sh` 76/76 (스테이징 검증 생략 note 0건). 라이브 세션 실측(`COO_RUN_LIVE=1`)은 아직. |
+| Last tested CachyOS environment | CachyOS, kernel 7.2.5-1-cachyos, Hyprland 0.56.2, Quickshell 0.3.1. `omarchy`/`omarchy-settings` 미설치. 2026-09-28 `bin/update-upstream` 로 핀을 옮기고 실저장소 재빌드 후 `./tests/test.sh` 76/76 (스테이징 검증 생략 note 0건). 라이브 세션 실측(`COO_RUN_LIVE=1`)은 아직. |
 
 이전 핀(`v4.0.3`, `05349870`)에 대한 실측 기록은 위 표를 이 핀으로 갱신하기
 전 git 히스토리에 남아 있다.

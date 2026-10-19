@@ -1,7 +1,7 @@
 # Maintainer: Cachy Omarchy Overlay
 pkgname=cachy-omarchy-shell
 pkgver=4.0.4
-pkgrel=1
+pkgrel=2
 pkgdesc='Pinned Omarchy Quattro shell runtime for CachyOS (no omarchy-settings)'
 arch=('any')
 url='https://github.com/basecamp/omarchy'
@@ -56,7 +56,7 @@ license=('MIT')
 depends=('quickshell' 'hyprland' 'uwsm' 'inotify-tools' 'libvips' 'procps-ng'
          'psmisc' 'jq' 'wl-clipboard' 'wtype' 'wireplumber' 'pipewire-pulse'
          'xdg-utils' 'git' 'grim' 'gum' 'hyprsunset' 'libpulse'
-         'perl' 'slurp' 'sudo' 'upower' 'which'
+         'perl' 'slurp' 'sudo' 'upower' 'which' 'diffutils'
          # 테마 훅·하드웨어 제어·메뉴/패널 대상 — v0.12.1 에서 optdepends 에서 승격.
          # 배열 안 주석에 괄호를 쓰지 않는다: 테스트가 sed 범위로 배열을 뜨는데
          # 닫는 괄호 한 글자가 추출을 조용히 잘라먹는다.

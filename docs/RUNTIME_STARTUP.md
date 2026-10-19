@@ -409,7 +409,7 @@ WARN: The Wayland connection experienced a fatal error
 | 헬퍼 스테이징 시 | 셸이 잠금 탈취 시도 → 거부 → **매번 사망** — **실측** |
 
 `tests/package/test_staged_helpers.sh` 가 이 미스테이징을 의도로
-고정한다(주석에 사유). 헬퍼 폐쇄(P08)를 이유로 나중에 올리려면 크래시를 먼저
+고정한다(사유는 `staged-helpers.tsv` 행의 note). 헬퍼 폐쇄(P08)를 이유로 나중에 올리려면 크래시를 먼저
 막아야 한다.
 
 ### 22.5 남은 헬퍼 폐쇄 결함 (lock 경로)

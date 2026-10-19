@@ -41,7 +41,7 @@
 
 ---
 
-## 클로저 전수 (생성)
+## 클로저 전수
 
 명령 → 패키지 → 등급 판정은 `tests/runtime/closure_check.py` 가 매번 계산하고
 `tests/runtime/test_dependency_closure.sh` 가 위반 여부를 검사한다. 표 자체는
@@ -56,7 +56,7 @@
 
 ### 등급 규칙 — `BASE` / `HARD` / `OPT` / `AUR` / `UNPACKAGED`
 
-실행 중 이 등급 체계가 개정됐다. 아래 표의 근거 열에 붙는 "(§4.2 개정)" 표기가
+실행 중 이 등급 체계가 개정됐다. `command-packages.tsv` 근거 열에 붙는 "(§4.2 개정)" 표기가
 가리키는 것이 이 개정이다 — 설계 문서 자체는 `docs/superpowers/`(gitignore 됨)
 아래 있어 저장소를 물려받는 사람은 읽을 수 없으므로, 그 요지를 여기 직접 적는다.
 
@@ -65,7 +65,12 @@
 `BASE`/`HARD`/`OPT` 3분기로 개정했다:
 
 - **BASE** — 기반 시스템 패키지(`coreutils`/`bash`/`systemd` 등). 부재할 수
-  없으므로 declare 하지 않는다. 위 표에서 제외된다.
+  없으므로 declare 하지 않는다. `base` 패키지 폐포(`pactree -s base` +
+  `pacman -Ql`)가 소유한 명령은 스캐너가 직접 도출하므로 `command-packages.tsv`
+  에 적지 않는다. 이 도출은 `pacman-contrib`(pactree)가 있어야 한다 — 없으면
+  경고를 내고 그 명령들이 `UNMAPPED_COMMAND` 로 실패한다. `base-devel` 은 사용자
+  시스템에 있다는 보장이 없어 도출 대상이 아니다(예: `cmp` 는 `diffutils` 를
+  HARD 로 선언한다).
 - **HARD** — 기동/기본 활성 경로에서 도달하는 명령. `depends` 로 선언한다
   (이미 선언돼 있으면 근거 열에 "이미 depends"로 남는다).
 - **OPT** — 사용자가 그 기능을 명시적으로 선택해야 도달하는 명령(메뉴 항목,
@@ -116,16 +121,16 @@ python3 tests/runtime/closure_check.py --tree <추출한 트리> --repo . \
 (`coo_extract_pkg` 로 셸 패키지를, `coo_extract_overlay <트리>/overlay` 로 오버레이를
 같은 루트에 푼다).
 
-### 스캐너의 알려진 한계 — 이 표가 완전성을 주장하지 않는 이유
+### 스캐너의 알려진 한계 — 이 감사가 완전성을 주장하지 않는 이유
 
-이 표는 감사의 상한이 아니라 정적 분석이 잡아낼 수 있는 것의 스냅샷이다. 아래
+이 감사는 상한이 아니라 정적 분석이 잡아낼 수 있는 것의 스냅샷이다. 아래
 네 가지는 코드 주석(`tests/runtime/closure_check.py`)에 이미 있는 한계를 그대로
 옮긴 것이며, 부드럽게 쓰지 않는다.
 
 1. **동적으로 조립되는 이름은 열거할 수 없다.** `"omarchy-installed-service-$service"`
    같은 문자열 연결/변수 보간 계열은 정적 분석으로 값 집합을 알 수 없다.
-   `omarchy-bar:165` 가 실제로 이 형태로 헬퍼를 호출한다 — 그 호출은 이 표에
-   나타나지 않는다.
+   `omarchy-bar:165` 가 실제로 이 형태로 헬퍼를 호출한다 — 그 호출은 스캔
+   결과에 나타나지 않는다.
 2. **QML/JS 는 문자열 리터럴만 읽는다.** `"omarchy-" + kind` 같은 문자열 연결이나
    템플릿 리터럴로 조립되는 이름은 수확기가 보지 못한다. 현재 핀 트리에는 이
    용법이 0건이다(grep 확인, 2026-08-21) — 업스트림이 이 형태를 도입하면 조용히
@@ -139,40 +144,37 @@ python3 tests/runtime/closure_check.py --tree <추출한 트리> --repo . \
 4. **가장 큰 억제 통로는 이 문서가 아니라 `docs/COMMAND_AUDIT.md` 에 있다.**
    스캐너는 메뉴 루트(`omarchy-menu.jsonc`)에서 이름을 수확할 때,
    `docs/COMMAND_AUDIT.md` 에서 `DISABLED` 로 표시된 행을 정규식으로 긁어
-   **차감한다**. 현재 실측 92개다 — `tests/data/closure-exceptions.tsv` 의
-   예외 행보다 훨씬 크다. 차감되는 이름 대부분은 우리가 의도적으로 취하지 않는
+   **차감한다**. 개수는 `--emit-table` 이 낸다(`tests/data/closure-exceptions.tsv` 의
+   예외 행보다 훨씬 크다). 차감되는 이름 대부분은 우리가 의도적으로 취하지 않는
    Omarchy OS 스택(공장 초기화, plymouth, 채널, install-gaming 계열)이므로
    결정 자체는 정당하다.
 
    정당하지 않았던 것은 **장부**다. 예외 파일은 사유가 파싱으로 강제되고
    `STALE_EXCEPTION` 으로 신선도가 검사되며 이 문서에서 논의된다. 반면 이
    `DISABLED` 통로는 사유가 필수가 아니고, 스테이징되거나 도달 불가가 되어도
-   아무도 알려주지 않으며, 생성 문서에 전혀 나타나지 않았다. 이번 wave 에서
-   개수와 이름을 위 생성 블록이 함께 내보내도록 바꿔 **숫자가 서술이 아니라
-   단언**이 되게 했지만, 사유 강제와 신선도 검사는 여전히 없다. 이 통로를 통해
-   무엇이 사라지는지 알고 싶으면 위 생성 블록의 마지막 목록을 읽어야 한다.
+   아무도 알려주지 않는다. `--emit-table` 이 개수와 이름을 내보내지만, 사유 강제와
+   신선도 검사는 여전히 없다. 이 통로를 통해 무엇이 사라지는지 알고 싶으면
+   `--emit-table` 출력의 해당 목록을 읽어야 한다.
 
 ### `docs/COMMAND_AUDIT.md` 와의 범위 차이
 
 `docs/COMMAND_AUDIT.md` 는 메뉴/셸이 도달하는 헬퍼를 감사 대상으로 삼고, 이 절의
 클로저 스캐너는 다른 도달성 정의(BFS 루트 + 인벤토리)를 쓴다. 그래서
-`tests/data/closure-exceptions.tsv` 의 잔여 예외 22건 중 12건은 `COMMAND_AUDIT.md` 에
+`tests/data/closure-exceptions.tsv` 의 잔여 예외 16건 중 11건은 `COMMAND_AUDIT.md` 에
 자기 행이 아예 없다(측정 명령 아래). 이것은 결함이 아니라 **범위 차이**이며, 다음
-사람이 12건을 "감사 누락"으로 오해하지 않도록 여기에 명시한다. 행 수는 주석을
-제외한 `closure-exceptions.tsv` 데이터 행이다(v0.9 의 31건에서 가시 UI 9개를
-스테이징하며 22건이 남았다).
+사람이 11건을 "감사 누락"으로 오해하지 않도록 여기에 명시한다. 행 수는 주석을
+제외한 `closure-exceptions.tsv` 데이터 행이다(v0.9 의 31건에서 줄어 현재 16건이다).
 
 ```console
 $ awk -F'\t' '!/^#/ && NF {print $1}' tests/data/closure-exceptions.tsv | while read -r name; do
     grep -qE "^\| \`$name\` \|" docs/COMMAND_AUDIT.md || echo "$name"
   done | wc -l
-12
+11
 ```
 
 또한 `tests/runtime/test_command_audit.sh` 는 `closure-exceptions.tsv` 를 읽지
 않는다. 즉 이 두 문서가 서로 모순되지 않는지는 **기계가 아니라 사람이** 지킨다 —
-이 절의 표가 코드와 동기화된다는 보장은 있어도, `COMMAND_AUDIT.md` 와의 정합은
-그 보장 밖이다.
+`COMMAND_AUDIT.md` 와의 정합은 어떤 테스트의 보장 밖이다.
 
 v0.10.0 이 `omarchy-battery-status` 를 포함한 가시 UI 헬퍼 9개를 스테이징하면서,
 이전에 여기 적혀 있던 Power 패널 배터리 상세 행 결손은 닫혔다. weather 위젯의

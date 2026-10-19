@@ -5,8 +5,9 @@
 #   fetch the new tag into build/omarchy -> rewrite upstream.lock and the shell
 #   PKGBUILD -> drop makepkg's stale caches -> build -> run the full suite.
 #
-# On any failure the tracked files are restored with git and build/omarchy goes
-# back to the old pin; --keep leaves the failed state in place for debugging.
+# On any failure the tracked files are restored with git, the artifacts that
+# were in build/ come back, and build/omarchy goes back to the old pin (or is
+# removed if this run created it); --keep leaves the failed state in place.
 set -euo pipefail
 
 repo_root=${COO_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}
@@ -16,7 +17,7 @@ build_dir=${COO_BUILD_DIR:-$repo_root/build}
 lock=$repo_root/upstream.lock
 shell_dir=$repo_root/packages/cachy-omarchy-shell
 shell_pkg=$shell_dir/PKGBUILD
-tracked=(upstream.lock packages/cachy-omarchy-shell/PKGBUILD)
+tracked=(upstream.lock packages/cachy-omarchy-shell/PKGBUILD README.md README.ko-KR.md)
 
 fail() { printf 'error: %s\n' "$1" >&2; exit 1; }
 usage() { printf 'Usage: update-upstream [--keep]\n'; }
@@ -48,30 +49,58 @@ git -C "$repo_root" rev-parse --git-dir >/dev/null 2>&1 || fail 'update-upstream
 git -C "$repo_root" diff --quiet HEAD -- "${tracked[@]}" ||
   fail "uncommitted changes in ${tracked[*]}; commit or stash them first"
 
-old_shell_artifact=""
-coo_current_artifacts "$repo_root" && old_shell_artifact=$COO_SHELL_ARTIFACT
+coo_current_artifacts "$repo_root" || fail 'cannot read the current package versions'
+old_shell_artifact=$COO_SHELL_ARTIFACT
+old_overlay_artifact=$COO_OVERLAY_ARTIFACT
+old_pkgrel=$(grep -m1 '^pkgrel=' "$shell_pkg" | cut -d= -f2- | tr -d "'\"")
 old_head=""
+created_clone=0
 if [[ -d $omarchy_git/.git ]]; then
-  old_head=$(git -C "$omarchy_git" rev-parse --verify 'HEAD^{commit}' 2>/dev/null) || old_head=""
+  old_head=$(git -C "$omarchy_git" rev-parse --verify 'HEAD^{commit}') || fail "cannot read HEAD of $omarchy_git"
+else
+  created_clone=1
 fi
 
+# A rebuild may overwrite an artifact under a name build/ already holds (the
+# overlay always; the shell when the pin moves within one version). Park the
+# current ones so a failure can put them back.
+backup=$(mktemp -d "${TMPDIR:-/tmp}/coo-update.XXXXXX") || fail 'could not create a backup directory'
+for name in "$old_shell_artifact" "$old_overlay_artifact"; do
+  if [[ -e $build_dir/$name ]]; then cp -p "$build_dir/$name" "$backup/$name" || fail "could not back up $name"; fi
+done
+
 restore() {
-  local status=$?
+  local status=$? problems=0 name
   trap - EXIT
-  (( status == 0 )) && exit 0
+  if (( status == 0 )); then rm -rf "$backup"; exit 0; fi
   if (( keep )); then
-    printf 'kept: failed update left in place (--keep); undo with: git checkout HEAD -- %s\n' "${tracked[*]}" >&2
+    rm -rf "$backup"
+    printf 'kept: failed update left in place (--keep): %s is at the new pin, build/ may hold new artifacts; undo with: git checkout HEAD -- %s\n' \
+      "$omarchy_git" "${tracked[*]}" >&2
     exit "$status"
   fi
-  git -C "$repo_root" checkout -q HEAD -- "${tracked[@]}"
-  if [[ -n $old_head ]]; then
-    git -C "$omarchy_git" checkout -q --detach "$old_head" || printf 'warn: could not return %s to %s\n' "$omarchy_git" "$old_head" >&2
+  # Every step runs even if an earlier one failed; the summary says what is left.
+  git -C "$repo_root" checkout -q HEAD -- "${tracked[@]}" || { printf 'warn: could not restore %s\n' "${tracked[*]}" >&2; problems=1; }
+  if (( created_clone )); then
+    rm -rf "$omarchy_git" || { printf 'warn: could not remove the clone %s\n' "$omarchy_git" >&2; problems=1; }
+  else
+    git -C "$omarchy_git" checkout -q --detach "$old_head" || { printf 'warn: could not return %s to %s\n' "$omarchy_git" "$old_head" >&2; problems=1; }
   fi
   if [[ -n ${new_shell_artifact:-} && $new_shell_artifact != "$old_shell_artifact" ]]; then
-    rm -f "${build_dir:?}/$new_shell_artifact"
+    rm -f "${build_dir:?}/$new_shell_artifact" || problems=1
   fi
+  for name in "$old_shell_artifact" "$old_overlay_artifact"; do
+    if [[ -e $backup/$name ]]; then
+      mv -f "$backup/$name" "$build_dir/$name" || { printf 'warn: could not put back %s (kept in %s)\n' "$name" "$backup" >&2; problems=1; }
+    fi
+  done
   rm -rf "$shell_dir"/{src,pkg,omarchy}
-  printf 'reverted: upstream.lock and the PKGBUILD are back at HEAD\n' >&2
+  if (( problems )); then
+    printf 'partially reverted: see the warnings above; build/ and the clone may not match HEAD\n' >&2
+  else
+    printf 'reverted: tracked files, build/ artifacts and the clone are back as before\n' >&2
+    rm -rf "$backup"
+  fi
   exit "$status"
 }
 trap restore EXIT
@@ -92,14 +121,23 @@ OMARCHY_CHANNEL=$OMARCHY_CHANNEL
 OMARCHY_REPOSITORY=$OMARCHY_REPOSITORY
 OMARCHY_TAG=v$latest
 EOT
-awk -v version="$latest" -v pin="$commit" '
+# The same version re-tagged to another commit must still be a new package
+# revision, never a rebuild under the old file name.
+if [[ $latest == "$OMARCHY_VERSION" ]]; then new_pkgrel=$((old_pkgrel + 1)); else new_pkgrel=1; fi
+awk -v version="$latest" -v pin="$commit" -v rel="$new_pkgrel" '
   /^pkgver=/ { print "pkgver=" version; next }
-  /^pkgrel=/ { print "pkgrel=1"; next }
+  /^pkgrel=/ { print "pkgrel=" rel; next }
   /^_commit=/ { print "_commit=\047" pin "\047"; next }
   { print }
 ' "$shell_pkg" >"$shell_pkg.new"
 cat "$shell_pkg.new" >"$shell_pkg"
 rm -f "$shell_pkg.new"
+# The README package table repeats the shell version; test_readme_versions.sh
+# compares it with the PKGBUILD, so move it with the PKGBUILD.
+for readme in README.md README.ko-KR.md; do
+  [[ -f $repo_root/$readme ]] || continue
+  sed -i -E "s#^([|] \`cachy-omarchy-shell\` [|] )[^|]*[^| ] *[|]#\1$latest-$new_pkgrel |#" "$repo_root/$readme"
+done
 coo_current_artifacts "$repo_root" || exit 1
 new_shell_artifact=$COO_SHELL_ARTIFACT
 

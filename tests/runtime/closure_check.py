@@ -3,7 +3,7 @@
 
 Reads an extracted install tree (not the source tree) so the audit matches
 what users actually receive.  Pure analysis: no side effects beyond reading
-files and read-only `pacman -Qqo` lookups.
+files and read-only `pacman -Qqo` / `pacman -Ql` / `pactree -s` lookups.
 """
 import argparse
 import json
@@ -22,7 +22,7 @@ BUILTINS = {
     "trap", "read", "test", "true", "false", "wait", "shopt", "getopts",
     "break", "continue",
     "command", "builtin", "type", "hash", "alias", "unalias", "let", "mapfile",
-    "printf_",  # placeholder guard; printf itself is mapped in the tsv
+    "printf_",  # placeholder guard; printf itself is a base command, derived from pacman
 }
 # Wrappers that prefix a real command; the token after them is the command.
 PREFIXES = {"sudo", "setsid", "nohup", "exec", "command", "env", "uwsm-app"}
@@ -806,21 +806,29 @@ def read_tsv(path, ncols):
 
 
 def base_command_owners():
-    """command -> package for every executable the base/base-devel closure owns.
+    """command -> package for every executable the `base` closure owns.
 
     Such a command can never be absent, so it needs no row in the map: the
-    scanner derives a BASE row for it from pacman instead. Empty when pactree
-    or pacman is missing (then the command is reported as unmapped).
+    scanner derives a BASE row for it from pacman instead. Only `base`
+    counts: a user's system need not have base-devel, so a command from it
+    (patch, make, envsubst) must be mapped and declared like any other.
+
+    Empty, with a warning on stderr, when pactree or pacman is missing (every
+    such command is then reported as unmapped). Exits when either tool is
+    present but fails, so the cause shows instead of dozens of UNMAPPED lines.
     """
     if shutil.which("pactree") is None or shutil.which("pacman") is None:
+        print("warn: pactree/pacman missing; base commands are not derived", file=sys.stderr)
         return {}
-    pkgs = set()
-    for seed in ("base", "base-devel"):
-        r = subprocess.run(["pactree", "-l", "-s", seed], capture_output=True, text=True)
-        pkgs |= {re.split(r"[<>=]", t)[0] for t in r.stdout.split()}
+    r = subprocess.run(["pactree", "-l", "-s", "base"], capture_output=True, text=True)
+    if r.returncode != 0:
+        sys.exit(f"error: pactree -l -s base failed ({r.returncode}): {r.stderr.strip()}")
+    pkgs = {re.split(r"[<>=]", t)[0] for t in r.stdout.split()}
     if not pkgs:
-        return {}
+        sys.exit("error: pactree -l -s base listed no packages")
     r = subprocess.run(["pacman", "-Ql", *sorted(pkgs)], capture_output=True, text=True)
+    if r.returncode != 0:
+        sys.exit(f"error: pacman -Ql failed ({r.returncode}): {r.stderr.strip()}")
     owners = {}
     for line in r.stdout.splitlines():
         pkg, _, path = line.partition(" ")
@@ -969,7 +977,7 @@ def main():
         }
         menu_names = set(OMARCHY_RE.findall(menu.read_text()))
         # 이 차감은 규모가 큰 억제 통로다 — 예외 파일보다 훨씬 크면서
-        # 사유도, 신선도 검사도, 생성 문서 노출도 없었다. 개수를 세어
+        # 사유도, 신선도 검사도 없다. 개수를 세어
         # --emit-table 이 단언 대상으로 내보내게 한다(산문에 손으로 적은
         # 숫자는 맵이 바뀌어도 green 인 채로 거짓이 될 수 있다).
         menu_suppressed |= menu_names & known_bad
@@ -1006,7 +1014,7 @@ def main():
             else:
                 # 업스트림에 그런 헬퍼가 없다 = 헬퍼가 아니다. 그래프에서
                 # 빼되 조용히 빼지 않는다 — --emit-table 이 개수와 이름을
-                # 함께 찍어, 생성된 문서를 읽는 사람이 스캐너가 무엇을
+                # 함께 찍어, --emit-table 출력을 읽는 사람이 스캐너가 무엇을
                 # 헬퍼로 인정하지 않았는지 보게 한다.
                 not_upstream_helpers.add(name)
             continue
@@ -1139,11 +1147,10 @@ def main():
     # optdepends declaration itself is correct, is self-contradictory and
     # makes a green run impossible on any machine that lacks every
     # optional tool. So a missing binary is not a violation, and — since
-    # v0.9 rebaseline fix round 1 (C-2) — it is not noted anywhere in
-    # --emit-table's output either: which commands happen to be installed
-    # on the machine running this scan is a fact about that machine, not
-    # about this project, and the emitted table is committed and asserted
-    # against verbatim (test_dependency_closure.sh). A missing binary
+    # It is not noted anywhere in --emit-table's output either: which
+    # commands happen to be installed on the machine running this scan is a
+    # fact about that machine, not about this project, and the output should
+    # read the same everywhere. A missing binary
     # simply narrows what this pass can check; it says nothing else. When
     # the binary *is* present, pacman still has to agree with the mapped
     # package, and a mismatch stays a real violation.
@@ -1167,8 +1174,8 @@ def main():
 
     # BASE 는 "부재할 수 없으므로 선언 대상이 아니다" 라는 주장이다. 그
     # 주장은 검사 가능하다: 선언된 depends 의 전이 폐포, 또는 Arch 의
-    # base/base-devel 폐포, 또는 우리가 직접 빌드하는 패키지 안에 있어야
-    # 한다. 그 셋 중 어디에도 없으면 그것은 기반 패키지가 아니라 그냥
+    # base 폐포, 또는 우리가 직접 빌드하는 패키지 안에 있어야
+    # 한다(base-devel 은 사용자 시스템에 있다는 보장이 없어 제외). 그 셋 중 어디에도 없으면 그것은 기반 패키지가 아니라 그냥
     # 선언되지 않은 의존이고, BASE 라고 적어 침묵시킨 것이다.
     #
     # 이 검사가 없으면 클래스 칼럼 한 글자를 고치는 것만으로 게이트를
@@ -1180,7 +1187,7 @@ def main():
     base_unverifiable = shutil.which("pactree") is None
     if not base_unverifiable:
         guaranteed = set()
-        for seed in sorted(depends) + ["base", "base-devel"]:
+        for seed in sorted(depends) + ["base"]:
             r = subprocess.run(
                 ["pactree", "-l", "-s", seed], capture_output=True, text=True
             )
@@ -1200,7 +1207,7 @@ def main():
             if klass == "BASE" and package not in guaranteed:
                 violations.append(
                     f"UNJUSTIFIED_BASE {package} ({cmd} — 선언된 depends 의 전이 "
-                    f"폐포에도 base/base-devel 에도 없다; BASE 가 아니라 선언되지 "
+                    f"폐포에도 base 에도 없다; BASE 가 아니라 선언되지 "
                     f"않은 의존이다)"
                 )
 
@@ -1208,28 +1215,28 @@ def main():
         violations.append(f"UNMATCHED_DISABLED_PLUGIN {pid}")
 
     if args.emit_table:
-        # 이 표는 문서에 커밋되고 --emit-table 재생성 결과와 문자 그대로
-        # 비교된다(test_dependency_closure.sh). 이 스캔을 실행하는 머신에
+        # 이 표는 체크인되지 않는다(필요할 때 --emit-table 로 뽑는다). 같은
+        # 핀이면 어느 머신에서 뽑아도 같아야 한다. 이 스캔을 실행하는 머신에
         # 무엇이 설치돼 있는지는 그 머신에 대한 사실이지 이 프로젝트에 대한
-        # 사실이 아니다 — 커밋되는 표 안에 넣으면 다른 머신/CI/사용자가
-        # optdepends 하나만 깔아도 손대지 않은 문서가 거짓 RED 를 낸다
-        # (v0.9 rebaseline fix round 1, C-2). 그래서 여기서는 `not_installed`
+        # 사실이 아니다 — 표 안에 넣으면 다른 머신/CI/사용자가
+        # optdepends 하나만 깔아도 같은 핀의 출력이 달라진다. 그래서 여기서는 `not_installed`
         # 를 표에 전혀 찍지 않는다 — 그 정보는 위쪽 실제 위반 판정(있으면
         # UNMAPPED_COMMAND)에서만 쓰이고, 표 셀에는 클래스와 근거만 남는다.
         print("| command | package | class | 근거 |")
         print("| --- | --- | --- | --- |")
         for cmd, package, klass, rationale in table:
             print(f"| `{cmd}` | `{package}` | {klass} | {rationale} |")
-        # 개수는 여기서 함께 내보내 표와 같은 단언 대상이 되게 한다 — 산문에
-        # 손으로 옮겨 적은 숫자는 맵이 바뀌어도 스위트가 green 인 채로 거짓이
-        # 될 수 있다(v0.9 rebaseline fix round 1, I-2).
+        # 개수는 표와 함께 내보낸다 — 산문에 손으로 옮겨 적은 숫자는 맵이
+        # 바뀌어도 스위트가 green 인 채로 거짓이 될 수 있다.
         base_count = sum(1 for r in table if r[2] == "BASE")
+        mapped_names = {r[0] for r in map_rows}
+        derived_count = sum(1 for r in table if r[0] not in mapped_names)
         print()
         print(
-            "tests/data/command-packages.tsv: 전체 %d행, 위 표에는 도달한 %d행이 "
-            "모두 실린다(BASE %d행 포함 — BASE 는 declare 대상이 아닐 뿐 "
-            "검사 대상에서 빠지지 않는다)"
-            % (len(map_rows), len(table), base_count)
+            "tests/data/command-packages.tsv: 전체 %d행; 위 표는 도달한 %d행 "
+            "(tsv 에서 %d행, pacman 에서 도출한 base 행 %d행; BASE 합계 %d행 — "
+            "BASE 는 declare 대상이 아닐 뿐 검사 대상에서 빠지지 않는다)"
+            % (len(map_rows), len(table), len(table) - derived_count, derived_count, base_count)
         )
         if base_unverifiable:
             print(
@@ -1245,7 +1252,7 @@ def main():
         for name in sorted(menu_suppressed):
             print(f"- `{name}`")
         # 스캐너가 헬퍼로 인정하지 않은 이름을 여기서 드러낸다. 이 목록이
-        # 조용하면, 생성된 문서는 도구가 갖지 않은 완전성을 주장하게 된다.
+        # 조용하면, 이 출력은 도구가 갖지 않은 완전성을 주장하게 된다.
         print()
         print(
             "스캐너가 헬퍼로 인정하지 않은 이름: %d개 "

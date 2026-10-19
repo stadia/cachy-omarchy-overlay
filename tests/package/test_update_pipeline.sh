@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 # bin/check-upstream, bin/update-upstream and bin/bump-pkgrel against a
-# disposable repository and a disposable local "upstream". Only
-# `git ls-remote --tags` is faked (a test cannot ask a real remote what it
-# advertises); every other git call is real. No network, pacman or sudo.
+# disposable repository and a disposable local "upstream". Faked: `git
+# ls-remote --tags` and fetch failure injection (a test cannot ask a real
+# remote what it advertises), makepkg, bsdtar and the test runner. Every other
+# git call is real. No network, pacman or sudo.
 set -euo pipefail
+# update-upstream hands these to the suite it runs, which includes this test
+# when it is run for real; they must never steer the fixture at the real repo.
+unset COO_OMARCHY_GIT COO_BUILD_DIR COO_REPO_ROOT
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/assert.sh"
 
 pin_ver=$(awk -F= '$1 == "OMARCHY_VERSION" { print $2; exit }' "$REPO_ROOT/upstream.lock")
@@ -36,17 +40,20 @@ cp -a "$REPO_ROOT/bin" "$root/bin"
 cp -a "$REPO_ROOT/lib" "$root/lib"
 cp "$REPO_ROOT/packages/cachy-omarchy-shell/PKGBUILD" "$root/packages/cachy-omarchy-shell/"
 cp "$REPO_ROOT/packages/cachy-omarchy-overlay/PKGBUILD" "$root/packages/cachy-omarchy-overlay/"
+cp "$REPO_ROOT/README.md" "$REPO_ROOT/README.ko-KR.md" "$root/"
 sed -e "s#^OMARCHY_REPOSITORY=.*#OMARCHY_REPOSITORY=file://$upstream#" \
     -e "s#^OMARCHY_COMMIT=.*#OMARCHY_COMMIT=$old_commit#" "$REPO_ROOT/upstream.lock" >"$root/upstream.lock"
 sed -i -e "s/^_commit=.*/_commit='$old_commit'/" -e 's/^pkgrel=.*/pkgrel=5/' "$root/packages/cachy-omarchy-shell/PKGBUILD"
+sed -i -E "s#^([|] \`cachy-omarchy-shell\` [|] )[^|]*[^| ] *[|]#\1$pin_ver-5 |#" "$root/README.md" "$root/README.ko-KR.md"
 sed -i -e 's/^pkgver=.*/pkgver=0.9.9/' "$root/packages/cachy-omarchy-overlay/PKGBUILD"
 chmod +x "$root"/bin/*
 git init -q "$root"
 printf 'build/\npackages/*/src/\npackages/*/pkg/\npackages/*/omarchy/\n' >"$root/.gitignore"
 git -C "$root" add -A
 git -C "$root" "${ident[@]}" commit -q -m fixture
+fixture_head=$(git -C "$root" rev-parse HEAD)
 reset_repo() {
-  git -C "$root" checkout -q HEAD -- .
+  git -C "$root" reset -q --hard "$fixture_head"
   git -C "$root" clean -fdxq
   rm -rf "$root/build" "$root"/packages/*/{src,pkg,omarchy}
   git clone -q "$upstream" "$root/build/omarchy"
@@ -117,9 +124,15 @@ run_update() {
     COO_BSDTAR_BIN="$fake/bsdtar" COO_TEST_RUNNER="$fake/test-runner" \
     "$@" "$root/bin/update-upstream" 2>&1
 }
+seed_build() {
+  mkdir -p "$root/build"
+  printf 'old shell\n' >"$root/build/$shell_old"
+  printf 'old overlay\n' >"$root/build/$overlay_art"
+}
 clone_head() { git -C "$root/build/omarchy" rev-parse HEAD; }
 tracked_dirty() { git -C "$root" status --porcelain | wc -l; }
 shell_new=cachy-omarchy-shell-$next_ver-1-any.pkg.tar.zst
+shell_old=cachy-omarchy-shell-$pin_ver-5-any.pkg.tar.zst
 overlay_art=cachy-omarchy-overlay-0.9.9-1-any.pkg.tar.zst
 
 # --- check-upstream is read-only ---
@@ -163,10 +176,15 @@ assert_eq "$(grep -c '^runner$' "$log")" "1" "the suite runs once"
 assert_eq "$stale" "0" "makepkg's stale src cache is dropped"
 assert_file_exists "$root/build/$shell_new" "the new shell artifact lands in build/"
 assert_file_exists "$root/build/$overlay_art" "the overlay artifact lands in build/"
+assert_eq "$(find "$root/build" -maxdepth 1 -name '*.pkg.tar.zst' | wc -l)" "2" "a fresh build leaves exactly two artifacts"
+for readme in README.md README.ko-KR.md; do
+  assert_contains "$(grep -F '`cachy-omarchy-shell` |' "$root/$readme" | head -1)" "| $next_ver-1 |" "$readme version row moves with the PKGBUILD"
+done
 
 # --- update-upstream: every failure stage reverts everything ---
 for mode in fetch build audit test; do
   reset_repo
+  seed_build
   : >"$log"
   case $mode in
     fetch) envs=(COO_FAKE_FETCH_FAIL=1); expected='could not fetch' ;;
@@ -183,7 +201,37 @@ for mode in fetch build audit test; do
   assert_eq "$(clone_head)" "$old_commit" "$mode failure returns build/omarchy to the old pin"
   [[ -e $root/build/$shell_new ]] && left=1 || left=0
   assert_eq "$left" "0" "$mode failure leaves no new-pin artifact"
+  assert_eq "$(cat "$root/build/$shell_old")" "old shell" "$mode failure keeps the old shell artifact"
+  assert_eq "$(cat "$root/build/$overlay_art")" "old overlay" "$mode failure puts the overwritten overlay artifact back"
+  assert_eq "$(find "$root/packages/cachy-omarchy-shell" -maxdepth 1 \( -name src -o -name pkg -o -name omarchy \) | wc -l)" "0" "$mode failure drops makepkg's caches"
+  assert_eq "$(git -C "$root" diff HEAD --stat -- README.md README.ko-KR.md | wc -l)" "0" "$mode failure restores the README tables"
 done
+
+# --- the same version re-tagged to another commit is a new revision ---
+reset_repo
+seed_build
+# the fake remote advertises the next version; pretend the pin already has it
+sed -i "s#^OMARCHY_VERSION=.*#OMARCHY_VERSION=$next_ver#" "$root/upstream.lock"
+sed -i -e "s/^pkgver=.*/pkgver=$next_ver/" "$root/packages/cachy-omarchy-shell/PKGBUILD"
+sed -i -E "s#^([|] \`cachy-omarchy-shell\` [|] )[^|]*[^| ] *[|]#\1$next_ver-5 |#" "$root/README.md" "$root/README.ko-KR.md"
+git -C "$root" "${ident[@]}" commit -q -am 'same version, other commit'
+printf 'old shell\n' >"$root/build/cachy-omarchy-shell-$next_ver-5-any.pkg.tar.zst"
+out=$(run_update) && code=0 || code=$?
+assert_eq "$code" "0" "a re-tag of the pinned version updates"
+assert_contains "$(cat "$root/packages/cachy-omarchy-shell/PKGBUILD")" "pkgrel=6" "a re-tag bumps pkgrel instead of reusing the file name"
+assert_file_exists "$root/build/cachy-omarchy-shell-$next_ver-6-any.pkg.tar.zst" "the re-tag builds under a new file name"
+reset_repo
+seed_build
+sed -i "s#^OMARCHY_COMMIT=.*#OMARCHY_COMMIT=$old_commit#;s#^OMARCHY_VERSION=.*#OMARCHY_VERSION=$next_ver#" "$root/upstream.lock"
+sed -i -e "s/^pkgver=.*/pkgver=$next_ver/" "$root/packages/cachy-omarchy-shell/PKGBUILD"
+sed -i -E "s#^([|] \`cachy-omarchy-shell\` [|] )[^|]*[^| ] *[|]#\1$next_ver-5 |#" "$root/README.md" "$root/README.ko-KR.md"
+git -C "$root" "${ident[@]}" commit -q -am 'same version, other commit'
+printf 'old shell\n' >"$root/build/cachy-omarchy-shell-$next_ver-5-any.pkg.tar.zst"
+out=$(run_update COO_FAKE_TEST_MODE=fail) && code=0 || code=$?
+assert_eq "$code" "9" "a failed re-tag update fails"
+assert_eq "$(cat "$root/build/cachy-omarchy-shell-$next_ver-5-any.pkg.tar.zst")" "old shell" "a failed re-tag keeps the old artifact under its own name"
+[[ -e $root/build/cachy-omarchy-shell-$next_ver-6-any.pkg.tar.zst ]] && left=1 || left=0
+assert_eq "$left" "0" "a failed re-tag leaves no new revision behind"
 
 # --- the runner's own exit code survives; --keep leaves the failed state ---
 reset_repo
@@ -197,6 +245,18 @@ assert_eq "$code" "9" "--keep still fails"
 assert_contains "$out" "kept:" "--keep reports that nothing was reverted"
 assert_contains "$(cat "$root/upstream.lock")" "OMARCHY_VERSION=$next_ver" "--keep leaves the moved lock"
 assert_eq "$(clone_head)" "$new_commit" "--keep leaves build/omarchy at the new pin"
+assert_contains "$out" "build/omarchy" "--keep says the clone stays at the new pin"
+assert_contains "$(cat "$root/packages/cachy-omarchy-shell/PKGBUILD")" "pkgver=$next_ver" "--keep leaves the moved PKGBUILD"
+assert_file_exists "$root/build/$shell_new" "--keep leaves the new artifact"
+
+# --- a clone this run created does not outlive a failed run ---
+reset_repo
+rm -rf "$root/build/omarchy"
+out=$(run_update COO_FAKE_BUILD_FAIL=1) && code=0 || code=$?
+assert_eq "$code" "7" "a failed update with no prior clone fails"
+[[ -e $root/build/omarchy ]] && left=1 || left=0
+assert_eq "$left" "0" "the clone the run created is removed again"
+assert_eq "$(tracked_dirty)" "0" "and the tracked files are back at HEAD"
 
 # --- a missing clone is created; local edits to the moved files are refused ---
 reset_repo
@@ -211,6 +271,16 @@ assert_eq "$code" "1" "update refuses uncommitted edits to the files it rewrites
 assert_contains "$out" "uncommitted changes" "the refusal names the reason"
 assert_eq "$(clone_head)" "$old_commit" "the refusal touches nothing"
 git -C "$root" checkout -q HEAD -- upstream.lock
+printf '# local edit\n' >>"$root/packages/cachy-omarchy-shell/PKGBUILD"
+out=$(run_update) && code=0 || code=$?
+assert_eq "$code" "1" "update refuses uncommitted edits to the PKGBUILD"
+git -C "$root" checkout -q HEAD -- packages/cachy-omarchy-shell/PKGBUILD
+printf '# staged edit\n' >>"$root/README.md"
+git -C "$root" add README.md
+out=$(run_update) && code=0 || code=$?
+assert_eq "$code" "1" "update refuses staged-only edits to a file it rewrites"
+git -C "$root" reset -q HEAD -- README.md
+git -C "$root" checkout -q HEAD -- README.md
 
 # --- bump-pkgrel is an explicit local revision: no lock or version change ---
 reset_repo

@@ -1359,8 +1359,15 @@ DO NOT INSTALL
 DO NOT MODIFY CURRENT PACKAGE
 ```
 
-The tracked files are restored from git and `build/omarchy` returns to the old
-pin (`--keep` leaves the failed state in place).
+The tracked files (`upstream.lock`, the shell PKGBUILD, both READMEs) are
+restored from git, the new shell artifact is removed, the `build/` artifacts
+the run overwrote are put back from a backup, and `build/omarchy` returns to
+the old pin (or is removed if the run created it). `--keep` leaves the failed
+state in place. Uncommitted edits elsewhere (for example under `overlay/`)
+are not guarded: they go into the build and the test run, and the overlay
+artifact is rebuilt under its existing name, from where the backup restores it.
+Re-tagging the pinned version to another commit bumps `pkgrel`, so the new
+shell never reuses the old file name.
 
 ---
 

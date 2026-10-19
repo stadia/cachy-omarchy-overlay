@@ -85,7 +85,7 @@ jobs:
       # closure 스캐너가 핀 커밋의 bin/ 목록을 읽는다.
       - name: Omarchy 소스 준비
         run: |
-          source upstream.lock
+          . ./upstream.lock
           git clone "$OMARCHY_REPOSITORY" build/omarchy
           git -C build/omarchy checkout --detach "$OMARCHY_COMMIT"
           test "$(git -C build/omarchy rev-parse HEAD)" = "$OMARCHY_COMMIT"

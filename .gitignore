@@ -10,3 +10,4 @@ vendor/omarchy/
 packages/cachy-omarchy-shell/omarchy/
 docs/superpowers/
 __pycache__/
+/build/.publish.lock
