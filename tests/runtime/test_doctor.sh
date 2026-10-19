@@ -251,15 +251,6 @@ assert_contains "$out" "FAIL: shell autostart missing from $config/hypr/bindings
 printf 'hl.on("hyprland.start", function() end)\n' >>"$config/hypr/bindings.lua"
 out=$(run_doctor); code=$?
 assert_contains "$out" "PASS: shell autostart declared (bindings.lua)" "hyprland.start 가 있으면 통과한다"
-# 폐기된 `cachy-omarchy-shell --run` 사본은 WARN(별칭이 셸을 띄운다). 새 autostart 는 조용하다.
-printf 'hl.on("hyprland.start", function() hl.exec_cmd("cachy-omarchy-shell --run") end)\n' >"$config/hypr/bindings.lua"
-out=$(run_doctor); code=$?
-assert_contains "$out" "WARN: shell autostart still runs the deprecated cachy-omarchy-shell --run" "옛 --run 사본을 WARN 으로 알린다"
-assert_eq "$code" "0" "옛 --run 사본은 doctor 를 실패시키지 않는다"
-printf 'hl.on("hyprland.start", function() hl.exec_cmd("omarchy-launch-shell") end)\n' >"$config/hypr/bindings.lua"
-out=$(run_doctor); code=$?
-[[ $out == *"deprecated cachy-omarchy-shell --run"* ]] && w=1 || w=0
-assert_eq "$w" "0" "omarchy-launch-shell autostart 는 경고하지 않는다"
 rm -f "$config/hypr/bindings.lua"
 mv "$hypr/hyprland.lua.bak" "$hypr/hyprland.lua"
 

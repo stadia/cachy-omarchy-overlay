@@ -154,24 +154,6 @@ out=$(run_restart "" 0 2>&1); code=$?
 assert_eq "$code" "1" "ping 무응답 → exit 1"
 assert_contains "$out" "did not become ready" "준비되지 않았다고 말한다"
 
-# 폐기된 --run 은 업그레이드 직후 옛 bindings.lua 사본이 부르므로 경고 후 업스트림
-# 감독자로 넘긴다. --ipc/--path 는 삭제.
-cat > "$stub/omarchy-launch-shell" <<'STUB'
-#!/usr/bin/env bash
-printf 'omarchy-launch-shell %s\n' "$*" >> "$COO_CALL_LOG"
-STUB
-chmod +x "$stub"/*
-: > "$calls"
-out=$(PATH="$stub:$PATH" COO_OMARCHY_PATH="$fake/upstream" COO_CALL_LOG="$calls" "$W" --run 2>&1); code=$?
-assert_eq "$code" "0" "--run 은 감독자로 넘긴다"
-assert_contains "$out" "cachy-omarchy-bindings --force" "--run 경고가 갱신 방법을 말한다"
-assert_contains "$(cat "$calls")" "omarchy-launch-shell" "--run → omarchy-launch-shell"
-for mode in --ipc --path; do
-  out=$("$W" "$mode" 2>&1); code=$?
-  assert_eq "$code" "1" "$mode 는 삭제됨 → exit 1"
-  assert_contains "$out" "삭제됐다" "$mode → 삭제 안내"
-done
-
 out=$("$W" --help 2>&1); code=$?
 assert_eq "$code" "0" "--help → exit 0"
 assert_contains "$out" "--restart" "--help 가 --restart 를 안내한다"

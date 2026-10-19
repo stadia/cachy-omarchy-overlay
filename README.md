@@ -21,7 +21,7 @@ Two Arch packages are produced.
 | Package | Version | Role |
 |---|---|---|
 | `cachy-omarchy-shell` | 4.0.4-7 | The pinned Omarchy Quattro shell runtime (Quickshell tree, `omarchy-settings` excluded) |
-| `cachy-omarchy-overlay` | 1.0.2-5 | The CachyOS integration layer (wrapper commands, Hyprland bindings, defaults) |
+| `cachy-omarchy-overlay` | 1.0.2-6 | The CachyOS integration layer (wrapper commands, Hyprland bindings, defaults) |
 
 The upstream pin is managed by `upstream.lock` (currently `basecamp/omarchy @ v4.0.4`,
 `c668141`).
@@ -137,9 +137,7 @@ refuses while the session is locked.
 
 **Upgrading:** an existing `~/.config/cachy-omarchy/hypr/bindings.lua` is never overwritten
 without `--force`. If `cachy-omarchy-doctor` reports that SUPER+K still runs the removed
-`cachy-omarchy-keybindings`, or still runs the deprecated `cachy-omarchy-shell --run`
-(it still starts the shell, with a warning, but the alias will go), run
-`cachy-omarchy-bindings --force`.
+`cachy-omarchy-keybindings`, run `cachy-omarchy-bindings --force`.
 
 ## Build and install
 

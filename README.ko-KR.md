@@ -20,7 +20,7 @@ SUPER + K      →  Omarchy 스타일 키바인딩 뷰어
 | 패키지 | 버전 | 역할 |
 |---|---|---|
 | `cachy-omarchy-shell` | 4.0.4-7 | 핀된 Omarchy Quattro 셸 런타임 (Quickshell 트리, `omarchy-settings` 제외) |
-| `cachy-omarchy-overlay` | 1.0.2-5 | CachyOS 통합 계층 (래퍼 명령, Hyprland 바인딩, 기본값) |
+| `cachy-omarchy-overlay` | 1.0.2-6 | CachyOS 통합 계층 (래퍼 명령, Hyprland 바인딩, 기본값) |
 
 업스트림 핀은 `upstream.lock`이 관리한다 (현재 `basecamp/omarchy @ v4.0.4`,
 `c668141`).
@@ -134,9 +134,7 @@ idle → screensaver → lock → wake 체인이 패키징돼 있다: idle 타�
 
 **업그레이드:** 기존 `~/.config/cachy-omarchy/hypr/bindings.lua` 는 `--force` 없이는
 덮어쓰지 않는다. `cachy-omarchy-doctor` 가 SUPER+K 가 삭제된
-`cachy-omarchy-keybindings` 를 부른다고 알리거나, 폐기된 `cachy-omarchy-shell --run` 을
-아직 부른다고 알리면(경고와 함께 셸은 뜨지만 별칭은 제거될 예정이다)
-`cachy-omarchy-bindings --force` 를 실행한다.
+`cachy-omarchy-keybindings` 를 부른다고 알리면 `cachy-omarchy-bindings --force` 를 실행한다.
 
 ## 빌드와 설치
 

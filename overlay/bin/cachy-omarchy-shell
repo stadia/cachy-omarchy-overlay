@@ -112,15 +112,6 @@ cmd_restart() {
 
 case ${1:-} in
   --restart) shift; cmd_restart "$@" ;;
-  --run)
-    # 업그레이드해도 라이브 bindings.lua 사본은 --force 없이 갱신되지 않아 옛 사본이
-    # 계속 --run 을 부른다. exec_cmd 는 실패를 알리지 않으므로 여기서 죽으면 로그인
-    # 후 셸이 조용히 사라진다 — 경고만 남기고 업스트림 감독자로 넘긴다.
-    printf 'warning: cachy-omarchy-shell --run 은 폐기됐다 — 사본을 갱신하라: cachy-omarchy-bindings --force\n' >&2
-    exec omarchy-launch-shell ;;
-  --ipc|--path)
-    printf 'error: cachy-omarchy-shell %s 는 삭제됐다 — IPC 는 omarchy-shell 을 쓴다.\n' "$1" >&2
-    exit 1 ;;
   --help|"") usage ;;
   *) printf 'error: 알 수 없는 인자: %s\n' "$1" >&2; usage >&2; exit 1 ;;
 esac
