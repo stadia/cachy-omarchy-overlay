@@ -131,8 +131,9 @@ recover manually with `cachy-omarchy-shell --restart`.
 ## Build and install
 
 ```bash
-bin/build-packages           # build both packages + audit (build/*.pkg.tar.zst)
-bin/install-packages         # install the build output
+bin/build-packages           # build both packages + audit into build/
+bin/test-packages            # full suite against the build/ artifacts
+bin/install-packages --install   # sudo pacman -U the current pair from build/
 cachy-omarchy-init           # one-time: create bindings and user state
 ```
 
@@ -148,8 +149,10 @@ Upstream tracking:
 ```bash
 bin/check-upstream           # check upstream for changes against the pin
 bin/update-upstream          # refresh the pin + rebuild pipeline
-bin/rollback                 # return to the previous pin
+bin/rollback                 # reinstall the newest older build/ artifact per package
 ```
+
+Builds before this change also copied every artifact into `~/.local/state/cachy-omarchy/` (`validated-builds/`, `packages/`, `*.manifest`). Nothing reads that directory any more; delete it to reclaim the space.
 
 ## Development
 

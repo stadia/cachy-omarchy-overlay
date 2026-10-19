@@ -746,7 +746,7 @@ cachy-omarchy-overlay/
 │   └── uwsm/10-cachy-omarchy         # 세션 환경 드롭인 (§45)
 ├── bin/                              # check-upstream, update-upstream, build-packages,
 │                                     # test-packages, install-packages, rollback,
-│                                     # bump-pkgrel, ci-resolve-install, validated-build.sh
+│                                     # bump-pkgrel, ci-resolve-install, package-names.sh
 ├── lib/runtime.sh                    # 테스트용 아티팩트 추출 헬퍼
 ├── tests/                            # test.sh 러너, lib/, data/, package/, runtime/
 ├── docs/                             # COMMAND_AUDIT, RUNTIME_DEPENDENCIES, RUNTIME_STARTUP
@@ -1472,38 +1472,22 @@ Independent semantic version:
 
 # 36. Rollback
 
-Every successful build/install workflow must preserve enough information to
-roll back.
-
-Preferred package cache:
-
-```text
-~/.local/state/cachy-omarchy/packages/
-```
-
-or rely on the pacman cache when reliable.
-
-Rollback command:
+`bin/build-packages` 는 결과를 `build/` 에 버전별 파일 이름으로 남기고 지우지
+않는다. 그 파일들이 rollback 원천이다.
 
 ```bash
 ./bin/rollback
 ```
 
-Conceptually:
-
-```text
-current 4.0.1-1
-        ↓
-select previous tested build
-        ↓
-pacman -U 4.0.0-2
-        ↓
-restart shell
-        ↓
-smoke test
-```
+패키지마다 `pacman -Q` 로 설치 버전을 읽고, `build/` 에서 그보다 낮은 가장 새
+버전을 `vercmp` 로 골라 `pacman -U` 한다. 더 낮은 버전이 없는 패키지는 그대로
+둔다(overlay 는 독립 버전이라 흔하다). 둘 다 없으면 아무것도 하지 않고 실패한다.
+`COO_ROLLBACK_SMOKE_BIN` 을 주면 pacman 뒤에 실행한다.
 
 Rollback must not restore unrelated CachyOS system files.
+
+0.x 의 `~/.local/state/cachy-omarchy/{validated-builds,packages}` 와
+`*.manifest` 는 더 이상 쓰지도 읽지도 않는다. 지워도 된다.
 
 ---
 
@@ -1514,13 +1498,13 @@ Initial developer installation:
 ```bash
 ./bin/build-packages
 ./bin/test-packages
-./bin/install-packages
+./bin/install-packages --install
 ```
 
-Eventually:
+`install-packages --install` 은 `build/` 의 현재 버전 두 파일로 아래 명령을 실행한다:
 
 ```bash
-sudo pacman -U   build/cachy-omarchy-shell-*.pkg.tar.zst   build/cachy-omarchy-overlay-*.pkg.tar.zst
+sudo pacman -U build/cachy-omarchy-shell-<ver>-<rel>-any.pkg.tar.zst build/cachy-omarchy-overlay-<ver>-<rel>-any.pkg.tar.zst
 ```
 
 No install script should blindly copy files into `/usr`.

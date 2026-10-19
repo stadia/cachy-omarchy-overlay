@@ -127,8 +127,9 @@ WARN 한다(`docs/RUNTIME_STARTUP.md` 참고).
 ## 빌드와 설치
 
 ```bash
-bin/build-packages           # 두 패키지 빌드 + 감사 (build/*.pkg.tar.zst)
-bin/install-packages         # 빌드 산출물 설치
+bin/build-packages           # 두 패키지 빌드 + 감사, 결과는 build/ 에
+bin/test-packages            # build/ 아티팩트 대상 전체 스위트
+bin/install-packages --install   # build/ 의 현재 두 파일을 sudo pacman -U
 cachy-omarchy-init           # 최초 1회: 바인딩 + 사용자 상태 생성
 ```
 
@@ -144,8 +145,12 @@ cachy-omarchy-init           # 최초 1회: 바인딩 + 사용자 상태 생성
 ```bash
 bin/check-upstream           # 핀 대비 업스트림 변경 확인
 bin/update-upstream          # 핀 갱신 + 재빌드 파이프라인
-bin/rollback                 # 이전 핀으로 복귀
+bin/rollback                 # 패키지마다 build/ 의 더 낮은 최신 아티팩트로 재설치
 ```
+
+이 변경 이전의 빌드는 모든 아티팩트를 `~/.local/state/cachy-omarchy/`
+(`validated-builds/`, `packages/`, `*.manifest`)에도 복사했다. 이제 그
+디렉터리는 아무것도 읽지 않으므로, 공간이 필요하면 지워도 된다.
 
 ## 개발
 

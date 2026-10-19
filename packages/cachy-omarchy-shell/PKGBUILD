@@ -81,7 +81,7 @@ optdepends=(
   #
   # 아래 AUR class 4건은 리포엔 없고 AUR 에만 존재한다(각 AUR RPC info 로 실측,
   # fix round 1). pacman -U 는 depends 를 리포/설치된 패키지로만 해결하므로
-  # (bin/install-packages:55) depends 에 넣으면 우리 패키지 자체가 설치
+  # (bin/install-packages) depends 에 넣으면 우리 패키지 자체가 설치
   # 불가해진다 — 그래서 HARD 성격이라도 optdepends 에 둔다:
   'xdg-terminal-exec: AUR — 터미널 실행의 구동 기계, omarchy-launch-tui/omarchy-launch-terminal/omarchy-launch-floating-terminal-with-presentation 전부 이것 없이는 실패(HARD 성격이나 리포에 없어 depends 불가)'
   # ttfx 는 리포 무결과(pacman -Ss ttfx 0건, 2026-08-23 실측) — AUR 전용이라

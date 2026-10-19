@@ -46,9 +46,8 @@ jobs:
             test "$(git -C build/omarchy rev-parse HEAD)" = "$OMARCHY_COMMIT"
           '
 
-      # bin/test-packages 는 bin/build-packages 가 남긴 validated-build
-      # 매니페스트를 검증한다. 둘을 같은 사용자로 돌려야 상태 디렉터리가
-      # 일치한다.
+      # bin/test-packages 는 bin/build-packages 가 build/ 에 남긴 현재 버전
+      # 두 아티팩트로 전체 스위트를 돈다.
       - name: 빌드 + 테스트
         run: |
           sudo -u builder --preserve-env=GITHUB_WORKSPACE bash -lc '
