@@ -439,9 +439,10 @@ lock 플러그인이 이름으로 부르지만 스테이징되지 않은 것:
 `hyprctl reload` 한다. 업스트림에서 그것을 읽는 쪽은
 `config/hypr/hyprland.lua:26` 의 `require("default.hypr.toggles")` 다.
 
-우리 오버레이는 `overlay/hypr/bindings.lua` 끝의 sweep 블록으로 같은 자리를
-채운다 — 정렬된 `*.lua` 를 각각 `pcall(dofile)`. `dofile` 은 모듈 캐시가 없어
-업스트림 `{ reload = true }` 의 의미가 그대로 성립한다.
+우리 오버레이는 `overlay/hypr/bindings.lua` 끝의 블록으로 같은 자리를 채운다.
+v0.11 에서는 정렬된 `*.lua` 를 각각 `pcall(dofile)` 하는 sweep 을 직접
+구현했으나, #12 에서 업스트림 `require("default.hypr.toggles")` 호출로
+교체했다(아래 §23.1). 아래 conf 경로 실측은 그대로 유효하다.
 
 **conf 경로 실측:** 중첩 Hyprland(0.56.2, `env -u HYPRLAND_INSTANCE_SIGNATURE
 Hyprland -c <tmp>/hyprland.conf --verify-config`, 사용자 세션 무관)로 세 번
@@ -479,6 +480,42 @@ Hyprland -c <tmp>/hyprland.conf --verify-config`, 사용자 세션 무관)로 �
 뿐 그 안의 Lua 를 실행하지 않으므로, seam 은 `hyprland.lua` 설정에서만
 성립한다. 이 실측이 conf 비지원 결정(SPEC §76)의 근거 중 하나다 —
 conf 만 있는 환경은 `cachy-omarchy-doctor` 가 WARN 한다.
+
+### 23.1 업스트림 require 로 전환 (#12, 2026-10-19 실측)
+
+가설: `package.path` 에 `$OMARCHY_PATH/?.lua` 를 붙이면 관리 블록의
+`pcall(dofile, bindings.lua)` 진입에서도 `require("default.hypr.toggles")` 가
+성립한다. 중첩 Hyprland 0.56.2(Wayland 백엔드 — headless 백엔드는 §23 3번과
+같은 이유로 못 뜬다), 임시 HOME·별도 `XDG_RUNTIME_DIR`, `HYPRLAND_INSTANCE_SIGNATURE`
+를 지운 환경에서 쟀다. 라이브 세션에는 reload 를 보내지 않았다.
+
+| # | 항목 | 결과 |
+|---|---|---|
+| 1 | `pcall(dofile)` 진입에서 require | 성립. `require_all` 의 `{ reload = true }` 도 동작 |
+| 2 | reload 후 값 변경 | `general:gaps_out` 37 → 53 으로 바뀜, toggle 이 reload 마다 재실행 |
+| 3 | 레거시 `*-disabled.lua` | 실행되지 않음(`exclude`). `*-disabled-name` 은 데이터로 `hl.device` 에만 전달 |
+| 4 | `workspace-layouts` | **`?.lua` 만 붙이면 실패** — 아래 참조 |
+| 5 | `OMARCHY_PATH` 없음 | 조용히 지나감, `configerrors` 비어 있음 |
+
+**4번:** 레이아웃 파일이 하나라도 있으면
+`module 'omarchy.workspace-layouts.3' not found` 가 config 에러로 뜬다 —
+`require_all` 이 `~/.local/state/?.lua` 를 경로 루트로 전제하기 때문이다.
+업스트림 `default/hypr/bootstrap.lua` 를 `dofile` 하면 그 경로와
+`~/.config/?.lua` 가 올라가고 `default.hypr.*` 모듈 캐시도 비워져, 에러 없이
+`hl.workspace_rule` 이 적용된다(v0.11 재구현은 레이아웃 복원을 하지 않았다).
+
+깨진 toggle 파일(`05-broken.lua`)은 Hyprland 의 `require` 가 에러를
+`configerrors` 로 보고하기만 하고 **뒤의 toggle·`disabled-name`·레이아웃은
+계속 로드**된다 — 기존 per-file `pcall` 격리와 같은 결과이고, 에러가 화면에
+보이게 된 점만 다르다.
+
+결과: 재구현 블록을 `pcall(function() dofile(bootstrap.lua);
+require("default.hypr.toggles") end)` 로 교체했다. 전제: shell 패키지가
+`default/hypr/{bootstrap,toggles,paths,require_all,disabled-input-device,
+workspace-layouts}.lua` 를 스테이징한다(`stage-upstream.sh`) — 이 6개가 없는
+구버전 shell 패키지에서는 `pcall` 이 삼켜 toggle 이 조용히 비활성화된다.
+`tests/runtime/test_toggles_seam.sh` 가 패키지를 추출해 이 체인과 보안
+계약(레거시 파일 미실행, 이름의 코드 합성 없음)을 고정한다.
 
 ## §24 락 인지 셸 재시작 + reload/compat 위임 체인 (v0.12.0, 2026-08-23)
 

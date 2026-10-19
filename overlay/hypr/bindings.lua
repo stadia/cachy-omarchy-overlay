@@ -30,73 +30,35 @@ do
   end
 end
 
--- Omarchy toggles seam (v0.11): 업스트림 config/hypr/hyprland.lua 의
--- require("default.hypr.toggles") 가 하던 일을 우리 관리 블록 안에서 한다.
+-- Omarchy toggles seam (#12): 업스트림 config/hypr/hyprland.lua 의
+-- require("default.hypr.toggles") 를 그대로 부른다.
 -- omarchy-hyprland-monitor-clamshell / -internal / -internal-mirror 이
 -- ~/.local/state/omarchy/toggles/hypr/*.lua 를 쓰고 hyprctl reload 하는데,
 -- 그것을 읽는 쪽이 없으면 아무도 안 보는 dead file 만 남는다.
--- 업스트림의 require 체인(default.hypr.paths / require_all)은 끌어오지 않는다
--- — 관리 블록은 pcall(dofile) 로 진입하므로 그 package.path 루트가 성립하지
--- 않는다. dofile 은 모듈 캐시가 없어 업스트림 { reload = true } 의 의미가
--- 그대로 따라온다. 디렉터리 부재는 정상 경로다.
 --
--- 4.0.1 (보안): sweep 이 두 레거시 생성 파일을 코드로 로드하면 안 된다 —
--- touchpad-disabled.lua / touchscreen-disabled.lua 는 구버전에서 USB
--- 디스크립터의 장치 이름이 Lua 코드로 들어가 생성됐어서, 아직 마이그레이션
--- 전인 설치에 남아 있으면 리로드마다 주입된 코드가 실행된다(업스트림
--- default/hypr/toggles.lua 의 exclude 와 같은 계약). 대신 4.0.1 의
--- omarchy-toggle-input-device 가 쓰는 데이터 파일 <kind>-disabled-name 을
--- 읽어 장치만 끈다(upstream default/hypr/disabled-input-device.lua 자리) —
--- 이름은 절대 코드로 합성하지 않는다.
+-- 관리 블록은 pcall(dofile) 로 진입하므로 package.path 를 직접 세워야 한다.
+-- package.path 에 $OMARCHY_PATH/?.lua 만 붙이면 부족하다 — 워크스페이스
+-- 레이아웃 파일이 있을 때 omarchy.workspace-layouts.* 를 못 찾아 config 에러가
+-- 난다(Hyprland 0.56.2 중첩 인스턴스 실측, 2026-10-19). 그래서 업스트림
+-- bootstrap.lua 를 부른다: ~/.local/state/?.lua 와 ~/.config/?.lua 와
+-- $OMARCHY_PATH/?.lua 를 path 에 올리고 default.hypr.* 모듈 캐시를 비워
+-- 리로드마다 toggle 이 다시 실행되게 한다.
+--
+-- 4.0.1 (보안) 계약은 업스트림 toggles.lua 가 진다: 레거시 touchpad-disabled.lua /
+-- touchscreen-disabled.lua 는 코드로 로드하지 않고(exclude), 장치 이름은
+-- <kind>-disabled-name 데이터 파일에서 읽어 hl.device 로만 전달한다.
+-- tests/runtime/test_toggles_seam.sh 가 이 두 가지를 고정한다.
+--
+-- pcall 안에서 부른다: OMARCHY_PATH 가 없는 환경(uwsm 드롭인 미적용)이나
+-- 업스트림 트리가 없는 구버전 shell 패키지에서는 조용히 지나간다. toggle
+-- 파일 하나가 깨져도 Hyprland 의 require 가 에러를 config 에러로 보고만 하고
+-- 뒤의 toggle 은 계속 로드된다(같은 실측).
 do
-  local home = os.getenv("HOME")
-  local dir = os.getenv("HOME") .. "/.local/state/omarchy/toggles/hypr"
-  local quoted = "'" .. dir:gsub("'", "'\\''") .. "'"
-  -- -print0 + NUL 분리: 줄 단위로 읽으면 파일명에 든 개행에서 경로가 잘려
-  -- 그 toggle 이 조용히 로드되지 않는다. 정렬은 셸 `sort` 대신 table.sort 로
-  -- 옮긴다 — NUL 스트림을 파이프로 한 번 더 넘기지 않기 위해서다.
-  local pipe = io.popen(
-    "find " .. quoted .. " -maxdepth 1 -type f -name '*.lua' -print0 2>/dev/null"
-  )
-  if pipe then
-    local blob = pipe:read("*a") or ""
-    pipe:close()
-
-    -- 평문 find 로 자른다. Lua 패턴의 %z 는 5.1 에만 있고 5.2+ 에서 빠졌는데,
-    -- Hyprland 가 임베드한 버전을 전제하지 않기 위해 패턴을 쓰지 않는다.
-    local paths, start = {}, 1
-    while true do
-      local stop = blob:find("\0", start, true)
-      if not stop then break end
-      if stop > start then paths[#paths + 1] = blob:sub(start, stop - 1) end
-      start = stop + 1
-    end
-    table.sort(paths)
-
-    for _, path in ipairs(paths) do
-      if path:sub(-22) == "/touchpad-disabled.lua"
-        or path:sub(-25) == "/touchscreen-disabled.lua"
-      then
-        -- 4.0.1 exclude: 레거시 생성 Lua 는 코드로 로드하지 않는다.
-      else
-        -- toggle 파일 하나가 깨져도 사용자 설정 전체가 죽지 않는다(SPEC §5.1).
-        pcall(dofile, path)
-      end
-    end
-  end
-
-  -- *-disabled-name: 장치 이름 데이터를 읽어 장치만 끈다. 빈 파일/부재는
-  -- 정상 경로다(업스트림의 name ~= "" 가드).
-  for _, kind in ipairs({ "touchpad", "touchscreen" }) do
-    local f = io.open(
-      dir .. "/" .. kind .. "-disabled-name", "r"
-    )
-    if f then
-      local name = f:read("*l")
-      f:close()
-      if name and name ~= "" then
-        hl.device({ name = name, enabled = false })
-      end
-    end
+  local root = os.getenv("OMARCHY_PATH")
+  if root and root ~= "" then
+    pcall(function()
+      dofile(root .. "/default/hypr/bootstrap.lua")
+      require("default.hypr.toggles")
+    end)
   end
 end
