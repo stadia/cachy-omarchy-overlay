@@ -91,6 +91,8 @@ linked	omarchy-launch-floating-terminal-with-presentation	gum presentation layer
 data	logo.txt	read by omarchy-show-logo through $OMARCHY_PATH
 verbatim	omarchy-bar	menu style.bar and session lifecycle
 verbatim	omarchy-shell-config	menu style.bar and session lifecycle
+verbatim	omarchy-shell	upstream shell IPC client (replaces the compat shim)
+verbatim	omarchy-launch-shell	upstream shell supervisor (autostart and restart)
 verbatim	omarchy-plugin-catalog	menu style.bar and session lifecycle
 verbatim	omarchy-system-lock	menu style.bar and session lifecycle
 verbatim	omarchy-apply-lock	menu style.bar and session lifecycle

@@ -9,7 +9,7 @@ B="$REPO_ROOT/overlay/hypr/bindings.lua"
 assert_file_exists "$B" "bindings.lua 소스 존재"
 lua=$(cat "$B")
 assert_contains "$lua" 'hyprland.start' "autostart 1회 트리거 패키징됨"
-assert_contains "$lua" 'cachy-omarchy-shell --run' "래퍼 기동 명령 패키징됨"
+assert_contains "$lua" 'hl.exec_cmd("omarchy-launch-shell")' "업스트림 감독자 기동 명령 패키징됨"
 
 # 유닛 파일은 저장소에 더 이상 존재하지 않는다. (assert.sh 에 pass/fail 헬퍼가
 # 없으므로 수동 패턴: ok 출력 또는 ASSERT_FAILURES 증가.)

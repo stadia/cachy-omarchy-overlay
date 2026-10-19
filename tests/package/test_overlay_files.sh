@@ -17,12 +17,10 @@ for p in \
   usr/bin/cachy-omarchy-bindings \
   usr/bin/cachy-omarchy-init \
   usr/bin/cachy-omarchy-doctor \
-  usr/lib/cachy-omarchy/compat/bin/omarchy-shell \
   usr/lib/cachy-omarchy/compat/bin/omarchy-update-available \
   usr/lib/cachy-omarchy/compat/bin/omarchy-theme-set-browser \
   usr/lib/cachy-omarchy/compat/bin/omarchy-theme-set-keyboard \
   usr/lib/cachy-omarchy/compat/bin/omarchy-restart-shell \
-  usr/bin/omarchy-shell \
   usr/bin/omarchy-update-available \
   usr/bin/omarchy-theme-set-browser \
   usr/bin/omarchy-theme-set-keyboard \

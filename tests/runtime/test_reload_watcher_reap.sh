@@ -53,11 +53,13 @@ mkdir -p "$plugins_dir"
 mkdir -p "$HOME/.local/state/omarchy/toggles"
 : > "$HOME/.local/state/omarchy/toggles/bar-off"
 
-W="$REPO_ROOT/overlay/bin/cachy-omarchy-shell"
 export COO_OMARCHY_PATH="$root"
+LAUNCH="$COO_OMARCHY_PATH/bin/omarchy-launch-shell"
+IPC="$COO_OMARCHY_PATH/bin/omarchy-shell"
+export OMARCHY_PATH="$COO_OMARCHY_PATH"
 stdout_log="$COO_TEST_SANDBOX/shell.stdout"
 
-"$W" --run > "$stdout_log" 2>&1 &
+"$LAUNCH" > "$stdout_log" 2>&1 &
 shell_pid=$!
 our_shell_pid=$shell_pid
 
@@ -94,7 +96,7 @@ trap 'final_safety_net; exit 143' TERM
 # IPC 가 응답할 때까지 상한을 두고 기다린다. 셸이 중간에 죽으면 즉시 끊는다.
 reply=""
 for _ in $(seq 1 40); do
-  reply=$("$W" --ipc shell ping 2>/dev/null) && [[ -n $reply ]] && break
+  reply=$("$IPC" shell ping 2>/dev/null) && [[ -n $reply ]] && break
   kill -0 "$shell_pid" 2>/dev/null || break
   sleep 0.25
 done

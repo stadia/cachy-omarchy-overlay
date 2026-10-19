@@ -46,8 +46,10 @@ defaults="$REPO_ROOT/overlay/defaults/shell.json"
 mkdir -p "$HOME/.local/state/omarchy/toggles"
 : > "$HOME/.local/state/omarchy/toggles/bar-off"
 
-W="$REPO_ROOT/overlay/bin/cachy-omarchy-shell"
 export COO_OMARCHY_PATH="$root"
+LAUNCH="$COO_OMARCHY_PATH/bin/omarchy-launch-shell"
+IPC="$COO_OMARCHY_PATH/bin/omarchy-shell"
+export OMARCHY_PATH="$COO_OMARCHY_PATH"
 
 # --run 은 systemd-cat 으로 감싸므로 stdout/stderr 은 저널로 간다. 여기서
 # 리다이렉트한 파일은 (정상이라면) 비어 있고, 그것을 기동 로그로 착각하면
@@ -57,7 +59,7 @@ journal_log="$COO_TEST_SANDBOX/shell.journal"
 cursor=$(journalctl --user -n 0 --show-cursor 2>/dev/null | sed -n 's/^-- cursor: //p')
 since=$(date '+%Y-%m-%d %H:%M:%S')
 
-"$W" --run > "$stdout_log" 2>&1 &
+"$LAUNCH" > "$stdout_log" 2>&1 &
 shell_pid=$!
 # cleanup() 이 재진입 방지로 shell_pid 를 비우므로, 종료 후 잔여물 검사가
 # 참조할 PID 는 여기서 별도로 보존해 둔다 (아래 "잔여물 없음" 절 참고).
@@ -99,10 +101,21 @@ trap 'cleanup; exit 143' TERM
 # 프로세스를 즉시 잡아내 루프를 끊는다. 실측은 2회차(~0.5s)에 응답.
 reply=""
 for _ in $(seq 1 40); do
-  reply=$("$W" --ipc shell ping 2>/dev/null) && [[ -n $reply ]] && break
+  reply=$("$IPC" shell ping 2>/dev/null) && [[ -n $reply ]] && break
   kill -0 "$shell_pid" 2>/dev/null || break
   sleep 0.25
 done
+
+# $! 는 omarchy-launch-shell 감독자의 PID 다. hyprctl layers 의 pid 는 그 자식
+# quickshell 의 것이므로, 우리 경로에 매칭되는 실제 quickshell 을 따로 찾는다.
+qs_pid=""
+for _ in $(seq 1 20); do
+  for cand in $(pgrep -f "quickshell -n -p $COO_OMARCHY_PATH/shell" 2>/dev/null); do
+    [[ -r /proc/$cand/comm && $(<"/proc/$cand/comm") == quickshell ]] && { qs_pid=$cand; break 2; }
+  done
+  sleep 0.25
+done
+[[ $qs_pid =~ ^[0-9]+$ ]] && our_shell_pid=$qs_pid || qs_pid=$shell_pid
 
 # R01 — 프로세스가 살아 있다.
 kill -0 "$shell_pid" 2>/dev/null && alive=0 || alive=1
@@ -117,8 +130,8 @@ assert_eq "$reply" "ok" "R02 IPC ping 응답"
 # 성립한다. 그래서 존재로 증명한다: 실효 설정과 레지스트리를 직접 물어본다.
 cfg='{}'; plugins='[]'
 if (( alive == 0 )); then
-  cfg=$("$W" --ipc shell listShellConfig 2>/dev/null) || cfg='{}'
-  plugins=$("$W" --ipc shell listPlugins 2>/dev/null) || plugins='[]'
+  cfg=$("$IPC" shell listShellConfig 2>/dev/null) || cfg='{}'
+  plugins=$("$IPC" shell listPlugins 2>/dev/null) || plugins='[]'
   [[ -n $cfg ]] || cfg='{}'
   [[ -n $plugins ]] || plugins='[]'
 fi
@@ -188,7 +201,7 @@ if command -v hyprctl >/dev/null && (( alive == 0 )); then
   mons=$(hyprctl -j monitors 2>/dev/null | jq -c '[ .[] | select(.disabled | not) ]') || mons='[]'
 
   read_our_layers() {
-    our_layers=$(hyprctl -j layers 2>/dev/null | jq -c --argjson pid "$shell_pid" \
+    our_layers=$(hyprctl -j layers 2>/dev/null | jq -c --argjson pid "$qs_pid" \
       '[ to_entries[].value.levels | to_entries[] as $lv | $lv.value[]
          | select(.pid == $pid) | . + {level: ($lv.key | tonumber)} ]') || our_layers='[]'
     onscreen=$(jq -r -n --argjson l "$our_layers" --argjson m "$mons" '
@@ -249,9 +262,9 @@ cleanup
 sleep 0.5   # journald 플러시.
 
 if [[ -n $cursor ]]; then
-  journalctl --user --after-cursor "$cursor" -t cachy-omarchy-shell --no-pager -o cat > "$journal_log" 2>/dev/null
+  journalctl --user --after-cursor "$cursor" -t omarchy-shell --no-pager -o cat > "$journal_log" 2>/dev/null
 else
-  journalctl --user --since "$since" -t cachy-omarchy-shell --no-pager -o cat > "$journal_log" 2>/dev/null
+  journalctl --user --since "$since" -t omarchy-shell --no-pager -o cat > "$journal_log" 2>/dev/null
 fi
 [[ -f $journal_log ]] || : > "$journal_log"
 

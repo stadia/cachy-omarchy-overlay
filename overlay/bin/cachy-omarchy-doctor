@@ -145,7 +145,8 @@ check_executable "shell wrapper" "$BIN_DIR/cachy-omarchy-shell"
 check_executable "launcher invocation" "$BIN_DIR/omarchy-menu"
 check_executable "binding helper" "$BIN_DIR/cachy-omarchy-bindings"
 check_executable "keybinding invocation" "$BIN_DIR/omarchy-menu-keybindings"
-check_executable "compat omarchy-shell" "$COMPAT_BIN/omarchy-shell"
+check_executable "shell launcher" "$BIN_DIR/omarchy-launch-shell"
+check_executable "shell IPC client" "$BIN_DIR/omarchy-shell"
 
 # omarchy-system-lock pipes the shell's answer to /dev/null, so a missing PAM
 # service makes it exit 0 while locking nothing. Nothing else in the session
@@ -215,8 +216,8 @@ if command -v pgrep >/dev/null 2>&1 && pgrep -x quickshell >/dev/null 2>&1; then
   elif ! command -v timeout >/dev/null 2>&1; then
     warn "IPC ping not measurable (timeout missing)"
   else
-    ipc_output=$(COO_OMARCHY_PATH="$OMARCHY_PATH" \
-      timeout --kill-after=1s "$IPC_TIMEOUT" "$BIN_DIR/cachy-omarchy-shell" --ipc shell ping 2>&1)
+    ipc_output=$(OMARCHY_PATH="$OMARCHY_PATH" OMARCHY_SHELL_IPC_TIMEOUT="$IPC_TIMEOUT" \
+      timeout --kill-after=1s "$IPC_TIMEOUT" "$BIN_DIR/omarchy-shell" shell ping 2>&1)
     ipc_status=$?
     if [[ $ipc_status -eq 0 ]]; then
       pass "IPC ping${ipc_output:+ ($ipc_output)}"
@@ -274,6 +275,11 @@ if [[ -f $HYPR_DIR/hyprland.lua && -f $CONFIG_DIR/hypr/bindings.lua ]] \
   else
     fail "shell autostart missing from $CONFIG_DIR/hypr/bindings.lua — run: cachy-omarchy-bindings --force"
   fi
+fi
+# 구형 사본의 자동 기동은 삭제된 `cachy-omarchy-shell --run` 을 부른다. exec_cmd 는
+# 실패를 알리지 않아 로그인해도 셸이 조용히 뜨지 않는다.
+if [[ -f $CONFIG_DIR/hypr/bindings.lua ]] && grep -qF -e 'cachy-omarchy-shell --run' "$CONFIG_DIR/hypr/bindings.lua"; then
+  fail "shell autostart still runs the removed cachy-omarchy-shell --run in $CONFIG_DIR/hypr/bindings.lua — run: cachy-omarchy-bindings --force"
 fi
 # M10: clipboard history 존재 공개 (§66 — 사용자가 모를 수 있는 로컬 상태를
 # 알리되 지우는 것은 사용자 몫). upstream Clipboard.qml:20 은 XDG_STATE_HOME 이

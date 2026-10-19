@@ -4,8 +4,10 @@
 # probe 가 살아남는지 실측한다 (SPEC §45, 설계 문서 §9.3·§10.4).
 #
 # 안전: 사용자 세션의 셸은 절대 건드리지 않는다. 추출 트리를 OMARCHY_PATH 로
-# 삼아 우리 인스턴스를 따로 띄우고, --restart 는 그 경로 패턴에만 매칭된다
-# (cachy-omarchy-shell:100 — `quickshell -n -p $OMARCHY_PATH/shell`).
+# 삼아 우리 인스턴스를 따로 띄우고, 재시작은 그 경로의 quickshell kill 과
+# omarchy-launch-shell 재기동으로 흉내 낸다(cachy-omarchy-shell --restart 는 Hyprland
+# 환경으로 사용자 셸을 띄우므로 쓰지 않는다)
+# (`quickshell -n -p $OMARCHY_PATH/shell`).
 set -uo pipefail
 REPO_ROOT="${REPO_ROOT:?}"
 source "$REPO_ROOT/tests/lib/assert.sh"
@@ -40,11 +42,12 @@ assert_eq "$uwsm_owner" "uwsm" "real /usr/bin/uwsm-app 은 uwsm 패키지 소유
 root="$COO_TEST_SANDBOX/scope-root"
 coo_extract_pkg "$root"
 export COO_OMARCHY_PATH="$root/usr/share/cachy-omarchy/upstream"
+LAUNCH="$COO_OMARCHY_PATH/bin/omarchy-launch-shell"
+IPC="$COO_OMARCHY_PATH/bin/omarchy-shell"
 export OMARCHY_PATH="$COO_OMARCHY_PATH"
 # AppLibrary 는 bare uwsm-app 을 실행한다. 먼저 real /usr/bin 을 두어 artifact
 # 또는 호출자 PATH 의 shim 이 아닌 uwsm 패키지 바이너리만 해석되게 한다.
 export PATH="/usr/bin:$COO_OMARCHY_PATH/bin:$PATH"
-W="$REPO_ROOT/overlay/bin/cachy-omarchy-shell"
 SHELL_PAT="quickshell -n -p $COO_OMARCHY_PATH/shell"
 
 # systemd-cat 의 cmdline 도 SHELL_PAT 를 포함하므로 pgrep 결과만 쓰면 부모 PID를
@@ -94,9 +97,12 @@ mkdir -p "$HOME/.local/state/omarchy/toggles"
 : > "$HOME/.local/state/omarchy/toggles/bar-off"
 
 probe_pid=""
+launch_pids=()
 cleanup() {
   local pids candidate
-  "$W" --ipc shell hide omarchy.menu >/dev/null 2>&1 || true
+  # 감독자(omarchy-launch-shell)를 먼저 멈춘다 — 셸만 죽이면 되살린다.
+  [[ ${#launch_pids[@]} -gt 0 ]] && kill -TERM "${launch_pids[@]}" 2>/dev/null
+  "$IPC" shell hide omarchy.menu >/dev/null 2>&1 || true
   # Return 직후 signal 이 오면 marker는 이미 쓰였지만 아래 대입은 아직 못 했을
   # 수 있다. sandbox pidfile에서 numeric PID만 복구해 test-owned probe만 정리한다.
   if [[ -z $probe_pid && -s $pidfile ]]; then
@@ -117,9 +123,10 @@ trap 'cleanup; exit 143' TERM
 
 # 1) 추출 트리의 셸만 기동한다. IPC 응답을 확인하지 못하면 어떤 키도 주입하지
 # 않아 사용자 앱을 선택할 가능성을 없앤다.
-"$W" --run >/dev/null 2>&1 &
+"$LAUNCH" >/dev/null 2>&1 &
+launch_pids+=("$!")
 for _ in $(seq 1 40); do
-  reply=$("$W" --ipc shell ping 2>/dev/null) && [[ $reply == ok ]] && break
+  reply=$("$IPC" shell ping 2>/dev/null) && [[ $reply == ok ]] && break
   sleep 0.25
 done
 assert_eq "${reply:-}" "ok" "테스트 전용 extracted shell 인스턴스 기동"
@@ -140,7 +147,7 @@ menu_layers() {
     || echo '[]'
 }
 
-"$W" --ipc shell summon omarchy.menu '{"menu":"apps"}' >/dev/null
+"$IPC" shell summon omarchy.menu '{"menu":"apps"}' >/dev/null
 for _ in $(seq 1 40); do
   [[ $(jq -r 'length' <<<"$(menu_layers)") -gt 0 ]] && { menu_mapped=0; break; }
   sleep 0.25
@@ -178,9 +185,13 @@ if (( found == 0 )); then
   assert_eq "$detached" "0" "probe cgroup 이 extracted shell cgroup 과 다르다"
 
   # 4) 핵심 단언: extracted shell 을 재시작해도 probe 가 살아남는다 (§10.4).
-  "$W" --restart >/dev/null 2>&1
+  # 정상 종료(kill)는 감독자가 재기동하지 않는 종료다. 새 감독자를 따로 띄운다.
+  quickshell kill -p "$COO_OMARCHY_PATH/shell" --any-display >/dev/null 2>&1
+  for _ in $(seq 1 50); do pgrep -f "$SHELL_PAT" >/dev/null 2>&1 || break; sleep 0.1; done
+  "$LAUNCH" >/dev/null 2>&1 &
+  launch_pids+=("$!")
   for _ in $(seq 1 40); do
-    reply=$("$W" --ipc shell ping 2>/dev/null) && [[ $reply == ok ]] && break
+    reply=$("$IPC" shell ping 2>/dev/null) && [[ $reply == ok ]] && break
     sleep 0.25
   done
   assert_eq "${reply:-}" "ok" "재시작 후 extracted shell 이 다시 응답한다"

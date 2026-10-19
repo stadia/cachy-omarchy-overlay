@@ -152,6 +152,8 @@ helpers=(
   omarchy-brightness-keyboard-mute
   omarchy-bar
   omarchy-shell-config
+  omarchy-shell
+  omarchy-launch-shell
   omarchy-plugin-catalog
   omarchy-system-lock
   omarchy-apply-lock
