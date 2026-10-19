@@ -57,6 +57,11 @@ old_head=""
 created_clone=0
 if [[ -d $omarchy_git/.git ]]; then
   old_head=$(git -C "$omarchy_git" rev-parse --verify 'HEAD^{commit}') || fail "cannot read HEAD of $omarchy_git"
+elif [[ -e $omarchy_git || -L $omarchy_git ]]; then
+  # Only a path this run creates may be removed on rollback; anything already
+  # there (a partial checkout, an empty directory, a worktree whose .git is a
+  # file) is left alone.
+  fail "$omarchy_git exists but is not a git clone (.git directory); move it aside first"
 else
   created_clone=1
 fi

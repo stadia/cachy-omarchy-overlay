@@ -207,6 +207,24 @@ for mode in fetch build audit test; do
   assert_eq "$(git -C "$root" diff HEAD --stat -- README.md README.ko-KR.md | wc -l)" "0" "$mode failure restores the README tables"
 done
 
+# --- a build/omarchy that is not a git clone is refused, never deleted ---
+reset_repo
+seed_build
+rm -rf "$root/build/omarchy"
+mkdir -p "$root/build/omarchy"
+printf 'keep me\n' >"$root/build/omarchy/partial"
+out=$(run_update) && code=0 || code=$?
+[[ $code != 0 ]] && failed=1 || failed=0
+assert_eq "$failed" "1" "a non-clone build/omarchy makes the update fail"
+assert_contains "$out" "is not a git clone" "a non-clone build/omarchy is named in the refusal"
+assert_eq "$(cat "$root/build/omarchy/partial")" "keep me" "a non-clone build/omarchy keeps its contents"
+rm -f "$root/build/omarchy/partial"
+out=$(run_update) && code=0 || code=$?
+[[ $code != 0 ]] && failed=1 || failed=0
+assert_eq "$failed" "1" "an empty build/omarchy makes the update fail"
+[[ -d $root/build/omarchy ]] && kept=1 || kept=0
+assert_eq "$kept" "1" "an empty build/omarchy is not removed"
+
 # --- an artifact already under the candidate's name survives a failed run ---
 reset_repo
 seed_build
