@@ -30,3 +30,20 @@ Reason: An active Polkit authentication flow can leave the locked session waitin
 Upstream issue: not filed; v1.0 acceptance evidence is in `git show v1.0.2:docs/V1_ACCEPTANCE.md` (§polkit).
 
 Can remove when: an upstream fix is verified to cancel an active Polkit flow before the session lock becomes secure.
+
+## Keybindings sheet on a stock CachyOS Hyprland config
+
+Patch: `0003-adapt-menu-keybindings-to-cachy-hyprland.patch`
+
+Reason: upstream's `omarchy-menu-keybindings` assumes an Omarchy Lua config where every bind has a
+`description`. A stock CachyOS `hyprland.lua` has none, so upstream shows only two static rows. The
+patch records every `hl.bind` from the Lua source (synthesizing a description from the command or
+the `hl.dsp.*` expression), joins the source cache to `hyprctl binds` on modmask+key instead of
+modmask+description, separates record fields with ASCII 0x1f so command arguments may contain commas,
+drops the two hardcoded Omarchy web-app rows, and changes the cache key so records from the unpatched
+helper are not reused. The Lua scan itself stays upstream's (`pcall(dofile, config)` with a fake `hl`),
+which also follows the managed `pcall(dofile, ...)` block into `~/.config/cachy-omarchy/hypr/bindings.lua`.
+
+Upstream issue: not filed.
+
+Can remove when: upstream's sheet lists description-less binds and joins them without a description.

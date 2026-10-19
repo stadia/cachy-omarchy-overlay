@@ -25,10 +25,11 @@ user-invocable: false
 - `commit.gpgsign` 꺼져 있음 — 다시 켜지 말 것.
 
 ## 현재 아키텍처 (경로/명령)
-- 우리 명령 6개, 모두 `overlay/bin/`에 있고 설치되면 `/usr/bin/`으로 간다:
+- 우리 명령 5개, 모두 `overlay/bin/`에 있고 설치되면 `/usr/bin/`으로 간다:
   `cachy-omarchy-shell`, `cachy-omarchy-launcher`(업스트림 `omarchy-menu toggle` 호환 별칭),
-  `cachy-omarchy-keybindings`, `cachy-omarchy-bindings`, `cachy-omarchy-init`, `cachy-omarchy-doctor`.
-  SUPER+SPACE 는 업스트림 `omarchy-menu toggle` 을 직접 부른다.
+  `cachy-omarchy-bindings`, `cachy-omarchy-init`, `cachy-omarchy-doctor`.
+  SUPER+SPACE 는 업스트림 `omarchy-menu toggle`, SUPER+K 는 패치된 업스트림
+  `omarchy-menu-keybindings`(셸 패키지, 패치 0003)를 직접 부른다.
 - 사용자 라이브 설정: `~/.config/cachy-omarchy/`(hypr/bindings.lua). `shell.json` 은
   셸이 읽지 않는 dead file 이므로 init 가 만들지 않는다.
 - 패키지 정본: `/usr/share/cachy-omarchy/hypr/bindings.lua`. 셸 기본 설정은 업스트림 트리의 `config/omarchy/shell.json`.

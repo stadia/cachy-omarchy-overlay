@@ -21,7 +21,7 @@ assert_contains "$lsrc" 'SUPER + space' "lua 가 SUPER+SPACE 를 바인딩한다
 assert_contains "$lsrc" "omarchy-menu toggle" "lua 대상은 업스트림 메뉴"
 assert_contains "$lsrc" "hl.unbind" "lua 는 unbind 후 bind 한다"
 assert_contains "$lsrc" 'hl.unbind("SUPER + K")' "lua 는 SUPER+K 를 먼저 unbind 한다"
-assert_contains "$lsrc" 'hl.bind("SUPER + K", hl.dsp.exec_cmd("cachy-omarchy-keybindings"), { description = "Keybindings" })' "lua 가 SUPER+K 를 keybindings 명령에 바인딩한다"
+assert_contains "$lsrc" 'hl.bind("SUPER + K", hl.dsp.exec_cmd("omarchy-menu-keybindings"), { description = "Keybindings" })' "lua 가 SUPER+K 를 keybindings 명령에 바인딩한다"
 # description 은 장식이 아니다: 업스트림 prioritize_entries 가 이 영어 문자열로
 # 시트 정렬 우선순위를 매긴다 (Keybindings=0, Launch apps=5).
 assert_contains "$lsrc" '{ description = "Launch apps" }' "lua 런처 bind 가 Launch apps description 을 단다"

@@ -20,17 +20,16 @@ Two Arch packages are produced.
 
 | Package | Version | Role |
 |---|---|---|
-| `cachy-omarchy-shell` | 4.0.4-2 | The pinned Omarchy Quattro shell runtime (Quickshell tree, `omarchy-settings` excluded) |
+| `cachy-omarchy-shell` | 4.0.4-4 | The pinned Omarchy Quattro shell runtime (Quickshell tree, `omarchy-settings` excluded) |
 | `cachy-omarchy-overlay` | 1.0.2-1 | The CachyOS integration layer (wrapper commands, Hyprland bindings, defaults) |
 
 The upstream pin is managed by `upstream.lock` (currently `basecamp/omarchy @ v4.0.4`,
 `c668141`).
 
-Seven public commands are installed into `/usr/bin`:
+Six public commands are installed into `/usr/bin`:
 
 - `cachy-omarchy-shell` — start the shell (`--run`), talk to it (`--ipc`), restart it manually (`--restart`)
 - `cachy-omarchy-launcher` — compatibility alias for upstream `omarchy-menu toggle`, which SUPER + SPACE now calls directly
-- `cachy-omarchy-keybindings` — toggle the keybinding viewer (SUPER + K)
 - `cachy-omarchy-bindings` — inject/remove the managed source block in your Hyprland config
 - `cachy-omarchy-init` — one-time user setup (never overwrites existing files)
 - `cachy-omarchy-doctor` — read-only diagnostics (including theme state)

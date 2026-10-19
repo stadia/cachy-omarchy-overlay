@@ -147,7 +147,7 @@ check_file "omarchy.menu availability" "$OMARCHY_PATH/default/omarchy/omarchy-me
 check_executable "shell wrapper" "$BIN_DIR/cachy-omarchy-shell"
 check_executable "launcher invocation" "$BIN_DIR/omarchy-menu"
 check_executable "binding helper" "$BIN_DIR/cachy-omarchy-bindings"
-check_executable "keybinding invocation" "$BIN_DIR/cachy-omarchy-keybindings"
+check_executable "keybinding invocation" "$BIN_DIR/omarchy-menu-keybindings"
 check_executable "compat omarchy-shell" "$COMPAT_BIN/omarchy-shell"
 
 # omarchy-system-lock pipes the shell's answer to /dev/null, so a missing PAM

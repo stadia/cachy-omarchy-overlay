@@ -523,7 +523,6 @@ Expected content:
 ```text
 /usr/bin/cachy-omarchy-shell
 /usr/bin/cachy-omarchy-launcher
-/usr/bin/cachy-omarchy-keybindings
 
 /usr/share/cachy-omarchy/defaults/
 ```
@@ -640,7 +639,6 @@ must be an explicit architecture decision.
 ```text
 /usr/bin/cachy-omarchy-shell
 /usr/bin/cachy-omarchy-launcher
-/usr/bin/cachy-omarchy-keybindings
 /usr/bin/cachy-omarchy-bindings
 /usr/bin/cachy-omarchy-init
 /usr/bin/cachy-omarchy-doctor
@@ -960,7 +958,7 @@ Initial bindings:
 
 ```text
 SUPER + SPACE -> cachy-omarchy-launcher
-SUPER + K     -> cachy-omarchy-keybindings
+SUPER + K     -> omarchy-menu-keybindings (upstream helper, patched: shell package patch 0003)
 ```
 
 The project must not overwrite the full Hyprland config.
@@ -1560,7 +1558,6 @@ Minimum commands:
 ```text
 cachy-omarchy-shell
 cachy-omarchy-launcher
-cachy-omarchy-keybindings
 cachy-omarchy-bindings
 cachy-omarchy-init
 cachy-omarchy-doctor

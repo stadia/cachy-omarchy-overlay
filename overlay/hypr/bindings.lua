@@ -7,7 +7,7 @@
 hl.unbind("SUPER + space")
 hl.bind("SUPER + space", hl.dsp.exec_cmd("omarchy-menu toggle"), { description = "Launch apps" })
 hl.unbind("SUPER + K")
-hl.bind("SUPER + K", hl.dsp.exec_cmd("cachy-omarchy-keybindings"), { description = "Keybindings" })
+hl.bind("SUPER + K", hl.dsp.exec_cmd("omarchy-menu-keybindings"), { description = "Keybindings" })
 
 -- Quattro shell autostart: 세션 시작 1회 발화(hyprland.start). 리로드로는
 -- 재기동하지 않는다 — 복구는 수동 `cachy-omarchy-shell --restart`. 업스트림

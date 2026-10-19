@@ -29,7 +29,7 @@ assert_file_exists "$root/usr/share/cachy-omarchy/upstream/shell/shell.qml" \
   "R01-R03 extracted shell.qml exists"
 assert_file_exists "$root/usr/bin/omarchy-menu" \
   "R04 extracted upstream menu command exists"
-assert_file_exists "$root/usr/bin/cachy-omarchy-keybindings" \
+assert_file_exists "$root/usr/bin/omarchy-menu-keybindings" \
   "R05 extracted keybindings helper exists"
 # R06: app-launch now goes through the real uwsm-app from the uwsm package
 # (session-environment redesign) instead of a shim we extract — there is no

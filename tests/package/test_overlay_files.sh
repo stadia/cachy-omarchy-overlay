@@ -14,7 +14,6 @@ assert_eq "$?" "0" "오버레이 추출 성공"
 for p in \
   usr/bin/cachy-omarchy-shell \
   usr/bin/cachy-omarchy-launcher \
-  usr/bin/cachy-omarchy-keybindings \
   usr/bin/cachy-omarchy-bindings \
   usr/bin/cachy-omarchy-init \
   usr/bin/cachy-omarchy-doctor \
@@ -23,13 +22,11 @@ for p in \
   usr/lib/cachy-omarchy/compat/bin/omarchy-theme-set-browser \
   usr/lib/cachy-omarchy/compat/bin/omarchy-theme-set-keyboard \
   usr/lib/cachy-omarchy/compat/bin/omarchy-restart-shell \
-  usr/lib/cachy-omarchy/compat/bin/omarchy-menu-keybindings \
   usr/bin/omarchy-shell \
   usr/bin/omarchy-update-available \
   usr/bin/omarchy-theme-set-browser \
   usr/bin/omarchy-theme-set-keyboard \
   usr/bin/omarchy-restart-shell \
-  usr/bin/omarchy-menu-keybindings \
   usr/share/cachy-omarchy/hypr/bindings.lua \
   usr/share/uwsm/env-hyprland.d/10-cachy-omarchy ; do
   assert_file_exists "$dest/$p" "소유: $p"
@@ -39,7 +36,7 @@ done
 assert_eq "$c" "0" "bindings.conf 는 설치되지 않는다 (Lua 전용)"
 
 # 공개 명령은 실행 가능해야 한다.
-for b in shell launcher keybindings bindings init doctor; do
+for b in shell launcher bindings init doctor; do
   [[ -x "$dest/usr/bin/cachy-omarchy-$b" ]] && x=0 || x=1
   assert_eq "$x" "0" "실행 가능: cachy-omarchy-$b"
 done
