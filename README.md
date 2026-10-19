@@ -26,12 +26,18 @@ Two Arch packages are produced.
 The upstream pin is managed by `upstream.lock` (currently `basecamp/omarchy @ v4.0.5`,
 `94a8fbc`).
 
-Four public commands are installed into `/usr/bin`:
+Three overlay setup and diagnostic commands are installed into `/usr/bin`:
 
 - `cachy-omarchy-bindings` — inject/remove the managed source block in your Hyprland config
 - `cachy-omarchy-init` — one-time user setup (never overwrites existing files)
 - `cachy-omarchy-doctor` — read-only diagnostics (including theme state)
-- `omarchy-theme-set` — apply a theme from the audited upstream helper set
+
+Runtime commands come from the audited upstream helper set: `omarchy-menu toggle`
+opens the launcher, `omarchy-menu-keybindings` opens the keybinding viewer,
+`omarchy-theme-set` applies a theme, and `omarchy-shell` sends IPC requests.
+`omarchy-restart-shell` is the overlay's lock-aware restart implementation.
+The former `cachy-omarchy-shell` and `cachy-omarchy-launcher` commands have been removed;
+`cachy-omarchy-shell` remains the runtime package name.
 
 ## Session requirement
 
@@ -120,10 +126,10 @@ still shipped and still reachable, just transitively, through the same
 `up`/`down`/`cycle` are upstream media-key (XF86Kbd*) bindings this overlay
 does not ship.
 
-Optional: install `ttfx` (AUR) for the idle screensaver and `socat` for its
-multi-monitor placement. Without them the screensaver simply does not start;
-nothing else is affected. The clamshell/toggle seam that this chain uses only
-runs for `hyprland.lua` configs (see `docs/RUNTIME_STARTUP.md`).
+Optional: install `ttfx` (AUR) for the idle screensaver. Without it the
+screensaver simply does not start; locking still works. `socat`, used for
+multi-monitor placement, is already a package dependency. The clamshell/toggle
+seam that this chain uses only runs for `hyprland.lua` configs (see `docs/RUNTIME_STARTUP.md`).
 
 ## Startup model
 
@@ -144,7 +150,12 @@ bin/build-packages           # build both packages + audit into build/
 bin/test-packages            # full suite against the build/ artifacts
 bin/install-packages --install   # sudo pacman -U the current pair from build/
 cachy-omarchy-init           # one-time: create bindings and user state
+cachy-omarchy-doctor         # check session, runtime and user configuration
 ```
+
+Build and runtime validation require CachyOS/Arch with the session requirements
+above. After the first setup, log out and back into the uwsm-managed Hyprland
+session to load the session environment and shell autostart.
 
 `cachy-omarchy-init` also configures the lock screen the first time it runs. It
 delegates to the upstream `omarchy-apply-lock` helper, which writes
@@ -176,7 +187,10 @@ Document map:
 
 - `SPEC.md` — the authoritative specification
 - `UPSTREAM.md` — upstream pin and tracking policy
-- `docs/RUNTIME_STARTUP.md` — measured startup paths and plugin disablement
+- `docs/RUNTIME_STARTUP.md` — startup, configuration, coexistence and restart contracts
+- `docs/RUNTIME_DEPENDENCIES.md` — dependency policy and closure audit limits
+- `docs/COMMAND_AUDIT.md` — staged, adapted and disabled helper inventory
+- `packages/cachy-omarchy-shell/PATCHES.md` — maintained patches and removal conditions
 
 Milestone design and implementation plans are kept in a private development tree and are
 not part of this repository. Where public documents cite a design record, they name the
@@ -185,8 +199,11 @@ file only.
 ## Known gaps
 
 `xdg-terminal-exec` stays an AUR-only optdepend — no fallback adapter is shipped.
-Recovering a lock stranded by a crashed `hyprlock` is out of scope
-(`docs/RUNTIME_STARTUP.md` §22.4). Release history is in the git tags
+Stranded-lock recovery remains disabled: both session-lock helpers are intentionally
+unstaged after the earlier coexistence crash (`docs/RUNTIME_STARTUP.md` §22.4).
+The 4.0.5 guard awaits live validation in [#20](https://github.com/stadia/cachy-omarchy-overlay/issues/20);
+the current pin has automated test evidence, but no live Wayland acceptance run yet
+(see `UPSTREAM.md`). Release history is in the git tags
 (`git tag`).
 
 ## License

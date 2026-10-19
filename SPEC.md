@@ -903,8 +903,8 @@ The overlay must not:
 
 - start a second Hyprland;
 - stop, mask, disable or uninstall a running Waybar, notification daemon or
-  lock helper — detect and report, never evict (revised in v0.2.0; this host
-  has no Waybar installed, so coexistence remains unmeasured);
+  lock helper — detect and report, never evict (revised in v0.2.0;
+  Waybar coexistence was measured on 2026-08-17, RUNTIME_STARTUP §17.6 in tag v1.0.2);
 - keep upstream plugins suppressed by default. Since v0.2.0 the staged
   `shell.json` is the pinned upstream file verbatim, so bar, notifications,
   OSD, idle and lock come up enabled. Suppression is added back only where a
@@ -1595,8 +1595,8 @@ keybinding invocation
 It should also report installed package versions:
 
 ```text
-Upstream Omarchy runtime: 4.0.4-1
-Overlay integration:      1.0.2-1
+Upstream Omarchy runtime: 4.0.5-1
+Overlay integration:      1.0.2-7
 ```
 
 ---
@@ -1689,9 +1689,9 @@ Example classification:
 
 ```text
 omarchy-shell
-  ADAPT
-  Thin IPC wrapper.
-  Replace with cachy-omarchy-shell wrapper.
+  ADOPT
+  Stage the upstream IPC client verbatim.
+  The uwsm session supplies OMARCHY_PATH; no cachy-omarchy-shell command is installed.
 
 omarchy-theme-set
   ADOPT (M9 — was "DISABLE initially" at M2)
@@ -2085,9 +2085,14 @@ All must be true:
 전 항목 측정됨(v1.0 기준). 항목별 증거 원장과 실측 기록은 태그 `v1.0.2` 의
 `docs/RC_GAP_INVENTORY.md`·`docs/V1_ACCEPTANCE.md`·`docs/RUNTIME_STARTUP.md` §12–§22 에 있다.
 
-잠금 공존 실측(§22)이 남긴 결정: ext-session-lock 은 클라이언트 하나만 쥐고, 거부당하면
+4.0.5 이전 잠금 공존 실측(§22)이 남긴 결정: ext-session-lock 은 클라이언트 하나만 쥐고, 거부당하면
 quickshell 은 프로토콜 오류로 죽는다. 그래서 업스트림 stranded-lock 회수 헬퍼
-(`omarchy-hyprland-session-locked`)는 올리지 않는다(`test_staged_helpers.sh`(`tests/data/staged-helpers.tsv`)가 고정).
+(`omarchy-hyprland-session-locked`와 4.0.5 래퍼
+`omarchy-hyprland-session-lock-stranded`)는 올리지 않는다
+(`test_staged_helpers.sh`·`tests/data/staged-helpers.tsv`가 고정).
+4.0.5 래퍼는 다른 quickshell/qs/hyprlock이 살아 있으면 exit 2로 회수를 보류한다.
+이 가드가 이전 충돌을 막고 크래시 후 고아 락을 복구하는지는
+[#20](https://github.com/stadia/cachy-omarchy-overlay/issues/20)에서 라이브 검증할 때까지 미확정이다.
 
 ---
 
