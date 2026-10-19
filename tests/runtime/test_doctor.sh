@@ -22,10 +22,11 @@ unset COO_IPC_TIMEOUT \
   TEST_DOCTOR_PROCESS TEST_DOCTOR_PING_FAIL TEST_DOCTOR_OFFICIAL_PRESENT \
   TEST_DOCTOR_WAYLAND_DISPLAY \
   COO_TEST_DOCTOR_PAM_LOCK_FILE
-mkdir -p "$prefix/upstream/shell" "$prefix/upstream/default/omarchy" "$compat" \
+mkdir -p "$prefix/upstream/shell" "$prefix/upstream/default/omarchy" "$prefix/upstream/default/hypr" "$compat" \
   "$root/usr/bin" "$root/usr/lib/systemd/user" "$hypr" "$config" "$user_config" "$state" "$fake_bin"
 printf '// fixture shell\n' >"$prefix/upstream/shell/shell.qml"
 printf '{}\n' >"$prefix/upstream/default/omarchy/omarchy-menu.jsonc"
+printf -- '-- fixture bootstrap\n' >"$prefix/upstream/default/hypr/bootstrap.lua"
 printf -- '-- no conflicting bindings\n' >"$hypr/hyprland.lua"
 os_release=$COO_TEST_SANDBOX/os-release
 printf 'ID=cachyos\n' >"$os_release"
@@ -178,9 +179,10 @@ rm -f "$root/usr/bin/omarchy-gone"
 
 empty_root=$COO_TEST_SANDBOX/empty-exposure
 empty_prefix=$empty_root/usr/share/cachy-omarchy
-mkdir -p "$empty_root/usr/bin" "$empty_prefix/upstream/shell" "$empty_prefix/upstream/default/omarchy"
+mkdir -p "$empty_root/usr/bin" "$empty_prefix/upstream/shell" "$empty_prefix/upstream/default/omarchy" "$empty_prefix/upstream/default/hypr"
 printf '// fixture shell\n' >"$empty_prefix/upstream/shell/shell.qml"
 printf '{}\n' >"$empty_prefix/upstream/default/omarchy/omarchy-menu.jsonc"
+printf -- '-- fixture bootstrap\n' >"$empty_prefix/upstream/default/hypr/bootstrap.lua"
 out_empty=$(PATH="$fake_bin:/usr/bin:/bin" WAYLAND_DISPLAY="${TEST_DOCTOR_WAYLAND_DISPLAY:-}" \
   OMARCHY_PATH="$empty_prefix/upstream" \
   COO_PACMAN_LOG="$pacman_log" COO_PREFIX_ROOT="$empty_prefix" COO_COMPAT_BIN="$compat" \
@@ -347,6 +349,12 @@ out=$(run_doctor); code=$?
 assert_eq "$code" 1 "missing shell.qml fails"
 assert_contains "$out" "FAIL: shell.qml" "missing shell.qml is explicit"
 printf '// fixture shell\n' >"$prefix/upstream/shell/shell.qml"
+
+rm -f "$prefix/upstream/default/hypr/bootstrap.lua"
+out=$(run_doctor); code=$?
+assert_eq "$code" 1 "missing toggles seam bootstrap fails"
+assert_contains "$out" "FAIL: toggles seam bootstrap missing" "missing bootstrap is explicit"
+printf -- '-- fixture bootstrap\n' >"$prefix/upstream/default/hypr/bootstrap.lua"
 
 printf 'hl.bind("SUPER + SPACE", hl.dsp.exec_cmd("something"))\n' >"$hypr/hyprland.lua"
 out=$(run_doctor); code=$?

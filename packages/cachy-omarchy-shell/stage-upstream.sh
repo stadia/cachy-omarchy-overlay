@@ -30,7 +30,8 @@ install -D -m644 "$src/default/systemd/user/omarchy-speaker-tuning.service" \
 # $OMARCHY_PATH/default/hypr/toggles/$FLAG.lua 를 사용자 hypr 설정으로 복사한다
 # (bin/omarchy-hyprland-toggle:18 FLAG_SOURCE). 정적 lua 조각 3개 —
 # flags.lua / single-window-aspect-ratio.lua / window-no-gaps.lua. default/hypr
-# 전체가 아니라 이 디렉터리만 올린다 (나머지 hypr 설정은 CachyOS 소유).
+# 전체가 아니라 이 디렉터리와 바로 아래 seam 모듈만 올린다 (나머지 hypr 설정은
+# CachyOS 소유).
 install -d "$dest/usr/share/cachy-omarchy/upstream/default/hypr"
 cp -a "$src/default/hypr/toggles" \
   "$dest/usr/share/cachy-omarchy/upstream/default/hypr/toggles"

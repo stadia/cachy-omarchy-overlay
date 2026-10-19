@@ -517,6 +517,29 @@ workspace-layouts}.lua` 를 스테이징한다(`stage-upstream.sh`) — 이 6개
 `tests/runtime/test_toggles_seam.sh` 가 패키지를 추출해 이 체인과 보안
 계약(레거시 파일 미실행, 이름의 코드 합성 없음)을 고정한다.
 
+알려진 한계와 운영 메모(PR #17 리뷰):
+
+- **격리는 Hyprland 동작에 기댄다.** 업스트림 `require_all` 은 `require` 를
+  순회할 뿐 격리가 없어, 순수 Lua 에서는 깨진 toggle 하나가 뒤의 toggle·
+  `disabled-name`·레이아웃을 멈춘다(끈 터치패드가 다시 켜질 수 있다).
+  Hyprland 0.56.2 의 `require` 가 에러를 보고만 하고 계속 진행한다는 실측에
+  기대며, `test_toggles_seam.sh` 가 그 가정을 Hyprland 식 `require` 래퍼로
+  하네스에 명시해 두 경우(래퍼 있음: 계속 로드 + 에러 기록, 없음: 중단하되
+  설정은 안 죽음)를 모두 고정한다. Hyprland 가 이 동작을 바꾸면 래퍼 가정을
+  다시 재야 한다.
+- **`XDG_STATE_HOME` 불일치(업스트림).** `toggles.lua` 는 `paths.state_home`
+  (`XDG_STATE_HOME`) 을 읽지만 writer(`omarchy-hyprland-monitor-clamshell` 등)는
+  `$HOME/.local/state` 에 고정해서 쓴다. 비기본값이면 toggle 이 읽히지 않는다 —
+  v0.11 sweep 은 `$HOME` 고정이라 이 경우가 없었다. 기본 세션
+  (`XDG_STATE_HOME=$HOME/.local/state`)에서는 무관하다.
+- **기존 사용자는 `cachy-omarchy-bindings --force` 전까지 옛 sweep 을 유지한다**
+  (`bindings.lua` 는 사용자 라이브 설정, SPEC §6.6). 깨지지는 않지만 레이아웃
+  복원은 적용되지 않는다.
+- **버전 결합.** 이 변경은 shell `4.0.4-7` 에서 들어오고 overlay 는
+  `cachy-omarchy-shell>=4.0.4-7` 를 요구한다. 그래도 어긋난 조합이 생기면
+  `cachy-omarchy-doctor` 가 `$OMARCHY_PATH/default/hypr/bootstrap.lua` 부재를
+  FAIL 로 알린다(pcall 이 삼켜 `configerrors` 에는 아무것도 안 뜨기 때문).
+
 ## §24 락 인지 셸 재시작 + reload/compat 위임 체인 (v0.12.0, 2026-08-23)
 
 `cachy-omarchy-shell --restart` 는 kill 전에 셸 자신에게 `qs ipc -n -p
