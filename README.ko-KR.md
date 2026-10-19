@@ -19,15 +19,15 @@ SUPER + K      →  Omarchy 스타일 키바인딩 뷰어
 
 | 패키지 | 버전 | 역할 |
 |---|---|---|
-| `cachy-omarchy-shell` | 4.0.4-5 | 핀된 Omarchy Quattro 셸 런타임 (Quickshell 트리, `omarchy-settings` 제외) |
-| `cachy-omarchy-overlay` | 1.0.2-2 | CachyOS 통합 계층 (래퍼 명령, Hyprland 바인딩, 기본값) |
+| `cachy-omarchy-shell` | 4.0.4-6 | 핀된 Omarchy Quattro 셸 런타임 (Quickshell 트리, `omarchy-settings` 제외) |
+| `cachy-omarchy-overlay` | 1.0.2-4 | CachyOS 통합 계층 (래퍼 명령, Hyprland 바인딩, 기본값) |
 
 업스트림 핀은 `upstream.lock`이 관리한다 (현재 `basecamp/omarchy @ v4.0.4`,
 `c668141`).
 
 설치되는 공개 명령 6개 (`/usr/bin`):
 
-- `cachy-omarchy-shell` — 셸 기동(`--run`)·IPC(`--ipc`)·수동 재기동(`--restart`)
+- `cachy-omarchy-shell` — 잠금 인지 수동 재기동(`--restart`); 기동은 업스트림 `omarchy-launch-shell`, IPC 는 업스트림 `omarchy-shell`
 - `cachy-omarchy-launcher` — 업스트림 `omarchy-menu toggle` 의 호환 별칭 (SUPER + SPACE 는 이제 그것을 직접 부른다)
 - `cachy-omarchy-bindings` — 사용자 Hyprland 설정에 관리 source 블록 주입/제거
 - `cachy-omarchy-init` — 최초 1회 사용자 설정 생성 (기존 파일 덮어쓰지 않음)
@@ -128,8 +128,15 @@ idle → screensaver → lock → wake 체인이 패키징돼 있다: idle 타�
 
 셸은 systemd 유닛이 아니라 **Hyprland autostart**로 뜬다 — 업스트림 omarchy와 같은
 모델이다. `bindings.lua`가 `hyprland.start` 이벤트(세션 시작 시 1회)에
-`cachy-omarchy-shell --run`을 실행한다. 크래시 시 자동 재기동은 없으며
-`cachy-omarchy-shell --restart`로 수동 복구한다.
+업스트림 `omarchy-launch-shell`을 실행한다. 이 감독자는 Qt가 죽으면 셸을 다시
+띄운다(분당 최대 5회). 수동 재시작은 `omarchy-restart-shell`이며 세션이 잠겨 있으면
+거부한다.
+
+**업그레이드:** 기존 `~/.config/cachy-omarchy/hypr/bindings.lua` 는 `--force` 없이는
+덮어쓰지 않는다. `cachy-omarchy-doctor` 가 SUPER+K 가 삭제된
+`cachy-omarchy-keybindings` 를 부른다고 알리거나, 폐기된 `cachy-omarchy-shell --run` 을
+아직 부른다고 알리면(경고와 함께 셸은 뜨지만 별칭은 제거될 예정이다)
+`cachy-omarchy-bindings --force` 를 실행한다.
 
 ## 빌드와 설치
 
@@ -159,7 +166,8 @@ rollback 대상은 `build/` 에 있는 바로 아래 버전이며, 한 번도 �
 빌드일 수 있다. 다시 실행하면 한 단계씩 더 내려간다. 원치 않는 버전은 `build/`
 에서 그 아티팩트를 지워 후보에서 뺀다. 두 패키지 중 하나라도 설치돼 있지 않으면
 rollback 전체가 실패한다. 끝난 뒤에는 `cachy-omarchy-shell --restart` 로 셸을
-다시 시작한다.
+다시 시작한다. `omarchy-launch-shell` 채택(셸 4.0.4-6) 이전 버전으로 되돌렸다면
+`cachy-omarchy-bindings --force` 를 다시 실행해 bindings 사본을 옛 패키지에 맞춘다.
 
 0.x 빌드는 모든 아티팩트를 `~/.local/state/cachy-omarchy/`
 (`validated-builds/`, `packages/`, `*.manifest`)에도 복사했다. 이제 그

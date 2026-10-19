@@ -9,7 +9,6 @@ REPO_ROOT="${REPO_ROOT:?}"
 source "$REPO_ROOT/tests/lib/assert.sh"
 source "$REPO_ROOT/lib/runtime.sh"
 
-W="$REPO_ROOT/overlay/bin/cachy-omarchy-shell"
 
 marker=$COO_TEST_SANDBOX/r06.marker
 : >"$COO_TEST_SANDBOX/r06.probe.sh"
@@ -54,6 +53,9 @@ Categories=Utility;
 EOF
 
 export COO_OMARCHY_PATH="$root"
+LAUNCH="$COO_OMARCHY_PATH/bin/omarchy-launch-shell"
+IPC="$COO_OMARCHY_PATH/bin/omarchy-shell"
+export OMARCHY_PATH="$COO_OMARCHY_PATH"
 export OMARCHY_PATH="$root"
 # 실제 설치에서는 /usr/bin/omarchy-* 심링크가 helper 를 공급한다. 추출 트리에는
 # 그 심링크가 있지만 /usr/bin 에 설치되지 않았으므로, 호출자 PATH 로 같은
@@ -72,11 +74,11 @@ test_shell_pid() {
   return 1
 }
 
-"$W" --run >/dev/null 2>&1 &
+"$LAUNCH" >/dev/null 2>&1 &
 wrapper_pid=$!
 
 cleanup() {
-  "$W" --ipc shell hide omarchy.menu >/dev/null 2>&1 || true
+  "$IPC" shell hide omarchy.menu >/dev/null 2>&1 || true
   [[ -n ${wrapper_pid:-} ]] || return 0
   local pid=$wrapper_pid
   wrapper_pid=""
@@ -97,7 +99,7 @@ trap 'cleanup; exit 143' TERM
 
 reply=""
 for _ in $(seq 1 40); do
-  reply=$("$W" --ipc shell ping 2>/dev/null) && [[ -n $reply ]] && break
+  reply=$("$IPC" shell ping 2>/dev/null) && [[ -n $reply ]] && break
   kill -0 "$wrapper_pid" 2>/dev/null || break
   sleep 0.25
 done
@@ -118,7 +120,7 @@ menu_layers() {
     || echo '[]'
 }
 
-"$W" --ipc shell summon omarchy.menu '{"menu":"apps"}' >/dev/null
+"$IPC" shell summon omarchy.menu '{"menu":"apps"}' >/dev/null
 menu_mapped=1
 for _ in $(seq 1 40); do
   [[ $(jq -r 'length' <<<"$(menu_layers)") -gt 0 ]] && { menu_mapped=0; break; }
@@ -142,7 +144,7 @@ done
 assert_eq "$launched" "0" "R06 dummy 앱이 마커를 남겼다"
 [[ -f $marker ]] && assert_eq "$(cat "$marker")" "launched" "R06 마커 내용"
 
-"$W" --ipc shell hide omarchy.menu >/dev/null 2>&1 || true
+"$IPC" shell hide omarchy.menu >/dev/null 2>&1 || true
 sleep 0.2
 remaining=$(jq -r 'length' <<<"$(menu_layers)")
 assert_eq "$remaining" "0" "종료 전 omarchy-menu 가 닫혔다"

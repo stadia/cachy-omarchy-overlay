@@ -22,9 +22,10 @@ BIN="$root/usr/bin"
 export COO_PREFIX_ROOT="$root/usr/share/cachy-omarchy"
 export COO_COMPAT_BIN="$root/usr/lib/cachy-omarchy/compat/bin"
 
-# 1) 셸 래퍼가 추출 트리에서 업스트림을 찾는다.
-assert_eq "$("$BIN/cachy-omarchy-shell" --path)" \
-  "$COO_PREFIX_ROOT/upstream" "--path 가 설치 트리를 가리킨다"
+# 1) 업스트림 기동/IPC 명령이 설치 트리의 verbatim 파일로 해석된다.
+for c in omarchy-launch-shell omarchy-shell; do
+  assert_eq "$(readlink -f "$BIN/$c")" "$COO_PREFIX_ROOT/upstream/bin/$c" "$c 가 설치 트리의 업스트림 파일을 가리킨다"
+done
 assert_file_exists "$COO_PREFIX_ROOT/upstream/shell/shell.qml" "업스트림 셸 트리 존재"
 
 # 2) 기본 shell.json 은 셸 패키지의 업스트림 트리 한 곳에만 있다.

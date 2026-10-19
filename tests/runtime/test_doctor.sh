@@ -41,14 +41,7 @@ mkdir -p "$root/usr/share/cachy-omarchy/upstream/bin"
 printf '#!/usr/bin/env bash\nexit 0\n' >"$root/usr/share/cachy-omarchy/upstream/bin/omarchy-menu-keybindings"
 chmod +x "$root/usr/share/cachy-omarchy/upstream/bin/omarchy-menu-keybindings"
 ln -s ../share/cachy-omarchy/upstream/bin/omarchy-menu-keybindings "$root/usr/bin/omarchy-menu-keybindings"
-cat >"$root/usr/bin/cachy-omarchy-shell" <<'EOF'
-#!/usr/bin/env bash
-if [[ ${1:-} == --ipc && ${2:-} == shell && ${3:-} == ping ]]; then
-  [[ ${TEST_DOCTOR_PING_FAIL:-0} == 1 ]] && exit 1
-  printf 'ok\n'
-fi
-exit 0
-EOF
+printf '#!/usr/bin/env bash\nexit 0\n' >"$root/usr/bin/cachy-omarchy-shell"
 chmod +x "$root/usr/bin/cachy-omarchy-shell"
 cat >"$fake_bin/pgrep" <<'EOF'
 #!/usr/bin/env bash
@@ -93,9 +86,19 @@ esac
 EOF
 for cmd in hyprctl quickshell; do printf '#!/usr/bin/env bash\nexit 0\n' >"$fake_bin/$cmd"; done
 chmod +x "$fake_bin/pgrep" "$fake_bin/qs" "$fake_bin/pacman" "$fake_bin/hyprctl" "$fake_bin/quickshell"
-printf '#!/usr/bin/env bash\nexit 0\n' >"$compat/omarchy-shell"
-chmod +x "$compat/omarchy-shell"
 mkdir -p "$prefix/upstream/bin"
+cat >"$prefix/upstream/bin/omarchy-shell" <<'EOF'
+#!/usr/bin/env bash
+if [[ ${1:-} == shell && ${2:-} == ping ]]; then
+  [[ ${TEST_DOCTOR_PING_FAIL:-0} == 1 ]] && exit 1
+  printf 'ok\n'
+fi
+exit 0
+EOF
+chmod +x "$prefix/upstream/bin/omarchy-shell"
+printf '#!/usr/bin/env bash\nexit 0\n' >"$prefix/upstream/bin/omarchy-launch-shell"
+chmod +x "$prefix/upstream/bin/omarchy-launch-shell"
+ln -s ../share/cachy-omarchy/upstream/bin/omarchy-launch-shell "$root/usr/bin/omarchy-launch-shell"
 printf '#!/usr/bin/env bash\nexit 0\n' >"$prefix/upstream/bin/omarchy-theme-set"
 chmod +x "$prefix/upstream/bin/omarchy-theme-set"
 ln -s ../share/cachy-omarchy/upstream/bin/omarchy-theme-set "$root/usr/bin/omarchy-theme-set"
@@ -103,7 +106,7 @@ ln -s ../share/cachy-omarchy/upstream/bin/omarchy-theme-set "$root/usr/bin/omarc
 printf '#!/usr/bin/env bash\nexit 0\n' >"$prefix/upstream/bin/omarchy-menu"
 chmod +x "$prefix/upstream/bin/omarchy-menu"
 ln -s ../share/cachy-omarchy/upstream/bin/omarchy-menu "$root/usr/bin/omarchy-menu"
-ln -s ../lib/cachy-omarchy/compat/bin/omarchy-shell "$root/usr/bin/omarchy-shell"
+ln -s ../share/cachy-omarchy/upstream/bin/omarchy-shell "$root/usr/bin/omarchy-shell"
 
 pacman_log=$COO_TEST_SANDBOX/pacman.log
 run_doctor() {
@@ -246,6 +249,15 @@ assert_contains "$out" "FAIL: shell autostart missing from $config/hypr/bindings
 printf 'hl.on("hyprland.start", function() end)\n' >>"$config/hypr/bindings.lua"
 out=$(run_doctor); code=$?
 assert_contains "$out" "PASS: shell autostart declared (bindings.lua)" "hyprland.start 가 있으면 통과한다"
+# 폐기된 `cachy-omarchy-shell --run` 사본은 WARN(별칭이 셸을 띄운다). 새 autostart 는 조용하다.
+printf 'hl.on("hyprland.start", function() hl.exec_cmd("cachy-omarchy-shell --run") end)\n' >"$config/hypr/bindings.lua"
+out=$(run_doctor); code=$?
+assert_contains "$out" "WARN: shell autostart still runs the deprecated cachy-omarchy-shell --run" "옛 --run 사본을 WARN 으로 알린다"
+assert_eq "$code" "0" "옛 --run 사본은 doctor 를 실패시키지 않는다"
+printf 'hl.on("hyprland.start", function() hl.exec_cmd("omarchy-launch-shell") end)\n' >"$config/hypr/bindings.lua"
+out=$(run_doctor); code=$?
+[[ $out == *"deprecated cachy-omarchy-shell --run"* ]] && w=1 || w=0
+assert_eq "$w" "0" "omarchy-launch-shell autostart 는 경고하지 않는다"
 rm -f "$config/hypr/bindings.lua"
 mv "$hypr/hyprland.lua.bak" "$hypr/hyprland.lua"
 

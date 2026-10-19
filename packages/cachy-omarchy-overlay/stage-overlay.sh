@@ -14,7 +14,7 @@ done
 # uwsm-app 은 여기에 없다: /usr/bin/uwsm-app 은 uwsm 패키지 소유이고,
 # cachy-omarchy-shell 이 uwsm 을 depends 로 끌어온다.
 install -d "$dest/usr/lib/cachy-omarchy/compat/bin"
-for c in omarchy-shell omarchy-update-available \
+for c in omarchy-update-available \
          omarchy-theme-set-browser omarchy-theme-set-keyboard \
          omarchy-restart-shell; do
   install -D -m755 "$src/compat/bin/$c" "$dest/usr/lib/cachy-omarchy/compat/bin/$c"

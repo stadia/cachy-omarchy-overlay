@@ -5,7 +5,6 @@ set -uo pipefail
 REPO_ROOT="${REPO_ROOT:?}"
 source "$REPO_ROOT/tests/lib/assert.sh"
 
-SHIM="$REPO_ROOT/overlay/compat/bin/omarchy-shell"
 STAGE="$REPO_ROOT/packages/cachy-omarchy-shell/stage-upstream.sh"
 PATCH="$REPO_ROOT/packages/cachy-omarchy-shell/0003-adapt-menu-keybindings-to-cachy-hyprland.patch"
 
@@ -42,17 +41,6 @@ assert_file_exists "$root/bin/omarchy-cmd-present" "스테이징: omarchy-cmd-pr
 assert_file_exists "$root/bin/omarchy-menu-keybindings" "스테이징: omarchy-menu-keybindings"
 [[ -e $root/bin/omarchy-theme-install ]] && s=1 || s=0
 assert_eq "$s" "1" "스테이징: omarchy-theme-install 는 0.8.0 에서 회수돼 올라간다"
-
-fake_shell="$COO_TEST_SANDBOX/fake-cachy-omarchy-shell"
-fake_log="$COO_TEST_SANDBOX/fake-shell.args"
-cat >"$fake_shell" <<'FAKE'
-#!/usr/bin/env bash
-: "${COO_FAKE_SHELL_LOG:?}"
-printf '%s\n' "$@" >"$COO_FAKE_SHELL_LOG"
-printf '%s\n' "${COO_FAKE_SHELL_MESSAGE:-fake shell failure}" >&2
-exit "${COO_FAKE_SHELL_STATUS:-1}"
-FAKE
-chmod +x "$fake_shell"
 
 # --- 데이터 수집 적응 (hermetic: hyprctl stub + fixture lua) -----------------
 [[ ${HOME:-} == "${COO_TEST_SANDBOX:?}" ]] || {
@@ -185,27 +173,5 @@ out=$(PATH="$stubbin:$root/bin:$nolua" XDG_CACHE_HOME="$COO_TEST_SANDBOX/cache-n
   "$nolua/bash" "$K" --print 2>&1); code=$?
 assert_eq "$code" "1" "lua 가 없으면 --print 는 exit 1 (빈 시트 exit 0 이 아니다)"
 assert_contains "$out" "lua is not installed" "lua 부재 사유가 stderr 로 나온다"
-
-# --- compat omarchy-shell shim: 실행 인자/오류 모드를 실제로 검증 ------------
-assert_file_exists "$SHIM" "compat omarchy-shell 존재"
-[[ -x $SHIM ]] && x=0 || x=1
-assert_eq "$x" "0" "compat omarchy-shell 실행 가능"
-
-: >"$fake_log"
-out=$(COO_SHELL_BIN="$fake_shell" COO_FAKE_SHELL_LOG="$fake_log" "$SHIM" shell summon omarchy.menu 2>&1); code=$?
-assert_eq "$code" "1" "shim 일반 3인자 실패는 전파한다"
-assert_contains "$out" "fake shell failure" "shim 일반 실패는 출력도 전파한다"
-assert_eq "$(cat "$fake_log")" $'--ipc\nshell\nsummon\nomarchy.menu\n{}' "shim 3인자 summon 은 {} 를 정확히 한 번 붙인다"
-
-: >"$fake_log"
-out=$(COO_SHELL_BIN="$fake_shell" COO_FAKE_SHELL_LOG="$fake_log" "$SHIM" shell summon omarchy.menu '{"mode":"select"}' 2>&1); code=$?
-assert_eq "$code" "1" "shim payload summon 실패는 전파한다"
-assert_eq "$(cat "$fake_log")" $'--ipc\nshell\nsummon\nomarchy.menu\n{"mode":"select"}' "shim payload summon 은 {} 를 추가하지 않는다"
-
-: >"$fake_log"
-out=$(COO_SHELL_BIN="$fake_shell" COO_FAKE_SHELL_LOG="$fake_log" "$SHIM" -q shell toggle omarchy.menu 2>&1); code=$?
-assert_eq "$code" "0" "shim -q 는 실패해도 exit 0"
-assert_eq "$out" "" "shim -q 는 failing helper 출력을 숨긴다"
-assert_eq "$(cat "$fake_log")" $'--ipc\nshell\ntoggle\nomarchy.menu\n{}' "shim -q toggle 도 {} 를 한 번 붙인다"
 
 exit "$ASSERT_FAILURES"

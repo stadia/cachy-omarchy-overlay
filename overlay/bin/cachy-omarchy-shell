@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
-# 패키징된 Omarchy Quattro 셸을 CachyOS 에서 기동하고 IPC 를 전달한다.
-#
-# 기동/IPC 명령은 핀된 업스트림 bin/omarchy-launch-shell 및 bin/omarchy-shell
-# (basecamp/omarchy @ f0020448ca87329199de7cb12f2015ebc4a3e5e7, MIT) 의 동작을
-# 그대로 따른다. 새 Quickshell 호스트를 만들지 않는다 (SPEC 55, 70).
+# 락 인지 셸 재시작. 기동과 IPC 는 업스트림 omarchy-launch-shell / omarchy-shell
+# 이 맡는다(basecamp/omarchy @ 핀, MIT) — 이 명령은 업스트림 omarchy-restart-shell
+# 이 의존하는 미스테이징 omarchy-hyprland-session-locked 가 없는 자리를 메운다.
 set -uo pipefail
 
 PREFIX_ROOT=${COO_PREFIX_ROOT:-/usr/share/cachy-omarchy}
@@ -12,151 +10,117 @@ export OMARCHY_PATH
 
 fail() { printf 'error: %s\n' "$1" >&2; exit 1; }
 
-# qs ipc 가 stdout 에 실어 exit 0 으로 돌려주는 IPC-레벨 오류 문자열들(§11).
-# cmd_ipc 와 cmd_restart 의 락 조회가 이 어휘를 공유한다 — 중복 정의 금지.
-is_ipc_error_output() {
-  case $1 in
-    "Target not found."|"Function not found."|"Too few arguments provided"*|"Too many arguments provided"*)
-      return 0 ;;
-    *) return 1 ;;
-  esac
-}
-
 usage() {
   cat <<'USAGE'
-사용법: cachy-omarchy-shell <명령>
+사용법: cachy-omarchy-shell --restart
 
-명령:
-  --run                       Quickshell 을 포그라운드로 기동한다 (Hyprland autostart 용).
-  --ipc <target> <method> ..  실행 중인 셸에 IPC 호출을 전달한다.
-  --path                      해석된 OMARCHY_PATH 를 출력한다.
-  --restart                   실행 중 셸을 kill 하고 새 인스턴스를 detached 로 띄운다.
-  --help                      이 도움말.
+  --restart   세션이 잠겨 있지 않을 때만 실행 중 셸을 정상 종료시키고 업스트림
+              omarchy-launch-shell 로 다시 띄운다. 락 상태를 알 수 없으면
+              (기동 중·무응답 포함) 거부한다.
+  --help      이 도움말.
+
+기동은 omarchy-launch-shell, IPC 는 omarchy-shell 을 직접 쓴다.
 
 환경:
   COO_OMARCHY_PATH   업스트림 루트 override (기본: /usr/share/cachy-omarchy/upstream)
-  COO_IPC_TIMEOUT    IPC 호출당 타임아웃 (기본 2s)
+  COO_IPC_TIMEOUT    락 조회 IPC 타임아웃 (기본 2s)
 USAGE
 }
 
-require_tree() {
+cmd_restart() {
   [[ -f $OMARCHY_PATH/shell/shell.qml ]] \
     || fail "셸 트리를 찾을 수 없다: $OMARCHY_PATH/shell/shell.qml"
-}
-
-cmd_run() {
-  require_tree
-  # 수동 --run 이중 기동 방지(autostart 는 hyprland.start 1회라 무관하지만 수동
-  # 실행 보호). 정밀 매칭: 실제 quickshell 실행 cmdline 을 잡고, qs ipc 프로세스
-  # (qs ipc -n -p <경로> call)는 false positive 안 남(#5).
-  if pgrep -f "quickshell -n -p $OMARCHY_PATH/shell" >/dev/null 2>&1; then
-    exit 0
-  fi
-  # PATH 는 건드리지 않는다 (SPEC §45). 위젯이 bare name 으로 부르는 helper 는
-  # /usr/bin/omarchy-* 심링크로 노출되고, compat 적응 카피도 같은 방식이다.
-
-  # Qt 를 wayland 에 고정(방어적 — xcb 폴백 차단). Hyprland autostart(hyprland.start)
-  # 로 기동하면 WAYLAND_DISPLAY 가 컴포저터 env 로 항상 정상이라 socket-wait 는
-  # 불필요해 제거됐다. 세션 터미널 전제(SPEC §16).
-  export QT_QPA_PLATFORM=wayland
-
-  # 파일 워처를 끄는 것은 필수다. pacman 이 $OMARCHY_PATH/shell 을 다시 쓰는
-  # 도중 리로드가 걸리면 반쯤 쓰인 트리를 읽고, 실패한 리로드가 두 번째 엔진
-  # 세대를 남겨 다음 재시작의 IPC kill 을 크래시로 만든다.
-  exec env QS_DISABLE_FILE_WATCHER=1 QS_NO_RELOAD_POPUP=1 \
-    systemd-cat -t cachy-omarchy-shell -- \
-    quickshell -n -p "$OMARCHY_PATH/shell"
-}
-
-cmd_ipc() {
-  require_tree
-  (( $# >= 2 )) || fail "사용법: cachy-omarchy-shell --ipc <target> <method> [args...]"
-
-  local timeout_v=${COO_IPC_TIMEOUT:-2s} output status
-  output=$(timeout --kill-after=1s "$timeout_v" \
-    qs ipc -n -p "$OMARCHY_PATH/shell" call -- "$@" 2>/dev/null)
-  status=$?
-
-  (( status == 124 || status == 137 )) && fail "셸이 응답하지 않는다"
-  (( status != 0 )) && fail "셸이 실행 중이 아니다"
-
-  # IPC 레벨 오류는 stdout 에 실려 exit 0 으로 온다. 그대로 통과시키면
-  # 실패가 성공처럼 보인다.
-  is_ipc_error_output "$output" && fail "$output"
-  # 기동 중인 셸도 stdout + exit 0 으로 답한다 — ping 이 성공으로 읽히면
-  # 안 된다. 업스트림 bin/omarchy-shell 과 같은 판정. (--restart 의 락 조회는
-  # 이 응답을 JSON 파싱 실패로 보고 이미 안전하게 거부한다.)
-  [[ $output == "Not ready to accept queries yet"* ]] && fail "셸이 아직 준비되지 않았다 (not ready)"
-
-  [[ -n $output ]] && printf '%s\n' "$output"
-  return 0
-}
-
-cmd_restart() {
-  require_tree
 
   # 세션이 잠긴 동안 재시작하면 화면 잠금 클라이언트(hyprlock)가 함께 죽어
   # 세션이 Hyprland failsafe 뒤에 갇힌다(RUNTIME_STARTUP §22.4). 고아 락을
   # 판별해 재획득까지 시도하는 업스트림 omarchy-hyprland-session-locked 경로는
   # 범위 밖(closure-exceptions.tsv 의 blocked 행) — 우리는 거부만 한다.
   #
-  # 셸이 IPC 에 전혀 응답하지 않거나(실행 중이 아님/타임아웃), 응답은 왔지만
-  # IPC 레벨 오류(대상 없음 등 — lock 플러그인이 아직 로드되지 않았거나
-  # 애초에 빠졌다는 뜻)면 보존할 락도 없으므로 그대로 진행한다. 반대로
-  # 응답은 왔는데 스키마가 온전한 "잠기지 않음"이 아니면(JSON 파싱 실패,
-  # jq 부재, 필수 키 누락 등) 안전한 쪽으로 거부한다: 잘못 진행하면
-  # hyprlock 을 죽여 세션이 갇히는 중대 사고이고, 잘못 거부하면 재시작
-  # 한 번을 손해 보는 경미한 사고이기 때문이다. 정리하면: **스키마가
-  # 온전한 "unlocked" 응답만 진행, 락 서비스 부재도 진행, 그 외 전부 거부.**
+  # 잘못 진행하면 hyprlock 을 죽여 세션이 갇히는 중대 사고이고, 잘못 거부하면
+  # 재시작 한 번을 손해 보는 경미한 사고이기 때문에 **허용 목록**으로 판정한다:
+  # 스키마가 온전한 "unlocked" 응답, 그리고 보존할 락이 확실히 없는 두 경우
+  # (셸 미실행 = "is not running", lock 플러그인 부재 = "Target not found.")만
+  # 진행하고, 그 밖의 전부(무응답·기동 중·알 수 없는 오류·명령 부재)는 거부한다.
   #
-  # 셸 자신이 이미 판정한 값(lock/Service.qml 의 `locked` 프로퍼티, 정확히
-  # lockRequested||sessionLock.locked||sessionLock.secure)을 status() 가
-  # `.locked` 로 그대로 노출하므로 이를 우선 사용한다 — 클라이언트에서
-  # `.secure`/`.requested` 두 항만 재조합하는 것보다 강한 판정이다.
-  local lock_out lock_status locking
-  lock_out=$(timeout --kill-after=1s "${COO_IPC_TIMEOUT:-2s}" \
-    qs ipc -n -p "$OMARCHY_PATH/shell" call -- lock status 2>/dev/null)
+  # 판정은 셸 자신이 계산한 `locked` 에 secure/requested 를 OR 한 값이다.
+  local lock_out lock_err lock_status locking err_file
+  err_file=$(mktemp) || fail "임시 파일을 만들 수 없다"
+  trap 'rm -f "$err_file"' RETURN
+  lock_out=$(OMARCHY_SHELL_IPC_TIMEOUT=${COO_IPC_TIMEOUT:-2s} \
+    omarchy-shell lock status 2>"$err_file")
   lock_status=$?
-  if (( lock_status == 0 )) && ! is_ipc_error_output "$lock_out"; then
+  lock_err=$(<"$err_file")
+  if (( lock_status == 0 )); then
     locking=$(printf '%s' "$lock_out" \
       | jq -r 'if (has("locked") and has("secure") and has("requested"))
                 then (.locked or .secure or .requested) else "unknown" end' 2>/dev/null)
     [[ $locking == "false" ]] \
       || fail "Refusing to restart the shell while the session is locked."
+  else
+    case $lock_err in
+      *"is not running"*|*"Target not found."*) ;;
+      *) fail "Refusing to restart the shell: lock state unknown (${lock_err:-omarchy-shell exited $lock_status})." ;;
+    esac
   fi
 
-  # 정밀 매칭: qs ipc 프로세스(qs ipc -n -p <경로> call)는 cmdline 에
-  # "quickshell -n -p <경로>" 가 없으므로 false positive 안 남(#5).
-  # 이 패턴은 systemd-cat 부모(systemd-cat -t cachy-omarchy-shell -- quickshell -n -p <경로>)
-  # 도 의도적으로 같이 잡아 --restart 가 부모·자식 모두를 죽이게 한다(버그 아님).
-  local pat="quickshell -n -p $OMARCHY_PATH/shell"
-  local pids n=0
-  pids=$(pgrep -f "$pat" 2>/dev/null || true)
-  if [[ -n $pids ]]; then
-    kill -TERM $pids 2>/dev/null || true
-    while pgrep -f "$pat" >/dev/null 2>&1 && (( n < 30 )); do
-      sleep 0.1; n=$((n + 1))
-    done
-    pids=$(pgrep -f "$pat" 2>/dev/null || true)
-    [[ -n $pids ]] && kill -KILL $pids 2>/dev/null || true
+  # 새 셸은 Hyprland 에서 띄워 정식 세션 환경을 상속시킨다. SSH/TTY 에서 불린
+  # 경우를 위해 업스트림 omarchy-restart-shell 처럼 인스턴스 서명을 복구하고,
+  # 셸을 죽이기 전에 Hyprland 에 닿는지 확인한다 — 죽인 뒤에야 재기동 불가를
+  # 알면 세션이 셸 없이 남는다.
+  if [[ -z ${HYPRLAND_INSTANCE_SIGNATURE:-} ]]; then
+    local hypr_dir
+    hypr_dir=$(find "${XDG_RUNTIME_DIR:-/run/user/$UID}/hypr" -mindepth 1 -maxdepth 1 -type d \
+      -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -n 1 | cut -d' ' -f2-)
+    [[ -n $hypr_dir ]] && export HYPRLAND_INSTANCE_SIGNATURE=${hypr_dir##*/}
   fi
-  # KILL/TERM 후 pgrep 에서 완전히 사라질 때까지 잠깐 대기 — cmd_run 멱등 가드가
-  # 죽어가는 프로세스를 보고 no-op 하는 reap race 방지.
-  n=0
-  while pgrep -f "$pat" >/dev/null 2>&1 && (( n < 10 )); do
-    sleep 0.05; n=$((n + 1))
+  local hypr_err
+  hypr_err=$(hyprctl -j monitors 2>&1 >/dev/null) \
+    || fail "Hyprland 에 닿지 못해 재시작하지 않는다: ${hypr_err:-hyprctl failed}"
+
+  # 업스트림 감독자(omarchy-launch-shell)는 비정상 종료면 재기동한다. TERM 으로
+  # 죽이면 감독자가 새로 띄우고 우리도 새로 띄워 셸이 이중 기동하므로, 업스트림
+  # omarchy-restart-shell 처럼 quickshell kill(정상 종료)로 멈춘다. 한 번의 kill
+  # 은 인스턴스 하나만 멈추므로 더 없을 때까지 반복한다.
+  local n=0
+  while (( n < 10 )) && timeout 5 quickshell kill -p "$OMARCHY_PATH/shell" --any-display >/dev/null 2>&1; do
+    n=$((n + 1))
   done
-  # cmd_run 을 재사용(자체 멱등 가드·Qt 핀·file-watcher off·systemd-cat 로깅).
-  # detached 로 띄워 명령이 반환하게 한다.
-  setsid "$0" --run </dev/null >/dev/null 2>&1 &
-  disown 2>/dev/null || true
+
+  # kill 이 돌아온 직후에도 죽어가는 인스턴스가 남아 있을 수 있다(IPC 종료 뒤
+  # 엔진 정리 중). 이때 새로 띄우면 "already running" 으로 exit 0 하고 감독자가
+  # 그것을 의도된 정지로 읽어 셸이 영영 안 뜬다. 끝내 안 사라지면 옛 인스턴스가
+  # ping 에 답해 거짓 성공이 되므로 여기서 실패한다.
+  n=0
+  while (( n < 50 )) && pgrep -f "quickshell -n -p $OMARCHY_PATH/shell" >/dev/null 2>&1; do
+    sleep 0.1; n=$((n + 1))
+  done
+  pgrep -f "quickshell -n -p $OMARCHY_PATH/shell" >/dev/null 2>&1 \
+    && fail "이전 셸이 종료되지 않았다 — 새로 띄우지 않는다."
+
+  hypr_err=$(hyprctl dispatch 'hl.dsp.exec_cmd("omarchy-launch-shell")' 2>&1 >/dev/null) \
+    || fail "Hyprland 에 omarchy-launch-shell 기동을 요청하지 못했다: ${hypr_err:-hyprctl failed}"
+
+  local attempt
+  for (( attempt = 0; attempt < 50; attempt++ )); do
+    if OMARCHY_SHELL_IPC_TIMEOUT=0.5s omarchy-shell shell ping >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 0.1
+  done
+  fail "Omarchy shell did not become ready after restart."
 }
 
 case ${1:-} in
-  --run)     shift; cmd_run "$@" ;;
   --restart) shift; cmd_restart "$@" ;;
-  --ipc)     shift; cmd_ipc "$@" ;;
-  --path)    printf '%s\n' "$OMARCHY_PATH" ;;
+  --run)
+    # 업그레이드해도 라이브 bindings.lua 사본은 --force 없이 갱신되지 않아 옛 사본이
+    # 계속 --run 을 부른다. exec_cmd 는 실패를 알리지 않으므로 여기서 죽으면 로그인
+    # 후 셸이 조용히 사라진다 — 경고만 남기고 업스트림 감독자로 넘긴다.
+    printf 'warning: cachy-omarchy-shell --run 은 폐기됐다 — 사본을 갱신하라: cachy-omarchy-bindings --force\n' >&2
+    exec omarchy-launch-shell ;;
+  --ipc|--path)
+    printf 'error: cachy-omarchy-shell %s 는 삭제됐다 — IPC 는 omarchy-shell 을 쓴다.\n' "$1" >&2
+    exit 1 ;;
   --help|"") usage ;;
   *) printf 'error: 알 수 없는 인자: %s\n' "$1" >&2; usage >&2; exit 1 ;;
 esac

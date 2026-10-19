@@ -5,6 +5,7 @@ set -uo pipefail
 REPO_ROOT="${REPO_ROOT:?}"
 source "$REPO_ROOT/tests/lib/assert.sh"
 source "$REPO_ROOT/lib/runtime.sh"
+source "$REPO_ROOT/tests/lib/qml_errors.sh"
 
 # 옵트인 게이트가 먼저다 — 기본 실행은 허용된 사유 하나로만 skip 한다.
 [[ ${COO_RUN_LIVE:-0} == 1 ]] || { echo "skip: 라이브 키 주입 (COO_RUN_LIVE=1 필요)"; exit 0; }
@@ -34,10 +35,10 @@ mkdir -p "$HOME/.local/state/omarchy/toggles"
 : > "$HOME/.local/state/omarchy/toggles/bar-off"
 
 K="$root/bin/omarchy-menu-keybindings"
-W="$REPO_ROOT/overlay/bin/cachy-omarchy-shell"
 export COO_OMARCHY_PATH="$root"
-export COO_COMPAT_BIN="$REPO_ROOT/overlay/compat/bin"
-export COO_SHELL_BIN="$W"
+LAUNCH="$COO_OMARCHY_PATH/bin/omarchy-launch-shell"
+IPC="$COO_OMARCHY_PATH/bin/omarchy-shell"
+export OMARCHY_PATH="$COO_OMARCHY_PATH"
 export OMARCHY_PATH="$root"
 
 # This milestone adds no QML viewer. The only task diff must remain shell test code.
@@ -98,7 +99,7 @@ stop_pid() {
 shell_pid=""
 helper_pid=""
 cleanup() {
-  "$W" --ipc shell hide omarchy.menu >/dev/null 2>&1 || true
+  "$IPC" shell hide omarchy.menu >/dev/null 2>&1 || true
   stop_pid "${helper_pid:-}"
   helper_pid=""
   stop_pid "${shell_pid:-}"
@@ -108,12 +109,12 @@ trap cleanup EXIT
 trap 'cleanup; exit 130' INT
 trap 'cleanup; exit 143' TERM
 
-"$W" --run >/dev/null 2>&1 &
+"$LAUNCH" >/dev/null 2>&1 &
 shell_pid=$!
 
 reply=""
 for _ in $(seq 1 40); do
-  reply=$("$W" --ipc shell ping 2>/dev/null) && [[ -n $reply ]] && break
+  reply=$("$IPC" shell ping 2>/dev/null) && [[ -n $reply ]] && break
   kill -0 "$shell_pid" 2>/dev/null || break
   sleep 0.25
 done
@@ -168,14 +169,15 @@ printf '      FINDING: helper cancellation exit = %s\n' "$helper_code"
 cleanup
 sleep 0.5
 if [[ -n $cursor ]]; then
-  journalctl --user --after-cursor "$cursor" -t cachy-omarchy-shell --no-pager -o cat > "$journal_log" 2>/dev/null
+  journalctl --user --after-cursor "$cursor" -t omarchy-shell --no-pager -o cat > "$journal_log" 2>/dev/null
 else
-  journalctl --user --since "$since" -t cachy-omarchy-shell --no-pager -o cat > "$journal_log" 2>/dev/null
+  journalctl --user --since "$since" -t omarchy-shell --no-pager -o cat > "$journal_log" 2>/dev/null
 fi
 [[ -f $journal_log ]] || : > "$journal_log"
 assert_eq "$(grep -c "Configuration Loaded" "$journal_log")" "1" "기동 로그를 저널에서 수집했다"
-errs=$(grep -ciE "ReferenceError|TypeError|is not a type|Cannot assign|unavailable" "$journal_log")
+errs=$(coo_count_qml_errors "$journal_log")
 assert_eq "$errs" "0" "키바인드 UI 경로에 QML 오류 없음"
+coo_report_known_qml_burst "$journal_log"
 fatal=$(grep -cE "ERROR" "$journal_log")
 assert_eq "$fatal" "0" "키바인드 UI 경로에 ERROR 레벨 없음"
 

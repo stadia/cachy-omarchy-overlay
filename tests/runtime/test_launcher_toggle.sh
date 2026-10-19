@@ -5,6 +5,7 @@ set -uo pipefail
 REPO_ROOT="${REPO_ROOT:?}"
 source "$REPO_ROOT/tests/lib/assert.sh"
 source "$REPO_ROOT/lib/runtime.sh"
+source "$REPO_ROOT/tests/lib/qml_errors.sh"
 
 # 옵트인 게이트가 먼저다 — 기본 실행은 허용된 사유 하나로만 skip 한다.
 [[ ${COO_RUN_LIVE:-0} == 1 ]] || { echo "skip: 라이브 키 주입 (COO_RUN_LIVE=1 필요)"; exit 0; }
@@ -26,16 +27,17 @@ root=$(coo_upstream_root "$dest")
 mkdir -p "$HOME/.local/state/omarchy/toggles"
 : > "$HOME/.local/state/omarchy/toggles/bar-off"
 
-COMPAT="$REPO_ROOT/overlay/compat/bin"
-W="$REPO_ROOT/overlay/bin/cachy-omarchy-shell"
 export COO_OMARCHY_PATH="$root"
+LAUNCH="$COO_OMARCHY_PATH/bin/omarchy-launch-shell"
+IPC="$COO_OMARCHY_PATH/bin/omarchy-shell"
+export OMARCHY_PATH="$COO_OMARCHY_PATH"
 export OMARCHY_PATH="$root"
 
 journal_log="$COO_TEST_SANDBOX/shell.journal"
 cursor=$(journalctl --user -n 0 --show-cursor 2>/dev/null | sed -n 's/^-- cursor: //p')
 since=$(date '+%Y-%m-%d %H:%M:%S')
 
-"$W" --run >/dev/null 2>&1 &
+"$LAUNCH" >/dev/null 2>&1 &
 shell_pid=$!
 
 menu_layers() {
@@ -72,7 +74,7 @@ wait_menu() {
 }
 
 cleanup() {
-  "$W" --ipc shell hide omarchy.menu >/dev/null 2>&1 || true
+  "$IPC" shell hide omarchy.menu >/dev/null 2>&1 || true
   [[ -n ${shell_pid:-} ]] || return 0
   local pid=$shell_pid
   shell_pid=""
@@ -93,13 +95,13 @@ trap 'cleanup; exit 143' TERM
 
 reply=""
 for _ in $(seq 1 40); do
-  reply=$("$W" --ipc shell ping 2>/dev/null) && [[ -n $reply ]] && break
+  reply=$("$IPC" shell ping 2>/dev/null) && [[ -n $reply ]] && break
   kill -0 "$shell_pid" 2>/dev/null || break
   sleep 0.25
 done
 assert_eq "$reply" "ok" "셸 ping (토글 전)"
 
-plugins=$("$W" --ipc shell listPlugins 2>/dev/null) || plugins='[]'
+plugins=$("$IPC" shell listPlugins 2>/dev/null) || plugins='[]'
 menu_kinds=$(jq -r '[ .[] | select(.id == "omarchy.menu") | .kinds | join(",") ] | .[0] // "absent"' <<<"$plugins")
 assert_eq "$menu_kinds" "menu,bar-widget" "R03 omarchy.menu 가 레지스트리에 있다"
 
@@ -108,7 +110,7 @@ before=$(jq -r 'length' <<<"$(menu_layers)")
 assert_eq "$before" "0" "토글 전 omarchy-menu layer 없음"
 
 # SUPER+SPACE 가 실제로 실행하는 명령 그대로: 업스트림 omarchy-menu toggle.
-out=$(PATH="$COMPAT:$PATH" COO_SHELL_BIN="$W" "$root/bin/omarchy-menu" toggle 2>&1); code=$?
+out=$(PATH="$COO_OMARCHY_PATH/bin:$PATH" "$root/bin/omarchy-menu" toggle 2>&1); code=$?
 assert_eq "$code" "0" "런처 토글 호출 exit 0"
 
 wait_menu open && opened=0 || opened=1
@@ -130,14 +132,15 @@ assert_eq "$(menu_onscreen)" "" "R05 메뉴 표면이 화면에서 사라졌다"
 cleanup
 sleep 0.5
 if [[ -n $cursor ]]; then
-  journalctl --user --after-cursor "$cursor" -t cachy-omarchy-shell --no-pager -o cat > "$journal_log" 2>/dev/null
+  journalctl --user --after-cursor "$cursor" -t omarchy-shell --no-pager -o cat > "$journal_log" 2>/dev/null
 else
-  journalctl --user --since "$since" -t cachy-omarchy-shell --no-pager -o cat > "$journal_log" 2>/dev/null
+  journalctl --user --since "$since" -t omarchy-shell --no-pager -o cat > "$journal_log" 2>/dev/null
 fi
 [[ -f $journal_log ]] || : > "$journal_log"
 assert_eq "$(grep -c "Configuration Loaded" "$journal_log")" "1" "기동 로그를 저널에서 수집했다"
-errs=$(grep -ciE "ReferenceError|TypeError|is not a type|Cannot assign|unavailable" "$journal_log")
+errs=$(coo_count_qml_errors "$journal_log")
 assert_eq "$errs" "0" "토글 경로에 QML 오류 없음"
+coo_report_known_qml_burst "$journal_log"
 fatal=$(grep -cE "ERROR" "$journal_log")
 assert_eq "$fatal" "0" "토글 경로에 ERROR 레벨 없음"
 

@@ -97,13 +97,13 @@ commit. The list of upstream helpers the closure scanner trusts is not stored:
 - `usr/bin/cachy-omarchy-{shell,launcher,bindings,init,doctor}`
   — 공개 명령 5개. `launcher` 는 업스트림 `omarchy-menu toggle` 의 호환 별칭이다
   (SUPER+SPACE 는 그것을 직접 부른다). `reload` 는 `--restart` 와 같은 별칭이라 지웠다.
-- `usr/lib/cachy-omarchy/compat/bin/{omarchy-shell,omarchy-update-available,
+- `usr/lib/cachy-omarchy/compat/bin/{omarchy-update-available,
   omarchy-theme-set-browser,omarchy-theme-set-keyboard,
-  omarchy-restart-shell}` — compat 적응 카피 5개. 실체는 이 통제 경로에만
+  omarchy-restart-shell}` — compat 적응 카피 4개. 실체는 이 통제 경로에만
   둔다(§44). `omarchy-restart-shell` 은 `cachy-omarchy-shell --restart` 로 위임한다
   (세션이 잠긴 동안은 거부).
-- `usr/bin/omarchy-{shell,update-available,theme-set-browser,theme-set-keyboard,
-  restart-shell}` — compat 실체를 가리키는 상대 심링크 5개.
+- `usr/bin/omarchy-{update-available,theme-set-browser,theme-set-keyboard,
+  restart-shell}` — compat 실체를 가리키는 상대 심링크 4개.
   `/usr/bin` 은 심링크만 놓는 평평한 뷰이다(§45 개정).
 - `usr/share/uwsm/env-hyprland.d/10-cachy-omarchy` — uwsm 세션 환경 드롭인.
   그래픽 세션에 `OMARCHY_PATH=/usr/share/cachy-omarchy/upstream` 을 공급한다(§45).

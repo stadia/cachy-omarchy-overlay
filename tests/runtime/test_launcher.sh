@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SUPER+SPACE 체인(업스트림 omarchy-menu → compat omarchy-shell → 래퍼)과 호환
+# SUPER+SPACE 체인(업스트림 omarchy-menu → 업스트림 omarchy-shell)과 호환
 # 별칭, IPC 오류 문자열 실측. 메뉴를 실제로 열지 않는다 (R04/R05 는
 # test_launcher_toggle.sh).
 set -uo pipefail
@@ -8,8 +8,6 @@ source "$REPO_ROOT/tests/lib/assert.sh"
 source "$REPO_ROOT/lib/runtime.sh"
 
 L="$REPO_ROOT/overlay/bin/cachy-omarchy-launcher"
-W="$REPO_ROOT/overlay/bin/cachy-omarchy-shell"
-COMPAT="$REPO_ROOT/overlay/compat/bin"
 
 # SUPER+SPACE 는 업스트림 `omarchy-menu toggle` 이다. 호환 별칭
 # cachy-omarchy-launcher 는 옛 사용자 바인딩 사본을 위해 그것으로 넘긴다.
@@ -34,38 +32,33 @@ out=$(PATH="$fake:$PATH" COO_FAKE_LOG="$fake/menu.log" "$L" --nonsense 2>&1); co
 assert_eq "$code" "1" "알 수 없는 인자 → exit 1"
 assert_eq "$(cat "$fake/menu.log")" "" "알 수 없는 인자는 메뉴를 토글하지 않는다"
 
-# 실제 체인: 업스트림 omarchy-menu → compat omarchy-shell → 우리 셸 래퍼.
-# 래퍼 자리에 스텁을 둬 IPC 인자만 본다(셸을 띄우지 않는다).
-cat >"$fake/cachy-omarchy-shell" <<'STUB'
+# 실제 체인: 업스트림 omarchy-menu → 업스트림 omarchy-shell → qs ipc.
+# qs 자리에 스텁을 둬 IPC 인자만 본다(셸을 띄우지 않는다).
+cat >"$fake/qs" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\n' "$@" >"$COO_FAKE_LOG"
+exit "${STUB_QS_EXIT:-0}"
 STUB
-chmod +x "$fake/cachy-omarchy-shell"
+chmod +x "$fake/qs"
 
 dest="$COO_TEST_SANDBOX/pkg"
 if coo_extract_pkg "$dest" 2>/dev/null; then
   root=$(coo_upstream_root "$dest")
-  PATH="$COMPAT:$PATH" COO_SHELL_BIN="$fake/cachy-omarchy-shell" COO_FAKE_LOG="$fake/ipc.log" \
+  PATH="$fake:$root/bin:$PATH" OMARCHY_PATH="$root" COO_FAKE_LOG="$fake/ipc.log" \
     "$root/bin/omarchy-menu" toggle; code=$?
   assert_eq "$code" "0" "omarchy-menu toggle 체인 exit 0"
-  assert_eq "$(cat "$fake/ipc.log")" $'--ipc\nshell\ntoggle\nomarchy.menu\n{"menu":"root"}' \
-    "omarchy-menu toggle 이 래퍼에 루트 메뉴 토글 IPC 를 보낸다"
+  assert_eq "$(cat "$fake/ipc.log")" $'ipc\n-n\n-p\n'"$root"$'/shell\ncall\n--\nshell\ntoggle\nomarchy.menu\n{"menu":"root"}' \
+    "omarchy-menu toggle 이 업스트림 omarchy-shell 을 거쳐 루트 메뉴 토글 IPC 를 보낸다"
 
   # 셸이 없으면 실패가 호출자까지 올라와야 한다. 업스트림 omarchy-menu 는
-  # omarchy-shell 을 -q 없이 부르므로 compat shim 이 오류를 삼키지 않는다.
-  cat >"$fake/down-shell" <<'STUB'
-#!/usr/bin/env bash
-printf 'error: 셸이 실행 중이 아니다\n' >&2
-exit 1
-STUB
-  chmod +x "$fake/down-shell"
+  # omarchy-shell 을 -q 없이 부르므로 오류를 삼키지 않는다.
   cat >"$fake/omarchy-menu" <<STUB
 #!/usr/bin/env bash
 exec "$root/bin/omarchy-menu" "\$@"
 STUB
-  out=$(PATH="$fake:$COMPAT:$PATH" COO_SHELL_BIN="$fake/down-shell" "$L" 2>&1); code=$?
+  out=$(PATH="$fake:$root/bin:$PATH" OMARCHY_PATH="$root" STUB_QS_EXIT=1 COO_FAKE_LOG="$fake/ipc.log" "$L" 2>&1); code=$?
   assert_eq "$code" "1" "셸 미기동이면 호환 별칭도 실패한다"
-  assert_contains "$out" "셸이 실행 중이 아니다" "실패 사유가 호출자에게 보인다"
+  assert_contains "$out" "not running" "실패 사유가 호출자에게 보인다"
 fi
 
 # ---------------------------------------------------------------- IPC 오류 문자열 실측 (M2 발견 3)
@@ -84,7 +77,7 @@ mkdir -p "$HOME/.local/state/omarchy/toggles"
 
 export COO_OMARCHY_PATH="$root"
 export OMARCHY_PATH="$root"
-"$W" --run >/dev/null 2>&1 &
+"$root/bin/omarchy-launch-shell" >/dev/null 2>&1 &
 shell_pid=$!
 cleanup() {
   [[ -n ${shell_pid:-} ]] || return 0
@@ -107,7 +100,7 @@ trap 'cleanup; exit 143' TERM
 
 reply=""
 for _ in $(seq 1 40); do
-  reply=$("$W" --ipc shell ping 2>/dev/null) && [[ -n $reply ]] && break
+  reply=$("$root/bin/omarchy-shell" shell ping 2>/dev/null) && [[ -n $reply ]] && break
   kill -0 "$shell_pid" 2>/dev/null || break
   sleep 0.25
 done
@@ -125,11 +118,11 @@ printf 'measured ipc function-miss: %q\n' "$raw_fn"
 assert_contains "$raw_target" "Target not found." "qs 가 Target not found. 를 stdout 으로 낸다"
 assert_contains "$raw_fn" "Function not found." "qs 가 Function not found. 를 stdout 으로 낸다"
 
-out=$("$W" --ipc nosuch ping 2>&1); code=$?
+out=$("$root/bin/omarchy-shell" nosuch ping 2>&1); code=$?
 assert_eq "$code" "1" "없는 target → 래퍼 exit 1 (silent success 금지)"
 assert_contains "$out" "Target not found." "래퍼가 실측 문자열을 실패로 승격한다"
 
-out=$("$W" --ipc shell nosuchfn 2>&1); code=$?
+out=$("$root/bin/omarchy-shell" shell nosuchfn 2>&1); code=$?
 assert_eq "$code" "1" "없는 method → 래퍼 exit 1"
 assert_contains "$out" "Function not found." "래퍼가 Function not found. 를 실패로 승격한다"
 

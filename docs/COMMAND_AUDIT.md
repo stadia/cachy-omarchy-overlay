@@ -15,9 +15,9 @@
 
 | command | called from | purpose | deps | class | action |
 | --- | --- | --- | --- | --- | --- |
-| `omarchy-launch-shell` | 세션/유닛 | `quickshell -n -p $OMARCHY_PATH/shell` + journal + hyprctl 재시도 | quickshell, hyprctl, systemd-cat | ADAPTED | wrapper — `cachy-omarchy-shell --run`. 로직 재사용 가능, 이름/경로만 우리 것 |
-| `omarchy-shell` | 핫키, 메뉴, 플러그인 | 기동하지 않음. `qs ipc` 전달 | OMARCHY_PATH, qs, timeout | ADAPTED | wrapper — `cachy-omarchy-launcher`가 `shell toggle omarchy.menu` 호출 |
-| `omarchy-restart-shell` | 업데이트/디버그 | 기존 qs 인스턴스 kill 후 재기동 | quickshell kill | ADAPTED | wrapper — `overlay/compat/bin/omarchy-restart-shell` 이 `cachy-omarchy-shell --restart` 로 위임한다 (v0.12.0) |
+| `omarchy-launch-shell` | 세션/유닛 | `quickshell -n -p $OMARCHY_PATH/shell` + journal + hyprctl 재시도 | quickshell, hyprctl, systemd-cat | SAFE | verbatim 스테이징(#11). autostart 가 직접 부른다 |
+| `omarchy-shell` | 핫키, 메뉴, 플러그인 | 기동하지 않음. `qs ipc` 전달 | OMARCHY_PATH, qs, timeout | SAFE | verbatim 스테이징(#11). compat shim 을 대체한다 |
+| `omarchy-restart-shell` | 업데이트/디버그 | 기존 qs 인스턴스 kill 후 재기동 | quickshell kill | ADAPTED | wrapper — `overlay/compat/bin/omarchy-restart-shell` 이 `cachy-omarchy-shell --restart` 로 위임한다. 업스트림 감독자와 이중 기동하지 않도록 `quickshell kill` 로 멈춘다(#11) |
 | `quickshell` / `qs` | 위 두 명령 | 엔진 | CachyOS 패키지 | SAFE | package (의존) |
 
 ---
@@ -315,6 +315,8 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-restart-wifi` | SAFE | package | 0.8.0. rfkill unblock wifi + nmcli radio. 표준 도구 |
 | `omarchy-screensaver` | SAFE | package | 0.11.0. 스크린세이버 본체 — `omarchy-launch-screensaver` 가 터미널 안에서 exec 한다. ttfx(AUR)로 효과를 그린다 |
 | `omarchy-shell-config` | SAFE | package | `omarchy-bar` 가 source 하는 설정 헬퍼 |
+| `omarchy-shell` | SAFE | package | 업스트림 verbatim. 셸 IPC 클라이언트 — compat shim 을 대체한다(#11) |
+| `omarchy-launch-shell` | SAFE | package | 업스트림 verbatim. 셸 감독자(최대 5회/분 재기동) — autostart 와 `--restart` 가 부른다(#11) |
 | `omarchy-show-done` | SAFE | package | v0.12.0. 프레젠테이션 명령 종료 뒤 gum spinner와 키 입력 대기. gum 은 hard depends |
 | `omarchy-show-logo` | SAFE | package | v0.12.0. `$OMARCHY_PATH/logo.txt` 를 터미널에 출력. logo.txt 를 같은 업스트림 루트에 verbatim 설치 |
 | `omarchy-state` | SAFE | package | reboot/shutdown 전이 |
@@ -528,7 +530,7 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-restart-audio` | SAFE | package | audio-tuning 전이. v0.12.0에서 `omarchy-launch-floating-terminal-with-presentation` 프레젠테이션 체인까지 스테이징해 `update.hardware.audio` 메뉴 행의 실행 결손을 닫았다 |
 | `omarchy-restart-bluetooth` | SAFE | package | 0.8.0 verbatim stage. rfkill unblock/list bluetooth |
 | `omarchy-restart-hyprsunset` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-restart-shell` | ADAPTED | wrapper | v0.12.0 compat 적응 카피(`overlay/compat/bin/omarchy-restart-shell`) → `cachy-omarchy-shell --restart` 위임. quickshell kill/재기동 + 세션 락 재확보 폴링이 있는 원본은 미스테이징 헬퍼 3개(`omarchy-hyprland-session-locked`(blocked)·`omarchy-launch-shell`·`omarchy-system-sleep-lock`)를 전제하고 이 환경의 quickshell 0.3.0(kill 즉시 반환)에서 레이스를 만들어 verbatim 이 아니라 락 인지 재시작 프런트로 대체한다. `tests/data/closure-exceptions.tsv` 예외 행 회수 |
+| `omarchy-restart-shell` | ADAPTED | wrapper | v0.12.0 compat 적응 카피(`overlay/compat/bin/omarchy-restart-shell`) → `cachy-omarchy-shell --restart` 위임. quickshell kill/재기동 + 세션 락 재확보 폴링이 있는 원본은 미스테이징 헬퍼 2개(`omarchy-hyprland-session-locked`(blocked)·`omarchy-system-sleep-lock`)를 전제하고 kill 직후 죽어가는 인스턴스가 남는 레이스가 있어 verbatim 이 아니라 락 인지 재시작 프런트로 대체한다. `tests/data/closure-exceptions.tsv` 예외 행 회수 |
 | `omarchy-restart-trackpad` | SAFE | package | 0.8.0 verbatim stage. i2c_hid_acpi 언바인드/바인드 + modprobe |
 | `omarchy-restart-wifi` | SAFE | package | 0.8.0 verbatim stage. rfkill + nmcli radio |
 | `omarchy-restart-xcompose` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
@@ -537,7 +539,7 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-setup-security-fingerprint` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-setup-security-sshd` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
 | `omarchy-setup-security-sudoless-docker` | DISABLED | disable | 4.0.1 신규(메뉴 setup.security.sudoless-docker). docker 그룹 추가는 root-equivalent 권한 상승이라 이 오버레이가 조용히 노출하지 않는다(사용자 확인 `omarchy-setup` 계열 때문에 비활성). 바이너리 부재 = 행 숨김 |
-| `omarchy-shell` | ADAPTED | wrapper | M2 `cachy-omarchy-shell --ipc`. 메뉴의 summon/toggle 경로 |
+| `omarchy-shell` | SAFE | package | 업스트림 verbatim(#11). 메뉴의 summon/toggle 경로 |
 | `omarchy-sudo-docker` | DISABLED | disable | 4.0.1 신규. docker 두 행(`setup/remove.security.sudoless-docker`)의 when 가드. 이 가드 자체를 올리지 않으므로 두 행이 모두 숨겨진다 — 그래서 그 삼총사를 한 묶음 DISABLED 로 분류한다 |
 | `omarchy-sudo-passwordless` | SAFE | package | 0.8.0 verbatim stage. /etc/sudoers.d/99-omarchy-nopasswd-$USER + systemd-run 자동 만료. self-contained 이고 패스워드리스 sudo 를 부여하는 보안 민감 토글 |
 | `omarchy-system-factory-reset` | DISABLED | disable | Omarchy ISO `@factory` 전제. CachyOS PATH 에 올리지 않음. lock/logout/reboot/shutdown 과 별개 |

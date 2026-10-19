@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# --restart 는 세션이 잠긴 동안 셸을 죽이면 안 된다. 계약: 스키마가 온전한
-# (locked/secure/requested 세 키가 다 있는) "unlocked" 응답만 진행, IPC
-# 레벨 오류(대상 없음 등, exit 0 + 오류 문자열 — lock 서비스 부재로 간주)나
-# IPC 자체 실패(타임아웃/셸 미기동)도 보존할 락이 없으므로 진행, 그 외
-# (파싱 불가·키 누락 등) 전부 안전하게 거부한다.
-# 실제 quickshell/hyprlock 은 전혀 건드리지 않는다 — qs/pgrep/kill/setsid
-# 를 모두 스텁으로 교체한다.
+# --restart 는 세션이 잠긴 동안 셸을 죽이면 안 된다. 계약(허용 목록): 스키마가
+# 온전한(locked/secure/requested 세 키가 다 있는) "unlocked" 응답, 그리고 보존할
+# 락이 확실히 없는 두 경우("is not running" = 셸 미실행, "Target not found." =
+# lock 플러그인 부재)만 진행한다. 기동 중·무응답·알 수 없는 오류·파싱 불가·키 누락은
+# 전부 안전하게 거부한다. 진행할 때는 Hyprland 에 닿는지 확인한 뒤 정상 종료
+# (quickshell kill) 하고 Hyprland 가 omarchy-launch-shell 을 띄운다 — TERM 으로
+# 죽이면 감독자가 되살려 이중 기동하기 때문이다.
+# 실제 quickshell/hyprlock/Hyprland 는 전혀 건드리지 않는다 — omarchy-shell,
+# quickshell, hyprctl, pgrep 을 모두 스텁으로 교체한다.
 set -uo pipefail
 REPO_ROOT="${REPO_ROOT:?}"
 source "$REPO_ROOT/tests/lib/assert.sh"
@@ -20,123 +22,160 @@ mkdir -p "$fake/upstream/shell" "$stub"
 : > "$fake/upstream/shell/shell.qml"
 : > "$calls"
 
-# 가짜 qs: "ipc ... call -- lock status" 호출에 $STUB_LOCK_JSON 을,
-# exit code 는 $STUB_LOCK_EXIT(기본 0) 을 그대로 돌려준다.
-cat > "$stub/qs" <<'STUB'
+# 가짜 omarchy-shell: "lock status" 에는 $STUB_LOCK_JSON(stdout)·$STUB_LOCK_ERR
+# (stderr)·$STUB_LOCK_EXIT 를, "shell ping" 에는 ok 를 돌려준다.
+cat > "$stub/omarchy-shell" <<'STUB'
 #!/usr/bin/env bash
-printf 'qs %s\n' "$*" >> "$COO_CALL_LOG"
-printf '%s' "${STUB_LOCK_JSON:-}"
-exit "${STUB_LOCK_EXIT:-0}"
+printf 'omarchy-shell %s\n' "$*" >> "$COO_CALL_LOG"
+if [[ $1 == lock && $2 == status ]]; then
+  printf '%s' "${STUB_LOCK_JSON:-}"
+  printf '%s' "${STUB_LOCK_ERR:-}" >&2
+  exit "${STUB_LOCK_EXIT:-0}"
+fi
+echo ok
 STUB
-chmod +x "$stub/qs"
-
-# pgrep: 아무 것도 못 찾은 척(재시작 경로가 kill 을 건드리지 않게) 하면서
-# 호출 여부만 기록한다.
+# kill 은 한 번만 성공하고(살아 있던 셸) 그 다음은 실패한다(더 없음).
+cat > "$stub/quickshell" <<'STUB'
+#!/usr/bin/env bash
+printf 'quickshell %s\n' "$*" >> "$COO_CALL_LOG"
+[[ -e $COO_CALL_LOG.killed ]] && exit 1
+: > "$COO_CALL_LOG.killed"
+exit 0
+STUB
+# STUB_HYPR_FAIL=monitors|dispatch 로 해당 호출만 실패시킨다.
+cat > "$stub/hyprctl" <<'STUB'
+#!/usr/bin/env bash
+printf 'hyprctl %s\n' "$*" >> "$COO_CALL_LOG"
+if [[ $1 == -j && ${STUB_HYPR_FAIL:-} == monitors ]] || [[ $1 == dispatch && ${STUB_HYPR_FAIL:-} == dispatch ]]; then
+  echo "hyprctl stub failure" >&2
+  exit 1
+fi
+STUB
+# STUB_PGREP_ALIVE=1 이면 옛 인스턴스가 끝내 안 죽는다.
 cat > "$stub/pgrep" <<'STUB'
 #!/usr/bin/env bash
-printf 'pgrep %s\n' "$*" >> "$COO_CALL_LOG"
-exit 1
+[[ ${STUB_PGREP_ALIVE:-0} == 1 ]]
 STUB
-chmod +x "$stub/pgrep"
-
-# kill: 호출됐다는 사실만 기록 — 거부 경로에서 절대 호출되면 안 된다.
-cat > "$stub/kill" <<'STUB'
-#!/usr/bin/env bash
-printf 'kill %s\n' "$*" >> "$COO_CALL_LOG"
-exit 0
-STUB
-chmod +x "$stub/kill"
-
-# setsid: 실제 재기동 대신 호출만 기록한다 (진짜 프로세스를 절대 띄우지
-# 않는다).
-cat > "$stub/setsid" <<'STUB'
-#!/usr/bin/env bash
-printf 'setsid %s\n' "$*" >> "$COO_CALL_LOG"
-exit 0
-STUB
-chmod +x "$stub/setsid"
+chmod +x "$stub"/*
 
 run_restart() {
-  : > "$calls"
+  : > "$calls"; rm -f "$calls.killed"
   PATH="$stub:$PATH" \
     COO_OMARCHY_PATH="$fake/upstream" \
     COO_CALL_LOG="$calls" \
-    STUB_LOCK_JSON="$1" \
+    STUB_LOCK_JSON="${1:-}" \
+    STUB_LOCK_ERR="${3:-}" \
     STUB_LOCK_EXIT="${2:-0}" \
+    STUB_HYPR_FAIL="${STUB_HYPR_FAIL:-}" STUB_PGREP_ALIVE="${STUB_PGREP_ALIVE:-0}" \
     "$W" --restart
 }
 
-kill_called() { grep -q '^kill ' "$calls"; }
-pgrep_called() { grep -q '^pgrep ' "$calls"; }
+killed() { grep -q '^quickshell kill' "$calls"; }
+launched() { grep -qF 'hyprctl dispatch hl.dsp.exec_cmd("omarchy-launch-shell")' "$calls"; }
 
-# cmd_restart 는 setsid 를 detach 로 백그라운드에 띄우고 바로 반환하므로,
-# 로그 기록은 살짝 뒤늦게 온다. 무한 대기 없이 짧게 폴링한다.
-setsid_called() {
-  local n=0
-  while (( n < 20 )); do
-    grep -q '^setsid ' "$calls" && return 0
-    sleep 0.05; n=$((n + 1))
-  done
-  return 1
+refuses() {
+  local label=$1 json=$2 exit_code=$3 err=${4:-} out code k l
+  out=$(run_restart "$json" "$exit_code" "$err" 2>&1); code=$?
+  assert_eq "$code" "1" "$label → exit 1"
+  assert_contains "$out" "Refusing to restart the shell" "$label → 거부 메시지"
+  killed && k=1 || k=0
+  assert_eq "$k" "0" "$label → quickshell kill 미호출"
+  launched && l=1 || l=0
+  assert_eq "$l" "0" "$label → 재기동 미요청"
 }
 
-# (a) secure:true (스키마 완전) → 거부
-out=$(run_restart '{"locked":true,"secure":true,"requested":false}' 0 2>&1); code=$?
-assert_eq "$code" "1" "secure:true → exit 1"
-assert_contains "$out" "Refusing to restart the shell while the session is locked." "secure:true → 거부 메시지"
-kill_called && k=1 || k=0
-assert_eq "$k" "0" "secure:true → kill 미호출"
-pgrep_called && p=1 || p=0
-assert_eq "$p" "0" "secure:true → pgrep 도달 안 함"
+proceeds() {
+  local label=$1 json=$2 exit_code=$3 err=${4:-} out code k l
+  out=$(run_restart "$json" "$exit_code" "$err" 2>&1); code=$?
+  assert_eq "$code" "0" "$label → exit 0"
+  killed && k=1 || k=0
+  assert_eq "$k" "1" "$label → quickshell kill 로 정상 종료"
+  launched && l=1 || l=0
+  assert_eq "$l" "1" "$label → Hyprland 에 omarchy-launch-shell 재기동 요청"
+}
 
-# (b) requested:true (스키마 완전) → 거부
-out=$(run_restart '{"locked":true,"secure":false,"requested":true}' 0 2>&1); code=$?
-assert_eq "$code" "1" "requested:true → exit 1"
-assert_contains "$out" "Refusing to restart the shell while the session is locked." "requested:true → 거부 메시지"
-kill_called && k=1 || k=0
-assert_eq "$k" "0" "requested:true → kill 미호출"
-pgrep_called && p=1 || p=0
-assert_eq "$p" "0" "requested:true → pgrep 도달 안 함"
+refuses "secure:true" '{"locked":true,"secure":true,"requested":false}' 0
+refuses "requested:true" '{"locked":true,"secure":false,"requested":true}' 0
+refuses "locked 만 true" '{"locked":true,"secure":false,"requested":false}' 0
+refuses "파싱 불가" 'not json' 0
+# {} 는 스키마 불완전: 세 키를 모두 요구하지 않으면 fail-open 이 된다.
+refuses "{}" '{}' 0
+# 셸이 기동 중이면 락 서비스가 아직 로드 중일 수 있다.
+refuses "not ready" '' 1 'omarchy-shell is not ready'
 
-# (c) locked:false, secure:false, requested:false (스키마 완전) → 진행 (setsid 호출)
-out=$(run_restart '{"locked":false,"secure":false,"requested":false}' 0 2>&1); code=$?
-assert_eq "$code" "0" "잠기지 않음 → exit 0"
-setsid_called && s=1 || s=0
-assert_eq "$s" "1" "잠기지 않음 → 재기동(setsid) 진행"
+proceeds "잠기지 않음" '{"locked":false,"secure":false,"requested":false}' 0
+proceeds "셸 미실행" '' 1 'omarchy-shell is not running'
+proceeds "lock 서비스 부재" '' 1 'Target not found.'
+# 허용 목록 밖은 전부 거부 — 잠긴 채 멈춘 셸, 명령 부재, 업스트림의 새 오류 문구.
+refuses "IPC 무응답" '' 1 'omarchy-shell is not responding'
+refuses "명령 부재(127)" '' 127 'omarchy-shell: command not found'
+refuses "알 수 없는 오류" '' 1 'Something new went wrong'
+refuses "오류 문구 없는 nonzero" '' 1 ''
 
-# (d) IPC 실패(셸 미실행) → 진행
-out=$(run_restart '' 1 2>&1); code=$?
-assert_eq "$code" "0" "IPC 실패 → exit 0 (보존할 락 없음)"
-setsid_called && s=1 || s=0
-assert_eq "$s" "1" "IPC 실패 → 재기동(setsid) 진행"
+# 순서: 종료가 재기동보다 먼저다.
+run_restart '{"locked":false,"secure":false,"requested":false}' 0 >/dev/null 2>&1
+kill_line=$(grep -n '^quickshell kill' "$calls" | head -1 | cut -d: -f1)
+launch_line=$(grep -n '^hyprctl dispatch' "$calls" | head -1 | cut -d: -f1)
+assert_eq "$(( kill_line < launch_line ? 1 : 0 ))" "1" "정상 종료가 재기동보다 먼저다"
+assert_contains "$(grep '^quickshell kill' "$calls" | head -1)" "-p $fake/upstream/shell --any-display" "kill 은 이 트리의 셸만 겨냥한다"
 
-# (e) 응답은 왔는데 파싱 불가(쓰레기 JSON) → 거부
-out=$(run_restart 'not json' 0 2>&1); code=$?
-assert_eq "$code" "1" "파싱 불가 → exit 1"
-assert_contains "$out" "Refusing to restart the shell while the session is locked." "파싱 불가 → 거부 메시지"
-kill_called && k=1 || k=0
-assert_eq "$k" "0" "파싱 불가 → kill 미호출"
-pgrep_called && p=1 || p=0
-assert_eq "$p" "0" "파싱 불가 → pgrep 도달 안 함"
+# OMARCHY_PATH 가 없는 곳을 가리키면 조용히 성공하지 말고 무엇이 없는지 말한다.
+out=$(COO_OMARCHY_PATH=/nonexistent "$W" --restart 2>&1); code=$?
+assert_eq "$code" "1" "잘못된 OMARCHY_PATH → exit 1"
+assert_contains "$out" "shell.qml" "오류가 무엇이 없는지 말해준다"
 
-# (f) IPC 레벨 오류(exit 0 + "Target not found.") → lock 서비스 부재로 간주,
-# 보존할 락이 없으므로 진행한다 (lock 플러그인 비활성/로딩 중인 셸에서도
-# 재시작이 영원히 막히지 않아야 한다).
-out=$(run_restart 'Target not found.' 0 2>&1); code=$?
-assert_eq "$code" "0" "IPC 오류 문자열 → exit 0 (lock 서비스 부재로 간주, 진행)"
-setsid_called && s=1 || s=0
-assert_eq "$s" "1" "IPC 오류 문자열 → 재기동(setsid) 진행"
+# Hyprland 에 닿지 못하면 셸을 죽이기 전에 멈춘다(죽인 뒤엔 되살릴 수 없다).
+unlocked='{"locked":false,"secure":false,"requested":false}'
+out=$(STUB_HYPR_FAIL=monitors run_restart "$unlocked" 0 2>&1); code=$?
+assert_eq "$code" "1" "Hyprland 에 못 닿으면 exit 1"
+assert_contains "$out" "hyprctl stub failure" "hyprctl 의 오류를 그대로 전한다"
+killed && k=1 || k=0
+assert_eq "$k" "0" "Hyprland 에 못 닿으면 셸을 죽이지 않는다"
 
-# (g) 응답은 파싱되지만 키가 없음({}) → 스키마 불완전, 거부.
-# .secure/.requested 두 항만 보던 이전 판정식은 {} 를 "false or false" =
-# false 로 읽어 실수로 진행시켰다(fail-open) — 이제는 세 키가 모두 있어야
-# 판정하고, 없으면 거부한다.
-out=$(run_restart '{}' 0 2>&1); code=$?
-assert_eq "$code" "1" "{} → exit 1 (스키마 불완전 → 거부)"
-assert_contains "$out" "Refusing to restart the shell while the session is locked." "{} → 거부 메시지"
-kill_called && k=1 || k=0
-assert_eq "$k" "0" "{} → kill 미호출"
-pgrep_called && p=1 || p=0
-assert_eq "$p" "0" "{} → pgrep 도달 안 함"
+# 기동 요청이 실패하면 성공으로 보고하지 않는다.
+out=$(STUB_HYPR_FAIL=dispatch run_restart "$unlocked" 0 2>&1); code=$?
+assert_eq "$code" "1" "dispatch 실패 → exit 1"
+assert_contains "$out" "hyprctl stub failure" "dispatch 오류를 그대로 전한다"
+
+# 옛 인스턴스가 끝내 안 죽으면 새로 띄우지 않는다(already running 거짓 성공 방지).
+out=$(STUB_PGREP_ALIVE=1 run_restart "$unlocked" 0 2>&1); code=$?
+assert_eq "$code" "1" "옛 인스턴스가 남으면 exit 1"
+assert_contains "$out" "종료되지 않았다" "원인을 말한다"
+launched && l=1 || l=0
+assert_eq "$l" "0" "옛 인스턴스가 남으면 재기동을 요청하지 않는다"
+
+# 새 셸이 ping 에 끝내 안 답하면 성공이라 하지 않는다.
+cat > "$stub/omarchy-shell" <<'STUB'
+#!/usr/bin/env bash
+if [[ $1 == lock && $2 == status ]]; then printf '{"locked":false,"secure":false,"requested":false}'; exit 0; fi
+exit 1
+STUB
+out=$(run_restart "" 0 2>&1); code=$?
+assert_eq "$code" "1" "ping 무응답 → exit 1"
+assert_contains "$out" "did not become ready" "준비되지 않았다고 말한다"
+
+# 폐기된 --run 은 업그레이드 직후 옛 bindings.lua 사본이 부르므로 경고 후 업스트림
+# 감독자로 넘긴다. --ipc/--path 는 삭제.
+cat > "$stub/omarchy-launch-shell" <<'STUB'
+#!/usr/bin/env bash
+printf 'omarchy-launch-shell %s\n' "$*" >> "$COO_CALL_LOG"
+STUB
+chmod +x "$stub"/*
+: > "$calls"
+out=$(PATH="$stub:$PATH" COO_OMARCHY_PATH="$fake/upstream" COO_CALL_LOG="$calls" "$W" --run 2>&1); code=$?
+assert_eq "$code" "0" "--run 은 감독자로 넘긴다"
+assert_contains "$out" "cachy-omarchy-bindings --force" "--run 경고가 갱신 방법을 말한다"
+assert_contains "$(cat "$calls")" "omarchy-launch-shell" "--run → omarchy-launch-shell"
+for mode in --ipc --path; do
+  out=$("$W" "$mode" 2>&1); code=$?
+  assert_eq "$code" "1" "$mode 는 삭제됨 → exit 1"
+  assert_contains "$out" "삭제됐다" "$mode → 삭제 안내"
+done
+
+out=$("$W" --help 2>&1); code=$?
+assert_eq "$code" "0" "--help → exit 0"
+assert_contains "$out" "--restart" "--help 가 --restart 를 안내한다"
+out=$("$W" --bogus 2>&1); code=$?
+assert_eq "$code" "1" "알 수 없는 인자 → exit 1"
 
 exit "$ASSERT_FAILURES"

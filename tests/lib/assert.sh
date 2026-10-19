@@ -40,7 +40,7 @@ assert_exit() {
   assert_eq "$code" "$expected" "$label (exit)"
 }
 
-# Live-runtime usability probe for tests that start `cachy-omarchy-shell --run`.
+# Live-runtime usability probe for tests that start `omarchy-launch-shell`.
 #
 # `command -v` proves only that a binary is on PATH, not that it works.  The
 # wrapper execs through `systemd-cat`, so in a sandbox/container without
