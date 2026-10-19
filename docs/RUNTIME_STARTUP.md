@@ -69,12 +69,14 @@ journalctl --user -t omarchy-shell
 
 ### 알려진 한계 — 사용자 `~/.config/omarchy/shell.json` 오버라이드
 
-사용자가 `~/.config/omarchy/shell.json` 을 만들면, 딥머지가 없으므로 **우리 기본값이 통째로 무시된다.** 그 파일에 `disabledPlugins` 가 없으면 §3의 비활성 집합이 풀려 바·알림·락이 돌아온다.
+사용자가 `~/.config/omarchy/shell.json` 을 만들면, 딥머지가 없으므로 **패키지 기본값이 통째로 무시된다.** 현재 패키지 기본값은 업스트림과 같고
+`disabledPlugins`가 없다. 사용자 파일이 있으면 이후 핀의 기본 레이아웃 변경도
+자동 반영되지 않는다.
 
 **우리는 `~/.config/omarchy/shell.json` 을 쓰지 않는다** (감사 지침, §6.6). 대응:
 
-- 감지해 경로에 경고를 인쇄하는 것은 M7 `cachy-omarchy-doctor` 후보 항목이다.
-- 이 한계는 패키지 기본값의 안전성이 사용자 파일 하나에 의해 우회될 수 있음을 의미한다.
+- `cachy-omarchy-doctor`가 파일의 존재와 경로를 WARN으로 알린다.
+- 사용자 파일의 유지·수정·삭제는 사용자 몫이다.
 
 > **측정 vs 추론**: 3단계 해석 순서와 "딥머지 없음"은 핀 커밋 소스(`shell.qml:71~87`)에서
 > 확인한 사실이다. 사용자 파일이 우리 기본값을 무시한다는 것은 소스에서 직접 읽은
@@ -375,6 +377,16 @@ mako 때와 같은 구조 — 밀어내기가 아니라 **순서**다(§17.4). �
 
 ### 22.4 결정적 발견 — 거부당했을 때 quickshell 은 죽는다
 
+이 절의 크래시는 4.0.5 가드 도입 전 실측이다. 현재 핀의
+`strandedLockCheckProc`는 `omarchy-hyprland-session-lock-stranded <own-pid>`를
+부르고, 그 래퍼가 `omarchy-hyprland-session-locked`로 잠금을 확인한 뒤 다른
+quickshell/qs/hyprlock 프로세스가 살아 있으면 exit 2(미정)로 회수를 보류한다.
+이 가드가 아래 충돌을 막는지는 아직 실측하지 않았다.
+[#20](https://github.com/stadia/cachy-omarchy-overlay/issues/20)에서 hyprlock 보유 중과
+셸 단독 잠금 후 크래시·재기동을 각각 검증할 때까지 두 헬퍼의 미스테이징을 유지한다.
+
+아래는 이전 호출 경로와 실측 기록이다.
+
 `Service.qml` 의 `checkStrandedLock()` 은 `omarchy-hyprland-session-locked` 를
 불러 exit 0(=세션 잠김)이고 그 잠금이 우리 것이 아니면 `strandedLock` 으로
 판정하고 `recoverStrandedLock()` → `beginLock()` 으로 세션 잠금을 **가져오려
@@ -397,8 +409,9 @@ WARN: The Wayland connection experienced a fatal error
 `onLockFinished` 로 우아하게 처리하고 생존, quickshell 은 프로토콜 오류로
 연결이 끊겨 죽는다.
 
-**현재 출고본은 이 경로에 진입하지 않는다** — `omarchy-hyprland-session-locked`
-가 스테이징돼 있지 않아 `bash -c` 가 127 로 끝나고, `onExited(127)` 는
+**현재 출고본은 이 경로에 진입하지 않는다** — 두 헬퍼 모두 미스테이징이며,
+4.0.5에서는 호출 대상 `omarchy-hyprland-session-lock-stranded`가 없어
+`bash -c`가 127로 끝나고, `onExited(127)`는
 `strandedLockResolved = true` + `strandedLock = false` 로 조용히 비활성화된다
 (exit 2 만 "미정"으로 재시도). 헬퍼 부재가 우연히 fail-safe 로 작동하고 있다.
 
@@ -411,20 +424,18 @@ WARN: The Wayland connection experienced a fatal error
 고정한다(사유는 `staged-helpers.tsv` 행의 note). 헬퍼 폐쇄(P08)를 이유로 나중에 올리려면 크래시를 먼저
 막아야 한다.
 
-### 22.5 남은 헬퍼 폐쇄 결함 (lock 경로)
+### 22.5 lock 경로의 헬퍼 폐쇄 상태
 
-lock 플러그인이 이름으로 부르지만 스테이징되지 않은 것:
-
-| 헬퍼 | 호출 지점 | 현재 결과 |
+| 헬퍼 | 호출 지점 | 현재 상태 |
 | --- | --- | --- |
-| `omarchy-hyprland-session-locked` | `strandedLockCheckProc` | 127 → stranded 복구 비활성 (**의도적 유지**, §22.4) |
-| `omarchy-system-wake` | `runWake()` — 잠금/오타 입력마다 | 127 → 화면 깨우기 없음 |
-| `omarchy-brightness-keyboard` | `runBlank()` | 127 → 키보드 백라이트 안 꺼짐 |
+| `omarchy-hyprland-session-lock-stranded` → `omarchy-hyprland-session-locked` | `strandedLockCheckProc` | 미스테이징, 127 → stranded 복구 비활성 (**의도적 유지**, §22.4) |
+| `omarchy-system-wake` | `runWake()` — 잠금/오타 입력마다 | v0.11.0부터 스테이징, 화면·키보드 백라이트 복원 체인 포함 |
+| `omarchy-brightness-keyboard` | `runBlank()` | v0.11.0부터 스테이징, `off`/`restore` 경로 연결 |
 
-`omarchy-system-wake` / `omarchy-brightness-keyboard` 는 §22.4 같은 위험이
-없고 순수 기능 손실이라 후속 마일스톤에서 verbatim 스테이징 후보다. 셋 다
-`Process` stderr 가 저널로 나오지 않아 **로그에 `command not found` 가 남지
-않는다** — 조용한 실패라는 점을 기록해 둔다.
+이전 실측 당시 뒤의 두 헬퍼도 없었으나 v0.11.0에서 기능 손실을 해소했다.
+현재 남은 의도적 미스테이징은 고아 락 복구뿐이다. `Process` stderr가 저널에
+나오지 않아 헬퍼 부재가 `command not found`로 보이지 않을 수 있다는 당시 관측은
+그대로 남긴다.
 
 ### 22.6 정리
 
@@ -540,10 +551,10 @@ workspace-layouts}.lua` 를 스테이징한다(`stage-upstream.sh`) — 이 6개
   `cachy-omarchy-doctor` 가 `$OMARCHY_PATH/default/hypr/bootstrap.lua` 부재를
   FAIL 로 알린다(pcall 이 삼켜 `configerrors` 에는 아무것도 안 뜨기 때문).
 
-## §24 락 인지 셸 재시작 + reload/compat 위임 체인 (v0.12.0, 2026-08-23)
+## §24 락 인지 셸 재시작 (v0.12.0 도입, PR #18에서 명령 통합)
 
-`cachy-omarchy-shell --restart` 는 kill 전에 셸 자신에게 `qs ipc -n -p
-$OMARCHY_PATH/shell call -- lock status` 로 락 상태를 묻는다. `status()` 는
+`omarchy-restart-shell`은 kill 전에 셸 자신에게 `omarchy-shell lock status`로
+락 상태를 묻는다. `status()` 는
 `shell/plugins/lock/Service.qml` 이 이미 계산해 둔 `locked`
 (`lockRequested || sessionLock.locked || sessionLock.secure`) 를 포함해
 `secure`/`requested` 등을 JSON 으로 반환한다. 판정:
@@ -568,15 +579,16 @@ $OMARCHY_PATH/shell call -- lock status` 로 락 상태를 묻는다. `status()`
 잠그는 라이브 실험은 하지 않았다 — mock IPC 응답으로 세 분기를 각각
 검사한다).
 
-위임 체인:
+설치 경로:
 
 ```
-omarchy-restart-shell (compat, /usr/bin 심링크 → compat/bin 실체)
-  → cachy-omarchy-shell --restart (락 조회 → kill → 재기동 로직 실체)
+/usr/bin/omarchy-restart-shell
+  → ../lib/cachy-omarchy/compat/bin/omarchy-restart-shell
 ```
 
-compat `omarchy-restart-shell` 은 `exec cachy-omarchy-shell --restart` 다 — 락
-조회·kill 로직을 이중화하지 않는다. 진행하기로 하면 Hyprland 에 닿는지 먼저
+락 조회·kill·재기동 로직은 `overlay/compat/bin/omarchy-restart-shell`에 있다.
+PR #18에서 `cachy-omarchy-shell` 실행 명령을 지우고 이곳으로 통합했다.
+진행하기로 하면 Hyprland에 닿는지 먼저
 확인한 뒤(SSH/TTY 에서는 인스턴스 서명을 복구) `quickshell kill` 로 정상 종료시키고,
 옛 인스턴스가 사라지길 기다렸다가 `hyprctl dispatch` 로 `omarchy-launch-shell` 을
 띄운다. TERM 으로 죽이면 업스트림 감독자가 되살려 이중 기동하므로 쓰지 않는다. (v0.12.0 에는 사이에 `cachy-omarchy-reload`
@@ -585,12 +597,13 @@ verbatim 으로 올리지 않은 이유: 원본은 미스테이징 헬퍼 2개
 (`omarchy-hyprland-session-locked`, `omarchy-system-sleep-lock`)를 전제하고
 `quickshell kill` 이 종료까지 블록하는 빌드를 가정한다. kill 직후에도 죽어가는
 인스턴스가 남을 수 있어(새로 띄우면 `already running` 으로 exit 0 → 감독자가 의도된
-정지로 읽는다) 우리 `--restart` 는 사라질 때까지 기다린다. (`omarchy-launch-shell`
+정지로 읽는다) 우리 `omarchy-restart-shell`은 사라질 때까지 기다린다. (`omarchy-launch-shell`
 은 #11 에서 verbatim 스테이징됐다.)
 
 **stranded-lock recovery 를 이 체인에 넣지 않은 이유.**
-`omarchy-hyprland-session-locked` (업스트림에서 고아 락을 판별해 재확보를
-시도하는 헬퍼)는 여전히 스테이징하지 않는다 — `milestone=blocked`. §22.4 의
+`omarchy-hyprland-session-locked`와 4.0.5 래퍼
+`omarchy-hyprland-session-lock-stranded`는 여전히 스테이징하지 않는다 —
+`milestone=blocked`. 4.0.5 가드의 재평가는 #20에서 진행하며 아직 검증 전이다. §22.4 의
 실측이 근거다: hyprlock 이 세션을 쥔 상태에서 quickshell 이 ext-session-lock
 을 요청하면 hyprlock 은 `onLockFinished` 로 우아하게 처리해 생존하지만,
 quickshell 은 Wayland 프로토콜 오류로 연결이 끊겨 죽는다. 이 마일스톤은 그

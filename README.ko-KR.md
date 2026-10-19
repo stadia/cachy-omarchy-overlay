@@ -25,12 +25,18 @@ SUPER + K      →  Omarchy 스타일 키바인딩 뷰어
 업스트림 핀은 `upstream.lock`이 관리한다 (현재 `basecamp/omarchy @ v4.0.5`,
 `94a8fbc`).
 
-설치되는 공개 명령 4개 (`/usr/bin`):
+오버레이의 설정·진단 명령 3개 (`/usr/bin`):
 
 - `cachy-omarchy-bindings` — 사용자 Hyprland 설정에 관리 source 블록 주입/제거
 - `cachy-omarchy-init` — 최초 1회 사용자 설정 생성 (기존 파일 덮어쓰지 않음)
 - `cachy-omarchy-doctor` — 읽기 전용 진단 (테마 상태 포함)
-- `omarchy-theme-set` — 감사된 업스트림 helper 집합으로 테마 적용
+
+런타임 명령은 감사된 업스트림 helper 집합을 쓴다. `omarchy-menu toggle`은 런처,
+`omarchy-menu-keybindings`는 키바인딩 뷰어, `omarchy-theme-set`은 테마 적용,
+`omarchy-shell`은 IPC 요청을 담당한다. `omarchy-restart-shell`은 오버레이가
+구현한 잠금 인지 재시작 명령이다. 이전 `cachy-omarchy-shell`·
+`cachy-omarchy-launcher` 실행 명령은 삭제됐고, `cachy-omarchy-shell`은 런타임
+패키지 이름으로만 남아 있다.
 
 ## 세션 요구사항
 
@@ -117,9 +123,9 @@ idle → screensaver → lock → wake 체인이 패키징돼 있다: idle 타�
 `up`/`down`/`cycle`은 이 오버레이가 스테이징하지 않는 업스트림 미디어 키
 (XF86Kbd*) 바인딩 전용이다.
 
-선택: idle 스크린세이버는 `ttfx`(AUR), 다중 모니터 배치는 `socat` 이 있어야
-한다. 없으면 스크린세이버만 조용히 뜨지 않으며 다른 기능에는 영향이 없다. 이
-체인이 쓰는 clamshell/toggle seam 은 `hyprland.lua` 설정에서만 동작한다
+선택: idle 스크린세이버를 쓰려면 `ttfx`(AUR)를 설치한다. 없으면
+스크린세이버만 조용히 뜨지 않으며 잠금은 동작한다. 다중 모니터 배치에 쓰는
+`socat`은 이미 패키지 필수 의존성이다. 이 체인이 쓰는 clamshell/toggle seam 은 `hyprland.lua` 설정에서만 동작한다
 (`docs/RUNTIME_STARTUP.md` 참고).
 
 ## 기동 모델
@@ -141,7 +147,12 @@ bin/build-packages           # 두 패키지 빌드 + 감사, 결과는 build/ �
 bin/test-packages            # build/ 아티팩트 대상 전체 스위트
 bin/install-packages --install   # build/ 의 현재 두 파일을 sudo pacman -U
 cachy-omarchy-init           # 최초 1회: 바인딩 + 사용자 상태 생성
+cachy-omarchy-doctor         # 세션·런타임·사용자 설정 진단
 ```
+
+빌드와 런타임 검증은 위 세션 요구사항을 갖춘 CachyOS/Arch 환경에서 실행한다.
+최초 설정 뒤에는 로그아웃하고 uwsm 관리 Hyprland 세션으로 다시 로그인해
+세션 환경과 셸 자동 기동을 적용한다.
 
 `cachy-omarchy-init` 은 첫 실행에서 잠금 화면도 설정한다. 업스트림
 `omarchy-apply-lock` 헬퍼에 위임하며, 그 헬퍼가 `/etc/pam.d/omarchy-lock-password`
@@ -180,7 +191,10 @@ rollback 전체가 실패한다. 끝난 뒤에는 `omarchy-restart-shell` 로 �
 
 - `SPEC.md` — 최종 권위 명세
 - `UPSTREAM.md` — 업스트림 핀/추적 정책
-- `docs/RUNTIME_STARTUP.md` — 기동 경로·플러그인 비활성화 실측
+- `docs/RUNTIME_STARTUP.md` — 기동·설정·공존·재시작 계약
+- `docs/RUNTIME_DEPENDENCIES.md` — 의존성 정책과 클로저 감사 한계
+- `docs/COMMAND_AUDIT.md` — 스테이징·적응·비활성 helper 목록
+- `packages/cachy-omarchy-shell/PATCHES.md` — 유지하는 패치와 제거 조건
 
 마일스톤 설계·구현 플랜은 비공개 개발 트리에 남겨 두고 이 저장소에는 담지 않는다.
 공개 문서에서 설계 기록을 인용할 때는 파일명만 밝힌다.
@@ -188,8 +202,11 @@ rollback 전체가 실패한다. 끝난 뒤에는 `omarchy-restart-shell` 로 �
 ## 알려진 한계
 
 `xdg-terminal-exec` 는 여전히 AUR 전용 optdepend — fallback 어댑터는 만들지
-않는다. 크래시한 `hyprlock` 이 stranded 시킨 잠금을 복구하는 것은 범위 밖이다
-(`docs/RUNTIME_STARTUP.md` §22.4). 릴리스 이력은 git 태그
+않는다. 고아 락 복구는 비활성 상태다. 이전 공존 실험의 크래시 때문에 두
+session-lock 헬퍼를 의도적으로 스테이징하지 않는다(`docs/RUNTIME_STARTUP.md` §22.4).
+4.0.5 가드의 라이브 검증은 [#20](https://github.com/stadia/cachy-omarchy-overlay/issues/20)에서
+진행할 예정이다. 현재 핀은 자동 테스트 근거만 있고 라이브 Wayland 인수 검증은
+아직이다(`UPSTREAM.md` 참고). 릴리스 이력은 git 태그
 (`git tag`)에 있다.
 
 ## 라이선스

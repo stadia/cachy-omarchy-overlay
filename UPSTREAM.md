@@ -25,8 +25,10 @@
 1. resolves the latest stable `vX.Y.Z` tag (the same lookup as
    `bin/check-upstream`) and fetches that commit into `build/omarchy`
    (cloned if missing) and checks it out;
-2. rewrites `upstream.lock` and the shell `PKGBUILD` (`pkgver`, `pkgrel=1`,
-   `_commit`) and deletes makepkg's stale `src/`, `pkg/` and `omarchy/` caches;
+2. rewrites `upstream.lock`, the shell `PKGBUILD` (`pkgver`, `_commit`,
+   `pkgrel=1` for a new version or an increment for a moved tag), and the shell
+   package version in both README tables, then deletes makepkg's stale `src/`,
+   `pkg/` and `omarchy/` caches;
 3. `bin/build-packages`, then `bin/test-packages` (the whole suite).
 
 If any step fails, the tracked files (the lock, the PKGBUILD and both READMEs)
@@ -94,9 +96,10 @@ commit. The list of upstream helpers the closure scanner trusts is not stored:
 업스트림 소스가 아니라 이 레포에서 새로 작성한 CachyOS 통합 레이어. 소유 파일은
 다음 범주다(정확한 목록은 `tests/package/test_overlay_files.sh` 가 단언한다):
 
-- `usr/bin/cachy-omarchy-{shell,launcher,bindings,init,doctor}`
-  — 공개 명령 5개. `launcher` 는 업스트림 `omarchy-menu toggle` 의 호환 별칭이다
-  (SUPER+SPACE 는 그것을 직접 부른다). `reload` 는 `--restart` 와 같은 별칭이라 지웠다.
+- `usr/bin/cachy-omarchy-{bindings,init,doctor}` — 설정·진단 명령 3개.
+  `cachy-omarchy-shell`·`cachy-omarchy-launcher` 실행 명령은 삭제됐다(PR #18).
+  기동은 업스트림 `omarchy-launch-shell`, IPC 는 `omarchy-shell`, SUPER+SPACE 는
+  `omarchy-menu toggle`을 직접 쓴다. `cachy-omarchy-shell`은 패키지 이름으로만 남는다.
 - `usr/lib/cachy-omarchy/compat/bin/{omarchy-update-available,
   omarchy-theme-set-browser,omarchy-theme-set-keyboard,
   omarchy-restart-shell}` — compat 적응 카피 4개. 실체는 이 통제 경로에만
@@ -138,7 +141,13 @@ systemd 유저 유닛은 기동 전환(SPEC §17 "Shell Autostart", RUNTIME_STAR
   install/remove 계열과 같은 패키지/설치 경로 경계
 - XF86 media 키의 자동 주입 (M10 D6)
 - `omarchy-system-factory-reset` / `-finish` (Omarchy ISO `@factory` 전제)
-- 락/알림의 기본 활성 (OSD 패널은 M10 에서 채택 — direct CLI/audio helper 경로만)
+- 고아 락 복구 헬퍼 `omarchy-hyprland-session-locked` /
+  `omarchy-hyprland-session-lock-stranded` — 이전 공존 크래시 이후 미스테이징 유지.
+  4.0.5 가드는 다른 quickshell/qs/hyprlock 생존 시 exit 2(미정)로 회수를 보류한다.
+  이 가드의 안전성과 크래시 후 복구는 [#20](https://github.com/stadia/cachy-omarchy-overlay/issues/20) 라이브 검증 대기.
+
+바·알림·OSD·idle·lock 플러그인 자체는 업스트림 기본값대로 활성이다.
+고아 락 복구 경로만 헬퍼 부재(exit 127)로 비활성화한다.
 
 ## Minimum safe subset
 
@@ -146,7 +155,10 @@ CachyOS에서 `omarchy.menu`를 쓰려면 공식 OS가 아니라 **핀된 런타
 
 ## Known limitations (미해결)
 
-상세와 실측 근거는 `docs/RUNTIME_STARTUP.md` §6.
+현재 제한은 README의 "Known gaps"와 `docs/RUNTIME_STARTUP.md` §22.4·§23에
+기록한다. 4.0.5 라이브 Wayland 인수 검증은 아직 수행하지 않았으며, 위 환경 표의
+자동 테스트 결과와 이전 핀의 공존 실측을 구분한다. 삭제된 §6 등 과거 절은
+`git show v1.0.2:docs/RUNTIME_STARTUP.md`로 읽는다.
 
 ### 역사 기록 (해소됨 — 이 목록에 있었으나 더 이상 제한이 아니다)
 

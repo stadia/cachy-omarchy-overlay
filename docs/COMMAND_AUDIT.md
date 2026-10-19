@@ -15,9 +15,9 @@
 
 | command | called from | purpose | deps | class | action |
 | --- | --- | --- | --- | --- | --- |
-| `omarchy-launch-shell` | 세션/유닛 | `quickshell -n -p $OMARCHY_PATH/shell` + journal + hyprctl 재시도 | quickshell, hyprctl, systemd-cat | SAFE | verbatim 스테이징(#11). autostart 가 직접 부른다 |
+| `omarchy-launch-shell` | Hyprland autostart | `quickshell -n -p $OMARCHY_PATH/shell` + journal + hyprctl 재시도 | quickshell, hyprctl, systemd-cat | SAFE | verbatim 스테이징(#11). autostart 가 직접 부른다 |
 | `omarchy-shell` | 핫키, 메뉴, 플러그인 | 기동하지 않음. `qs ipc` 전달 | OMARCHY_PATH, qs, timeout | SAFE | verbatim 스테이징(#11). compat shim 을 대체한다 |
-| `omarchy-restart-shell` | 업데이트/디버그 | 기존 qs 인스턴스 kill 후 재기동 | quickshell kill | ADAPTED | wrapper — `overlay/compat/bin/omarchy-restart-shell` 이 `cachy-omarchy-shell --restart` 로 위임한다. 업스트림 감독자와 이중 기동하지 않도록 `quickshell kill` 로 멈춘다(#11) |
+| `omarchy-restart-shell` | 업데이트/디버그 | 기존 qs 인스턴스 kill 후 재기동 | quickshell kill | ADAPTED | wrapper — `overlay/compat/bin/omarchy-restart-shell`이 락 조회·kill·재기동을 직접 구현한다(PR #18). 업스트림 감독자와 이중 기동하지 않도록 `quickshell kill` 로 멈춘다(#11) |
 | `quickshell` / `qs` | 위 두 명령 | 엔진 | CachyOS 패키지 | SAFE | package (의존) |
 
 ---
@@ -34,7 +34,7 @@
 
 ```text
 omarchy-plymouth-*
-omarchy-launch-screensaver / -about / -floating-terminal-with-presentation
+omarchy-launch-about
 omarchy-reinstall-configs
 omarchy-update / omarchy-update-firmware / omarchy-pkg-*
 omarchy-install-* / omarchy-remove-*
@@ -50,7 +50,7 @@ omarchy-branding-* / omarchy-theme-bg-install / omarchy-plymouth-*
 
 | command | called from | purpose | class | action |
 | --- | --- | --- | --- | --- |
-| `omarchy-menu-keybindings` | 메뉴 `learn.keybindings` | `hyprctl binds` + Lua 캐시 + 검색 메뉴 | ADAPTED | SUPER+K / 메뉴 action 모두 패치 0003 이 적용된 업스트림 `omarchy-menu-keybindings` 를 부른다(셸 패키지 스테이징 + compat `omarchy-shell` + 스테이징 `omarchy-menu-select`/`omarchy-cmd-present`). **M4 실측 완료**(아래). 데이터 수집만 CachyOS Hyprland 설정에 맞춘다 |
+| `omarchy-menu-keybindings` | 메뉴 `learn.keybindings` | `hyprctl binds` + Lua 캐시 + 검색 메뉴 | ADAPTED | SUPER+K / 메뉴 action 모두 패치 0003 이 적용된 업스트림 `omarchy-menu-keybindings` 를 부른다(셸 패키지 스테이징 + 업스트림 `omarchy-shell` + 스테이징 `omarchy-menu-select`/`omarchy-cmd-present`). **M4 실측 완료**(아래). 데이터 수집만 CachyOS Hyprland 설정에 맞춘다 |
 | `omarchy-menu-tmux-keybindings` | 메뉴 | Tmux 전용 | SAFE | package — 0.8.0 verbatim stage. tmux(opt) 바인딩 검색. config/tmux 폴백 미출시지만 사용자 설정 없으면 exit 1 로 degrade |
 | `omarchy-menu-herdr-keybindings` | 메뉴 | Herdr 전용 | DISABLED | disable |
 
@@ -107,18 +107,18 @@ omarchy-branding-* / omarchy-theme-bg-install / omarchy-plymouth-*
 
 ## 셸 인프라 (기본 활성 플러그인이 부름)
 
-idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러그인 DISABLE이 우선.
-아래 `omarchy-system-lock` 행은 **idle 플러그인 정책**이다. 메뉴 `system.lock` 헬퍼는 전수 표에서 SAFE/package 다.
+idle/lock/osd/battery는 업스트림 기본값대로 활성이다. 아래 helper는 기본 활성
+플러그인에서도 호출된다. 고아 락 복구만 의도적으로 비활성 상태를 유지한다.
 
 | command | plugin | class | action |
 | --- | --- | --- | --- |
 | `omarchy-launch-screensaver` | idle | SAFE | package (0.11.0). 짝 헬퍼 `omarchy-screensaver` 와 함께 스테이징 — 하나만 올리면 창이 뜨고 본체가 127 로 즉시 죽는다. `tests/data/closure-exceptions.tsv` 예외 행 회수 |
-| `omarchy-system-lock` | idle | DISABLED | disable plugin |
+| `omarchy-system-lock` | idle | SAFE | package — 메뉴와 같은 잠금 경로. `omarchy-apply-lock`의 PAM 설정이 전제 |
 | `omarchy-system-wake` | idle / lock | SAFE | package (0.11.0). idle 플러그인 종료 경로와 lock 플러그인의 `runWake()` 양쪽이 부른다. 자체 체인(brightness-display/brightness-keyboard/hyprland-monitor-clamshell) 전부 staged |
-| `omarchy-hyprland-session-locked` / `omarchy-hyprland-session-lock-stranded` | lock | **DISABLED — 공존 위험** | **의도적 미스테이징(4.0.5부터 `strandedLockCheckProc` 는 래퍼 `-lock-stranded` 를 부르고 래퍼가 `-locked` 를 부른다 — 둘 다 막는다).** `strandedLockCheckProc` 가 이걸 불러 exit 0 이면 세션 잠금을 회수하려 하는데, hyprlock 이 이미 쥔 상태면 ext-session-lock 거부로 **quickshell 이 죽는다**(실측 §22.4). 헬퍼가 없으면 127 → 복구 경로가 조용히 비활성 = fail-safe. `tests/package/test_staged_helpers.sh`(`staged-helpers.tsv` 의 `absent` 행)가 고정. `tests/data/closure-exceptions.tsv` 에도 등록(v0.9, milestone=blocked — 크기가 아니라 스테이징 자체가 실측된 크래시를 만들기 때문. `never` 는 미래 작업이 다시 안 볼 표시라 부정확 — 해제 조건: ext-session-lock 거부가 quickshell 을 죽이지 않게 되기 전까지) |
+| `omarchy-hyprland-session-locked` / `omarchy-hyprland-session-lock-stranded` | lock | **DISABLED — 공존 위험** | **의도적 미스테이징.** 4.0.5부터 `strandedLockCheckProc`는 `-lock-stranded` 래퍼를 부르고 래퍼가 `-locked`를 부른다. 다른 quickshell/qs/hyprlock 생존 시 exit 2(미정)로 회수를 보류하는 가드가 추가됐다. 이전 경로는 hyprlock 보유 중 회수 시 ext-session-lock 거부로 **quickshell이 죽었다**(§22.4). 새 가드의 공존·크래시 복구는 [#20](https://github.com/stadia/cachy-omarchy-overlay/issues/20) 라이브 검증 전이다. 헬퍼가 없으면 127 → 복구 경로가 조용히 비활성 = fail-safe. `tests/package/test_staged_helpers.sh`(`staged-helpers.tsv` 의 `absent` 행)가 고정. `tests/data/closure-exceptions.tsv` 에도 등록(v0.9, milestone=blocked — 크기가 아니라 스테이징 자체가 실측된 크래시를 만들기 때문. `never` 는 미래 작업이 다시 안 볼 표시라 부정확 — 해제 조건: #20의 두 실측에서 가드의 충돌 방지와 고아 락 복구를 확인하거나 quickshell 자체가 거부를 안전하게 처리할 때) |
 | `omarchy-brightness-keyboard` | lock | SAFE | package (0.11.0). lock 의 `runBlank()` 가 부른다. `omarchy-osd`(staged)만 호출 |
 | `omarchy-battery-low` | battery | SAFE | package — v0.9. battery 플러그인(기본 활성)이 10% 이하에서 부른다. 체인은 omarchy-notification-send + omarchy-hook 뿐이라 verbatim |
-| `omarchy-powerprofiles-set` | battery | DISABLED | disable plugin |
+| `omarchy-powerprofiles-set` | battery | SAFE | package — `omarchy-powerprofiles-list`와 함께 스테이징 |
 | `omarchy-notification-send` | 여러 패널 | SAFE | package — M8 Tier B. `omarchy-reminder` 와 `omarchy-theme-set` 이 부른다(실측). 알림 표시 자체는 셸 플러그인 정책이지 이 helper 의 스테이징 여부와 별개다 |
 | `omarchy-shell osd ...` | AppLibrary 런치 OSD | OPTIONAL | osd 플러그인 정책에 따름 |
 | `omarchy-osd` | osd 패널 | M10: stage | `omarchy-shell -q osd show <jq payload>` 얇은 프런트. volume/mic-mute helper 와 함께 채택. display brightness 체인은 이후 verbatim 확장에서 채택 |
@@ -532,7 +532,7 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-restart-audio` | SAFE | package | audio-tuning 전이. v0.12.0에서 `omarchy-launch-floating-terminal-with-presentation` 프레젠테이션 체인까지 스테이징해 `update.hardware.audio` 메뉴 행의 실행 결손을 닫았다 |
 | `omarchy-restart-bluetooth` | SAFE | package | 0.8.0 verbatim stage. rfkill unblock/list bluetooth |
 | `omarchy-restart-hyprsunset` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-restart-shell` | ADAPTED | wrapper | v0.12.0 compat 적응 카피(`overlay/compat/bin/omarchy-restart-shell`) → `cachy-omarchy-shell --restart` 위임. quickshell kill/재기동 + 세션 락 재확보 폴링이 있는 원본은 미스테이징 헬퍼 2개(`omarchy-hyprland-session-locked`(blocked)·`omarchy-system-sleep-lock`)를 전제하고 kill 직후 죽어가는 인스턴스가 남는 레이스가 있어 verbatim 이 아니라 락 인지 재시작 프런트로 대체한다. `tests/data/closure-exceptions.tsv` 예외 행 회수 |
+| `omarchy-restart-shell` | ADAPTED | wrapper | compat 적응 카피(`overlay/compat/bin/omarchy-restart-shell`)가 락 조회·종료 대기·재기동을 직접 구현한다(PR #18에서 실행 명령 통합). quickshell kill/재기동 + 세션 락 재확보 폴링이 있는 원본은 미스테이징 헬퍼 2개(`omarchy-hyprland-session-locked`(blocked)·`omarchy-system-sleep-lock`)를 전제하고 kill 직후 죽어가는 인스턴스가 남는 레이스가 있어 verbatim 이 아니라 락 인지 재시작 프런트로 대체한다. `tests/data/closure-exceptions.tsv` 예외 행 회수 |
 | `omarchy-restart-trackpad` | SAFE | package | 0.8.0 verbatim stage. i2c_hid_acpi 언바인드/바인드 + modprobe |
 | `omarchy-restart-wifi` | SAFE | package | 0.8.0 verbatim stage. rfkill + nmcli radio |
 | `omarchy-restart-xcompose` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
