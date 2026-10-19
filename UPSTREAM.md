@@ -7,15 +7,15 @@
 | 항목 | 값 |
 | --- | --- |
 | Repository | https://github.com/basecamp/omarchy.git |
-| Version | 4.0.4 |
-| Tag | v4.0.4 |
-| Commit | `c668141e9c42b13c80c9ca4ea108e11708c5e8a5` |
+| Version | 4.0.5 |
+| Tag | v4.0.5 |
+| Commit | `94a8fbc2d67eec5673c7f16b8c5e8a9c8452ffdc` |
 | Channel | stable |
 | Source license | MIT (Copyright David Heinemeier Hansson) |
 | Known compatibility patches | `0001-stop-plugin-watcher-on-shell-exit.patch` (Quickshell `Io.Process` orphan cleanup, `docs/RUNTIME_STARTUP.md` §"역사 기록"), `0002-cancel-polkit-flow-before-session-lock.patch` (Polkit 인증 흐름을 세션 잠금 전에 취소) |
-| Last tested CachyOS environment | CachyOS, kernel 7.2.5-1-cachyos, Hyprland 0.56.2, Quickshell 0.3.1. `omarchy`/`omarchy-settings` 미설치. 2026-09-28 `bin/update-upstream` 로 핀을 옮기고 실저장소 재빌드 후 `./tests/test.sh` 76/76 (스테이징 검증 생략 note 0건). 라이브 세션 실측(`COO_RUN_LIVE=1`)은 아직. |
+| Last tested CachyOS environment | CachyOS, kernel 7.2.5-1-cachyos, Hyprland 0.56.2, Quickshell 0.3.1. `omarchy`/`omarchy-settings` 미설치. 2026-10-19 `bin/update-upstream` 로 핀을 옮기고 재빌드 후 `./tests/test.sh` 51개 통과·4개 skip(라이브 Wayland)·0개 실패. 라이브 세션 실측(`COO_RUN_LIVE=1`)은 아직. |
 
-이전 핀(`v4.0.3`, `05349870`)에 대한 실측 기록은 위 표를 이 핀으로 갱신하기
+이전 핀(`v4.0.4`, `c668141e9`)에 대한 실측 기록은 위 표를 이 핀으로 갱신하기
 전 git 히스토리에 남아 있다.
 
 ## Moving the pin

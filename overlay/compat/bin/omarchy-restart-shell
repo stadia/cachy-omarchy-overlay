@@ -23,6 +23,8 @@ omarchy-launch-shell 로 다시 띄운다. 락 상태를 알 수 없으면(기�
 환경:
   COO_OMARCHY_PATH   업스트림 루트 override (기본: /usr/share/cachy-omarchy/upstream)
   COO_IPC_TIMEOUT    락 조회 IPC 타임아웃 (기본 2s)
+  COO_EXIT_WAIT      이전 셸 종료 대기 초 (기본 30)
+  COO_READY_WAIT     새 셸 ping 응답 대기 초 (기본 60)
 USAGE
 }
 
@@ -79,9 +81,11 @@ cmd_restart() {
   # 업스트림 감독자(omarchy-launch-shell)는 비정상 종료면 재기동한다. TERM 으로
   # 죽이면 감독자가 새로 띄우고 우리도 새로 띄워 셸이 이중 기동하므로, 업스트림
   # omarchy-restart-shell 처럼 quickshell kill(정상 종료)로 멈춘다. 한 번의 kill
-  # 은 인스턴스 하나만 멈추므로 더 없을 때까지 반복한다.
-  local n=0
-  while (( n < 10 )) && timeout 5 quickshell kill -p "$OMARCHY_PATH/shell" --any-display >/dev/null 2>&1; do
+  # 은 인스턴스 하나만 멈추므로 더 없을 때까지 반복한다. 큰 바는 내려가는 데 몇 초
+  # 넘게 걸리므로(업스트림 4.0.5 가 같은 이유로 30초로 늘렸다) 클라이언트가 끝까지
+  # 기다리게 한다.
+  local n=0 deadline
+  while (( n < 10 )) && timeout 30 quickshell kill -p "$OMARCHY_PATH/shell" --any-display >/dev/null 2>&1; do
     n=$((n + 1))
   done
 
@@ -89,9 +93,9 @@ cmd_restart() {
   # 엔진 정리 중). 이때 새로 띄우면 "already running" 으로 exit 0 하고 감독자가
   # 그것을 의도된 정지로 읽어 셸이 영영 안 뜬다. 끝내 안 사라지면 옛 인스턴스가
   # ping 에 답해 거짓 성공이 되므로 여기서 실패한다.
-  n=0
-  while (( n < 50 )) && pgrep -f "quickshell -n -p $OMARCHY_PATH/shell" >/dev/null 2>&1; do
-    sleep 0.1; n=$((n + 1))
+  deadline=$((SECONDS + ${COO_EXIT_WAIT:-30}))
+  while (( SECONDS < deadline )) && pgrep -f "quickshell -n -p $OMARCHY_PATH/shell" >/dev/null 2>&1; do
+    sleep 0.1
   done
   pgrep -f "quickshell -n -p $OMARCHY_PATH/shell" >/dev/null 2>&1 \
     && fail "이전 셸이 종료되지 않았다 — 새로 띄우지 않는다."
@@ -99,8 +103,10 @@ cmd_restart() {
   hypr_err=$(hyprctl dispatch 'hl.dsp.exec_cmd("omarchy-launch-shell")' 2>&1 >/dev/null) \
     || fail "Hyprland 에 omarchy-launch-shell 기동을 요청하지 못했다: ${hypr_err:-hyprctl failed}"
 
-  local attempt
-  for (( attempt = 0; attempt < 50; attempt++ )); do
+  # 셸은 플러그인이 다 올라온 뒤에야 ping 에 답하고, 큰 바에서는 10초를 넘기므로
+  # 횟수가 아니라 데드라인으로 기다린다(업스트림 4.0.5 와 같은 60초).
+  deadline=$((SECONDS + ${COO_READY_WAIT:-60}))
+  while (( SECONDS < deadline )); do
     if OMARCHY_SHELL_IPC_TIMEOUT=0.5s omarchy-shell shell ping >/dev/null 2>&1; then
       return 0
     fi

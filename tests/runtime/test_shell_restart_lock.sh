@@ -63,6 +63,7 @@ run_restart() {
   PATH="$stub:$PATH" \
     COO_OMARCHY_PATH="$fake/upstream" \
     COO_CALL_LOG="$calls" \
+    COO_EXIT_WAIT=1 COO_READY_WAIT=1 \
     STUB_LOCK_JSON="${1:-}" \
     STUB_LOCK_ERR="${3:-}" \
     STUB_LOCK_EXIT="${2:-0}" \
