@@ -108,6 +108,28 @@ for mode in BUILD AUDIT EXTRA; do
 done
 assert_contains "$out" "ambiguous build artifacts" "extra artifact is reported as ambiguous"
 
+# 두 번째 복사가 중간에 실패해도 build/ 에 현재 이름의 반쪽 파일이나 임시
+# 파일이 남지 않아야 한다 (첫 번째 패키지도 게시되지 않는다).
+cat >"$fake/install" <<'EOF2'
+#!/usr/bin/env bash
+dest=${!#}
+src=${@: -2:1}
+if [[ $dest == *cachy-omarchy-overlay-* ]]; then
+  head -c 1 "$src" >"$dest"
+  echo 'fake-install: forced write failure' >&2
+  exit 5
+fi
+cp "$src" "$dest"
+EOF2
+chmod +x "$fake/install"
+fresh=$COO_TEST_SANDBOX/build-INSTALL
+code=0
+out=$(COO_REPO_ROOT="$root" COO_BUILD_DIR="$fresh" COO_MAKEPKG_BIN="$fake/makepkg" \
+  COO_BSDTAR_BIN="$fake/bsdtar" COO_INSTALL_BIN="$fake/install" "$root/bin/build-packages" 2>&1) || code=$?
+[[ $code != 0 ]] && failed=1 || failed=0
+assert_eq "$failed" "1" "build copy failure exits nonzero"
+assert_eq "$(find "$fresh" -type f 2>/dev/null | wc -l)" "0" "build copy failure leaves no partial or temp file"
+
 # --- test-packages: 현재 아티팩트가 있어야 러너를 부른다 ---
 run_tests() {
   COO_REPO_ROOT="$root" COO_BUILD_DIR="$1" COO_TEST_RUNNER="$fake/test-runner" \
@@ -182,5 +204,22 @@ code=0; out=$(COO_FAKE_Q_SHELL=4.0.10-1 COO_FAKE_Q_OVERLAY=0.3.0-1 COO_REPO_ROOT
   COO_SUDO_LOG="$sudolog" PATH="$fake:$PATH" "$root/bin/rollback" 2>&1) || code=$?
 assert_eq "$code" "0" "rollback as normal user succeeds"
 assert_contains "$(cat "$sudolog")" "sudo pacman -U" "rollback elevates only the pacman transaction"
+
+# vercmp 가 없거나 실패하면 "더 낮은 버전 없음" 으로 뭉개지 말고 크게 실패한다.
+reset_logs; code=0
+out=$(COO_FAKE_Q_SHELL=4.0.10-1 COO_FAKE_Q_OVERLAY=0.3.0-1 COO_VERCMP_BIN="$fake/no-such-vercmp" run_rollback) || code=$?
+assert_eq "$code" "1" "rollback without vercmp fails"
+assert_contains "$out" "error: vercmp not found: $fake/no-such-vercmp" "missing vercmp is explicit"
+assert_eq "$(wc -l <"$paclog")" "0" "rollback without vercmp invokes no pacman"
+printf '#!/usr/bin/env bash\nexit 3\n' >"$fake/vercmp-fail"
+printf '#!/usr/bin/env bash\necho newer\n' >"$fake/vercmp-junk"
+chmod +x "$fake/vercmp-fail" "$fake/vercmp-junk"
+for bad in vercmp-fail vercmp-junk; do
+  reset_logs; code=0
+  out=$(COO_FAKE_Q_SHELL=4.0.10-1 COO_FAKE_Q_OVERLAY=0.3.0-1 COO_VERCMP_BIN="$fake/$bad" run_rollback) || code=$?
+  assert_eq "$code" "1" "rollback with $bad fails"
+  assert_contains "$out" "error: vercmp failed" "$bad is explicit"
+  assert_eq "$(wc -l <"$paclog")" "0" "rollback with $bad invokes no pacman"
+done
 
 exit "$ASSERT_FAILURES"

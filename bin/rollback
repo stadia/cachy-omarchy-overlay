@@ -26,19 +26,34 @@ case ${1:-} in
   *) fail "unknown argument: $1" ;;
 esac
 
+command -v "$vercmp_bin" >/dev/null 2>&1 || fail "vercmp not found: $vercmp_bin"
+
+# Prints vercmp's result for $1 vs $2; a failing or garbled vercmp is fatal,
+# never read as "not older".
+version_cmp() {
+  local result
+  result=$("$vercmp_bin" "$1" "$2") && [[ $result =~ ^-?[0-9]+$ ]] ||
+    fail "vercmp failed comparing $1 and $2"
+  printf '%s' "$result"
+}
+
 # Prints the newest build/ artifact of $1 older than the installed version,
 # or nothing when there is none.
 previous_artifact() {
-  local pkg=$1 installed f ver best="" best_ver=""
+  local pkg=$1 installed f ver cmp best="" best_ver=""
   installed=$("${query_cmd[@]}" -Q "$pkg" 2>/dev/null) || fail "$pkg is not installed"
   installed=${installed#"$pkg "}
   for f in "$build_dir/$pkg"-*-any.pkg.tar.zst; do
     [[ -f $f ]] || continue
     ver=${f##*/}; ver=${ver#"$pkg-"}; ver=${ver%-any.pkg.tar.zst}
-    (( $("$vercmp_bin" "$ver" "$installed") < 0 )) || continue
-    if [[ -z $best_ver ]] || (( $("$vercmp_bin" "$ver" "$best_ver") > 0 )); then
-      best=$f best_ver=$ver
+    # Command substitutions do not inherit errexit; propagate explicitly.
+    cmp=$(version_cmp "$ver" "$installed") || exit 1
+    (( cmp < 0 )) || continue
+    if [[ -n $best_ver ]]; then
+      cmp=$(version_cmp "$ver" "$best_ver") || exit 1
+      (( cmp > 0 )) || continue
     fi
+    best=$f best_ver=$ver
   done
   printf '%s' "$best"
 }

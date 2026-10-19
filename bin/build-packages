@@ -58,10 +58,18 @@ for name in "$COO_SHELL_ARTIFACT" "$COO_OVERLAY_ARTIFACT"; do
   audit "$pkgdest/$name" || fail "archive audit failed: $name"
 done
 
-# Nothing reaches build/ until both packages built and passed the audit.
-# Older versions stay there: bin/rollback installs from them.
+# Nothing reaches build/ under a current name until both packages built,
+# passed the audit and were fully copied: copy each to a hidden temp name in
+# build/ (same filesystem), then rename both into place. Older versions stay
+# there: bin/rollback installs from them.
 mkdir -p "$build_dir"
+staged=()
+trap 'rm -rf "$work"; rm -f "${staged[@]}"' EXIT
 for name in "$COO_SHELL_ARTIFACT" "$COO_OVERLAY_ARTIFACT"; do
-  "$install_bin" -m 644 "$pkgdest/$name" "$build_dir/$name"
+  staged+=("$build_dir/.$name.tmp")
+  "$install_bin" -m 644 "$pkgdest/$name" "$build_dir/.$name.tmp" || fail "could not copy $name into $build_dir"
+done
+for name in "$COO_SHELL_ARTIFACT" "$COO_OVERLAY_ARTIFACT"; do
+  mv -f "$build_dir/.$name.tmp" "$build_dir/$name"
   printf 'built: %s\n' "$build_dir/$name"
 done
