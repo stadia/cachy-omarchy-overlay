@@ -20,8 +20,8 @@ Two Arch packages are produced.
 
 | Package | Version | Role |
 |---|---|---|
-| `cachy-omarchy-shell` | 4.0.4-5 | The pinned Omarchy Quattro shell runtime (Quickshell tree, `omarchy-settings` excluded) |
-| `cachy-omarchy-overlay` | 1.0.2-2 | The CachyOS integration layer (wrapper commands, Hyprland bindings, defaults) |
+| `cachy-omarchy-shell` | 4.0.4-6 | The pinned Omarchy Quattro shell runtime (Quickshell tree, `omarchy-settings` excluded) |
+| `cachy-omarchy-overlay` | 1.0.2-3 | The CachyOS integration layer (wrapper commands, Hyprland bindings, defaults) |
 
 The upstream pin is managed by `upstream.lock` (currently `basecamp/omarchy @ v4.0.4`,
 `c668141`).
@@ -130,9 +130,10 @@ runs for `hyprland.lua` configs (see `docs/RUNTIME_STARTUP.md`).
 ## Startup model
 
 The shell starts from **Hyprland autostart**, not from a systemd unit — the same model
-upstream omarchy uses. `bindings.lua` runs `cachy-omarchy-shell --run` on the
-`hyprland.start` event (once per session). There is no automatic restart after a crash;
-recover manually with `cachy-omarchy-shell --restart`.
+upstream omarchy uses. `bindings.lua` runs the upstream `omarchy-launch-shell` on the
+`hyprland.start` event (once per session); that supervisor relaunches the shell if Qt
+dies (up to 5 times a minute). Restart manually with `omarchy-restart-shell`, which
+refuses while the session is locked.
 
 **Upgrading:** an existing `~/.config/cachy-omarchy/hypr/bindings.lua` is never overwritten
 without `--force`. If `cachy-omarchy-doctor` reports that SUPER+K still runs the removed

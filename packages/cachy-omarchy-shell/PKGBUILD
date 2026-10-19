@@ -1,14 +1,14 @@
 # Maintainer: Cachy Omarchy Overlay
 pkgname=cachy-omarchy-shell
 pkgver=4.0.4
-pkgrel=5
+pkgrel=6
 pkgdesc='Pinned Omarchy Quattro shell runtime for CachyOS (no omarchy-settings)'
 arch=('any')
 url='https://github.com/basecamp/omarchy'
 license=('MIT')
 # libvips: omarchy-menu-images vipsthumbnail (theme/bg picker 미리보기 — 없으면
 #   썸네일 부재가 조용하다). procps-ng: pgrep/pkill (restart-btop/helix,
-#   theme-set-foot, cachy-omarchy-shell --run 중복 기동 검사). psmisc: killall
+#   theme-set-foot, omarchy-launch-shell 중복 기동 검사). psmisc: killall
 #   (restart-terminal 의 kitty/ghostty, restart-opencode). (M9, 설계 문서 D8)
 # jq (M10 승격): clipboard history/read/write, reminders timer JSON, OSD payload —
 #   더 이상 theme-hook 전용이 아니다. wl-clipboard: clipboard watcher(wl-paste)

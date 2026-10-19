@@ -19,8 +19,8 @@ SUPER + K      →  Omarchy 스타일 키바인딩 뷰어
 
 | 패키지 | 버전 | 역할 |
 |---|---|---|
-| `cachy-omarchy-shell` | 4.0.4-5 | 핀된 Omarchy Quattro 셸 런타임 (Quickshell 트리, `omarchy-settings` 제외) |
-| `cachy-omarchy-overlay` | 1.0.2-2 | CachyOS 통합 계층 (래퍼 명령, Hyprland 바인딩, 기본값) |
+| `cachy-omarchy-shell` | 4.0.4-6 | 핀된 Omarchy Quattro 셸 런타임 (Quickshell 트리, `omarchy-settings` 제외) |
+| `cachy-omarchy-overlay` | 1.0.2-3 | CachyOS 통합 계층 (래퍼 명령, Hyprland 바인딩, 기본값) |
 
 업스트림 핀은 `upstream.lock`이 관리한다 (현재 `basecamp/omarchy @ v4.0.4`,
 `c668141`).
@@ -128,8 +128,9 @@ idle → screensaver → lock → wake 체인이 패키징돼 있다: idle 타�
 
 셸은 systemd 유닛이 아니라 **Hyprland autostart**로 뜬다 — 업스트림 omarchy와 같은
 모델이다. `bindings.lua`가 `hyprland.start` 이벤트(세션 시작 시 1회)에
-`cachy-omarchy-shell --run`을 실행한다. 크래시 시 자동 재기동은 없으며
-`cachy-omarchy-shell --restart`로 수동 복구한다.
+업스트림 `omarchy-launch-shell`을 실행한다. 이 감독자는 Qt가 죽으면 셸을 다시
+띄운다(분당 최대 5회). 수동 재시작은 `omarchy-restart-shell`이며 세션이 잠겨 있으면
+거부한다.
 
 ## 빌드와 설치
 

@@ -862,7 +862,7 @@ Preferred lifecycle:
 ```text
 Hyprland session starts (hyprland.start event fires once)
         ↓
-cachy-omarchy-shell --run  (launched via overlay/hypr/bindings.lua)
+omarchy-launch-shell  (launched via overlay/hypr/bindings.lua)
         ↓
 Quickshell loads upstream shell tree (inherits Hyprland WAYLAND_DISPLAY)
         ↓
@@ -885,14 +885,16 @@ The shell is launched by Hyprland autostart, not a systemd user unit:
 
 ```text
 /usr/share/cachy-omarchy/hypr/bindings.lua   (autostart: hl.on("hyprland.start", …))
-/usr/bin/cachy-omarchy-shell --run           (wrapper: idempotent guard, QT wayland pin,
-                                             QS_DISABLE_FILE_WATCHER=1, systemd-cat logging)
+/usr/bin/omarchy-launch-shell                (upstream, verbatim: supervises quickshell,
+                                             relaunches if Qt dies, up to 5 times a minute)
 ```
 
-`--run` is foreground (Hyprland `exec` forks it). `--restart` kills the running
-instance (precise `quickshell -n -p <path>` match) and relaunches detached.
-There is no `Restart=on-failure` (R07 auto-recovery is not provided; recovery is
-manual `--restart`). Migration from the former systemd unit requires
+`omarchy-launch-shell` is foreground (Hyprland `exec` forks it). `cachy-omarchy-shell --restart`
+(also `omarchy-restart-shell`) refuses while the session is locked, stops the running shell
+with `quickshell kill` (a clean exit, so the supervisor does not double-start it) and
+relaunches through Hyprland. IPC is the upstream `omarchy-shell`.
+
+Migration from the former systemd unit requires
 `cachy-omarchy-bindings --force` to refresh the live bindings copy. The same applies
 when upgrading from a release whose bindings copy runs the removed
 `cachy-omarchy-keybindings` (SUPER+K is now the patched upstream
