@@ -48,22 +48,6 @@ journalctl --user -t omarchy-shell
 > **측정(#11)**: `omarchy-restart-shell` 후 `omarchy-launch-shell`(부모 Hyprland) 아래에
 > `quickshell` 이 1개 뜨고 10초 뒤에도 그대로이며(이중 기동 없음) IPC `shell ping` 이 `ok`.
 
---- | --- | --- |
-| `OMARCHY_PATH` | `/usr/share/cachy-omarchy/upstream` | `shell/shell.qml:27` 가 `Quickshell.env("OMARCHY_PATH")` 로 자산을 찾는다. uwsm 세션 환경(`/usr/share/uwsm/env-hyprland.d/10-cachy-omarchy`)이 공급하고, 래퍼가 같은 값을 기본으로 설정한다. 어느 쪽도 없으면 IPC·기동이 모두 실패한다. |
-| `QT_QPA_PLATFORM` | `wayland` | xcb 폴백 차단(방어적). Hyprland autostart(`hyprland.start`)로 기동하면 `WAYLAND_DISPLAY` 가 컴포지터 env 로 항상 정상이라 별도 socket-wait 는 없다. |
-| `QS_DISABLE_FILE_WATCHER` | `1` | **필수.** pacman 이 `$OMARCHY_PATH/shell` 을 다시 쓰는 도중 Quickshell 파일 워처가 리로드를 걸면 반쯤 쓰인 트리를 읽고, 실패한 리로드가 두 번째 엔진 세대를 남겨 다음 재시작의 IPC kill 을 크래시로 만든다. 업스트림 `bin/omarchy-launch-shell` 이 같은 이유로 끈다. 우리는 pacman 배포이므로 그대로 해당. |
-| `QS_NO_RELOAD_POPUP` | `1` | 업스트림 기동 명령이 함께 끄는 팝업. 기동 경로에 영향은 없지만 업스트림 동작을 그대로 따른다(§55). |
-
-`systemd-cat -t cachy-omarchy-shell` 은 Quickshell 의 stdout/stderr 를 저널로 보낸다. **래퍼의 stdout 리다이렉트는 정상이라면 항상 비어 있다.** 기동 로그는 저널을 태그로 읽어야 한다:
-
-```bash
-journalctl --user -t cachy-omarchy-shell
-```
-
-> **측정**: 이 명령으로 띄운 셸은 IPC `shell ping` 에 `ok` 로 응답한다(2회차, 약 0.5s).
-> 저널에 `Configuration Loaded` 가 한 줄 잡힌다. QML 오류·ERROR 레벨 없음.
-> 호환 작업(추가 env·compat shim·래퍼 변경·패치)은 **0** 이었다 — 업스트림이 그대로 기동한다(§6.1 최상 결과).
-
 ---
 
 ## 2. 설정 해석
