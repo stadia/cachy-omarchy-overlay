@@ -166,10 +166,13 @@ assert_contains "$body" "comment-only" "Lua 주석 원본 줄을 보존한다"
 rm -f "$hypr/hyprland.lua"
 printf '$mainMod = SUPER\nbind = $mainMod, Return, exec, ghostty\n' >"$hypr/hyprland.conf"
 before=$(cat "$hypr/hyprland.conf")
-out=$(COO_HYPR_DIR="$hypr" COO_CONFIG_DIR="$HOME/.config/cachy-omarchy" "$H" 2>&1); code=$?
+fresh_cfg=$COO_TEST_SANDBOX/conf-only-cfg
+out=$(COO_HYPR_DIR="$hypr" COO_CONFIG_DIR="$fresh_cfg" "$H" 2>&1); code=$?
 assert_eq "$code" "1" "conf 전용 구성은 exit 1"
 assert_contains "$out" "hyprland.conf 는 지원하지 않는다" "conf 전용 구성은 지원 밖임을 말한다"
 assert_eq "$(cat "$hypr/hyprland.conf")" "$before" "conf 본문은 건드리지 않는다"
+[[ -e $fresh_cfg ]] && made=1 || made=0
+assert_eq "$made" "0" "거부된 실행은 설정 디렉터리를 만들지 않는다"
 rm -f "$hypr/hyprland.conf"
 
 # --- 설치 경로 해석 (M5 Task 1) ---
@@ -196,6 +199,7 @@ assert_eq "$code" "0" "COO_SRC_HYPR 로 실행 성공"
 assert_file_exists "$COO_TEST_SANDBOX/cfg/hypr/bindings.lua" "override 소스에서 복사됨"
 
 # 2) 소스 디렉터리가 없으면 조용히 진행하지 않고 즉시 실패한다.
+mkdir -p "$COO_TEST_SANDBOX/hypr2"; printf -- '-- lua config\n' >"$COO_TEST_SANDBOX/hypr2/hyprland.lua"
 out=$(COO_SRC_HYPR="$COO_TEST_SANDBOX/nonexistent" \
       COO_HYPR_DIR="$COO_TEST_SANDBOX/hypr2" \
       COO_CONFIG_DIR="$COO_TEST_SANDBOX/cfg2" \

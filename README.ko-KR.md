@@ -90,11 +90,20 @@ helper 와 런타임 의존성(`jq`, `wl-clipboard`, `wtype`, `wireplumber`,
 
 ### 지원 범위
 
-**`hyprland.lua` 설정만 지원합니다.** `hyprland.conf` 는 지원하지 않습니다 —
-Lua 를 실행하지 못해 바인딩·셸 자동 기동·Lua toggle 파일이 적용되지 않습니다.
-`cachy-omarchy-bindings` 는 conf 만 있는 환경을 거부하고 `cachy-omarchy-doctor`
-가 WARN 합니다. 이는 노트북 뚜껑 동작을 지원한다는 뜻이 아닙니다. 이 오버레이는 upstream lid-switch 바인딩을
-스테이징하지 않습니다. 자세한 내용은 SPEC 의 "지원 계약" 절을 참고하세요.
+**`hyprland.lua` 설정만 지원한다.** `hyprland.conf` 는 지원하지 않는다 — Lua 를
+실행하지 못해 바인딩·셸 자동 기동·Lua toggle 파일이 적용되지 않는다.
+`cachy-omarchy-bindings` 와 `cachy-omarchy-init` 은 conf 만 있는 환경을 아무것도
+쓰기 전에 거부하고 `cachy-omarchy-doctor` 는 FAIL 한다. 이는 노트북 뚜껑 동작을
+지원한다는 뜻이 아니다. 이 오버레이는 upstream lid-switch 바인딩을 스테이징하지
+않는다. 자세한 내용은 SPEC 의 "지원 계약" 절을 참고.
+
+**conf 설정에서 업그레이드.** 이전 버전이 `hyprland.conf` 에 넣은 관리 블록은
+사용자 사본 `~/.config/cachy-omarchy/hypr/bindings.conf` 를 source 하므로
+업그레이드 직후에도 동작하지만 더는 아무도 관리하지 않는다(정본이 없어
+`--force` 로 새로고침할 수 없다). `hyprland.lua` 로 옮기고
+`cachy-omarchy-bindings` 를 다시 실행한 뒤, conf 의 블록과 `bindings.conf`
+사본은 직접 지운다. `cachy-omarchy-doctor` 가 남은 블록을 WARN 한다. 도구는 두
+파일을 수정하거나 지우지 않는다.
 
 ## 세션 생명주기
 

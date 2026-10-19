@@ -143,9 +143,5 @@ assert_eq "$rc" "0" "빈 disabled-name 은 오류가 아니다"
 [[ -s $h7/devices.log ]] && x=1 || x=0
 assert_eq "$x" "0" "빈 disabled-name 은 hl.device 를 부르지 않는다"
 
-# bindings 스크립트는 toggles 글롭을 주입하지 않는다(seam 은 bindings.lua 안).
-src_bindings=$(<"$REPO_ROOT/overlay/bin/cachy-omarchy-bindings")
-grep -q "toggles/hypr" <<<"$src_bindings" && x=1 || x=0
-assert_eq "$x" "0" "관리 블록 스니펫은 toggles 글롭을 넣지 않는다"
 
 exit "$ASSERT_FAILURES"

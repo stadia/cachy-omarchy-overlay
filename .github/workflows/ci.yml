@@ -113,7 +113,7 @@ jobs:
             install -d "$HOME/.config/hypr"
             printf -- "-- lua config\\n" > "$HOME/.config/hypr/hyprland.lua"
           '
-          conf_setup_status=$?
+          lua_setup_status=$?
           sudo -u enduser bash -lc 'cachy-omarchy-init' 2>&1 | tee /tmp/init.log
           init_status=${PIPESTATUS[0]}
 
@@ -130,12 +130,12 @@ jobs:
             echo '빈 HOME init 에 bindings 설정-부재 오류가 없다' >&2
             failed=1
           fi
-          if test "$conf_setup_status" -ne 0; then
-            echo '최소 Hyprland conf 구성에 실패했다' >&2
+          if test "$lua_setup_status" -ne 0; then
+            echo '최소 Hyprland lua 구성에 실패했다' >&2
             failed=1
           fi
           if test "$init_status" -ne 0; then
-            echo '최소 conf init 이 실패했다' >&2
+            echo '최소 lua init 이 실패했다' >&2
             failed=1
           fi
           # doctor_status 는 의도적으로 판정하지 않는다.

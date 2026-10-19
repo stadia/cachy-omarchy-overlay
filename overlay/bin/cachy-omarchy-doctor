@@ -120,15 +120,12 @@ validate_ipc_timeout() {
 }
 
 has_binding_conflict() {
-  local f body
-  for f in "$HYPR_DIR/hyprland.lua"; do
-    [[ -f $f ]] || continue
-    body=$(grep -vE '^[[:space:]]*(#|--)' "$f" || true)
-    if grep -qiE 'SUPER[[:space:]]*\+[[:space:]]*(SPACE|K)|bind[[:space:]]*=[[:space:]]*(SUPER|\$mainMod)[[:space:]]*,[[:space:]]*(SPACE|K)([[:space:]]*,|$)' <<<"$body"; then
-      return 0
-    fi
-  done
-  return 1
+  local f=$HYPR_DIR/hyprland.lua body
+  [[ -f $f ]] || return 1
+  body=$(grep -vE '^[[:space:]]*--' "$f" || true)
+  # 리터럴 "SUPER + SPACE|K" 와 mainMod .. " + SPACE|K" 두 형태(bindings 와 같다).
+  grep -qiE -e 'SUPER[[:space:]]*\+[[:space:]]*(SPACE|K)' \
+    -e 'mainMod[[:space:]]*\.\.[[:space:]]*["'\''][[:space:]]*\+[[:space:]]*(SPACE|K)' <<<"$body"
 }
 
 if ! validate_ipc_timeout; then
@@ -201,6 +198,8 @@ if has_binding_conflict; then
   fail "Hyprland binding conflict: SUPER+SPACE or SUPER+K already bound"
 elif [[ -f $HYPR_DIR/hyprland.lua ]]; then
   pass "Hyprland binding conflict absent"
+elif [[ -f $HYPR_DIR/hyprland.conf ]]; then
+  warn "Hyprland binding conflict not measurable (hyprland.conf unsupported)"
 else
   warn "Hyprland binding conflict not measurable (no config)"
 fi
@@ -253,9 +252,23 @@ else
   warn "no theme set — omarchy-theme-set \"Tokyo Night\" 또는 셸 메뉴 Style > Theme"
 fi
 # hyprland.conf 는 지원하지 않는다(Lua 설정 전용). lua 없이 conf 만 있으면
-# 바인딩 주입·셸 자동 기동·토글이 모두 적용되지 않으므로 알린다.
+# 바인딩·셸 자동 기동·토글이 모두 적용되지 않으므로 실패로 판정한다.
 if [[ -f $HYPR_DIR/hyprland.conf && ! -f $HYPR_DIR/hyprland.lua ]]; then
-  warn "hyprland.conf is not supported (Lua only): bindings, shell autostart and hypr toggles need $HYPR_DIR/hyprland.lua"
+  fail "hyprland.conf is not supported (Lua only): bindings, shell autostart and hypr toggles need $HYPR_DIR/hyprland.lua"
+fi
+# 예전 버전이 conf 에 넣은 관리 블록은 이제 아무도 관리하지 않는다. 읽기 전용 안내.
+if [[ -f $HYPR_DIR/hyprland.conf ]] && grep -qF '# >>> cachy-omarchy >>>' "$HYPR_DIR/hyprland.conf"; then
+  warn "stale cachy-omarchy block in hyprland.conf — remove it manually (and $CONFIG_DIR/hypr/bindings.conf)"
+fi
+# 셸 자동 기동은 bindings.lua 의 hyprland.start 한 곳이다. 그 줄이 생기기 전에 만든
+# 사본은 --force 없이 보존되므로 업그레이드해도 셸이 뜨지 않는다.
+if [[ -f $HYPR_DIR/hyprland.lua && -f $CONFIG_DIR/hypr/bindings.lua ]] \
+  && grep -qF -e '-- >>> cachy-omarchy >>>' "$HYPR_DIR/hyprland.lua"; then
+  if grep -qE 'hyprland\.start' "$CONFIG_DIR/hypr/bindings.lua"; then
+    pass "shell autostart declared (bindings.lua)"
+  else
+    fail "shell autostart missing from $CONFIG_DIR/hypr/bindings.lua — run: cachy-omarchy-bindings --force"
+  fi
 fi
 # M10: clipboard history 존재 공개 (§66 — 사용자가 모를 수 있는 로컬 상태를
 # 알리되 지우는 것은 사용자 몫). upstream Clipboard.qml:20 은 XDG_STATE_HOME 이

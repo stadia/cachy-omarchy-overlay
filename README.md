@@ -96,9 +96,17 @@ WARNs on its existence (`docs/RUNTIME_STARTUP.md`).
 
 **Only `hyprland.lua` configs are supported.** `hyprland.conf` is not: it
 cannot run Lua, so bindings, shell autostart and the Lua toggle files would not
-apply. `cachy-omarchy-bindings` refuses a conf-only setup and
-`cachy-omarchy-doctor` warns. This does not claim laptop-lid support: the
+apply. `cachy-omarchy-bindings` and `cachy-omarchy-init` refuse a conf-only setup
+before writing anything, and `cachy-omarchy-doctor` fails. This does not claim laptop-lid support: the
 overlay does not stage upstream's lid-switch binding. See the "지원 계약" section in SPEC.md.
+
+**Upgrading from a `hyprland.conf` setup.** The managed block an earlier version
+put in `hyprland.conf` sources your copy `~/.config/cachy-omarchy/hypr/bindings.conf`,
+so it keeps working right after the upgrade, but nothing maintains it any more
+(the shipped original is gone, so `--force` cannot refresh it). Move to
+`hyprland.lua`, re-run `cachy-omarchy-bindings`, then delete the block in
+`hyprland.conf` and the `bindings.conf` copy yourself. `cachy-omarchy-doctor`
+warns about a leftover block. The tools never edit or delete either file.
 
 ## Session lifecycle
 
