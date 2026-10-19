@@ -1,84 +1,59 @@
 #!/usr/bin/env bash
-# Roll back only a complete, checksummed archive of a prior validated pair.
+# Reinstall, per package, the newest build/ artifact older than the installed
+# version (SPEC §36). A package with nothing older in build/ is left as is.
 set -euo pipefail
 
 repo_root=${COO_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}
-state_dir=${COO_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/cachy-omarchy}
-sha256_bin=${COO_SHA256_BIN:-sha256sum}
+build_dir=${COO_BUILD_DIR:-$repo_root/build}
 pacman_bin=${COO_PACMAN_BIN:-}
 sudo_bin=${COO_SUDO_BIN:-sudo}
-mv_bin=${COO_MV_BIN:-mv}
+vercmp_bin=${COO_VERCMP_BIN:-vercmp}
 smoke_bin=${COO_ROLLBACK_SMOKE_BIN:-}
-# shellcheck disable=SC1091
-source "$repo_root/bin/validated-build.sh"
+fail() { printf 'error: %s\n' "$1" >&2; exit 1; }
 
-# Elevate only the pacman transaction, never the whole script: running as root
-# would resolve state_dir under /root and leave root-owned files behind under
-# the invoking user's XDG state dir. COO_PACMAN_BIN still overrides verbatim
-# (used by tests to substitute a fake pacman) and is never wrapped in sudo.
+# Same elevation rule as install-packages. Queries never need root.
 if [[ -n $pacman_bin ]]; then
-  pacman_cmd=("$pacman_bin")
+  pacman_cmd=("$pacman_bin"); query_cmd=("$pacman_bin")
 elif (( EUID == 0 )); then
-  coo_fail 'do not run rollback with sudo; run it as your normal user — it elevates only the pacman transaction itself. Usage: ./bin/rollback'
-  exit 1
+  fail 'do not run rollback with sudo; run it as your normal user — it elevates only the pacman transaction itself. Usage: ./bin/rollback'
 else
-  pacman_cmd=("$sudo_bin" pacman)
+  pacman_cmd=("$sudo_bin" pacman); query_cmd=(pacman)
 fi
 
-usage() { printf 'Usage: rollback\n'; }
 case ${1:-} in
-  --help) usage; exit 0 ;;
+  --help) printf 'Usage: rollback\n'; exit 0 ;;
   '') ;;
-  *) coo_fail "unknown argument: $1"; exit 1 ;;
+  *) fail "unknown argument: $1" ;;
 esac
 
-# A successful pacman transaction with failed installed-state finalization is
-# intentionally ambiguous. Never roll back from a stale pointer in that state.
-[[ ! -e $state_dir/install-pending.manifest && ! -L $state_dir/install-pending.manifest ]] || {
-  coo_fail 'incomplete install state requires operator recovery'
-  exit 1
+# Prints the newest build/ artifact of $1 older than the installed version,
+# or nothing when there is none.
+previous_artifact() {
+  local pkg=$1 installed f ver best="" best_ver=""
+  installed=$("${query_cmd[@]}" -Q "$pkg" 2>/dev/null) || fail "$pkg is not installed"
+  installed=${installed#"$pkg "}
+  for f in "$build_dir/$pkg"-*-any.pkg.tar.zst; do
+    [[ -f $f ]] || continue
+    ver=${f##*/}; ver=${ver#"$pkg-"}; ver=${ver%-any.pkg.tar.zst}
+    (( $("$vercmp_bin" "$ver" "$installed") < 0 )) || continue
+    if [[ -z $best_ver ]] || (( $("$vercmp_bin" "$ver" "$best_ver") > 0 )); then
+      best=$f best_ver=$ver
+    fi
+  done
+  printf '%s' "$best"
 }
 
-# Newest complete archive wins. Do not guess from arbitrary package files.
-mapfile -t candidates < <(find "$state_dir/packages" -mindepth 2 -maxdepth 2 -type f -name validated-build.manifest -print 2>/dev/null | sort -r)
-(( ${#candidates[@]} > 0 )) || { coo_fail 'no prior validated build is available'; exit 1; }
-selected=${candidates[0]}
-coo_validate_manifest "$state_dir" "$selected" "$sha256_bin" || {
-  coo_fail 'newest prior validated build is incomplete or corrupt'
-  exit 1
-}
+targets=()
+for pkg in cachy-omarchy-shell cachy-omarchy-overlay; do
+  artifact=$(previous_artifact "$pkg")
+  if [[ -n $artifact ]]; then
+    targets+=("$artifact")
+  else
+    printf 'note: no older %s in build/; keeping the installed version\n' "$pkg"
+  fi
+done
+(( ${#targets[@]} )) || fail 'nothing older in build/ to roll back to'
 
-# Make post-pacman state explicit before the transaction.  A failed pointer
-# finalization is ambiguous, so the existing pending guard must block another
-# install or rollback until an operator verifies the actual package state.
-pending=$state_dir/install-pending.manifest
-pending_tmp=$(mktemp "$state_dir/.install-pending.manifest-XXXXXX")
-cp "$selected" "$pending_tmp"
-"$mv_bin" "$pending_tmp" "$pending"
-
-set +e
-"${pacman_cmd[@]}" -U "$COO_RELEASE_DIR/artifacts/${COO_ARTIFACT_NAMES[0]}" \
-  "$COO_RELEASE_DIR/artifacts/${COO_ARTIFACT_NAMES[1]}"
-status=$?
-set -e
-if (( status != 0 )); then
-  rm -f "$pending"
-  exit "$status"
-fi
-
-pointer_tmp=$(mktemp "$state_dir/.installed-build.manifest-XXXXXX")
-cp "$selected" "$pointer_tmp"
-set +e
-COO_INSTALL_FINALIZE=1 "$mv_bin" "$pointer_tmp" "$state_dir/installed-build.manifest"
-status=$?
-set -e
-if (( status != 0 )); then
-  coo_fail 'pacman rollback succeeded but installed state finalization failed; pending state retained' || :
-  exit "$status"
-fi
-rm -f "$pending" || { coo_fail 'rollback state finalized but pending marker could not be removed'; exit 1; }
-
-if [[ -n $smoke_bin ]]; then
-  "$smoke_bin"
-fi
-printf 'rolled back from: %s\n' "$selected"
+"${pacman_cmd[@]}" -U "${targets[@]}"
+[[ -z $smoke_bin ]] || "$smoke_bin"
+printf 'rolled back to: %s\n' "${targets[@]##*/}"
