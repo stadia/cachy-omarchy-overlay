@@ -145,7 +145,7 @@ check_file "omarchy.menu availability" "$OMARCHY_PATH/default/omarchy/omarchy-me
 # 패키지) pcall 이 삼켜 toggle 이 조용히 꺼지고 configerrors 도 비어 있다 —
 # 다른 어디에도 신호가 없어서 FAIL 이다.
 check_file "toggles seam bootstrap" "$OMARCHY_PATH/default/hypr/bootstrap.lua"
-check_executable "shell wrapper" "$BIN_DIR/cachy-omarchy-shell"
+check_executable "shell restart" "$BIN_DIR/omarchy-restart-shell"
 check_executable "launcher invocation" "$BIN_DIR/omarchy-menu"
 check_executable "binding helper" "$BIN_DIR/cachy-omarchy-bindings"
 check_executable "keybinding invocation" "$BIN_DIR/omarchy-menu-keybindings"
@@ -279,11 +279,6 @@ if [[ -f $HYPR_DIR/hyprland.lua && -f $CONFIG_DIR/hypr/bindings.lua ]] \
   else
     fail "shell autostart missing from $CONFIG_DIR/hypr/bindings.lua — run: cachy-omarchy-bindings --force"
   fi
-fi
-# 구형 사본의 자동 기동은 폐기된 `cachy-omarchy-shell --run` 을 부른다. 경고 후
-# omarchy-launch-shell 로 넘겨 주므로 셸은 뜨지만, 별칭은 제거 예정이다.
-if [[ -f $CONFIG_DIR/hypr/bindings.lua ]] && grep -qF -e 'cachy-omarchy-shell --run' "$CONFIG_DIR/hypr/bindings.lua"; then
-  warn "shell autostart still runs the deprecated cachy-omarchy-shell --run in $CONFIG_DIR/hypr/bindings.lua — run: cachy-omarchy-bindings --force"
 fi
 # M10: clipboard history 존재 공개 (§66 — 사용자가 모를 수 있는 로컬 상태를
 # 알리되 지우는 것은 사용자 몫). upstream Clipboard.qml:20 은 XDG_STATE_HOME 이

@@ -100,7 +100,7 @@ commit. The list of upstream helpers the closure scanner trusts is not stored:
 - `usr/lib/cachy-omarchy/compat/bin/{omarchy-update-available,
   omarchy-theme-set-browser,omarchy-theme-set-keyboard,
   omarchy-restart-shell}` — compat 적응 카피 4개. 실체는 이 통제 경로에만
-  둔다(§44). `omarchy-restart-shell` 은 `cachy-omarchy-shell --restart` 로 위임한다
+  둔다(§44). `omarchy-restart-shell` 은 잠금 인지 재시작을 직접 구현한다
   (세션이 잠긴 동안은 거부).
 - `usr/bin/omarchy-{update-available,theme-set-browser,theme-set-keyboard,
   restart-shell}` — compat 실체를 가리키는 상대 심링크 4개.

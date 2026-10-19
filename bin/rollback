@@ -72,5 +72,5 @@ done
 "${pacman_cmd[@]}" -U "${targets[@]}"
 printf 'rolled back to: %s\n' "${targets[@]##*/}"
 if [[ -n $smoke_bin ]]; then
-  "$smoke_bin" || fail 'downgrade finished but the smoke check failed; restart the shell with cachy-omarchy-shell --restart and inspect it'
+  "$smoke_bin" || fail 'downgrade finished but the smoke check failed; restart the shell with omarchy-restart-shell and inspect it'
 fi
