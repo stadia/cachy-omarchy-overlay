@@ -40,10 +40,10 @@ mkdir -p "$stub"
 printf '#!/usr/bin/env bash\nexit 1\n' > "$stub/pgrep"
 chmod +x "$stub/pgrep"
 export COO_HYPR_DIR="$COO_TEST_SANDBOX/hypr"
-mkdir -p "$COO_HYPR_DIR"; : > "$COO_HYPR_DIR/hyprland.conf"
+mkdir -p "$COO_HYPR_DIR"; : > "$COO_HYPR_DIR/hyprland.lua"
 out=$(PATH="$stub:$BIN:$PATH" "$BIN/cachy-omarchy-init" 2>&1); code=$?
 assert_eq "$code" "0" "설치 트리에서 init exit 0"
-assert_file_exists "$HOME/.config/cachy-omarchy/hypr/bindings.conf" "init 가 바인딩 배치"
+assert_file_exists "$HOME/.config/cachy-omarchy/hypr/bindings.lua" "init 가 바인딩 배치"
 [[ -e "$HOME/.local/state/omarchy/toggles/bar-off" ]] && made=1 || made=0
 assert_eq "$made" "0" "설치 트리의 init 도 bar-off 를 만들지 않는다"
 

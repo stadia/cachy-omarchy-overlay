@@ -30,11 +30,13 @@ for p in \
   usr/bin/omarchy-theme-set-keyboard \
   usr/bin/omarchy-restart-shell \
   usr/bin/omarchy-menu-keybindings \
-  usr/share/cachy-omarchy/hypr/bindings.conf \
   usr/share/cachy-omarchy/hypr/bindings.lua \
   usr/share/uwsm/env-hyprland.d/10-cachy-omarchy ; do
   assert_file_exists "$dest/$p" "소유: $p"
 done
+
+[[ -e $dest/usr/share/cachy-omarchy/hypr/bindings.conf ]] && c=1 || c=0
+assert_eq "$c" "0" "bindings.conf 는 설치되지 않는다 (Lua 전용)"
 
 # 공개 명령은 실행 가능해야 한다.
 for b in shell launcher keybindings bindings init doctor; do

@@ -8,10 +8,10 @@ user-invocable: false
 
 ## 안전 규칙 (절대) — 다른 무엇보다 먼저 읽는다
 - `~/.config/hypr/**` 직접 편집 금지(어떤 수단으로도 — `cp`/`>`/`sed -i` 포함). 프로젝트가 소유하는 것은
-  `~/.config/cachy-omarchy/hypr/bindings.{conf,lua}` 뿐이고, 사용자의 실제 `hyprland.lua`/`hyprland.conf`는
+  `~/.config/cachy-omarchy/hypr/bindings.lua` 뿐이고, 사용자의 실제 `hyprland.lua`는
   `overlay/bin/cachy-omarchy-bindings`가 주입하는 관리 source 블록(`>>> cachy-omarchy >>>` ... `<<< cachy-omarchy <<<`)
   으로만 건드리며 본문은 절대 고치지 않는다. 테스트에서는 샌드박스 HOME(`./tests/test.sh` 가 만든다)만 쓴다.
-- `bindings.conf`/`bindings.lua`는 SPEC §6.6 상 "사용자 라이브 설정"이다 — 이미 존재하면 기본적으로
+- `bindings.lua`는 SPEC §6.6 상 "사용자 라이브 설정"이다 — 이미 존재하면 기본적으로
   덮어쓰지 않는다. `--force`를 명시적으로 줄 때만 정본(`/usr/share/cachy-omarchy/hypr/`)으로 새로고침한다.
 - Lua에서 `#`는 주석이 아니라 길이 연산자 → 마커는 Lua에 `--`를 쓴다. 무방비 `dofile` 금지 — `pcall` 가드
   필수(누락 시 사용자 설정 전체가 깨짐).
@@ -29,9 +29,9 @@ user-invocable: false
   `cachy-omarchy-shell`, `cachy-omarchy-launcher`(업스트림 `omarchy-menu toggle` 호환 별칭),
   `cachy-omarchy-keybindings`, `cachy-omarchy-bindings`, `cachy-omarchy-init`, `cachy-omarchy-doctor`.
   SUPER+SPACE 는 업스트림 `omarchy-menu toggle` 을 직접 부른다.
-- 사용자 라이브 설정: `~/.config/cachy-omarchy/`(hypr/bindings.{conf,lua}). `shell.json` 은
+- 사용자 라이브 설정: `~/.config/cachy-omarchy/`(hypr/bindings.lua). `shell.json` 은
   셸이 읽지 않는 dead file 이므로 init 가 만들지 않는다.
-- 패키지 정본: `/usr/share/cachy-omarchy/hypr/bindings.{conf,lua}`. 셸 기본 설정은 업스트림 트리의 `config/omarchy/shell.json`.
+- 패키지 정본: `/usr/share/cachy-omarchy/hypr/bindings.lua`. 셸 기본 설정은 업스트림 트리의 `config/omarchy/shell.json`.
 - compat 적응 카피: 실체는 `/usr/lib/cachy-omarchy/compat/bin/`(예: `omarchy-shell`,
   `omarchy-update-available`)에만 두고, `/usr/bin`에는 실체를 가리키는 상대 심링크만 놓는다 —
   `tests/runtime/test_installed_tree.sh`가 양방향으로 검사한다. `uwsm-app`은 shim이 아니라

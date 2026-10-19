@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
-# A-2: conf 사용자는 토글을 써보기 전에 지원 경계를 알아야 한다.
-#
-# 기존 doctor WARN 은 toggles 파일이 생긴 뒤에야 뜬다 — 기능이 조용히 안 먹은
-# 다음이다. init 은 설치 시점에 알린다. 설치를 막지는 않는다.
+# hyprland.conf 는 지원하지 않는다(Lua 전용). conf 만 있는 사용자는 설치 시점에
+# init 이 알린다. 설치를 막지는 않는다.
 set -uo pipefail
 REPO_ROOT="${REPO_ROOT:?}"
 source "$REPO_ROOT/tests/lib/assert.sh"
 
 INIT="$REPO_ROOT/overlay/bin/cachy-omarchy-init"
-MARK="Lua toggle 파일은 hyprland.lua 설정에서만 적용된다"
+MARK="hyprland.conf 는 지원하지 않는다"
 
 run_init() { # $1 = hypr 디렉터리
   HOME="$1/home" COO_HYPR_DIR="$1/hypr" \
@@ -38,7 +36,7 @@ else
   printf 'ok:   lua 구성에서는 고지하지 않는다\n'
 fi
 
-# 상태 3: 둘 다 있다 → 고지하지 않는다 (lua 가 있으면 토글이 동작한다).
+# 상태 3: 둘 다 있다 → 고지하지 않는다 (lua 가 있으면 그것을 쓴다).
 d3=$(mk both)
 printf 'monitor=,preferred,auto,1\n' > "$d3/hypr/hyprland.conf"
 printf '%s\n' '-- lua config' > "$d3/hypr/hyprland.lua"

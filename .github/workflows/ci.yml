@@ -111,7 +111,7 @@ jobs:
           useradd -m enduser
           sudo -u enduser bash -lc '
             install -d "$HOME/.config/hypr"
-            printf "monitor=,preferred,auto,1\\n" > "$HOME/.config/hypr/hyprland.conf"
+            printf -- "-- lua config\\n" > "$HOME/.config/hypr/hyprland.lua"
           '
           conf_setup_status=$?
           sudo -u enduser bash -lc 'cachy-omarchy-init' 2>&1 | tee /tmp/init.log

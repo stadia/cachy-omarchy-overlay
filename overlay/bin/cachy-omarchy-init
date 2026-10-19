@@ -23,7 +23,7 @@ usage() {
 최초 사용 시 사용자 설정을 만든다. 이미 있는 파일은 건드리지 않는다.
 
 만드는 것:
-  ~/.config/cachy-omarchy/hypr/bindings.{conf,lua}
+  ~/.config/cachy-omarchy/hypr/bindings.lua
   사용자 Hyprland 설정에 관리 source 블록       (충돌 시 주입하지 않음)
   기본 테마 시드 "Tokyo Night"                  (테마가 없을 때만, SPEC 6.6)
   /etc/pam.d/omarchy-lock-password              (없을 때만, omarchy-apply-lock
@@ -70,7 +70,7 @@ fi
 #    취급해 재시드한다. 셸이 떠 있으면 일반 경로로 적용해 실행 중 팔레트도
 #    바로 갱신하고, 아니면 OMARCHY_THEME_HEADLESS=1 로 symlink 만 놓는다 —
 #    셸은 다음 기동 때 current/theme 을 읽는다. 바인딩 주입(아래 3절)보다
-#    먼저 와야 conf 관리 블록의 테마 source 조건이 성립한다 (D5).
+#    먼저 와야 한다 (D5).
 # 테마 시드는 세션 밖(TTY·SSH)에서도 돌 수 있다 — uwsm 세션 환경을 전제할 수
 # 없으므로 OMARCHY_PATH 를 명시적으로 준다. 명령 자체는 /usr/bin/omarchy-theme-set
 # 심링크로 노출된다 (SPEC §45).
@@ -114,13 +114,10 @@ else
     || note "note: 잠금 화면 PAM 설정 실패 — 나중에 omarchy-apply-lock 을 직접 실행할 수 있다"
 fi
 
-# 2.7) A-2 지원 계약 고지 (SPEC "지원 계약").
-#    conf 사용자는 토글을 실제로 써본 뒤에야 — 기능이 조용히 안 먹은 다음에야
-#    — 지원 범위 밖임을 알게 된다. doctor WARN 은 toggles 파일이 생긴 뒤에만
-#    뜨기 때문이다. 여기서 설치 시점에 알린다. 설치를 막지는 않는다.
-#    lua 가 하나라도 있으면 토글이 동작하므로 고지하지 않는다.
+# 2.7) 지원 계약 고지: hyprland.conf 는 지원하지 않는다(Lua 설정 전용).
+#    설치를 막지는 않지만, 바인딩 주입 단계가 실패하기 전에 이유를 알린다.
 if [[ -f $HYPR_DIR/hyprland.conf && ! -f $HYPR_DIR/hyprland.lua ]]; then
-  note "참고: Lua toggle 파일은 hyprland.lua 설정에서만 적용된다. hyprland.conf 에서는 toggle 파일이 적용되지 않지만 설치는 정상 진행됩니다."
+  note "참고: hyprland.conf 는 지원하지 않는다(Lua 설정 전용). $HYPR_DIR/hyprland.lua 가 필요하다."
 fi
 
 # 3) Hyprland 바인딩. 충돌 감지와 --force 정책을 재구현하지 않고 위임한다

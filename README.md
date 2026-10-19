@@ -95,11 +95,11 @@ WARNs on its existence (`docs/RUNTIME_STARTUP.md`).
 
 ### Support scope
 
-**Lua toggle files apply only with a `hyprland.lua` config.** With a `hyprland.conf`
-setup, install/shell/launcher/theme all work, but those Lua toggle files are
-silently ignored because `.conf` does not execute Lua files. This does not
-claim laptop-lid support: the overlay does not stage upstream's lid-switch
-binding. See the "지원 계약" section in SPEC.md.
+**Only `hyprland.lua` configs are supported.** `hyprland.conf` is not: it
+cannot run Lua, so bindings, shell autostart and the Lua toggle files would not
+apply. `cachy-omarchy-bindings` refuses a conf-only setup and
+`cachy-omarchy-doctor` warns. This does not claim laptop-lid support: the
+overlay does not stage upstream's lid-switch binding. See the "지원 계약" section in SPEC.md.
 
 ## Session lifecycle
 
@@ -118,8 +118,7 @@ does not ship.
 Optional: install `ttfx` (AUR) for the idle screensaver and `socat` for its
 multi-monitor placement. Without them the screensaver simply does not start;
 nothing else is affected. The clamshell/toggle seam that this chain uses only
-runs for `hyprland.lua` configs — `hyprland.conf` users are WARNed by
-`cachy-omarchy-doctor` if they have toggle files (see `docs/RUNTIME_STARTUP.md`).
+runs for `hyprland.lua` configs (see `docs/RUNTIME_STARTUP.md`).
 
 ## Startup model
 

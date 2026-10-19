@@ -654,7 +654,7 @@ must be an explicit architecture decision.
 ├── commands.jsonc
 ├── environment
 └── hypr/
-    └── bindings.conf
+    └── bindings.lua
 ```
 
 ## 9.5 User State
@@ -738,7 +738,7 @@ cachy-omarchy-overlay/
 │   ├── bin/                          # cachy-omarchy-{shell,launcher,keybindings,bindings,init,doctor}
 │   ├── compat/bin/                   # 업스트림 이름의 적응 카피 (§44)
 │   ├── defaults/shell.json           # 셸 패키지가 설치하는 기본 설정(업스트림과 동일 내용)
-│   ├── hypr/bindings.{lua,conf}      # 관리 블록이 불러오는 바인딩 정본
+│   ├── hypr/bindings.lua             # 관리 블록이 불러오는 바인딩 정본
 │   └── uwsm/10-cachy-omarchy         # 세션 환경 드롭인 (§45)
 ├── bin/                              # check-upstream, update-upstream, build-packages,
 │                                     # test-packages, install-packages, rollback,
@@ -965,18 +965,13 @@ SUPER + K     -> cachy-omarchy-keybindings
 
 The project must not overwrite the full Hyprland config.
 
-Preferred user integration:
+Only Lua configs (`~/.config/hypr/hyprland.lua`) are supported (§76). A helper
+installs a managed block:
 
-```conf
-source = ~/.config/cachy-omarchy/hypr/bindings.conf
-```
-
-A helper can install a managed block:
-
-```conf
-# >>> cachy-omarchy >>>
-source = ~/.config/cachy-omarchy/hypr/bindings.conf
-# <<< cachy-omarchy <<<
+```lua
+-- >>> cachy-omarchy >>>
+pcall(dofile, "~/.config/cachy-omarchy/hypr/bindings.lua")
+-- <<< cachy-omarchy <<<
 ```
 
 Conflict detection is mandatory.
@@ -1979,7 +1974,7 @@ record lives in the private development tree
 The shell-side palette requires no code change: Color.qml watches
 `current/theme/colors.toml` and `shell.toml`, and the generated
 `hyprland.lua` reaches Hyprland through the managed source block (guarded
-load in `bindings.lua`; conditional `source =` line in the conf snippet).
+load in `bindings.lua`).
 
 ---
 
@@ -2312,23 +2307,17 @@ That is the architecture going forward.
 
 # 76. 지원 계약
 
-지원 대상은 `~/.config/hypr/hyprland.lua` 구성에서 관리하는 Lua toggle
-파일이다. **Lua toggle 파일은 hyprland.lua 설정에서만 적용된다.**
+지원 대상은 `~/.config/hypr/hyprland.lua` 구성이다. **`hyprland.conf` 는
+지원하지 않는다**(2026-10-19 결정, 이슈 #5). 업스트림 4.x 가 Lua 전용이고,
+`.conf` 는 Lua 를 실행하지 않아 바인딩 주입·셸 자동 기동·Lua toggle 파일이
+모두 적용되지 않기 때문이다(2026-08-23 중첩 Hyprland 실측: `source = ...*.lua`
+는 파싱되지만 일반 config 키워드 줄로 취급돼 조용히 버려진다).
 
-`hyprland.conf` 구성에서도 설치·셸·런처·테마는 정상 동작한다. 다만 conf 는
-그 Lua toggle 파일을 적용하지 않는다. 이것은 제품이 노트북 뚜껑 동작을
-지원한다는 선언이 아니다. 이 오버레이는 upstream lid-switch 바인딩을
-스테이징하지 않으며, clamshell helper 가 출하돼도 뚜껑을 닫는 동작으로
-도달하지 않는다(`README.md`의 Session lifecycle).
+conf 만 있는 환경에서는 `cachy-omarchy-bindings` 가 실패하고,
+`cachy-omarchy-doctor` 가 WARN 하며 `cachy-omarchy-init` 이 설치 시점에 같은
+경계를 고지한다. 이전 버전이 만든 `~/.config/cachy-omarchy/hypr/bindings.conf`
+는 사용자 파일이므로 지우지 않는다.
 
-이유는 우리가 만든 제약이 아니다. `.conf` 는 Lua 파일을 실행하지 않는다 —
-`source = .../*.lua` 는 파싱은 되지만 일반 config 키워드 줄로 취급돼 조용히
-버려진다(2026-08-23 중첩 Hyprland 실측, `tests/runtime/test_toggles_seam.sh:82`).
-그래서 관리 블록에 글롭 source 를 넣지 않는 것이 확정 동작이며, 기존
-`cachy-omarchy-doctor` WARN(`hyprland.conf setup: omarchy hypr toggles are not
-applied ... clamshell/monitor toggles are ignored — switch to a hyprland.lua
-config`)과 `cachy-omarchy-init` 이 설치 시점에 같은 경계를 고지한다.
-
-conf 사용자를 위한 toggle adapter 는 구현하지 않는다. 모든 Hyprland 구성을
-지원하려다 upstream deviation 을 늘리는 것보다, 경계를 명확히 하는 쪽을
-택했다.
+Lua toggle 파일을 쓴다고 해서 노트북 뚜껑 동작을 지원한다는 뜻은 아니다. 이
+오버레이는 upstream lid-switch 바인딩을 스테이징하지 않으며, clamshell helper 가
+출하돼도 뚜껑을 닫는 동작으로 도달하지 않는다(`README.md`의 Session lifecycle).

@@ -107,7 +107,7 @@ commit. The list of upstream helpers the closure scanner trusts is not stored:
   `/usr/bin` 은 심링크만 놓는 평평한 뷰이다(§45 개정).
 - `usr/share/uwsm/env-hyprland.d/10-cachy-omarchy` — uwsm 세션 환경 드롭인.
   그래픽 세션에 `OMARCHY_PATH=/usr/share/cachy-omarchy/upstream` 을 공급한다(§45).
-- `usr/share/cachy-omarchy/hypr/{bindings.conf,bindings.lua}` — `cachy-omarchy-bindings`
+- `usr/share/cachy-omarchy/hypr/bindings.lua` — `cachy-omarchy-bindings`
   가 사용자 `~/.config/cachy-omarchy/hypr/` 로 복사하는 소스.
 
 `uwsm-app` 은 어느 쪽 패키지도 소유하지 않는다 — `/usr/bin/uwsm-app` 은

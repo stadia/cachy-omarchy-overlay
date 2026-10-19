@@ -91,10 +91,10 @@ helper 와 런타임 의존성(`jq`, `wl-clipboard`, `wtype`, `wireplumber`,
 
 ### 지원 범위
 
-**Lua toggle 파일은 hyprland.lua 설정에서만 적용된다.** `hyprland.conf` 를
-쓰는 경우 설치·셸·런처·테마는 정상 동작하지만 그 Lua toggle 파일은 적용되지
-않습니다 — `.conf` 는 Lua 파일을 실행하지 않기 때문입니다. 이는 노트북 뚜껑
-동작을 지원한다는 뜻이 아닙니다. 이 오버레이는 upstream lid-switch 바인딩을
+**`hyprland.lua` 설정만 지원합니다.** `hyprland.conf` 는 지원하지 않습니다 —
+Lua 를 실행하지 못해 바인딩·셸 자동 기동·Lua toggle 파일이 적용되지 않습니다.
+`cachy-omarchy-bindings` 는 conf 만 있는 환경을 거부하고 `cachy-omarchy-doctor`
+가 WARN 합니다. 이는 노트북 뚜껑 동작을 지원한다는 뜻이 아닙니다. 이 오버레이는 upstream lid-switch 바인딩을
 스테이징하지 않습니다. 자세한 내용은 SPEC 의 "지원 계약" 절을 참고하세요.
 
 ## 세션 생명주기
@@ -113,9 +113,8 @@ idle → screensaver → lock → wake 체인이 패키징돼 있다: idle 타�
 
 선택: idle 스크린세이버는 `ttfx`(AUR), 다중 모니터 배치는 `socat` 이 있어야
 한다. 없으면 스크린세이버만 조용히 뜨지 않으며 다른 기능에는 영향이 없다. 이
-체인이 쓰는 clamshell/toggle seam 은 `hyprland.lua` 설정에서만 동작한다 —
-`hyprland.conf` 사용자는 toggle 파일이 있으면 `cachy-omarchy-doctor` 가
-WARN 한다(`docs/RUNTIME_STARTUP.md` 참고).
+체인이 쓰는 clamshell/toggle seam 은 `hyprland.lua` 설정에서만 동작한다
+(`docs/RUNTIME_STARTUP.md` 참고).
 
 ## 기동 모델
 
