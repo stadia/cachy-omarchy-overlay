@@ -1,0 +1,143 @@
+# kind	path	note
+# path is a helper name under bin/ (exec/verbatim/linked/exists/absent) or a path relative to the
+# staged upstream root (data/absent-data).
+# exists = present | exec = present and executable | verbatim = exec and byte-identical to the pin
+# linked = verbatim and /usr/bin/<name> resolves to the staged file | absent = must not be staged
+# data = byte-identical file | absent-data = must not exist
+verbatim	omarchy-menu-select	bar widgets, Tier A
+verbatim	omarchy-cmd-present	bar widgets, Tier A
+verbatim	omarchy-audio-output-sink	bar widgets, Tier A
+verbatim	omarchy-network-status	bar widgets, Tier A
+verbatim	omarchy-network-band	bar widgets, Tier A
+verbatim	omarchy-monitor-state	bar widgets, Tier A
+verbatim	omarchy-hyprland-monitor-scaling	bar widgets, Tier A
+verbatim	omarchy-reminder	bar widgets, Tier B
+verbatim	omarchy-notification-send	bar widgets, Tier B
+verbatim	omarchy-agent-usage-update	bar widgets, Tier B
+verbatim	omarchy-agent-usage-claude	bar widgets, Tier B
+verbatim	omarchy-agent-usage-codex	bar widgets, Tier B
+verbatim	omarchy-agent-usage-fireworks	bar widgets, Tier B
+verbatim	omarchy-brightness-display	bar monitor widget brightness chain
+verbatim	omarchy-brightness-display-ddc	bar monitor widget brightness chain
+verbatim	omarchy-hw-display	bar monitor widget brightness chain
+verbatim	omarchy-audio-output-switch	audio, brightness and input guards
+verbatim	omarchy-audio-output-set-default	audio, brightness and input guards
+verbatim	omarchy-audio-tuning	audio, brightness and input guards
+verbatim	omarchy-hw-match	audio, brightness and input guards
+verbatim	omarchy-restart-audio	audio, brightness and input guards
+verbatim	omarchy-brightness-display-apple	audio, brightness and input guards
+verbatim	omarchy-hyprland-monitor-focused	audio, brightness and input guards
+verbatim	omarchy-hyprland-monitor-focused-apple	audio, brightness and input guards
+verbatim	omarchy-hw-touchpad	audio, brightness and input guards
+verbatim	omarchy-hw-touchscreen	audio, brightness and input guards
+verbatim	omarchy-toggle-touchpad	audio, brightness and input guards
+verbatim	omarchy-toggle-touchscreen	audio, brightness and input guards
+verbatim	omarchy-toggle-input-device	audio, brightness and input guards
+verbatim	omarchy-hyprland-window-gaps-toggle	0.8.0 hyprland toggles and hw guards
+verbatim	omarchy-hyprland-window-single-square-aspect-toggle	0.8.0 hyprland toggles and hw guards
+verbatim	omarchy-hyprland-workspace-layout-toggle	0.8.0 hyprland toggles and hw guards
+verbatim	omarchy-hyprland-monitor-internal	0.8.0 hyprland toggles and hw guards
+verbatim	omarchy-hyprland-monitor-internal-mirror	0.8.0 hyprland toggles and hw guards
+verbatim	omarchy-hyprland-toggle	0.8.0 hyprland toggles and hw guards
+verbatim	omarchy-hyprland-toggle-enabled	0.8.0 hyprland toggles and hw guards
+verbatim	omarchy-hyprland-toggle-disabled	0.8.0 hyprland toggles and hw guards
+verbatim	omarchy-hyprland-monitor-laptop	0.8.0 hyprland toggles and hw guards
+verbatim	omarchy-hyprland-monitor-external-active	0.8.0 hyprland toggles and hw guards
+verbatim	omarchy-hw-laptop	0.8.0 hyprland toggles and hw guards
+verbatim	omarchy-hw-webcam	0.8.0 hyprland toggles and hw guards
+verbatim	omarchy-hw-dell-xps-haptic-touchpad	0.8.0 hyprland toggles and hw guards
+data	default/audio/filter-chain-host.conf	templates read through $OMARCHY_PATH
+data	default/audio/tunings/dell-xps-2026/tuning.conf	templates read through $OMARCHY_PATH
+data	default/systemd/user/omarchy-speaker-tuning.service	templates read through $OMARCHY_PATH
+data	default/hypr/toggles/flags.lua	templates read through $OMARCHY_PATH
+data	default/hypr/toggles/single-window-aspect-ratio.lua	templates read through $OMARCHY_PATH
+data	default/hypr/toggles/window-no-gaps.lua	templates read through $OMARCHY_PATH
+absent	omarchy-system-factory-reset	Omarchy ISO @factory assumption
+absent	omarchy-system-factory-reset-finish	Omarchy ISO @factory assumption
+absent-data	default/systemd/user/omarchy-crash-watch.service	other user unit templates stay out
+linked	omarchy-bar-text-color	transparent bar text contrast; Bar.qml calls it
+verbatim	omarchy-cmd-missing	idle -> screensaver -> lock -> wake chain
+verbatim	omarchy-hw-laptop-closed	idle -> screensaver -> lock -> wake chain
+verbatim	omarchy-hw-external-monitors	idle -> screensaver -> lock -> wake chain
+verbatim	omarchy-hw-clamshell	idle -> screensaver -> lock -> wake chain
+verbatim	omarchy-brightness-keyboard	idle -> screensaver -> lock -> wake chain
+verbatim	omarchy-hyprland-monitor-clamshell	idle -> screensaver -> lock -> wake chain
+verbatim	omarchy-system-wake	idle -> screensaver -> lock -> wake chain
+verbatim	omarchy-screensaver	idle -> screensaver -> lock -> wake chain
+verbatim	omarchy-launch-screensaver	idle -> screensaver -> lock -> wake chain
+data	default/alacritty/screensaver.toml	per-terminal screensaver config (kitty needs none)
+data	default/foot/screensaver.ini	per-terminal screensaver config (kitty needs none)
+data	default/ghostty/screensaver	per-terminal screensaver config (kitty needs none)
+absent-data	default/kitty/screensaver	upstream has no kitty file; do not invent one
+verbatim	omarchy-menu-clipboard	M10 utility plugins
+verbatim	omarchy-clipboard-open	M10 utility plugins
+verbatim	omarchy-clipboard-paste-text	M10 utility plugins
+verbatim	omarchy-clipboard-paste-file	M10 utility plugins
+verbatim	omarchy-launch-browser	M10 utility plugins
+verbatim	omarchy-launch-editor	M10 utility plugins
+verbatim	omarchy-launch-tui	M10 utility plugins
+verbatim	omarchy-hyprland-focus-app	M10 utility plugins
+verbatim	omarchy-menu-emoji	M10 utility plugins
+verbatim	omarchy-menu-emoji-insert	M10 utility plugins
+verbatim	omarchy-osd	M10 utility plugins
+verbatim	omarchy-audio-output-volume	M10 utility plugins
+verbatim	omarchy-audio-input-mute	M10 utility plugins
+verbatim	omarchy-brightness-keyboard-mute	M10 utility plugins
+exec	omarchy-menu-images	earlier stage dependency
+linked	omarchy-restart-gum	gum presentation layer
+linked	omarchy-show-logo	gum presentation layer
+linked	omarchy-show-done	gum presentation layer
+linked	omarchy-launch-floating-terminal-with-presentation	gum presentation layer
+data	logo.txt	read by omarchy-show-logo through $OMARCHY_PATH
+verbatim	omarchy-bar	menu style.bar and session lifecycle
+verbatim	omarchy-shell-config	menu style.bar and session lifecycle
+verbatim	omarchy-plugin-catalog	menu style.bar and session lifecycle
+verbatim	omarchy-system-lock	menu style.bar and session lifecycle
+verbatim	omarchy-apply-lock	menu style.bar and session lifecycle
+verbatim	omarchy-system-logout	menu style.bar and session lifecycle
+verbatim	omarchy-system-reboot	menu style.bar and session lifecycle
+verbatim	omarchy-system-shutdown	menu style.bar and session lifecycle
+verbatim	omarchy-hyprland-window-close-all	menu style.bar and session lifecycle
+verbatim	omarchy-state	menu style.bar and session lifecycle
+verbatim	omarchy-toggle-bar	menu style.bar and session lifecycle
+absent	omarchy-hyprland-session-locked	unsafe: stranded-lock recovery crashes quickshell (RUNTIME_STARTUP §22)
+exec	omarchy-theme-set	theme chain, Tier A
+exec	omarchy-theme-set-templates	theme chain, Tier A
+exec	omarchy-theme-color	theme chain, Tier A
+exec	omarchy-theme-list	theme chain, Tier A
+exec	omarchy-theme-current	theme chain, Tier A
+exec	omarchy-theme-osc	theme chain, Tier A
+exec	omarchy-theme-colors-from-alacritty	theme chain, Tier A
+exec	omarchy-hook	theme chain, Tier A
+exec	omarchy-restart-terminal	theme chain, Tier A
+exec	omarchy-restart-hyprctl	theme chain, Tier A
+exec	omarchy-restart-btop	theme chain, Tier A
+exec	omarchy-restart-opencode	theme chain, Tier A
+exec	omarchy-restart-helix	theme chain, Tier A
+exec	omarchy-theme-switcher	theme chain, Tier A
+exec	omarchy-theme-bg-set	theme chain, Tier A
+exec	omarchy-theme-bg-next	theme chain, Tier A
+exec	omarchy-theme-bg-current	theme chain, Tier A
+exec	omarchy-theme-bg-switcher	theme chain, Tier A
+exec	omarchy-theme-bg-cache	theme chain, Tier A
+exists	omarchy-theme-set-foot	post-theme hooks, Tier B
+exists	omarchy-theme-set-tmux	post-theme hooks, Tier B
+exists	omarchy-theme-set-gnome	post-theme hooks, Tier B
+exists	omarchy-theme-set-pi	post-theme hooks, Tier B
+exists	omarchy-theme-set-claude	post-theme hooks, Tier B
+exists	omarchy-theme-set-t3code	post-theme hooks, Tier B
+exists	omarchy-theme-set-vscode	post-theme hooks, Tier B
+exists	omarchy-theme-set-obsidian	post-theme hooks, Tier B
+exists	omarchy-toggle-enabled	post-theme hooks, Tier B
+verbatim	omarchy-theme-install	self-contained, staged since 0.8.0
+verbatim	omarchy-theme-update	self-contained, staged since 0.8.0
+verbatim	omarchy-theme-remove	self-contained, staged since 0.8.0
+absent	omarchy-theme-bg-install	Tier C: /etc writes, hardware-only, dev tools (compat shims live in the overlay)
+absent	omarchy-plymouth-set-by-theme	Tier C: /etc writes, hardware-only, dev tools (compat shims live in the overlay)
+absent	omarchy-theme-set-browser	Tier C: /etc writes, hardware-only, dev tools (compat shims live in the overlay)
+absent	omarchy-theme-set-keyboard	Tier C: /etc writes, hardware-only, dev tools (compat shims live in the overlay)
+absent	omarchy-theme-set-hermes	AUR/install-chain boundary: needs hermes-desktop from the AUR and the unstaged omarchy-install-hermes-cli (closure-exceptions.tsv)
+absent	omarchy-theme-set-keyboard-asus-rog	Tier C: /etc writes, hardware-only, dev tools (compat shims live in the overlay)
+absent	omarchy-theme-set-keyboard-f16	Tier C: /etc writes, hardware-only, dev tools (compat shims live in the overlay)
+absent	omarchy-dev-theme-preview	Tier C: /etc writes, hardware-only, dev tools (compat shims live in the overlay)
+absent	omarchy-dev-benchmark-theme-switcher	Tier C: /etc writes, hardware-only, dev tools (compat shims live in the overlay)

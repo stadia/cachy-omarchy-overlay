@@ -114,7 +114,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-launch-screensaver` | idle | SAFE | package (0.11.0). 짝 헬퍼 `omarchy-screensaver` 와 함께 스테이징 — 하나만 올리면 창이 뜨고 본체가 127 로 즉시 죽는다. `tests/data/closure-exceptions.tsv` 예외 행 회수 |
 | `omarchy-system-lock` | idle | DISABLED | disable plugin |
 | `omarchy-system-wake` | idle / lock | SAFE | package (0.11.0). idle 플러그인 종료 경로와 lock 플러그인의 `runWake()` 양쪽이 부른다. 자체 체인(brightness-display/brightness-keyboard/hyprland-monitor-clamshell) 전부 staged |
-| `omarchy-hyprland-session-locked` | lock | **DISABLED — 공존 위험** | **의도적 미스테이징.** `strandedLockCheckProc` 가 이걸 불러 exit 0 이면 세션 잠금을 회수하려 하는데, hyprlock 이 이미 쥔 상태면 ext-session-lock 거부로 **quickshell 이 죽는다**(실측 §22.4). 헬퍼가 없으면 127 → 복구 경로가 조용히 비활성 = fail-safe. `test_staged_session_helpers.sh` 가 고정. `tests/data/closure-exceptions.tsv` 에도 등록(v0.9, milestone=blocked — 크기가 아니라 스테이징 자체가 실측된 크래시를 만들기 때문. `never` 는 미래 작업이 다시 안 볼 표시라 부정확 — 해제 조건: ext-session-lock 거부가 quickshell 을 죽이지 않게 되기 전까지) |
+| `omarchy-hyprland-session-locked` | lock | **DISABLED — 공존 위험** | **의도적 미스테이징.** `strandedLockCheckProc` 가 이걸 불러 exit 0 이면 세션 잠금을 회수하려 하는데, hyprlock 이 이미 쥔 상태면 ext-session-lock 거부로 **quickshell 이 죽는다**(실측 §22.4). 헬퍼가 없으면 127 → 복구 경로가 조용히 비활성 = fail-safe. `tests/package/test_staged_helpers.sh`(`staged-helpers.tsv` 의 `absent` 행)가 고정. `tests/data/closure-exceptions.tsv` 에도 등록(v0.9, milestone=blocked — 크기가 아니라 스테이징 자체가 실측된 크래시를 만들기 때문. `never` 는 미래 작업이 다시 안 볼 표시라 부정확 — 해제 조건: ext-session-lock 거부가 quickshell 을 죽이지 않게 되기 전까지) |
 | `omarchy-brightness-keyboard` | lock | SAFE | package (0.11.0). lock 의 `runBlank()` 가 부른다. `omarchy-osd`(staged)만 호출 |
 | `omarchy-battery-low` | battery | SAFE | package — v0.9. battery 플러그인(기본 활성)이 10% 이하에서 부른다. 체인은 omarchy-notification-send + omarchy-hook 뿐이라 verbatim |
 | `omarchy-powerprofiles-set` | battery | DISABLED | disable plugin |
@@ -125,7 +125,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 ### M10 스테이징 목록 (verbatim, `$OMARCHY_PATH/bin`)
 
 `packages/cachy-omarchy-shell/stage-upstream.sh` 의 M10 슬라이스 — 회귀는
-`tests/package/test_staged_plugin_helpers.sh` + `test_makepkg.sh` 가 단언한다.
+`tests/package/test_staged_helpers.sh` + `test_makepkg.sh` 가 단언한다.
 전체 스테이징 집합은 아래 전수 표가 권위다.
 
 | helper | plugin | class | note |
@@ -148,8 +148,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 감사 에이전트가 업스트림 `bin/` 본문을 정독해 "공식 omarchy 전체 OS 가정"
 분류를 뒤집은 실측이다. 전부 업스트림 원본 그대로(verbatim) 올리며
 `/usr/bin` 노출 집합은 스테이징 집합과 같다(SPEC §45). 회귀는
-`tests/package/test_staged_theme_helpers.sh`·`test_staged_session_helpers.sh`·
-`test_staged_audio_brightness_helpers.sh`·`test_makepkg.sh`·
+`tests/package/test_staged_helpers.sh`(`tests/data/staged-helpers.tsv`)·`test_makepkg.sh`·
 `test_usr_bin_helpers.sh` 가 단언하고, 감사 일관성은
 `tests/runtime/test_command_audit.sh` 가 단언한다. 전체 집합은 아래 전수 표이고,
 메뉴 가시 행은 메뉴 전수 표에서 SAFE 로 재분류됐다.

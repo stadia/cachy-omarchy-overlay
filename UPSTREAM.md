@@ -13,72 +13,34 @@
 | Channel | stable |
 | Source license | MIT (Copyright David Heinemeier Hansson) |
 | Known compatibility patches | `0001-stop-plugin-watcher-on-shell-exit.patch` (Quickshell `Io.Process` orphan cleanup, `docs/RUNTIME_STARTUP.md` §"역사 기록"), `0002-cancel-polkit-flow-before-session-lock.patch` (Polkit 인증 흐름을 세션 잠금 전에 취소) |
-| Last tested CachyOS environment | CachyOS, kernel 7.2.5-1-cachyos, Hyprland 0.56.2, Quickshell 0.3.1. `omarchy`/`omarchy-settings` 미설치. 2026-09-28 `bin/update-upstream` candidate build, nested suite 76/76, transactional publish + 실저장소 재빌드 후 `./tests/test.sh` 76/76 (스테이징 검증 생략 note 0건). 라이브 세션 실측(`COO_RUN_LIVE=1`)은 아직. |
+| Last tested CachyOS environment | CachyOS, kernel 7.2.5-1-cachyos, Hyprland 0.56.2, Quickshell 0.3.1. `omarchy`/`omarchy-settings` 미설치. 2026-09-28 `bin/update-upstream` 로 핀을 옮기고 실저장소 재빌드 후 `./tests/test.sh` 76/76 (스테이징 검증 생략 note 0건). 라이브 세션 실측(`COO_RUN_LIVE=1`)은 아직. |
 
 이전 핀(`v4.0.3`, `05349870`)에 대한 실측 기록은 위 표를 이 핀으로 갱신하기
 전 git 히스토리에 남아 있다.
 
 ## Moving the pin
 
-`bin/update-upstream` moves `upstream.lock`, `packages/cachy-omarchy-shell/PKGBUILD`
-(`pkgver`/`_commit`), and `tests/data/upstream-helpers.txt` **together, in one
-run** — never move the pin by hand without regenerating the inventory. The
-inventory is the dependency closure scanner's (`tests/runtime/closure_check.py`)
-ground truth for "is this string really an upstream helper", scoped to the
-exact pinned commit; a pin move without a matching inventory regeneration
-would leave the scanner judging the new tree against the old commit's helper
-list. `tests/runtime/test_upstream_helper_inventory.sh` enforces that the
-inventory's `# commit:` header always matches `upstream.lock`'s
-`OMARCHY_COMMIT`. `tests/package/test_update_pipeline.sh`'s nested candidate
-run (`COO_UPDATE_PIPELINE_NESTED=1`) exercises this against a disposable
-fixture pin; the closure table's doc-sync check
-(`tests/runtime/test_dependency_closure.sh`) is deliberately skipped in that
-one context, because a fixture pin's regenerated inventory is expected to
-differ from `docs/RUNTIME_DEPENDENCIES.md`'s checked-in table, which tracks
-the real pin above.
+`bin/update-upstream` does the whole move in one run, on this repository:
 
-### A real pin move will fail the doc-sync assertion first — that is expected
+1. resolves the latest stable `vX.Y.Z` tag (the same lookup as
+   `bin/check-upstream`) and fetches that commit into `build/omarchy`
+   (cloned if missing) and checks it out;
+2. rewrites `upstream.lock` and the shell `PKGBUILD` (`pkgver`, `pkgrel=1`,
+   `_commit`) and deletes makepkg's stale `src/`, `pkg/` and `omarchy/` caches;
+3. `bin/build-packages`, then `bin/test-packages` (the whole suite).
 
-The skip above is wired only for the fixture (`COO_UPDATE_PIPELINE_NESTED=1`).
-`bin/update-upstream` does not set it, so a **real** candidate run executes the
-closure table's doc-sync assertion against the new pin, and any change in the
-generated table — a helper added upstream, a command that stopped being
-reachable, a package reclassified — makes
-`tests/runtime/test_dependency_closure.sh` fail. This is not a regression and
-must not be worked around in code: an automatic bypass would swallow genuine
-closure regressions along with the expected churn. Moving the pin is a
-supervised task, so the escape hatch is a documented order of operations, not a
-flag.
+If any step fails, the tracked files (the lock, the PKGBUILD and both READMEs)
+are restored from `HEAD`, `build/omarchy` goes back to the old pin, and the
+`build/` artifacts are put back as they were.
+Run with `--keep` to leave the failed state in place while you adapt the
+overlay to the new tree (undo with `git checkout HEAD -- upstream.lock
+packages/cachy-omarchy-shell/PKGBUILD README.md README.ko-KR.md`). The command
+refuses to start if those files have uncommitted edits.
 
-The table cannot be regenerated ahead of time, because generating it requires
-the new pin to be already staged and built. Unwind it in this order:
-
-1. Run `bin/update-upstream`. It moves `upstream.lock`, the PKGBUILD's
-   `pkgver`/`_commit`, and `tests/data/upstream-helpers.txt` together, then runs
-   the suite. Expect `test_dependency_closure.sh` to fail on the doc-sync
-   assertion; read its diff, since that diff is the pin's dependency delta.
-2. If the same run also reports `UNSTAGED_REACHABLE`, `MISSING_HARD_DEP`,
-   `MISSING_OPT_DEP` or `UNJUSTIFIED_BASE`, fix those first — they are real
-   findings about the new tree, not table churn. Staging, `depends`/`optdepends`
-   and `tests/data/command-packages.tsv` are the levers; the table is downstream
-   of all of them.
-3. With the candidate staged and built, regenerate the table and paste it
-   between the `CLOSURE_BEGIN`/`CLOSURE_END` markers in
-   `docs/RUNTIME_DEPENDENCIES.md`:
-
-   ```
-   python3 tests/runtime/closure_check.py \
-     --tree <extracted-tree> --repo . \
-     --map tests/data/command-packages.tsv \
-     --upstream-helpers tests/data/upstream-helpers.txt \
-     --exceptions tests/data/closure-exceptions.tsv --emit-table
-   ```
-
-   `tests/runtime/test_dependency_closure.sh` shows how the harness extracts
-   that tree (`coo_extract_pkg` / `coo_extract_overlay` into
-   `$COO_TEST_SANDBOX/closure-tree`).
-4. Re-run the suite. The doc-sync assertion should now pass, and the diff you
-   committed in step 3 is the human-readable record of what the pin changed.
+On success, review `git diff`, update the table at the top of this file, and
+commit. The list of upstream helpers the closure scanner trusts is not stored:
+`bin/list-upstream-helpers` reads `bin/` of `OMARCHY_COMMIT` from
+`build/omarchy` whenever the suite needs it.
 
 ## Components packaged (M1–M5; `pacman -U` 실설치는 2026-08-17 검증됨 — `docs/RUNTIME_STARTUP.md` §12)
 

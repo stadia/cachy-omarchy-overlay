@@ -7,12 +7,12 @@ defaults=${3:?defaults dir}
 install -d "$dest/usr/share/cachy-omarchy/upstream"
 cp -a "$src/shell" "$dest/usr/share/cachy-omarchy/upstream/"
 install -D -m644 "$src/version" "$dest/usr/share/cachy-omarchy/upstream/version"
-# v0.12.0 Track D: omarchy-show-logo 가 $OMARCHY_PATH/logo.txt 를 읽는다.
+# omarchy-show-logo 가 $OMARCHY_PATH/logo.txt 를 읽는다.
 # 프레젠테이션 헬퍼와 같은 업스트림 루트에 원본 그대로 설치한다.
 install -D -m644 "$src/logo.txt" "$dest/usr/share/cachy-omarchy/upstream/logo.txt"
 install -D -m644 "$src/default/omarchy/omarchy-menu.jsonc" \
   "$dest/usr/share/cachy-omarchy/upstream/default/omarchy/omarchy-menu.jsonc"
-# 테마 런타임 (M9): colors.toml 과 default/themed/*.tpl 은 같이 진화하는 한
+# 테마 런타임: colors.toml 과 default/themed/*.tpl 은 같이 진화하는 한
 # 쌍이므로 셸과 같은 핀 커밋에서 함께 스테이징한다. omarchy-theme-set 은
 # $OMARCHY_PATH/themes 와 $OMARCHY_PATH/default/themed 를 참조한다.
 # upstream/default/ 는 바로 위 omarchy-menu.jsonc install -D 가 만든다 —
@@ -26,7 +26,7 @@ cp -a "$src/default/themed" "$dest/usr/share/cachy-omarchy/upstream/default/"
 cp -a "$src/default/audio" "$dest/usr/share/cachy-omarchy/upstream/default/"
 install -D -m644 "$src/default/systemd/user/omarchy-speaker-tuning.service" \
   "$dest/usr/share/cachy-omarchy/upstream/default/systemd/user/omarchy-speaker-tuning.service"
-# 하이프랜드 토글 스니펫 (0.8.0): omarchy-hyprland-toggle 의 on() 경로가
+# 하이프랜드 토글 스니펫: omarchy-hyprland-toggle 의 on() 경로가
 # $OMARCHY_PATH/default/hypr/toggles/$FLAG.lua 를 사용자 hypr 설정으로 복사한다
 # (bin/omarchy-hyprland-toggle:18 FLAG_SOURCE). 정적 lua 조각 3개 —
 # flags.lua / single-window-aspect-ratio.lua / window-no-gaps.lua. default/hypr
@@ -34,7 +34,7 @@ install -D -m644 "$src/default/systemd/user/omarchy-speaker-tuning.service" \
 install -d "$dest/usr/share/cachy-omarchy/upstream/default/hypr"
 cp -a "$src/default/hypr/toggles" \
   "$dest/usr/share/cachy-omarchy/upstream/default/hypr/toggles"
-# 스크린세이버 터미널 설정 (v0.11). omarchy-launch-screensaver 가
+# 스크린세이버 터미널 설정. omarchy-launch-screensaver 가
 # $OMARCHY_PATH/default/{alacritty,foot,ghostty}/screensaver* 를 --config 로
 # 넘긴다. kitty 는 --override 인자만 쓰므로 설정 파일이 없다.
 install -D -m644 "$src/default/alacritty/screensaver.toml" \
@@ -45,7 +45,7 @@ install -D -m644 "$src/default/ghostty/screensaver" \
   "$dest/usr/share/cachy-omarchy/upstream/default/ghostty/screensaver"
 # 바·패널 위젯이 bare name 으로 부르는 업스트림 helper 를 verbatim 으로
 # 스테이징한다 (셸 래퍼가 $OMARCHY_PATH/bin 을 셸 프로세스 PATH 에 붙인다).
-# 목록은 위젯 실측에서 나왔다 — M8 평가 문서 "helper 처리 방침" Tier A·B.
+# 목록은 위젯 실측에서 나왔다.
 # 앞의 두 개는 M4 키바인딩 UI (cachy-omarchy-keybindings) 도 쓴다.
 # reminder/agent-usage 묶음(Tier B)은 기능 단위로 함께 있어야 성립한다:
 # omarchy-reminder 는 omarchy-notification-send 를 부르고, agents 패널은
@@ -54,18 +54,17 @@ install -D -m644 "$src/default/ghostty/screensaver" \
 # omarchy-menu-keybindings 도 넣지 않는다: 데이터 수집을 CachyOS 에 맞춘
 # 우리 적응 카피가 overlay/bin 에 있다. 나머지 업스트림 bin/ 은 전체 OS
 # 가정이라 여전히 넣지 않는다 (docs/COMMAND_AUDIT.md).
-# 테마 체인 (M9): omarchy-theme-set 의 critical path + 배경 묶음 + 메뉴 UI
+# 테마 체인: omarchy-theme-set 의 critical path + 배경 묶음 + 메뉴 UI
 # 프론트(omarchy-menu-images). yq 는 핀 커밋에서 불필요 (감사 실측).
-# browser/keyboard/install/update/remove 는 제외 — M9 설계 문서 D3·Tier C.
+# browser/keyboard/install/update/remove 는 제외.
 # 4.0.3 은 post 훅 두 개를 더했다. omarchy-theme-set-t3code 는 자체완결
 # (홈에만 쓰고 T3 Code 상태 디렉터리가 없으면 exit 0)이라 Tier B 로 올린다.
 # omarchy-theme-set-hermes 는 미스테이징 omarchy-install-hermes-cli 를 준비
 # 프로브로 부르고 hermes-desktop 을 전제하므로 제외한다
 # (tests/data/closure-exceptions.tsv 에 사유 기록).
 # omarchy-toggle-enabled 는 theme-set-vscode 의 skip 토글 게이트 — 사용자
-# 상태의 존재만 읽는 1행 테스트라 shim 없이 원본을 둔다 (M9 라이브 실측에서
-# 누락 확인, RUNTIME_STARTUP §18.6).
-# 유틸리티 플러그인 체인 (M10, 설계 문서 §3 Tier A): clipboard/emojis/OSD
+# 상태의 존재만 읽는 1행 테스트라 shim 없이 원본을 둔다.
+# 유틸리티 플러그인 체인: clipboard/emojis/OSD
 # 오버레이는 이미 기본 로드되고 QML 이 $OMARCHY_PATH/bin 의 helper 를 부른다.
 # clipboard-open 의 launch-browser/editor/tui/hyprland-focus-app 은 전이
 # closure 다. brightness-keyboard-mute 는 이름과 달리 mic-mute LED no-op
@@ -166,7 +165,7 @@ helpers=(
   omarchy-audio-tuning
   omarchy-hw-match
   omarchy-restart-audio
-  # audio input/sink pair (v0.10.0): Audio 패널 입력 기본값 + 싱크 선택 목록.
+  # audio input/sink pair: Audio 패널 입력 기본값 + 싱크 선택 목록.
   # input-set-default 는 output-set-default 의 입력측 대칭 (wpctl/pactl).
   # sink-availability 는 audio-tuning(staged) fronted-sink 만 부른다.
   omarchy-audio-input-set-default
@@ -182,7 +181,7 @@ helpers=(
   omarchy-toggle-touchpad
   omarchy-toggle-touchscreen
   omarchy-toggle-input-device
-  # ── verbatim 확장 (0.8.0): 감사 실측이 "공식 omarchy 전체 OS 가정" 분류를
+  # ── verbatim 확장: 감사 실측이 "공식 omarchy 전체 OS 가정" 분류를
   # 뒤집은 명령들. 전부 업스트림 원본 그대로 올린다 — 래퍼/적응 카피 없음.
   # docs/COMMAND_AUDIT.md 의 감사 실측과 테스트 전수가 근거다.
   #
@@ -277,11 +276,11 @@ helpers=(
   # theme-refresh: 현재 테마 재적용 9줄 래퍼. omarchy-theme-set(staged)만
   # 호출하는 체인 깊이 1 (감사 실측, closure-exceptions 0.10.0 행 회수).
   omarchy-theme-refresh
-  # bluetooth power/device pair (v0.10.0): 바 Bluetooth 위젯 기본 배치,
+  # bluetooth power/device pair: 바 Bluetooth 위젯 기본 배치,
   # rfkill/bluetoothctl만. power 는 외부 omarchy 의존 0, device 는 power 만 부른다.
   omarchy-bluetooth-power
   omarchy-bluetooth-device
-  # weather location/status pair (v0.10.0): bar weather 위젯 기본 배치,
+  # weather location/status pair: bar weather 위젯 기본 배치,
   # curl+BASE. location 은 외부 omarchy 의존 0, status 는 location 만 부른다.
   omarchy-weather-location
   omarchy-weather-status
@@ -298,7 +297,7 @@ helpers=(
   # omarchy 의존 0). 둘 다 새 외부 패키지 의존을 만들지 않는다.
   omarchy-git-url-check
   omarchy-theme-extras
-  # v0.11.0 Session Lifecycle Parity — 가드와 프로브.
+  # Session lifecycle: 가드와 프로브.
   # omarchy-cmd-missing: 화면보호기 런처(idle→screensaver 체인의 별도 스크립트)
   #   첫 줄의 ttfx 가드. 없으면 127 로 끝나 bash if 가 거짓으로 읽고 가드를
   #   통과해 버린다(fail-safe 붕괴).
@@ -320,7 +319,7 @@ helpers=(
   # `omarchy-cmd-missing ttfx && exit 1` 로 흡수된다 — 그 가드가 Task 1 이다.
   omarchy-screensaver
   omarchy-launch-screensaver
-  # v0.12.0 Track B: 바 투명 모드 텍스트 대비색. Bar.qml:834 가
+  # 바 투명 모드 텍스트 대비색. Bar.qml:834 가
   # requestedTransparent 일 때만 부른다 — 부재 시 Process 가 조용히 실패해
   # 투명 바 텍스트가 테마 전경색으로 고정된다(크래시 아님, 가시적 결손).
   # 이미 스테이징된 omarchy-cmd-present 하나만 부르는 자체완결 스크립트라
@@ -328,7 +327,7 @@ helpers=(
   # OPT 다 — 부재 시 omarchy-cmd-present magick 가드가 fallback() 으로
   # 빠져 텍스트색이 그냥 테마 전경색이 된다(fail-safe, PKGBUILD optdepends).
   omarchy-bar-text-color
-  # v0.12.0 Track D: gum 프레젠테이션 레이어. 메뉴의
+  # gum 프레젠테이션 레이어. 메뉴의
   # update.hardware.audio(omarchy-restart-audio),
   # setup.security.passwordless-sudo(omarchy-sudo-passwordless),
   # setup.network.dns.custom(omarchy-dns) 행이 이 런처를 거친다.

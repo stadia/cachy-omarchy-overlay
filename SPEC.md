@@ -732,7 +732,7 @@ cachy-omarchy-overlay/
 ├── SPEC.md · UPSTREAM.md · README.md (English) · README.ko-KR.md · LICENSE
 ├── upstream.lock                     # 핀: 버전·커밋·채널·저장소·태그
 ├── packages/
-│   ├── cachy-omarchy-shell/          # PKGBUILD, stage-upstream.sh, patches/
+│   ├── cachy-omarchy-shell/          # PKGBUILD, stage-upstream.sh, *.patch, PATCHES.md
 │   └── cachy-omarchy-overlay/        # PKGBUILD, stage-overlay.sh
 ├── overlay/                          # 우리가 쓴 통합층 — 오버레이 패키지의 원본
 │   ├── bin/                          # cachy-omarchy-{shell,launcher,keybindings,bindings,init,doctor}
@@ -1075,10 +1075,10 @@ The real PKGBUILD must be based on the runtime dependency audit.
 
 # 23. Patch Policy
 
-Patches live under:
+Patches live next to the PKGBUILD, as makepkg `source=` entries with sha256sums:
 
 ```text
-packages/cachy-omarchy-shell/patches/
+packages/cachy-omarchy-shell/*.patch
 ```
 
 Naming:
@@ -1091,7 +1091,7 @@ Naming:
 Every patch must include metadata in:
 
 ```text
-patches/README.md
+packages/cachy-omarchy-shell/PATCHES.md
 ```
 
 Example:
@@ -1349,12 +1349,25 @@ audit
 test
 ```
 
+The patches are applied by the PKGBUILD's `prepare()` during the build, so one
+run is enough.
+
 If any stage fails:
 
 ```text
 DO NOT INSTALL
 DO NOT MODIFY CURRENT PACKAGE
 ```
+
+The tracked files (`upstream.lock`, the shell PKGBUILD, both READMEs) are
+restored from git, the new shell artifact is removed, the `build/` artifacts
+the run overwrote are put back from a backup, and `build/omarchy` returns to
+the old pin (or is removed if the run created it). `--keep` leaves the failed
+state in place. Uncommitted edits elsewhere (for example under `overlay/`)
+are not guarded: they go into the build and the test run, and the overlay
+artifact is rebuilt under its existing name, from where the backup restores it.
+Re-tagging the pinned version to another commit bumps `pkgrel`, so the new
+shell never reuses the old file name.
 
 ---
 
@@ -2077,7 +2090,7 @@ All must be true:
 
 잠금 공존 실측(§22)이 남긴 결정: ext-session-lock 은 클라이언트 하나만 쥐고, 거부당하면
 quickshell 은 프로토콜 오류로 죽는다. 그래서 업스트림 stranded-lock 회수 헬퍼
-(`omarchy-hyprland-session-locked`)는 올리지 않는다(`test_staged_session_helpers.sh` 가 고정).
+(`omarchy-hyprland-session-locked`)는 올리지 않는다(`test_staged_helpers.sh`(`tests/data/staged-helpers.tsv`)가 고정).
 
 ---
 
@@ -2094,8 +2107,8 @@ quickshell 은 프로토콜 오류로 죽는다. 그래서 업스트림 stranded
 
 - **tests** — 핀 커밋으로 두 패키지를 빌드하고 `bin/test-packages` 로 전체 스위트를
   돌린다. 허용목록 밖의 `skip:` 은 실패다.
-- **resolve** — 로컬 pacman 저장소로 실제 설치 트랜잭션을 돌려 의존 선언이 충분한지
-  증명하고, headless `cachy-omarchy-init` 과 폐쇄 스캐너를 설치 트리에 돌린다.
+- **resolve** — tests lane 이 올린 아티팩트를 받아(다시 빌드하지 않는다), 로컬 pacman
+  저장소로 실제 설치 트랜잭션을 돌려 의존 선언이 충분한지 증명하고, headless `cachy-omarchy-init` 과 폐쇄 스캐너를 설치 트리에 돌린다.
 
 CI 는 릴리스를 발행하지 않는다. 업스트림 새 릴리스 감지·PR 자동화는 없다.
 

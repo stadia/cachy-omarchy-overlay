@@ -48,7 +48,7 @@ assert_file_exists "$patched_src/shell/services/PluginRegistry.qml" "pristine pi
 while IFS= read -r -d '' patch; do
   ( cd "$patched_src" && git apply -p1 "$patch" ) \
     || { printf 'error: 패치 적용 실패: %s\n' "${patch##*/}" >&2; exit 1; }
-done < <(find "$REPO_ROOT/packages/cachy-omarchy-shell/patches" -name '*.patch' -type f -print0 | sort -z)
+done < <(find "$REPO_ROOT/packages/cachy-omarchy-shell" -maxdepth 1 -name '*.patch' -type f -print0 | sort -z)
 bash "$script" "$patched_src" "$stage" "$defaults"
 
 root=$stage/usr/share/cachy-omarchy/upstream
@@ -75,7 +75,7 @@ assert_contains "$lock_qml" "cancelPolkitForSessionLock()" "staged lock invokes 
 # Must not stage excluded trees. themes/ 는 M9 부터 스테이징 대상이다 —
 # colors.toml 과 default/themed/*.tpl 이 같이 진화하는 한 쌍이라 셸과 같은
 # 핀 커밋에서 함께 간다 (M9 설계 문서). 테마 스테이징의 정합성은
-# tests/package/test_staged_themes.sh 가 단언한다.
+# tests/package/test_staged_helpers.sh 가 단언한다.
 if [[ -e $root/install || -e $root/migrations ]]; then
   printf 'FAIL: excluded upstream trees were staged\n'
   ASSERT_FAILURES=$((ASSERT_FAILURES + 1))
