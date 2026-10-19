@@ -152,7 +152,7 @@ bin/update-upstream          # refresh the pin + rebuild pipeline
 bin/rollback                 # reinstall the newest older build/ artifact per package
 ```
 
-The rollback target is the next lower version present in `build/`, which may be a build that was never installed. Running rollback again steps back further; delete unwanted artifacts from `build/` to exclude them.
+The rollback target is the next lower version present in `build/`, which may be a build that was never installed. Running rollback again steps back further; delete unwanted artifacts from `build/` to exclude them. Rollback fails as a whole if either package is not installed. Restart the shell afterwards with `cachy-omarchy-shell --restart`.
 
 0.x builds also copied every artifact into `~/.local/state/cachy-omarchy/` (`validated-builds/`, `packages/`, `*.manifest`). Nothing reads that directory any more; delete it to reclaim the space.
 

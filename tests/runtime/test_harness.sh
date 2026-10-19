@@ -7,22 +7,7 @@ source "$REPO_ROOT/lib/runtime.sh"
 
 assert_eq "$(coo_repo_root)" "$REPO_ROOT" "coo_repo_root"
 
-artifact=$(coo_pkg_artifact); code=$?
-if (( code != 0 )); then
-  echo "skip: build/*.pkg.tar.zst 없음 — 먼저 makepkg 를 돌릴 것"
-  exit 0
-fi
-assert_contains "$artifact" "cachy-omarchy-shell" "아티팩트 이름"
-
-dest="$COO_TEST_SANDBOX/pkg"
-coo_extract_pkg "$dest"
-assert_eq "$?" "0" "추출 성공"
-
-root=$(coo_upstream_root "$dest")
-assert_file_exists "$root/shell/shell.qml" "shell.qml 존재"
-assert_file_exists "$root/config/omarchy/shell.json" "기본 shell.json 존재"
-assert_file_exists "$root/version" "version 존재"
-
+# 아래 두 블록은 가짜 루트만 쓰므로 빌드 산출물이 없어도 실행돼야 한다.
 # 아티팩트가 없을 때는 조용히 실패해야 한다.
 out=$(COO_REPO_ROOT_OVERRIDE="$COO_TEST_SANDBOX/empty" coo_pkg_artifact 2>/dev/null); code=$?
 assert_eq "$code" "1" "아티팩트 없음 → exit 1"
@@ -59,5 +44,21 @@ assert_eq "$code:$out" "1:" "missing current shell artifact is absent, not an ol
 out=$(COO_BUILD_DIR= COO_REPO_ROOT_OVERRIDE="$fake_root" coo_overlay_artifact 2>/dev/null); code=$?
 assert_eq "$code:$out" "1:" "missing current overlay artifact is absent, not an older one"
 assert_eq "${OMARCHY_VERSION:-unset}" "unset" "artifact lookup does not leak lock variables"
+
+artifact=$(coo_pkg_artifact); code=$?
+if (( code != 0 )); then
+  echo "skip: build/*.pkg.tar.zst 없음 — 먼저 makepkg 를 돌릴 것"
+  exit "$ASSERT_FAILURES"
+fi
+assert_contains "$artifact" "cachy-omarchy-shell" "아티팩트 이름"
+
+dest="$COO_TEST_SANDBOX/pkg"
+coo_extract_pkg "$dest"
+assert_eq "$?" "0" "추출 성공"
+
+root=$(coo_upstream_root "$dest")
+assert_file_exists "$root/shell/shell.qml" "shell.qml 존재"
+assert_file_exists "$root/config/omarchy/shell.json" "기본 shell.json 존재"
+assert_file_exists "$root/version" "version 존재"
 
 exit "$ASSERT_FAILURES"

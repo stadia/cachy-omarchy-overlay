@@ -52,7 +52,10 @@ done
 audit() {
   local listing
   listing=$("$bsdtar_bin" -tf "$1") || return 1
-  ! grep -Eq '(^|/)(etc|boot|efi)(/|$)|usr/lib/systemd/system/' <<<"$listing"
+  local status=0
+  grep -Eq '(^|/)(etc|boot|efi)(/|$)|usr/lib/systemd/system/' <<<"$listing" || status=$?
+  # 1 = no forbidden path; 0 = found one; anything else = grep itself broke.
+  (( status == 1 ))
 }
 for name in "$COO_SHELL_ARTIFACT" "$COO_OVERLAY_ARTIFACT"; do
   audit "$pkgdest/$name" || fail "archive audit failed: $name"
@@ -61,7 +64,9 @@ done
 # Nothing reaches build/ under a current name until both packages built,
 # passed the audit and were fully copied: copy each to a hidden temp name in
 # build/ (same filesystem), then rename both into place. Older versions stay
-# there: bin/rollback installs from them.
+# there: bin/rollback installs from them. The two renames are not atomic
+# together: if the second fails, build/ can hold a new shell beside an old
+# overlay of the same version that were never verified as a pair.
 mkdir -p "$build_dir"
 staged=()
 trap 'rm -rf "$work"; rm -f "${staged[@]}"' EXIT
@@ -70,6 +75,7 @@ for name in "$COO_SHELL_ARTIFACT" "$COO_OVERLAY_ARTIFACT"; do
   "$install_bin" -m 644 "$pkgdest/$name" "$build_dir/.$name.tmp" || fail "could not copy $name into $build_dir"
 done
 for name in "$COO_SHELL_ARTIFACT" "$COO_OVERLAY_ARTIFACT"; do
-  mv -f "$build_dir/.$name.tmp" "$build_dir/$name"
+  mv -f "$build_dir/.$name.tmp" "$build_dir/$name" ||
+    fail "partial publish: $name not renamed; build/ may hold a mixed pair, rerun bin/build-packages"
   printf 'built: %s\n' "$build_dir/$name"
 done

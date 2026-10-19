@@ -41,7 +41,7 @@ version_cmp() {
 # or nothing when there is none.
 previous_artifact() {
   local pkg=$1 installed f ver cmp best="" best_ver=""
-  installed=$("${query_cmd[@]}" -Q "$pkg" 2>/dev/null) || fail "$pkg is not installed"
+  installed=$("${query_cmd[@]}" -Q "$pkg") || fail "$pkg is not installed (or pacman failed; see its message above)"
   installed=${installed#"$pkg "}
   for f in "$build_dir/$pkg"-*-any.pkg.tar.zst; do
     [[ -f $f ]] || continue
@@ -70,5 +70,7 @@ done
 (( ${#targets[@]} )) || fail 'nothing older in build/ to roll back to'
 
 "${pacman_cmd[@]}" -U "${targets[@]}"
-[[ -z $smoke_bin ]] || "$smoke_bin"
 printf 'rolled back to: %s\n' "${targets[@]##*/}"
+if [[ -n $smoke_bin ]]; then
+  "$smoke_bin" || fail 'downgrade finished but the smoke check failed; restart the shell with cachy-omarchy-shell --restart and inspect it'
+fi

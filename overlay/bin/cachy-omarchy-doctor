@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Read-only release diagnostics for the Cachy Omarchy overlay (SPEC §40).
-# It deliberately never installs, edits configuration, reloads Hyprland, or
-# attempts to recover incomplete package-manager state.
+# It deliberately never installs, edits configuration, or reloads Hyprland.
 set -uo pipefail
 
 PREFIX_ROOT=${COO_PREFIX_ROOT:-/usr/share/cachy-omarchy}

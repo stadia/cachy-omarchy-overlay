@@ -189,19 +189,38 @@ COO_REPO_ROOT="$candidate" COO_BUILD_DIR="$candidate_build" \
 
 # Tests passed on the candidate artifacts. Copy them next to the older builds
 # (bin/rollback installs from those) before touching tracked metadata.
+# Stage under hidden temp names first and rename only once every copy
+# succeeded, so a failed copy never truncates a current artifact.
 mkdir -p "$build_dir"
-while IFS= read -r artifact; do
-  "$install_bin" -m 644 "$artifact" "$build_dir/${artifact##*/}"
-done < <(find "$candidate_build" -maxdepth 1 -type f -name '*.pkg.tar.zst' -print | sort)
-# POSIX cannot atomically rename two different tracked files. Prepare both in
-# their own directories, then compensate the first rename if the second
-# fails.
+(
+  # shellcheck disable=SC1091
+  source "$candidate/bin/package-names.sh"
+  coo_current_artifacts "$candidate" || exit 1
+  printf '%s\n' "$COO_SHELL_ARTIFACT" "$COO_OVERLAY_ARTIFACT"
+) >"$candidate/artifact-names" || fail 'could not derive candidate artifact names'
+mapfile -t artifact_names <"$candidate/artifact-names"
+published_tmp=()
+meta_tmp=()
+trap 'rm -rf "$candidate"; rm -f "${published_tmp[@]}" "${meta_tmp[@]}"' EXIT
+for name in "${artifact_names[@]}"; do
+  [[ -f $candidate_build/$name ]] || fail "candidate artifact missing: $name"
+  published_tmp+=("$build_dir/.$name.tmp")
+  "$install_bin" -m 644 "$candidate_build/$name" "$build_dir/.$name.tmp" || fail "could not copy $name into $build_dir"
+done
+for name in "${artifact_names[@]}"; do
+  "$mv_bin" -f "$build_dir/.$name.tmp" "$build_dir/$name" ||
+    fail "partial publish: $name not renamed; rerun bin/update-upstream"
+done
+# POSIX cannot atomically rename different tracked files. Prepare lock,
+# PKGBUILD and inventory in their own directories, then compensate the
+# earlier renames if a later one fails.
 lock_backup=$(mktemp "${lock%/*}/.upstream.lock-backup-XXXXXX")
 pkg_backup=$(mktemp "${shell_pkg%/*}/.PKGBUILD-backup-XXXXXX")
 inventory_backup=$(mktemp "${inventory%/*}/.upstream-helpers-backup-XXXXXX")
 lock_new=$(mktemp "${lock%/*}/.upstream.lock-new-XXXXXX")
 pkg_new=$(mktemp "${shell_pkg%/*}/.PKGBUILD-new-XXXXXX")
 inventory_new=$(mktemp "${inventory%/*}/.upstream-helpers-new-XXXXXX")
+meta_tmp=("$lock_backup" "$pkg_backup" "$inventory_backup" "$lock_new" "$pkg_new" "$inventory_new")
 cp "$lock" "$lock_backup"; cp "$shell_pkg" "$pkg_backup"; cp "$inventory" "$inventory_backup"
 cp "$candidate_lock" "$lock_new"; cp "$candidate_pkg" "$pkg_new"; cp "$candidate_inventory" "$inventory_new"
 if ! COO_UPDATE_METADATA_PUBLISH=lock "$mv_bin" "$lock_new" "$lock"; then

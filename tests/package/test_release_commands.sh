@@ -25,8 +25,9 @@ overlay_now=cachy-omarchy-overlay-0.3.0-1-any.pkg.tar.zst
 cat >"$fake/makepkg" <<'EOT'
 #!/usr/bin/env bash
 set -euo pipefail
-[[ ${COO_FAKE_BUILD_FAIL:-0} != 1 ]] || { echo 'fake-makepkg: forced build failure' >&2; exit 7; }
 name=$(basename "$PWD")
+[[ ${COO_FAKE_BUILD_FAIL:-0} != 1 ]] || { echo 'fake-makepkg: forced build failure' >&2; exit 7; }
+[[ -z ${COO_FAKE_BUILD_FAIL_ONLY:-} || $name != *"$COO_FAKE_BUILD_FAIL_ONLY" ]] || { echo 'fake-makepkg: forced build failure' >&2; exit 7; }
 ver=$(grep -m1 '^pkgver=' PKGBUILD | cut -d= -f2)
 rel=$(grep -m1 '^pkgrel=' PKGBUILD | cut -d= -f2)
 mkdir -p "$PKGDEST"
@@ -35,7 +36,7 @@ printf '%s\n' "$name-$ver-$rel" >"$PKGDEST/$name-$ver-$rel-any.pkg.tar.zst"
 EOT
 cat >"$fake/bsdtar" <<'EOT'
 #!/usr/bin/env bash
-if [[ ${COO_FAKE_AUDIT_FAIL:-0} == 1 ]]; then echo etc/os-release; else echo usr/share/cachy-omarchy/ok; fi
+if [[ ${COO_FAKE_AUDIT_FAIL:-0} == 1 || ( -n ${COO_FAKE_AUDIT_FAIL_ONLY:-} && ${!#} == *"cachy-omarchy-$COO_FAKE_AUDIT_FAIL_ONLY-"* ) ]]; then echo etc/os-release; else echo usr/share/cachy-omarchy/ok; fi
 EOT
 cat >"$fake/pacman" <<'EOF'
 #!/usr/bin/env bash
@@ -108,6 +109,18 @@ for mode in BUILD AUDIT EXTRA; do
 done
 assert_contains "$out" "ambiguous build artifacts" "extra artifact is reported as ambiguous"
 
+# 두 패키지가 모두 통과해야 게시한다: 실패가 overlay 에만 있어도 아무것도 게시되지 않는다.
+for mode in BUILD AUDIT; do
+  case $mode in BUILD) only=COO_FAKE_BUILD_FAIL_ONLY ;; AUDIT) only=COO_FAKE_AUDIT_FAIL_ONLY ;; esac
+  fresh=$COO_TEST_SANDBOX/build-overlay-$mode
+  code=0
+  env "$only=overlay" COO_REPO_ROOT="$root" COO_BUILD_DIR="$fresh" COO_MAKEPKG_BIN="$fake/makepkg" \
+    COO_BSDTAR_BIN="$fake/bsdtar" "$root/bin/build-packages" >/dev/null 2>&1 || code=$?
+  [[ $code != 0 ]] && failed=1 || failed=0
+  assert_eq "$failed" "1" "overlay-only $mode failure exits nonzero"
+  assert_eq "$(find "$fresh" -type f 2>/dev/null | wc -l)" "0" "overlay-only $mode failure leaves nothing in build/"
+done
+
 # 두 번째 복사가 중간에 실패해도 build/ 에 현재 이름의 반쪽 파일이나 임시
 # 파일이 남지 않아야 한다 (첫 번째 패키지도 게시되지 않는다).
 cat >"$fake/install" <<'EOF2'
@@ -169,10 +182,31 @@ assert_contains "$(cat "$sudolog")" "sudo pacman -U $build/$shell_now" "install 
 code=0; out=$(COO_REPO_ROOT="$root" COO_BUILD_DIR="$build" "$root/bin/install-packages" 2>&1) || code=$?
 assert_eq "$code" "1" "install without --install refuses"
 
+# --- package-names.sh: 잘못된 메타데이터는 이유와 함께 실패한다 ---
+names_case() {
+  local lock_ver=$1 shell_ver=$2 shell_rel=$3 r=$COO_TEST_SANDBOX/names-repo
+  rm -rf "$r"; mkdir -p "$r/packages/cachy-omarchy-shell" "$r/packages/cachy-omarchy-overlay"
+  printf 'OMARCHY_VERSION=%s\nOMARCHY_COMMIT=1111111111111111111111111111111111111111\n' "$lock_ver" >"$r/upstream.lock"
+  printf "pkgver=%s\npkgrel=%s\n" "$shell_ver" "$shell_rel" >"$r/packages/cachy-omarchy-shell/PKGBUILD"
+  printf 'pkgver=0.3.0\npkgrel=1\n' >"$r/packages/cachy-omarchy-overlay/PKGBUILD"
+  ( source "$REPO_ROOT/bin/package-names.sh"; coo_current_artifacts "$r" && printf '%s\n' "$COO_SHELL_ARTIFACT" ) 2>&1
+}
+out=$(names_case 4.0.4 4.0.5 1) && code=0 || code=$?
+assert_eq "$code" "1" "package-names rejects a pkgver that differs from the lock"
+assert_contains "$out" "does not match upstream.lock" "pkgver mismatch is explained"
+out=$(names_case 4.0 4.0 1) && code=0 || code=$?
+assert_eq "$code:$out" "1:error: invalid upstream.lock" "package-names rejects a malformed lock version"
+out=$(names_case 4.0.4 4.0.4 x) && code=0 || code=$?
+assert_eq "$code:$out" "1:error: invalid PKGBUILD version metadata" "package-names rejects a non-numeric pkgrel"
+out=$(names_case 4.0.4 "'4.0.4'" "'2'") && code=0 || code=$?
+assert_eq "$code:$out" "0:cachy-omarchy-shell-4.0.4-2-any.pkg.tar.zst" "package-names accepts quoted values"
+
 # --- rollback: 설치 버전보다 낮은 가장 새 build/ 아티팩트 ---
+command -v vercmp >/dev/null 2>&1 || { echo "skip: vercmp 없음 — rollback 단언 생략"; exit "$ASSERT_FAILURES"; }
 rb=$COO_TEST_SANDBOX/rollback-build
 mkdir -p "$rb"
 for f in cachy-omarchy-shell-4.0.2-1 cachy-omarchy-shell-4.0.9-1 cachy-omarchy-shell-4.0.10-1 \
+         cachy-omarchy-shell-4.0.11-1 \
          cachy-omarchy-overlay-0.2.0-1 cachy-omarchy-overlay-0.3.0-1; do
   : >"$rb/$f-any.pkg.tar.zst"
 done
@@ -186,6 +220,26 @@ assert_eq "$code" "0" "rollback succeeds"
 assert_eq "$(head -n1 "$paclog")" "-U $rb/cachy-omarchy-shell-4.0.9-1-any.pkg.tar.zst $rb/cachy-omarchy-overlay-0.2.0-1-any.pkg.tar.zst" \
   "rollback picks by vercmp"
 assert_eq "$(tail -n1 "$paclog")" "smoke" "rollback smoke runs after pacman"
+assert_contains "$out" "rolled back to: cachy-omarchy-shell-4.0.9-1" "rollback reports the target"
+
+# pkgrel 만 다른 경우: 설치본 4.0.4-2 보다 낮은 가장 새 것은 4.0.4-1 이다.
+rb2=$COO_TEST_SANDBOX/rollback-pkgrel
+mkdir -p "$rb2"
+for f in cachy-omarchy-shell-4.0.4-1 cachy-omarchy-shell-4.0.3-9 cachy-omarchy-overlay-0.2.0-1; do
+  : >"$rb2/$f-any.pkg.tar.zst"
+done
+reset_logs; code=0
+out=$(COO_FAKE_Q_SHELL=4.0.4-2 COO_FAKE_Q_OVERLAY=0.2.0-1 COO_REPO_ROOT="$root" COO_BUILD_DIR="$rb2" \
+  COO_PACMAN_BIN="$fake/pacman" COO_PACMAN_LOG="$paclog" "$root/bin/rollback" 2>&1) || code=$?
+assert_eq "$code" "0" "rollback pkgrel case succeeds"
+assert_eq "$(cat "$paclog")" "-U $rb2/cachy-omarchy-shell-4.0.4-1-any.pkg.tar.zst" "rollback prefers the lower pkgrel over an older pkgver"
+
+# smoke 실패: 다운그레이드는 끝났다는 사실을 오류에 담는다.
+printf '#!/usr/bin/env bash\nexit 4\n' >"$fake/smoke-fail"; chmod +x "$fake/smoke-fail"
+reset_logs; code=0
+out=$(COO_FAKE_Q_SHELL=4.0.10-1 COO_FAKE_Q_OVERLAY=0.3.0-1 COO_ROLLBACK_SMOKE_BIN="$fake/smoke-fail" run_rollback) || code=$?
+assert_eq "$code" "1" "rollback with a failing smoke check fails"
+assert_contains "$out" "downgrade finished but the smoke check failed" "failed smoke says the downgrade already happened"
 reset_logs; code=0
 out=$(COO_FAKE_Q_SHELL=4.0.10-1 COO_FAKE_Q_OVERLAY=0.2.0-1 run_rollback) || code=$?
 assert_eq "$code" "0" "rollback shell only succeeds"
@@ -203,7 +257,7 @@ assert_eq "$(wc -l <"$paclog")" "0" "rollback not installed invokes no pacman"
 code=0; out=$(COO_FAKE_Q_SHELL=4.0.10-1 COO_FAKE_Q_OVERLAY=0.3.0-1 COO_REPO_ROOT="$root" COO_BUILD_DIR="$rb" \
   COO_SUDO_LOG="$sudolog" PATH="$fake:$PATH" "$root/bin/rollback" 2>&1) || code=$?
 assert_eq "$code" "0" "rollback as normal user succeeds"
-assert_contains "$(cat "$sudolog")" "sudo pacman -U" "rollback elevates only the pacman transaction"
+assert_eq "$(cat "$sudolog")" "sudo pacman -U $rb/cachy-omarchy-shell-4.0.9-1-any.pkg.tar.zst $rb/cachy-omarchy-overlay-0.2.0-1-any.pkg.tar.zst" "rollback elevates only the pacman transaction"
 
 # vercmp 가 없거나 실패하면 "더 낮은 버전 없음" 으로 뭉개지 말고 크게 실패한다.
 reset_logs; code=0

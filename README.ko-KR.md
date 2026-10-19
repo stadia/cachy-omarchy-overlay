@@ -150,7 +150,9 @@ bin/rollback                 # 패키지마다 build/ 의 더 낮은 최신 아�
 
 rollback 대상은 `build/` 에 있는 바로 아래 버전이며, 한 번도 설치한 적 없는
 빌드일 수 있다. 다시 실행하면 한 단계씩 더 내려간다. 원치 않는 버전은 `build/`
-에서 그 아티팩트를 지워 후보에서 뺀다.
+에서 그 아티팩트를 지워 후보에서 뺀다. 두 패키지 중 하나라도 설치돼 있지 않으면
+rollback 전체가 실패한다. 끝난 뒤에는 `cachy-omarchy-shell --restart` 로 셸을
+다시 시작한다.
 
 0.x 빌드는 모든 아티팩트를 `~/.local/state/cachy-omarchy/`
 (`validated-builds/`, `packages/`, `*.manifest`)에도 복사했다. 이제 그

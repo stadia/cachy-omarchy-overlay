@@ -34,8 +34,8 @@ mkdir -p "$state/toggles"; : > "$state/toggles/bar-off"
 run_init
 assert_file_exists "$state/toggles/bar-off" "기존 bar-off 는 지우지 않는다"
 
-# doctor 는 삭제 방법을 안내한다 (자동 삭제 금지). doctor 의 STATE_DIR 은
-# cachy-omarchy 상태이고 bar-off 가 사는 곳은 omarchy 상태라 다른 변수다.
+# doctor 는 삭제 방법을 안내한다 (자동 삭제 금지). bar-off 는 omarchy 상태
+# 디렉터리(COO_OMARCHY_STATE_DIR)에 산다.
 out=$(HOME="$home" COO_OMARCHY_STATE_DIR="$state" COO_CONFIG_DIR="$conf" \
   "$DOCTOR" 2>&1)
 assert_contains "$out" "bar-off" "doctor 가 bar-off 를 언급한다"

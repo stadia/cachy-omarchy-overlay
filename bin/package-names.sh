@@ -6,7 +6,7 @@
 # Sets COO_SHELL_ARTIFACT and COO_OVERLAY_ARTIFACT (file names, no directory)
 # and the lock's OMARCHY_* variables.
 coo_current_artifacts() {
-  local root=$1 shell_pkg overlay_pkg shell_rel overlay_ver overlay_rel
+  local root=$1 shell_ver shell_pkg overlay_pkg shell_rel overlay_ver overlay_rel
   shell_pkg=$root/packages/cachy-omarchy-shell/PKGBUILD
   overlay_pkg=$root/packages/cachy-omarchy-overlay/PKGBUILD
   if [[ ! -f $root/upstream.lock || ! -f $shell_pkg || ! -f $overlay_pkg ]]; then
@@ -24,6 +24,11 @@ coo_current_artifacts() {
   overlay_rel=$(grep -m1 '^pkgrel=' "$overlay_pkg" | cut -d= -f2- | tr -d "'\"")
   if [[ ! $shell_rel =~ ^[0-9]+$ || ! $overlay_ver =~ ^[0-9]+\.[0-9]+\.[0-9]+$ || ! $overlay_rel =~ ^[0-9]+$ ]]; then
     printf 'error: invalid PKGBUILD version metadata\n' >&2
+    return 1
+  fi
+  shell_ver=$(grep -m1 '^pkgver=' "$shell_pkg" | cut -d= -f2- | tr -d "'\"")
+  if [[ $shell_ver != "$OMARCHY_VERSION" ]]; then
+    printf 'error: shell PKGBUILD pkgver %s does not match upstream.lock OMARCHY_VERSION %s\n' "$shell_ver" "$OMARCHY_VERSION" >&2
     return 1
   fi
   COO_SHELL_ARTIFACT=cachy-omarchy-shell-$OMARCHY_VERSION-$shell_rel-any.pkg.tar.zst

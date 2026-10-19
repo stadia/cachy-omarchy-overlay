@@ -20,7 +20,7 @@ coo_current_artifact() (
   [[ -f $root/bin/package-names.sh ]] || exit 1
   # shellcheck disable=SC1091
   source "$root/bin/package-names.sh"
-  coo_current_artifacts "$root" 2>/dev/null || exit 1
+  coo_current_artifacts "$root" || exit 1
   case $kind in
     shell) name=$COO_SHELL_ARTIFACT ;;
     overlay) name=$COO_OVERLAY_ARTIFACT ;;
