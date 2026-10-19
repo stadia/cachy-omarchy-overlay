@@ -29,12 +29,13 @@
    `_commit`) and deletes makepkg's stale `src/`, `pkg/` and `omarchy/` caches;
 3. `bin/build-packages`, then `bin/test-packages` (the whole suite).
 
-If any step fails, the two tracked files are restored from `HEAD`,
-`build/omarchy` goes back to the old pin and the new shell artifact is removed.
+If any step fails, the tracked files (the lock, the PKGBUILD and both READMEs)
+are restored from `HEAD`, `build/omarchy` goes back to the old pin, and the
+`build/` artifacts are put back as they were.
 Run with `--keep` to leave the failed state in place while you adapt the
 overlay to the new tree (undo with `git checkout HEAD -- upstream.lock
-packages/cachy-omarchy-shell/PKGBUILD`). The command refuses to start if those
-two files have uncommitted edits.
+packages/cachy-omarchy-shell/PKGBUILD README.md README.ko-KR.md`). The command
+refuses to start if those files have uncommitted edits.
 
 On success, review `git diff`, update the table at the top of this file, and
 commit. The list of upstream helpers the closure scanner trusts is not stored:

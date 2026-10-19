@@ -86,10 +86,7 @@ restore() {
   else
     git -C "$omarchy_git" checkout -q --detach "$old_head" || { printf 'warn: could not return %s to %s\n' "$omarchy_git" "$old_head" >&2; problems=1; }
   fi
-  if [[ -n ${new_shell_artifact:-} && $new_shell_artifact != "$old_shell_artifact" ]]; then
-    rm -f "${build_dir:?}/$new_shell_artifact" || problems=1
-  fi
-  for name in "$old_shell_artifact" "$old_overlay_artifact"; do
+  for name in $(printf '%s\n' "$old_shell_artifact" "$old_overlay_artifact" "${new_shell_artifact:-}" | awk 'NF && !seen[$0]++'); do
     if [[ -e $backup/$name ]]; then
       mv -f "$backup/$name" "$build_dir/$name" || { printf 'warn: could not put back %s (kept in %s)\n' "$name" "$backup" >&2; problems=1; }
     else
@@ -143,6 +140,10 @@ for readme in README.md README.ko-KR.md; do
 done
 coo_current_artifacts "$repo_root" || exit 1
 new_shell_artifact=$COO_SHELL_ARTIFACT
+# The new name may already hold an older build; keep it too.
+if [[ $new_shell_artifact != "$old_shell_artifact" && -e $build_dir/$new_shell_artifact ]]; then
+  cp -p "$build_dir/$new_shell_artifact" "$backup/$new_shell_artifact" || exit 1
+fi
 
 # 3. makepkg caches still hold the old tree.
 rm -rf "$shell_dir"/{src,pkg,omarchy}

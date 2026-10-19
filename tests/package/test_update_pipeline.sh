@@ -207,6 +207,14 @@ for mode in fetch build audit test; do
   assert_eq "$(git -C "$root" diff HEAD --stat -- README.md README.ko-KR.md | wc -l)" "0" "$mode failure restores the README tables"
 done
 
+# --- an artifact already under the candidate's name survives a failed run ---
+reset_repo
+seed_build
+printf 'earlier candidate\n' >"$root/build/$shell_new"
+out=$(run_update COO_FAKE_TEST_MODE=fail) && code=0 || code=$?
+assert_eq "$code" "9" "a failed update with a pre-existing candidate artifact fails"
+assert_eq "$(cat "$root/build/$shell_new")" "earlier candidate" "the pre-existing candidate artifact is put back"
+
 # --- artifacts that did not exist before a failed run do not survive it ---
 reset_repo
 : >"$log"
