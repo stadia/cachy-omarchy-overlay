@@ -1,27 +1,25 @@
 #!/usr/bin/env bash
-# M4 Task 2: cachy-omarchy-keybindings 정적 계약 + 데이터 수집 적응 (hermetic).
+# 패치 0003 이 적용된 업스트림 omarchy-menu-keybindings: 정적 계약 + 데이터 수집 적응 (hermetic).
 # 라이브 컴포지터에서 메뉴를 열지 않는다 (열림/Escape 는 Task 3).
 set -uo pipefail
 REPO_ROOT="${REPO_ROOT:?}"
 source "$REPO_ROOT/tests/lib/assert.sh"
 
-K="$REPO_ROOT/overlay/bin/cachy-omarchy-keybindings"
 SHIM="$REPO_ROOT/overlay/compat/bin/omarchy-shell"
 STAGE="$REPO_ROOT/packages/cachy-omarchy-shell/stage-upstream.sh"
+PATCH="$REPO_ROOT/packages/cachy-omarchy-shell/0003-adapt-menu-keybindings-to-cachy-hyprland.patch"
 
-assert_file_exists "$K" "keybindings 명령 존재"
-[[ -x $K ]] && x=0 || x=1
-assert_eq "$x" "0" "keybindings 명령 실행 가능"
-[[ -x $K ]] || exit 1
-
-# --- 사용법/인자 계약 -------------------------------------------------------
-out=$("$K" --help 2>&1); code=$?
-assert_eq "$code" "0" "--help exit 0"
-assert_contains "$out" "SUPER+K" "--help 가 SUPER+K 를 설명한다"
-assert_contains "$out" "omarchy-menu-keybindings" "--help 가 업스트림 원본을 밝힌다"
-
-out=$("$K" --nonsense 2>&1); code=$?
-assert_eq "$code" "1" "알 수 없는 인자 → exit 1"
+# 핀된 업스트림 헬퍼에 패치만 적용한 사본 — 패키지 prepare() 와 같은 git apply 다.
+usrc=${COO_OMARCHY_GIT:-$REPO_ROOT/build/omarchy}
+[[ -f $usrc/bin/omarchy-menu-keybindings ]] || { echo "skip: 핀된 업스트림 소스(build/omarchy) 없음"; exit 0; }
+pk="$COO_TEST_SANDBOX/patched"
+mkdir -p "$pk/bin"
+cp "$usrc/bin/omarchy-menu-keybindings" "$pk/bin/"
+git -C "$pk" init -q
+git -C "$pk" apply "$PATCH"
+assert_eq "$?" "0" "패치 0003 이 핀된 헬퍼에 깔끔히 적용된다"
+K="$pk/bin/omarchy-menu-keybindings"
+chmod +x "$K"
 
 # --- IPC 재발명 없음 (소스 needle) ------------------------------------------
 src=$(cat "$K")
@@ -29,27 +27,22 @@ assert_contains "$src" "omarchy-menu-select" "선택 UI 는 업스트림 omarchy
 [[ $src == *"qs ipc"* ]] && q=1 || q=0
 assert_eq "$q" "0" "keybindings 스크립트는 qs ipc 를 직접 부르지 않는다"
 assert_contains "$src" "modmask" "hyprctl binds + Lua 캐시 데이터 수집을 감싼다"
-assert_contains "$src" "printf 'v13" "적응 캐시 스키마는 v13 이다"
-[[ $src == *"printf 'v11"* || $src == *"printf 'v12"* ]] && v=1 || v=0
-assert_eq "$v" "0" "이전(v11/v12) 캐시는 재사용하지 않는다"
+assert_contains "$src" "printf 'cachy-v1" "적응 캐시 키는 업스트림 v11 과 다르다"
+[[ $src == *"printf 'v11"* ]] && v=1 || v=0
+assert_eq "$v" "0" "업스트림 v11 캐시는 재사용하지 않는다"
+[[ $src == *"loadfile(config"* ]] && v=1 || v=0
+assert_eq "$v" "0" "Lua 샌드박스는 없다 (업스트림 pcall(dofile) 그대로)"
 
 # --- 스테이징: 이 뷰어가 쓰는 업스트림 bin 헬퍼 ------------------------------
-# (M9 갱신: omarchy-theme-set 체인은 M9 부터 스테이징 대상이다. "나머지 전부
-# 제외" 단언은 유효하지 않으므로, 여전히 제외인 것 — omarchy-menu-keybindings
-# (우리 적응 카피로 대체) — 만 잰다. 0.8.0 갱신: omarchy-theme-install 는
-# self-contained 실측으로 Tier C 에서 회수돼 스테이징된다.)
-usrc=${COO_OMARCHY_GIT:-$REPO_ROOT/build/omarchy}
 stage="$COO_TEST_SANDBOX/stage"
 bash "$STAGE" "$usrc" "$stage" "$REPO_ROOT/overlay/defaults"
 root="$stage/usr/share/cachy-omarchy/upstream"
 assert_file_exists "$root/bin/omarchy-menu-select" "스테이징: omarchy-menu-select"
 assert_file_exists "$root/bin/omarchy-cmd-present" "스테이징: omarchy-cmd-present"
-[[ -e $root/bin/omarchy-menu-keybindings ]] && s=1 || s=0
-assert_eq "$s" "0" "스테이징: 업스트림 omarchy-menu-keybindings 는 넣지 않는다"
+assert_file_exists "$root/bin/omarchy-menu-keybindings" "스테이징: omarchy-menu-keybindings"
 [[ -e $root/bin/omarchy-theme-install ]] && s=1 || s=0
 assert_eq "$s" "1" "스테이징: omarchy-theme-install 는 0.8.0 에서 회수돼 올라간다"
 
-# A fake shell makes pre-flight and compat tests independent from real qs.
 fake_shell="$COO_TEST_SANDBOX/fake-cachy-omarchy-shell"
 fake_log="$COO_TEST_SANDBOX/fake-shell.args"
 cat >"$fake_shell" <<'FAKE'
@@ -61,24 +54,6 @@ exit "${COO_FAKE_SHELL_STATUS:-1}"
 FAKE
 chmod +x "$fake_shell"
 
-# --- 미기동 실패: COO_SHELL_BIN 주입으로 실제 qs 를 절대 부르지 않는다 ------
-: >"$fake_log"
-out=$(COO_OMARCHY_PATH="$root" \
-  COO_SHELL_BIN="$fake_shell" COO_FAKE_SHELL_LOG="$fake_log" \
-  COO_FAKE_SHELL_MESSAGE='error: 셸이 실행 중이 아니다' "$K" 2>&1); code=$?
-assert_eq "$code" "1" "셸 미기동 → exit 1"
-assert_contains "$out" "--run" "미기동 안내가 기동 방법을 알려준다"
-assert_eq "$(cat "$fake_log")" $'--ipc\nshell\nping' "COO_SHELL_BIN pre-flight 주입이 qs 대신 호출된다"
-
-# 스테이징 헬퍼가 없는 트리는 조용히 넘어가지 않는다.
-fake="$COO_TEST_SANDBOX/faketree"
-mkdir -p "$fake/shell"
-: >"$fake/shell/shell.qml"
-out=$(COO_OMARCHY_PATH="$fake" \
-  COO_SHELL_BIN="$fake_shell" COO_FAKE_SHELL_LOG="$fake_log" "$K" 2>&1); code=$?
-assert_eq "$code" "1" "헬퍼 없는 트리 → exit 1"
-assert_contains "$out" "omarchy-menu-select" "오류가 무엇이 없는지 말해준다"
-
 # --- 데이터 수집 적응 (hermetic: hyprctl stub + fixture lua) -----------------
 [[ ${HOME:-} == "${COO_TEST_SANDBOX:?}" ]] || {
   printf 'FAIL: HOME 이 샌드박스가 아니다 — 사용자 상태를 건드릴 수 있어 중단한다\n' >&2
@@ -87,10 +62,10 @@ assert_contains "$out" "omarchy-menu-select" "오류가 무엇이 없는지 말�
 command -v lua >/dev/null || { echo "skip: lua 없음"; exit "$ASSERT_FAILURES"; }
 
 mkdir -p "$HOME/.config/hypr"
-side_effect_marker="$COO_TEST_SANDBOX/lua-side-effect"
 cat >"$HOME/.config/hypr/hyprland.lua" <<LUA
 local mainMod = "SUPER"
 hl.bind(mainMod .. " + T", hl.dsp.exec_cmd("ghostty"))
+hl.bind(mainMod .. " + SHIFT + T", hl.dsp.exec_cmd("ghostty --class=float"))
 hl.bind(mainMod .. " + C", hl.dsp.window.close())
 hl.bind(mainMod .. " + D", hl.dsp.exec_cmd("discord"), { description = "Discord" })
 hl.bind(mainMod .. " + X", hl.dsp.exec_cmd("foo --label=a,b"))
@@ -98,21 +73,17 @@ hl.bind(mainMod .. " + O", hl.dsp.exec_cmd("stale-old-command"))
 -- >>> cachy-omarchy >>>
 pcall(dofile, "$HOME/.config/cachy-omarchy/hypr/bindings.lua")
 -- <<< cachy-omarchy <<<
--- Regression: a prior dofile(config) scanner would execute this after T/X.
-os.execute("touch $side_effect_marker")
 LUA
 
 # The overlay's own binds live behind that managed dofile. They must reach the
 # scanner (SUPER+K would otherwise be missing from its own sheet), and their
-# override of an earlier bind must win — while staying just as sandboxed.
+# override of an earlier bind must win.
 mkdir -p "$HOME/.config/cachy-omarchy/hypr"
-overlay_side_effect_marker="$COO_TEST_SANDBOX/lua-overlay-side-effect"
 cat >"$HOME/.config/cachy-omarchy/hypr/bindings.lua" <<LUA
 hl.unbind("SUPER + K")
-hl.bind("SUPER + K", hl.dsp.exec_cmd("cachy-omarchy-keybindings"), { description = "Keybindings" })
+hl.bind("SUPER + K", hl.dsp.exec_cmd("omarchy-menu-keybindings"), { description = "Keybindings" })
 hl.unbind("SUPER + O")
 hl.bind("SUPER + O", hl.dsp.exec_cmd("cachy-omarchy-launcher"), { description = "Launch apps" })
-os.execute("touch $overlay_side_effect_marker")
 LUA
 
 stubbin="$COO_TEST_SANDBOX/stubbin"
@@ -123,6 +94,7 @@ cat >"$stubbin/hyprctl" <<'STUB'
 case ${1:-} in
   binds)
     printf 'bind\n\tmodmask: 64\n\tsubmap: \n\tkey: T\n\tkeycode: 0\n\tcatchall: false\n\tdescription: \n\tdispatcher: __lua\n\targ: 1\n\n'
+    printf 'bind\n\tmodmask: 65\n\tsubmap: \n\tkey: T\n\tkeycode: 0\n\tcatchall: false\n\tdescription: \n\tdispatcher: __lua\n\targ: 7\n\n'
     printf 'bind\n\tmodmask: 64\n\tsubmap: \n\tkey: C\n\tkeycode: 0\n\tcatchall: false\n\tdescription: \n\tdispatcher: __lua\n\targ: 2\n\n'
     printf 'bind\n\tmodmask: 64\n\tsubmap: \n\tkey: D\n\tkeycode: 0\n\tcatchall: false\n\tdescription: \n\tdispatcher: __lua\n\targ: 3\n\n'
     printf 'bind\n\tmodmask: 64\n\tsubmap: \n\tkey: X\n\tkeycode: 0\n\tcatchall: false\n\tdescription: \n\tdispatcher: __lua\n\targ: 4\n\n'
@@ -140,7 +112,7 @@ chmod +x "$stubbin/hyprctl"
 
 cachehome="$COO_TEST_SANDBOX/cache"
 # A v11-named upstream cache with stale content must not be selected by the
-# adapted v12 key. Its hash uses exactly the pre-adaptation key material.
+# patched key. Its hash uses exactly the pre-adaptation key material.
 old_cache_name=$( {
   printf 'v11\n'
   PATH="$stubbin:$PATH" hyprctl devices 2>/dev/null | grep -F 'active keymap:'
@@ -149,32 +121,29 @@ old_cache_name=$( {
 mkdir -p "$cachehome/omarchy"
 printf 'STALE V11 RECORD\texec\tstale-command\n' >"$cachehome/omarchy/keybindings-$old_cache_name.records"
 
-# omarchy-cmd-present 를 bare name 으로 부른다(128행) — 실제 설치에서는
+# 헬퍼가 omarchy-cmd-present 를 bare name 으로 부른다 — 실제 설치에서는
 # /usr/bin/omarchy-* 심링크가 공급하지만, 추출 트리에는 설치되지 않으므로
-# 호출자 PATH 에 $root/bin 을 넣어 같은 가시성을 만든다 (SPEC §45, 래퍼는
-# 더 이상 PATH 를 조작하지 않는다).
+# 호출자 PATH 에 $root/bin 을 넣어 같은 가시성을 만든다 (SPEC §45).
 out=$(PATH="$stubbin:$root/bin:$PATH" XDG_CACHE_HOME="$cachehome" \
-  COO_OMARCHY_PATH="$root" \
+  OMARCHY_PATH="$root" \
   "$K" --print 2>&1); code=$?
 assert_eq "$code" "0" "--print 는 셸 없이 목록을 만든다 (exit 0)"
-[[ -e $side_effect_marker ]] && side_effect=1 || side_effect=0
-assert_eq "$side_effect" "0" "제한 Lua 환경은 os.execute 부작용을 실행하지 않는다"
-[[ -e $overlay_side_effect_marker ]] && side_effect=1 || side_effect=0
-assert_eq "$side_effect" "0" "관리 dofile 로 읽은 파일도 같은 제한 환경에서 돈다"
 assert_contains "$out" "SUPER + K" "관리 source 블록의 bind 도 시트에 나온다"
 assert_contains "$out" "Keybindings" "관리 source 블록 bind 가 시트에 표시된다"
 assert_contains "$out" "Launch apps" "나중 bind 가 앞선 bind 를 덮어쓴다"
 # 우선순위: description 이 있으면 명령 문자열 대신 그것을 보여주고, upstream
 # prioritize_entries 가 Keybindings 를 맨 위로 올린다.
 assert_eq "$(head -1 <<<"$out")" "$(grep -m1 'Keybindings' <<<"$out")" "Keybindings 행이 시트 맨 위다"
-[[ $out == *"→ cachy-omarchy-keybindings"* ]] && raw=1 || raw=0
+[[ $out == *"→ omarchy-menu-keybindings"* ]] && raw=1 || raw=0
 assert_eq "$raw" "0" "description 이 있으면 날 명령 문자열을 보여주지 않는다"
 [[ $out == *"stale-old-command"* ]] && stale=1 || stale=0
 assert_eq "$stale" "0" "덮어쓰인 옛 bind 는 남지 않는다"
 [[ $out == *"STALE V11 RECORD"* ]] && stale=1 || stale=0
 assert_eq "$stale" "0" "v11 캐시 레코드는 선택되지 않는다"
-assert_contains "$out" "SUPER + T" "악성 행 전의 description-less lua bind 가 계속 수집된다"
+assert_contains "$out" "SUPER + T" "description 없는 lua bind 가 수집된다"
 assert_contains "$out" "ghostty" "exec_cmd 인자가 표시된다"
+assert_contains "$out" "SUPER SHIFT + T" "수식키 둘(modmask 65)이 modmask+key 로 조인돼 렌더링된다"
+assert_contains "$out" "ghostty --class=float" "modmask 65 bind 는 modmask 64 의 같은 키 bind 와 섞이지 않는다"
 assert_contains "$out" "window.close()" "lua dispatcher 는 hl.dsp. 를 벗긴 설명을 얻는다"
 assert_contains "$out" "Discord" "description 이 있는 bind 는 그것을 쓴다"
 assert_contains "$out" "Browser" "plain conf exec bind 도 그대로 통과한다"
@@ -187,6 +156,35 @@ assert_eq "$c" "0" "레코드 캐시 파일이 생긴다"
 cache_records=$(cat "$cachehome"/omarchy/keybindings-*.records)
 assert_contains "$cache_records" "firefox" "캐시 레코드는 dispatch 메타(exec 인자)를 담는다"
 assert_contains "$cache_records" $'exec\tfoo --label=a,b' "쉼표가 있는 dispatcher/arg 메타가 보존된다"
+
+# --- 실패 모드: 조용히 빈 시트를 내지 않는다 ---------------------------------
+# hyprctl 이 bind 를 하나도 안 주면 exit≠0 이고 레코드 캐시는 생기지 않는다.
+emptybin="$COO_TEST_SANDBOX/emptybin"
+mkdir -p "$emptybin"
+cat >"$emptybin/hyprctl" <<'STUB'
+#!/usr/bin/env bash
+[[ ${1:-} == devices ]] && printf 'Keyboards:\n\t\tactive keymap: stub\n'
+exit 0
+STUB
+chmod +x "$emptybin/hyprctl"
+emptycache="$COO_TEST_SANDBOX/cache-empty"
+out=$(PATH="$emptybin:$root/bin:$PATH" XDG_CACHE_HOME="$emptycache" OMARCHY_PATH="$root" \
+  "$K" --print 2>&1); code=$?
+assert_eq "$code" "1" "bind 가 하나도 없으면 --print 는 exit 1"
+ls "$emptycache"/omarchy/keybindings-*.records >/dev/null 2>&1 && c=1 || c=0
+assert_eq "$c" "0" "빈 결과는 캐시되지 않는다"
+
+# lua 가 PATH 에 없으면 stderr 로 이유를 말하고 exit 1 (빈 시트 exit 0 금지).
+# 스크립트가 lua 를 찾을 수 없도록 lua 만 뺀 심링크 디렉터리를 PATH 로 쓴다.
+nolua="$COO_TEST_SANDBOX/nolua"
+mkdir -p "$nolua"
+for t in bash env cat cut awk sed grep sort sha256sum mktemp mv rm find head tr ls dirname basename date mkdir xkbcli jq; do
+  tp=$(command -v "$t" 2>/dev/null) && ln -sf "$tp" "$nolua/$t"
+done
+out=$(PATH="$stubbin:$root/bin:$nolua" XDG_CACHE_HOME="$COO_TEST_SANDBOX/cache-nolua" OMARCHY_PATH="$root" \
+  "$nolua/bash" "$K" --print 2>&1); code=$?
+assert_eq "$code" "1" "lua 가 없으면 --print 는 exit 1 (빈 시트 exit 0 이 아니다)"
+assert_contains "$out" "lua is not installed" "lua 부재 사유가 stderr 로 나온다"
 
 # --- compat omarchy-shell shim: 실행 인자/오류 모드를 실제로 검증 ------------
 assert_file_exists "$SHIM" "compat omarchy-shell 존재"

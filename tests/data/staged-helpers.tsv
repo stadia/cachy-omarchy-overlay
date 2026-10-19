@@ -141,3 +141,4 @@ absent	omarchy-theme-set-keyboard-asus-rog	Tier C: /etc writes, hardware-only, d
 absent	omarchy-theme-set-keyboard-f16	Tier C: /etc writes, hardware-only, dev tools (compat shims live in the overlay)
 absent	omarchy-dev-theme-preview	Tier C: /etc writes, hardware-only, dev tools (compat shims live in the overlay)
 absent	omarchy-dev-benchmark-theme-switcher	Tier C: /etc writes, hardware-only, dev tools (compat shims live in the overlay)
+exec	omarchy-menu-keybindings	patched upstream helper (0003): keybindings sheet on a stock CachyOS config

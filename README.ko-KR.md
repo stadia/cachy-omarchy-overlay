@@ -19,17 +19,16 @@ SUPER + K      →  Omarchy 스타일 키바인딩 뷰어
 
 | 패키지 | 버전 | 역할 |
 |---|---|---|
-| `cachy-omarchy-shell` | 4.0.4-2 | 핀된 Omarchy Quattro 셸 런타임 (Quickshell 트리, `omarchy-settings` 제외) |
-| `cachy-omarchy-overlay` | 1.0.2-1 | CachyOS 통합 계층 (래퍼 명령, Hyprland 바인딩, 기본값) |
+| `cachy-omarchy-shell` | 4.0.4-5 | 핀된 Omarchy Quattro 셸 런타임 (Quickshell 트리, `omarchy-settings` 제외) |
+| `cachy-omarchy-overlay` | 1.0.2-2 | CachyOS 통합 계층 (래퍼 명령, Hyprland 바인딩, 기본값) |
 
 업스트림 핀은 `upstream.lock`이 관리한다 (현재 `basecamp/omarchy @ v4.0.4`,
 `c668141`).
 
-설치되는 공개 명령 7개 (`/usr/bin`):
+설치되는 공개 명령 6개 (`/usr/bin`):
 
 - `cachy-omarchy-shell` — 셸 기동(`--run`)·IPC(`--ipc`)·수동 재기동(`--restart`)
 - `cachy-omarchy-launcher` — 업스트림 `omarchy-menu toggle` 의 호환 별칭 (SUPER + SPACE 는 이제 그것을 직접 부른다)
-- `cachy-omarchy-keybindings` — 키바인딩 뷰어 토글 (SUPER + K)
 - `cachy-omarchy-bindings` — 사용자 Hyprland 설정에 관리 source 블록 주입/제거
 - `cachy-omarchy-init` — 최초 1회 사용자 설정 생성 (기존 파일 덮어쓰지 않음)
 - `cachy-omarchy-doctor` — 읽기 전용 진단 (테마 상태 포함)

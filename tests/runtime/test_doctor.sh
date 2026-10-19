@@ -35,10 +35,12 @@ pam_lock=$COO_TEST_SANDBOX/pam/omarchy-lock-password
 mkdir -p "$(dirname "$pam_lock")"
 printf '#%%PAM-1.0\n' >"$pam_lock"
 omarchy_state=$COO_TEST_SANDBOX/.local/state/omarchy
-for cmd in cachy-omarchy-bindings cachy-omarchy-keybindings; do
-  printf '#!/usr/bin/env bash\nexit 0\n' >"$root/usr/bin/$cmd"
-  chmod +x "$root/usr/bin/$cmd"
-done
+printf '#!/usr/bin/env bash\nexit 0\n' >"$root/usr/bin/cachy-omarchy-bindings"
+chmod +x "$root/usr/bin/cachy-omarchy-bindings"
+mkdir -p "$root/usr/share/cachy-omarchy/upstream/bin"
+printf '#!/usr/bin/env bash\nexit 0\n' >"$root/usr/share/cachy-omarchy/upstream/bin/omarchy-menu-keybindings"
+chmod +x "$root/usr/share/cachy-omarchy/upstream/bin/omarchy-menu-keybindings"
+ln -s ../share/cachy-omarchy/upstream/bin/omarchy-menu-keybindings "$root/usr/bin/omarchy-menu-keybindings"
 cat >"$root/usr/bin/cachy-omarchy-shell" <<'EOF'
 #!/usr/bin/env bash
 if [[ ${1:-} == --ipc && ${2:-} == shell && ${3:-} == ping ]]; then

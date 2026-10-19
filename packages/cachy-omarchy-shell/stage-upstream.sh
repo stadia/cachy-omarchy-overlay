@@ -46,14 +46,14 @@ install -D -m644 "$src/default/ghostty/screensaver" \
 # 바·패널 위젯이 bare name 으로 부르는 업스트림 helper 를 verbatim 으로
 # 스테이징한다 (셸 래퍼가 $OMARCHY_PATH/bin 을 셸 프로세스 PATH 에 붙인다).
 # 목록은 위젯 실측에서 나왔다.
-# 앞의 두 개는 M4 키바인딩 UI (cachy-omarchy-keybindings) 도 쓴다.
+# 앞의 두 개는 키바인딩 UI (omarchy-menu-keybindings) 도 쓴다.
 # reminder/agent-usage 묶음(Tier B)은 기능 단위로 함께 있어야 성립한다:
 # omarchy-reminder 는 omarchy-notification-send 를 부르고, agents 패널은
 # omarchy-agent-usage-update 가 CLI 별 수집기를 부른다. 수집기는 해당 CLI 가
 # 없으면 조용히 빈다.
-# omarchy-menu-keybindings 도 넣지 않는다: 데이터 수집을 CachyOS 에 맞춘
-# 우리 적응 카피가 overlay/bin 에 있다. 나머지 업스트림 bin/ 은 전체 OS
-# 가정이라 여전히 넣지 않는다 (docs/COMMAND_AUDIT.md).
+# omarchy-menu-keybindings 는 패치(0003)가 적용된 트리에서 스테이징된다:
+# 데이터 수집만 CachyOS 설정에 맞춘 적응이다 (PATCHES.md). 나머지 업스트림
+# bin/ 은 전체 OS 가정이라 여전히 넣지 않는다 (docs/COMMAND_AUDIT.md).
 # 테마 체인: omarchy-theme-set 의 critical path + 배경 묶음 + 메뉴 UI
 # 프론트(omarchy-menu-images). yq 는 핀 커밋에서 불필요 (감사 실측).
 # browser/keyboard/install/update/remove 는 제외.
@@ -258,6 +258,7 @@ helpers=(
   omarchy-battery-low
   omarchy-menu
   omarchy-menu-timezone
+  omarchy-menu-keybindings
   omarchy-menu-tmux-keybindings
   omarchy-dns
   omarchy-font-current

@@ -33,7 +33,7 @@ root=$(coo_upstream_root "$dest")
 mkdir -p "$HOME/.local/state/omarchy/toggles"
 : > "$HOME/.local/state/omarchy/toggles/bar-off"
 
-K="$REPO_ROOT/overlay/bin/cachy-omarchy-keybindings"
+K="$root/bin/omarchy-menu-keybindings"
 W="$REPO_ROOT/overlay/bin/cachy-omarchy-shell"
 export COO_OMARCHY_PATH="$root"
 export COO_COMPAT_BIN="$REPO_ROOT/overlay/compat/bin"
