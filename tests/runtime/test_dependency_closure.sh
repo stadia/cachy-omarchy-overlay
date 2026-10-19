@@ -20,10 +20,17 @@ if ! coo_extract_overlay "$tree/overlay"; then
   exit 1
 fi
 
+# 업스트림 헬퍼 목록은 체크인하지 않고 핀 커밋의 트리에서 그때그때 뽑는다.
+helpers="$COO_TEST_SANDBOX/upstream-helpers.txt"
+if ! COO_REPO_ROOT="$REPO_ROOT" "$REPO_ROOT/bin/list-upstream-helpers" >"$helpers"; then
+  printf 'FAIL: 핀 커밋의 업스트림 bin/ 목록을 읽지 못했다 (build/omarchy 클론이 필요하다)\n'
+  exit 1
+fi
+
 out=$(python3 "$REPO_ROOT/tests/runtime/closure_check.py" \
   --tree "$tree" --repo "$REPO_ROOT" \
   --map "$REPO_ROOT/tests/data/command-packages.tsv" \
-  --upstream-helpers "$REPO_ROOT/tests/data/upstream-helpers.txt" \
+  --upstream-helpers "$helpers" \
   --exceptions "$REPO_ROOT/tests/data/closure-exceptions.tsv" 2>&1)
 code=$?
 [[ -n $out ]] && printf '%s\n' "$out"
@@ -46,7 +53,7 @@ else
   generated=$(python3 "$REPO_ROOT/tests/runtime/closure_check.py" \
     --tree "$tree" --repo "$REPO_ROOT" \
     --map "$REPO_ROOT/tests/data/command-packages.tsv" \
-    --upstream-helpers "$REPO_ROOT/tests/data/upstream-helpers.txt" \
+    --upstream-helpers "$helpers" \
     --exceptions "$REPO_ROOT/tests/data/closure-exceptions.tsv" --emit-table)
   embedded=$(awk '/CLOSURE_BEGIN/{f=1;next} /CLOSURE_END/{f=0} f' \
     "$REPO_ROOT/docs/RUNTIME_DEPENDENCIES.md")

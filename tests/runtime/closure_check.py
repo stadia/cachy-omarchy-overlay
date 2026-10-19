@@ -1095,17 +1095,9 @@ def main():
     # exception now exempts nothing -- or (b) the BFS never visits it at
     # all any more -- the closure that justified it is gone.
     #
-    # (b) checks membership in `seen`, not `unstaged`. `unstaged` also
-    # requires upstream_helpers membership, which is ground truth for the
-    # *pinned commit currently being scanned* -- inside the update-pipeline
-    # fixture's nested candidate, that pin is a synthetic test commit whose
-    # regenerated tests/data/upstream-helpers.txt legitimately lists only a
-    # handful of fixture names (fix round 2/3), which would make every real
-    # exception row look unreachable there even though nothing changed
-    # about the real tree. `seen` is populated by the BFS traversal itself,
-    # before any upstream_helpers/staged classification, so it answers
-    # "did the graph still lead here" without depending on which pin's
-    # inventory happens to be loaded in this particular run.
+    # (b) checks membership in `seen`, not `unstaged`: `seen` is populated by
+    # the BFS traversal itself, before any upstream_helpers/staged
+    # classification, so it answers "did the graph still lead here".
     for name in sorted(exceptions):
         if name in staged:
             violations.append(f"STALE_EXCEPTION {name} (이미 스테이징됨 — 예외 불필요)")

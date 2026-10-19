@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Print the names under bin/ in the pinned upstream commit, one per line,
+# sorted. This is the closure scanner's ground truth for "is this string
+# really an upstream helper"; it is derived from the clone at test time
+# instead of being checked in, so it cannot drift from upstream.lock.
+set -euo pipefail
+
+repo_root=${COO_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}
+clone=${COO_OMARCHY_GIT:-$repo_root/build/omarchy}
+fail() { printf 'error: %s\n' "$1" >&2; exit 1; }
+
+case ${1:-} in
+  --help) printf 'Usage: list-upstream-helpers\n'; exit 0 ;;
+  '') ;;
+  *) fail "unknown argument: $1" ;;
+esac
+
+[[ -f $repo_root/upstream.lock ]] || fail 'upstream.lock not found'
+# shellcheck disable=SC1091
+source "$repo_root/upstream.lock"
+[[ ${OMARCHY_COMMIT:-} =~ ^[0-9a-f]{40}$ ]] || fail 'invalid OMARCHY_COMMIT in upstream.lock'
+[[ -d $clone/.git ]] || fail "no upstream clone at $clone (git clone ${OMARCHY_REPOSITORY:-<repository>} build/omarchy)"
+git -C "$clone" cat-file -e "$OMARCHY_COMMIT^{commit}" 2>/dev/null ||
+  fail "clone $clone lacks pinned commit $OMARCHY_COMMIT (git -C build/omarchy fetch origin tag v${OMARCHY_VERSION:-?})"
+names=$(git -C "$clone" ls-tree --name-only "$OMARCHY_COMMIT" -- bin/ | sed 's|^bin/||' | LC_ALL=C sort)
+[[ -n $names ]] || fail "no bin/ entries at $OMARCHY_COMMIT"
+printf '%s\n' "$names"

@@ -81,11 +81,15 @@ installed_root=${COO_INSTALLED_ROOT:-/}
 # 찾는다. pacman 설치 후에는 /usr/share/... 와 /usr/lib/... 이 한 루트 아래라
 # overlay/ 분기가 없고 두 번째 실설치 분기(/usr/lib/cachy-omarchy/compat/bin)가
 # 선택된다. 그러므로 / 를 넘긴다.
+helpers=$(mktemp "${TMPDIR:-/tmp}/coo-helpers-XXXXXX")
+trap 'rm -f "$helpers"' EXIT
+COO_REPO_ROOT="$repo_root" "$repo_root/bin/list-upstream-helpers" >"$helpers" \
+  || fail "게이트 C: 핀 커밋의 업스트림 bin/ 목록을 읽지 못했다 (build/omarchy 클론 필요)"
 python3 "$repo_root/tests/runtime/closure_check.py" \
   --tree "$installed_root" \
   --repo "$repo_root" \
   --map "$repo_root/tests/data/command-packages.tsv" \
-  --upstream-helpers "$repo_root/tests/data/upstream-helpers.txt" \
+  --upstream-helpers "$helpers" \
   --exceptions "$repo_root/tests/data/closure-exceptions.tsv" \
   || fail "게이트 C: HARD 명령이 실설치 트리에서 해결되지 않는다 — depends 선언 누락"
 ok "게이트 C: 폐쇄 스캐너가 실설치 트리에서 통과했다"

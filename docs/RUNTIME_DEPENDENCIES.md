@@ -99,10 +99,10 @@
 추론했는데, 그 방식이 여섯 라운드에 걸쳐 나온 모든 오탐의 단일 원인이었다
 (QML 네임스페이스, `reloadableId`, 우리 자신의 `cachy-omarchy-*`, 설정 파일
 이름, 알림 hint 키, grep 패턴, echo 안내문). 지금은 핀된 업스트림 `bin/` 목록
-(`tests/data/upstream-helpers.txt`)을 ground truth 로 쓴다 — 이름이 그 목록에
-없으면 헬퍼로 인정하지 않는다(아래 "스캐너가 헬퍼로 인정하지 않은 이름" 목록).
-핀을 옮길 때 이 인벤토리를 함께 재생성해야 하는 이유와 절차는 `UPSTREAM.md`
-"Moving the pin" 절에 있다.
+(`bin/list-upstream-helpers` 가 `build/omarchy` 에서 핀 커밋의 `git ls-tree` 로 그때그때
+뽑는다)을 ground truth 로 쓴다 — 이름이 그 목록에 없으면 헬퍼로 인정하지
+않는다(아래 "스캐너가 헬퍼로 인정하지 않은 이름" 목록). 목록은 체크인하지 않으므로
+핀과 어긋날 수 없다.
 
 <!-- CLOSURE_BEGIN -->
 | command | package | class | 근거 |
@@ -363,9 +363,9 @@ docs/COMMAND_AUDIT.md 의 DISABLED 행으로 메뉴 루트에서 억제된 이�
    템플릿 리터럴로 조립되는 이름은 수확기가 보지 못한다. 현재 핀 트리에는 이
    용법이 0건이다(grep 확인, 2026-08-21) — 업스트림이 이 형태를 도입하면 조용히
    빠진다.
-3. **인벤토리는 업스트림 `bin/` 만 덮는다.** `tests/data/upstream-helpers.txt` 는
-   핀된 업스트림 커밋의 `bin/` 디렉터리를 스냅샷한 것이다. 업스트림이 헬퍼를 다른
-   디렉터리로 옮기면, 인벤토리 재생성 테스트는 통과하면서도 그 헬퍼는 조용히
+3. **인벤토리는 업스트림 `bin/` 만 덮는다.** `bin/list-upstream-helpers` 는
+   핀된 업스트림 커밋의 `bin/` 디렉터리만 읽는다. 업스트림이 헬퍼를 다른
+   디렉터리로 옮기면 그 헬퍼는 조용히
    "헬퍼 아님"으로 분류되어 그래프에서 빠진다 — `UNSTAGED_REACHABLE` 로도 잡히지
    않는다.
 
