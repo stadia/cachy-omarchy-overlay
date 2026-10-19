@@ -316,6 +316,13 @@ helpers=(
   # hw-laptop-closed / hw-external-monitors / hw-clamshell: 뚜껑+외부모니터
   #   판정 체인. 전부 /proc·/sys 읽기뿐인 순수 프로브로 외부 의존이 없다.
   omarchy-cmd-missing
+  # 4.0.5: 브라우저/웹앱 런처가 부르는 쌍. omarchy-cmd-default-browser 는
+  #   mimeapps.list 를 직접 읽어 기본 브라우저 desktop ID 를 낸다(없으면 launch-browser
+  #   가 브라우저를 못 고른다). omarchy-cmd-browser-handoff 는 실행 중 크로미움
+  #   계열에 소켓으로 URL 을 넘기고, 실패하면 호출자가 새로 띄운다. 둘 다 새
+  #   omarchy-* 의존이 없고 socat 은 부재 시 실패 → fallback 으로 흡수된다.
+  omarchy-cmd-default-browser
+  omarchy-cmd-browser-handoff
   omarchy-hw-laptop-closed
   omarchy-hw-external-monitors
   omarchy-hw-clamshell

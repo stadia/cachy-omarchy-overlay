@@ -115,7 +115,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-launch-screensaver` | idle | SAFE | package (0.11.0). 짝 헬퍼 `omarchy-screensaver` 와 함께 스테이징 — 하나만 올리면 창이 뜨고 본체가 127 로 즉시 죽는다. `tests/data/closure-exceptions.tsv` 예외 행 회수 |
 | `omarchy-system-lock` | idle | DISABLED | disable plugin |
 | `omarchy-system-wake` | idle / lock | SAFE | package (0.11.0). idle 플러그인 종료 경로와 lock 플러그인의 `runWake()` 양쪽이 부른다. 자체 체인(brightness-display/brightness-keyboard/hyprland-monitor-clamshell) 전부 staged |
-| `omarchy-hyprland-session-locked` | lock | **DISABLED — 공존 위험** | **의도적 미스테이징.** `strandedLockCheckProc` 가 이걸 불러 exit 0 이면 세션 잠금을 회수하려 하는데, hyprlock 이 이미 쥔 상태면 ext-session-lock 거부로 **quickshell 이 죽는다**(실측 §22.4). 헬퍼가 없으면 127 → 복구 경로가 조용히 비활성 = fail-safe. `tests/package/test_staged_helpers.sh`(`staged-helpers.tsv` 의 `absent` 행)가 고정. `tests/data/closure-exceptions.tsv` 에도 등록(v0.9, milestone=blocked — 크기가 아니라 스테이징 자체가 실측된 크래시를 만들기 때문. `never` 는 미래 작업이 다시 안 볼 표시라 부정확 — 해제 조건: ext-session-lock 거부가 quickshell 을 죽이지 않게 되기 전까지) |
+| `omarchy-hyprland-session-locked` / `omarchy-hyprland-session-lock-stranded` | lock | **DISABLED — 공존 위험** | **의도적 미스테이징(4.0.5부터 `strandedLockCheckProc` 는 래퍼 `-lock-stranded` 를 부르고 래퍼가 `-locked` 를 부른다 — 둘 다 막는다).** `strandedLockCheckProc` 가 이걸 불러 exit 0 이면 세션 잠금을 회수하려 하는데, hyprlock 이 이미 쥔 상태면 ext-session-lock 거부로 **quickshell 이 죽는다**(실측 §22.4). 헬퍼가 없으면 127 → 복구 경로가 조용히 비활성 = fail-safe. `tests/package/test_staged_helpers.sh`(`staged-helpers.tsv` 의 `absent` 행)가 고정. `tests/data/closure-exceptions.tsv` 에도 등록(v0.9, milestone=blocked — 크기가 아니라 스테이징 자체가 실측된 크래시를 만들기 때문. `never` 는 미래 작업이 다시 안 볼 표시라 부정확 — 해제 조건: ext-session-lock 거부가 quickshell 을 죽이지 않게 되기 전까지) |
 | `omarchy-brightness-keyboard` | lock | SAFE | package (0.11.0). lock 의 `runBlank()` 가 부른다. `omarchy-osd`(staged)만 호출 |
 | `omarchy-battery-low` | battery | SAFE | package — v0.9. battery 플러그인(기본 활성)이 10% 이하에서 부른다. 체인은 omarchy-notification-send + omarchy-hook 뿐이라 verbatim |
 | `omarchy-powerprofiles-set` | battery | DISABLED | disable plugin |
@@ -240,7 +240,9 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 | `omarchy-clipboard-paste-file` | SAFE | package | M10 clipboard. 선택 시에만 `wl-copy`/`wtype` (D4) |
 | `omarchy-clipboard-paste-text` | SAFE | package | M10 clipboard. 선택 시에만 `wl-copy`/`wtype` (D4) |
 | `omarchy-cmd-missing` | SAFE | package | 0.11.0. `command -v` 부재 가드(cmd-present 의 반대). 화면보호기 런처 첫 줄의 ttfx 가드가 부른다 — 없으면 127 로 끝나 bash `if` 가 거짓으로 읽고 가드를 통과해 버린다(fail-safe 붕괴) |
+| `omarchy-cmd-browser-handoff` | SAFE | package | 4.0.5. launch-browser/launch-webapp 가 부른다. 실행 중 크로미움 계열의 SingletonSocket 으로 URL 을 넘기고 실패하면 비정상 종료 → 호출자가 새로 띄운다. socat 부재도 같은 fallback. 새 omarchy-* 의존 0 |
 | `omarchy-cmd-present` | SAFE | package | `command -v` 루프뿐인 가드. 여러 helper 와 메뉴 `when` 이 부른다 |
+| `omarchy-cmd-default-browser` | SAFE | package | 4.0.5. launch-browser/launch-webapp/default-browser/remove-browser 가 부른다. mimeapps.list 를 읽어 기본 브라우저 desktop ID 출력, 없으면 xdg-settings/xdg-mime. 새 omarchy-* 의존 0 |
 | `omarchy-default-browser` | SAFE | package | 0.8.0 기본 앱. xdg-settings default-web-browser. omarchy-* 의존 0 |
 | `omarchy-default-editor` | SAFE | package | 0.8.0 기본 앱. ~/.local/state/omarchy/defaults/editor 사용자 상태 |
 | `omarchy-default-terminal` | SAFE | package | 0.8.0 기본 앱. xdg-terminal-exec + ~/.config/xdg-terminals.list |
