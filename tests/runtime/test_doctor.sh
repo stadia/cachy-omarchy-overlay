@@ -308,15 +308,25 @@ assert_contains "$out" "FAIL: official package present: omarchy-settings" "offic
 
 # 0.x 개발 도구가 남긴 상태(매니페스트·pending 마커·릴리스 복사본)는 배포된
 # doctor 의 관심사가 아니다. 남아 있어도 판정과 출력에 영향이 없어야 한다.
-mkdir -p "$state/validated-builds/old/artifacts"
-printf 'pending\n' >"$state/install-pending.manifest"
-printf 'not a manifest\n' >"$state/validated-build.manifest"
-printf 'not a manifest\n' >"$state/installed-build.manifest"
-out=$(run_doctor); code=$?
-assert_eq "$code" 0 "legacy state is ignored"
-[[ $out == *manifest* || $out == *"install state"* ]] && mentioned=1 || mentioned=0
-assert_eq "$mentioned" 0 "legacy state is not reported"
-rm -rf "$state/validated-builds" "$state"/*.manifest
+# 0.x 도구가 쓰던 기본 위치($XDG_STATE_HOME/cachy-omarchy, 샌드박스 안)에
+# 심는다. 두 번째 실행은 pending 마커를 끊어진 심링크로 바꿔 본다.
+legacy_state=${XDG_STATE_HOME:?}/cachy-omarchy
+for pending_kind in file dangling-symlink; do
+  mkdir -p "$legacy_state/validated-builds/old/artifacts"
+  rm -f "$legacy_state/install-pending.manifest"
+  if [[ $pending_kind == file ]]; then
+    printf 'pending\n' >"$legacy_state/install-pending.manifest"
+  else
+    ln -s "$legacy_state/missing-target" "$legacy_state/install-pending.manifest"
+  fi
+  printf 'not a manifest\n' >"$legacy_state/validated-build.manifest"
+  printf 'not a manifest\n' >"$legacy_state/installed-build.manifest"
+  out=$(run_doctor); code=$?
+  assert_eq "$code" 0 "legacy state is ignored ($pending_kind)"
+  [[ $out == *manifest* || $out == *"install state"* ]] && mentioned=1 || mentioned=0
+  assert_eq "$mentioned" 0 "legacy state is not reported ($pending_kind)"
+done
+rm -rf "$legacy_state"
 
 printf '{}\n' >"$user_config/shell.json"
 out=$(run_doctor); code=$?
