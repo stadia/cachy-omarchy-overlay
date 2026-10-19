@@ -1609,7 +1609,7 @@ Overlay integration:      1.0.2-1
 Runtime logs:
 
 ```text
-journalctl --user -t cachy-omarchy-shell
+journalctl --user -t omarchy-shell
 ```
 
 사용자 로그 디렉터리는 없다(§9.5).

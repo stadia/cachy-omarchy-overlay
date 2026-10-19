@@ -15,23 +15,40 @@
 
 ## 1. 기동 명령
 
-확정된 `--run` 의 정확한 명령(`overlay/bin/cachy-omarchy-shell`):
+기동은 업스트림 `bin/omarchy-launch-shell` 을 그대로 쓴다(#11 이전에는 우리 래퍼의
+`--run` 이 이를 재구현했다). Hyprland autostart(`hyprland.start`)가
+`hl.exec_cmd("omarchy-launch-shell")` 로 부르고, 이 감독자가 아래를 한다:
 
 ```bash
-export OMARCHY_PATH=/usr/share/cachy-omarchy/upstream
-export QT_QPA_PLATFORM=wayland
-# PATH 는 어느 레이어도 건드리지 않는다 (§45 개정). 위젯이 bare name 으로 부르는
-# helper 는 /usr/bin/omarchy-* 상대 심링크로 노출된다.
-
-exec env QS_DISABLE_FILE_WATCHER=1 QS_NO_RELOAD_POPUP=1 \
-  systemd-cat -t cachy-omarchy-shell -- \
-  quickshell -n -p "$OMARCHY_PATH/shell"
+QS_DISABLE_FILE_WATCHER=1 QS_NO_RELOAD_POPUP=1 \
+  systemd-cat -t omarchy-shell -- quickshell -n -p "$OMARCHY_PATH/shell"
 ```
 
-각 환경변수의 이유:
+Qt 가 Wayland 연결 실패로 `_exit()` 하면(시그널이 없어 Quickshell 자체 재기동도 안
+걸린다) 감독자가 최대 5회/분 재기동한다. 정상 종료(exit 0)는 의도된 정지로 읽는다.
 
-| 변수 | 값 | 이유 |
-| --- | --- | --- |
+| 변수 | 이유 |
+| --- | --- |
+| `OMARCHY_PATH` | `shell/shell.qml:27` 가 `Quickshell.env("OMARCHY_PATH")` 로 자산을 찾는다. uwsm 세션 환경(`/usr/share/uwsm/env-hyprland.d/10-cachy-omarchy`)이 공급한다. |
+| `QS_DISABLE_FILE_WATCHER=1` | **필수.** pacman 이 `$OMARCHY_PATH/shell` 을 다시 쓰는 도중 파일 워처가 리로드를 걸면 반쯤 쓰인 트리를 읽고, 실패한 리로드가 두 번째 엔진 세대를 남겨 다음 재시작의 IPC kill 을 크래시로 만든다. |
+| `QS_NO_RELOAD_POPUP=1` | 업스트림 기동 명령이 함께 끄는 팝업. |
+
+`QT_QPA_PLATFORM=wayland` 는 더 이상 고정하지 않는다. 실측(#11): `WAYLAND_DISPLAY` 가
+있으면 고정 없이도 Qt 가 `wayland` 를 고르고, 없을 때만 `xcb` 로 폴백한다.
+`hl.exec_cmd` 로 뜬 프로세스는 `WAYLAND_DISPLAY`·`OMARCHY_PATH` 를 컴포지터에서
+받는다(`QT_QPA_PLATFORM` 은 없음). 폴백은 uwsm 유닛 경로처럼 `WAYLAND_DISPLAY` 전파
+전에 뜨는 경우에만 생긴다.
+
+기동 로그는 저널의 `omarchy-shell` 태그로 읽는다(래퍼 stdout 은 비어 있다):
+
+```bash
+journalctl --user -t omarchy-shell
+```
+
+> **측정(#11)**: `omarchy-restart-shell` 후 `omarchy-launch-shell`(부모 Hyprland) 아래에
+> `quickshell` 이 1개 뜨고 10초 뒤에도 그대로이며(이중 기동 없음) IPC `shell ping` 이 `ok`.
+
+--- | --- | --- |
 | `OMARCHY_PATH` | `/usr/share/cachy-omarchy/upstream` | `shell/shell.qml:27` 가 `Quickshell.env("OMARCHY_PATH")` 로 자산을 찾는다. uwsm 세션 환경(`/usr/share/uwsm/env-hyprland.d/10-cachy-omarchy`)이 공급하고, 래퍼가 같은 값을 기본으로 설정한다. 어느 쪽도 없으면 IPC·기동이 모두 실패한다. |
 | `QT_QPA_PLATFORM` | `wayland` | xcb 폴백 차단(방어적). Hyprland autostart(`hyprland.start`)로 기동하면 `WAYLAND_DISPLAY` 가 컴포지터 env 로 항상 정상이라 별도 socket-wait 는 없다. |
 | `QS_DISABLE_FILE_WATCHER` | `1` | **필수.** pacman 이 `$OMARCHY_PATH/shell` 을 다시 쓰는 도중 Quickshell 파일 워처가 리로드를 걸면 반쯤 쓰인 트리를 읽고, 실패한 리로드가 두 번째 엔진 세대를 남겨 다음 재시작의 IPC kill 을 크래시로 만든다. 업스트림 `bin/omarchy-launch-shell` 이 같은 이유로 끈다. 우리는 pacman 배포이므로 그대로 해당. |
@@ -222,7 +239,7 @@ uwsm 패키지 소유 실 바이너리다 (shim 삭제). SPEC §45.
 - `tests/package/test_usr_bin_helpers.sh` — 집합 일치, 서로소, 상대 심링크,
   dangling 없음, 어느 패키지도 `usr/bin/uwsm-app` 을 소유하지 않음.
 - `tests/runtime/test_installed_tree.sh` — 심링크 뷰 양방향.
-- `tests/runtime/test_shell_path.sh` — 래퍼가 PATH 를 건드리지 않음.
+- `tests/runtime/test_installed_tree.sh` — 설치 트리에 PATH 를 바꾸는 래퍼가 없음(기동은 업스트림 `omarchy-launch-shell`).
 - `tests/runtime/test_init_theme_seed.sh` — 추출 페이로드 init, 격리 PATH
   에서 `omarchy-theme-set` 부재는 exact note.
 - `tests/runtime/test_doctor.sh` — 세션 `OMARCHY_PATH` 부재 FAIL, 개별
@@ -336,7 +353,7 @@ quickshell 0.3.0, 격리 셸은 `/usr/share/cachy-omarchy/upstream` 사본을
 | --- | --- |
 | hyprlock 은 누가 소유하나 | `hyprlock 0.9.6-2.1` (우리 패키지 아님) |
 | 우리 패키지가 hyprlock 경로/`/etc`/시스템 유닛을 소유하나 | 두 아카이브 모두 **0건** |
-| 우리 코드가 lock 데몬을 stop/mask/disable/제거하나 | `pkill`/`killall`/`systemctl stop|mask|disable`/`pacman -R` **일치 0건**. 트리 안의 유일한 `kill` 은 `cachy-omarchy-shell --restart` 가 `quickshell -n -p <경로>` 전체 매칭으로 **자기 인스턴스**를 끄는 것 |
+| 우리 코드가 lock 데몬을 stop/mask/disable/제거하나 | `pkill`/`killall`/`systemctl stop|mask|disable`/`pacman -R` **일치 0건**. 트리 안의 유일한 종료는 `cachy-omarchy-shell --restart` 가 `quickshell kill -p <경로> --any-display` 로 **자기 트리의 셸**을 정상 종료시키는 것 |
 | hyprlock 은 데몬인가 | 아니다 — 온디맨드 실행. 정지할 상주 프로세스 자체가 없다 |
 
 부수 관측: **이 호스트에는 `~/.config/hypr/hyprlock.conf` 가 없다.** 설치돼
@@ -487,10 +504,12 @@ $OMARCHY_PATH/shell call -- lock status` 로 락 상태를 묻는다. `status()`
 (`lockRequested || sessionLock.locked || sessionLock.secure`) 를 포함해
 `secure`/`requested` 등을 JSON 으로 반환한다. 판정:
 
-- IPC 자체가 실패(타임아웃/셸 미기동)하거나, IPC 는 응답했지만 IPC-레벨
-  오류(`qs ipc` 가 stdout + exit 0 으로 돌려주는 `Target not found.` 류 —
-  lock 플러그인이 아직 로드되지 않았거나 애초에 빠졌다는 뜻)면 보존할
-  락이 없으므로 **진행**.
+- 락 조회는 `omarchy-shell lock status` 로 한다(업스트림 클라이언트가 IPC 레벨
+  오류와 기동 중 응답도 nonzero 로 올린다). 보존할 락이 **확실히 없는** 두 경우 —
+  `omarchy-shell is not running`(셸 미실행)과 `Target not found.`(lock 플러그인
+  부재) — 만 **진행**한다. 무응답(`is not responding`)·기동 중(`is not ready`)·
+  알 수 없는 오류·명령 부재는 락 상태를 알 수 없으므로 **거부**한다(잠긴 채 멈춘
+  셸을 죽이면 락 클라이언트를 잃는다).
 - IPC 는 성공했고 응답이 `locked`/`secure`/`requested` 세 키를 모두 갖춘
   JSON 이며 `jq` 로 `.locked or .secure or .requested` 가 정확히 `false`
   로 읽히는 경우만 **진행**(셸 자신의 `locked` 판정을 우선한다).
@@ -513,13 +532,17 @@ omarchy-restart-shell (compat, /usr/bin 심링크 → compat/bin 실체)
 ```
 
 compat `omarchy-restart-shell` 은 `exec cachy-omarchy-shell --restart` 다 — 락
-조회·kill 로직을 이중화하지 않는다. (v0.12.0 에는 사이에 `cachy-omarchy-reload`
+조회·kill 로직을 이중화하지 않는다. 진행하기로 하면 Hyprland 에 닿는지 먼저
+확인한 뒤(SSH/TTY 에서는 인스턴스 서명을 복구) `quickshell kill` 로 정상 종료시키고,
+옛 인스턴스가 사라지길 기다렸다가 `hyprctl dispatch` 로 `omarchy-launch-shell` 을
+띄운다. TERM 으로 죽이면 업스트림 감독자가 되살려 이중 기동하므로 쓰지 않는다. (v0.12.0 에는 사이에 `cachy-omarchy-reload`
 별칭이 있었으나 `--restart` 와 같은 일이라 지웠다.) 업스트림 `omarchy-restart-shell` 을
-verbatim 으로 올리지 않은 이유: 원본은 미스테이징 헬퍼 3개
-(`omarchy-hyprland-session-locked`, `omarchy-launch-shell`,
-`omarchy-system-sleep-lock`)를 전제하고 `quickshell kill` 이 종료까지
-블록하는 빌드를 가정하는데, 이 환경에 고정된 quickshell 0.3.0 은 kill 이
-즉시 반환해 그 전제가 레이스가 된다.
+verbatim 으로 올리지 않은 이유: 원본은 미스테이징 헬퍼 2개
+(`omarchy-hyprland-session-locked`, `omarchy-system-sleep-lock`)를 전제하고
+`quickshell kill` 이 종료까지 블록하는 빌드를 가정한다. kill 직후에도 죽어가는
+인스턴스가 남을 수 있어(새로 띄우면 `already running` 으로 exit 0 → 감독자가 의도된
+정지로 읽는다) 우리 `--restart` 는 사라질 때까지 기다린다. (`omarchy-launch-shell`
+은 #11 에서 verbatim 스테이징됐다.)
 
 **stranded-lock recovery 를 이 체인에 넣지 않은 이유.**
 `omarchy-hyprland-session-locked` (업스트림에서 고아 락을 판별해 재확보를

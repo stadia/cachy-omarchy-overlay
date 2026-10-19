@@ -21,14 +21,14 @@ Two Arch packages are produced.
 | Package | Version | Role |
 |---|---|---|
 | `cachy-omarchy-shell` | 4.0.4-6 | The pinned Omarchy Quattro shell runtime (Quickshell tree, `omarchy-settings` excluded) |
-| `cachy-omarchy-overlay` | 1.0.2-3 | The CachyOS integration layer (wrapper commands, Hyprland bindings, defaults) |
+| `cachy-omarchy-overlay` | 1.0.2-4 | The CachyOS integration layer (wrapper commands, Hyprland bindings, defaults) |
 
 The upstream pin is managed by `upstream.lock` (currently `basecamp/omarchy @ v4.0.4`,
 `c668141`).
 
 Six public commands are installed into `/usr/bin`:
 
-- `cachy-omarchy-shell` — start the shell (`--run`), talk to it (`--ipc`), restart it manually (`--restart`)
+- `cachy-omarchy-shell` — lock-aware manual restart (`--restart`); startup is upstream `omarchy-launch-shell` and IPC is upstream `omarchy-shell`
 - `cachy-omarchy-launcher` — compatibility alias for upstream `omarchy-menu toggle`, which SUPER + SPACE now calls directly
 - `cachy-omarchy-bindings` — inject/remove the managed source block in your Hyprland config
 - `cachy-omarchy-init` — one-time user setup (never overwrites existing files)
@@ -137,7 +137,9 @@ refuses while the session is locked.
 
 **Upgrading:** an existing `~/.config/cachy-omarchy/hypr/bindings.lua` is never overwritten
 without `--force`. If `cachy-omarchy-doctor` reports that SUPER+K still runs the removed
-`cachy-omarchy-keybindings`, run `cachy-omarchy-bindings --force`.
+`cachy-omarchy-keybindings`, or still runs the deprecated `cachy-omarchy-shell --run`
+(it still starts the shell, with a warning, but the alias will go), run
+`cachy-omarchy-bindings --force`.
 
 ## Build and install
 
@@ -163,7 +165,7 @@ bin/update-upstream          # refresh the pin + rebuild pipeline
 bin/rollback                 # reinstall the newest older build/ artifact per package
 ```
 
-The rollback target is the next lower version present in `build/`, which may be a build that was never installed. Running rollback again steps back further; delete unwanted artifacts from `build/` to exclude them. Rollback fails as a whole if either package is not installed. Restart the shell afterwards with `cachy-omarchy-shell --restart`.
+The rollback target is the next lower version present in `build/`, which may be a build that was never installed. Running rollback again steps back further; delete unwanted artifacts from `build/` to exclude them. Rollback fails as a whole if either package is not installed. Restart the shell afterwards with `cachy-omarchy-shell --restart`. If you roll back across the `omarchy-launch-shell` adoption (shell 4.0.4-6), re-run `cachy-omarchy-bindings --force` so the bindings copy matches the older package.
 
 0.x builds also copied every artifact into `~/.local/state/cachy-omarchy/` (`validated-builds/`, `packages/`, `*.manifest`). Nothing reads that directory any more; delete it to reclaim the space.
 

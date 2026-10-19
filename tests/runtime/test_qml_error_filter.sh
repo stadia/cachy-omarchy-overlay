@@ -22,4 +22,16 @@ printf 'WARN scene: @Ui/Button.qml[9:3]: TypeError: Cannot read property '"'"'x'
 printf 'WARN scene: @Ui/Button.qml[9:3]: TypeError: undefined is not a function\n' >> "$log"
 assert_eq "$(coo_count_qml_errors "$log")" "3" "Qt 6.12: other error shapes still count"
 
+# Near misses: a column other than -1, trailing text, and a property outside the
+# measured colour-token set must all keep counting.
+COO_QT_VERSION=6.12.0
+printf 'WARN scene: @Ui/Button.qml[58:3]: TypeError: Cannot read property '"'"'text'"'"' of undefined\n' > "$log"
+assert_eq "$(coo_count_qml_errors "$log")" "1" "Qt 6.12: a real column (not -1) still counts"
+printf 'WARN scene: @Ui/Button.qml[58:-1]: TypeError: Cannot read property '"'"'text'"'"' of undefined (extra)\n' > "$log"
+assert_eq "$(coo_count_qml_errors "$log")" "1" "Qt 6.12: trailing text still counts"
+printf 'WARN scene: @plugins/foo/Panel.qml[8:-1]: TypeError: Cannot read property '"'"'items'"'"' of undefined\n' > "$log"
+assert_eq "$(coo_count_qml_errors "$log")" "1" "Qt 6.12: a property outside the colour-token set still counts"
+printf 'WARN scene: @Commons/Border.qml[3:-1]: TypeError: Cannot read property '"'"'menu.border-alpha'"'"' of undefined\n' > "$log"
+assert_eq "$(coo_count_qml_errors "$log")" "0" "Qt 6.12: a measured dotted token is excluded"
+
 exit "$ASSERT_FAILURES"

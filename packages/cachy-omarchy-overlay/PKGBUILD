@@ -1,7 +1,7 @@
 # Maintainer: Cachy Omarchy Overlay
 pkgname=cachy-omarchy-overlay
 pkgver=1.0.2
-pkgrel=3
+pkgrel=4
 pkgdesc='CachyOS integration for the pinned Omarchy Quattro shell runtime'
 arch=('any')
 url='https://github.com/basecamp/omarchy'
@@ -10,10 +10,13 @@ license=('MIT')
 # omarchy-settings 에는 절대 의존하지 않는다 (SPEC 21).
 # >=4.0.4-5: /usr/bin/omarchy-menu-keybindings moved from this package to the
 # shell package (patched upstream helper); SUPER+K needs the new shell.
-depends=('cachy-omarchy-shell>=4.0.4-5' 'bash')
+# >=4.0.4-6: bindings.lua autostart, cachy-omarchy-shell --restart and the doctor
+# use omarchy-launch-shell and /usr/bin/omarchy-shell, which only the shell
+# package stages. Without this floor an overlay-only upgrade starts no shell.
+depends=('cachy-omarchy-shell>=4.0.4-6' 'bash')
 
 # /usr/bin/omarchy-* 를 공식 omarchy 패키지와 같은 이름으로 소유한다 (compat
-# 적응 카피 5개). 상호 배타가 의도다. provides 는 하지 않는다.
+# 적응 카피 4개). 상호 배타가 의도다. provides 는 하지 않는다.
 conflicts=('omarchy')
 
 source=()

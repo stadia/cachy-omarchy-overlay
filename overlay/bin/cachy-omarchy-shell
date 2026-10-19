@@ -15,7 +15,8 @@ usage() {
 사용법: cachy-omarchy-shell --restart
 
   --restart   세션이 잠겨 있지 않을 때만 실행 중 셸을 정상 종료시키고 업스트림
-              omarchy-launch-shell 로 다시 띄운다.
+              omarchy-launch-shell 로 다시 띄운다. 락 상태를 알 수 없으면
+              (기동 중·무응답 포함) 거부한다.
   --help      이 도움말.
 
 기동은 omarchy-launch-shell, IPC 는 omarchy-shell 을 직접 쓴다.
@@ -35,36 +36,51 @@ cmd_restart() {
   # 판별해 재획득까지 시도하는 업스트림 omarchy-hyprland-session-locked 경로는
   # 범위 밖(closure-exceptions.tsv 의 blocked 행) — 우리는 거부만 한다.
   #
-  # 셸이 없거나 응답하지 않거나 lock 플러그인이 없으면(omarchy-shell 이 IPC
-  # 레벨 오류도 nonzero 로 올린다) 보존할 락도 없으므로 진행한다. 단 "아직
-  # 준비되지 않음" 은 락 서비스가 로드 중일 수 있어 진행하지 않는다. 응답이
-  # 왔는데 스키마가 온전한 "잠기지 않음" 이 아니면 거부한다: 잘못 진행하면
-  # hyprlock 을 죽여 세션이 갇히는 중대 사고이고, 잘못 거부하면 재시작 한 번을
-  # 손해 보는 경미한 사고이기 때문이다. 정리: **스키마가 온전한 "unlocked"
-  # 응답만 진행, 락 서비스 부재·셸 부재도 진행, 그 외 전부 거부.**
+  # 잘못 진행하면 hyprlock 을 죽여 세션이 갇히는 중대 사고이고, 잘못 거부하면
+  # 재시작 한 번을 손해 보는 경미한 사고이기 때문에 **허용 목록**으로 판정한다:
+  # 스키마가 온전한 "unlocked" 응답, 그리고 보존할 락이 확실히 없는 두 경우
+  # (셸 미실행 = "is not running", lock 플러그인 부재 = "Target not found.")만
+  # 진행하고, 그 밖의 전부(무응답·기동 중·알 수 없는 오류·명령 부재)는 거부한다.
   #
-  # 셸 자신이 판정한 값(lock/Service.qml 의 `locked`)을 우선 쓴다.
+  # 판정은 셸 자신이 계산한 `locked` 에 secure/requested 를 OR 한 값이다.
   local lock_out lock_err lock_status locking err_file
   err_file=$(mktemp) || fail "임시 파일을 만들 수 없다"
+  trap 'rm -f "$err_file"' RETURN
   lock_out=$(OMARCHY_SHELL_IPC_TIMEOUT=${COO_IPC_TIMEOUT:-2s} \
     omarchy-shell lock status 2>"$err_file")
   lock_status=$?
   lock_err=$(<"$err_file")
-  rm -f "$err_file"
   if (( lock_status == 0 )); then
     locking=$(printf '%s' "$lock_out" \
       | jq -r 'if (has("locked") and has("secure") and has("requested"))
                 then (.locked or .secure or .requested) else "unknown" end' 2>/dev/null)
     [[ $locking == "false" ]] \
       || fail "Refusing to restart the shell while the session is locked."
-  elif [[ $lock_err == *"not ready"* ]]; then
-    fail "Refusing to restart the shell while it is still starting (lock state unknown)."
+  else
+    case $lock_err in
+      *"is not running"*|*"Target not found."*) ;;
+      *) fail "Refusing to restart the shell: lock state unknown (${lock_err:-omarchy-shell exited $lock_status})." ;;
+    esac
   fi
+
+  # 새 셸은 Hyprland 에서 띄워 정식 세션 환경을 상속시킨다. SSH/TTY 에서 불린
+  # 경우를 위해 업스트림 omarchy-restart-shell 처럼 인스턴스 서명을 복구하고,
+  # 셸을 죽이기 전에 Hyprland 에 닿는지 확인한다 — 죽인 뒤에야 재기동 불가를
+  # 알면 세션이 셸 없이 남는다.
+  if [[ -z ${HYPRLAND_INSTANCE_SIGNATURE:-} ]]; then
+    local hypr_dir
+    hypr_dir=$(find "${XDG_RUNTIME_DIR:-/run/user/$UID}/hypr" -mindepth 1 -maxdepth 1 -type d \
+      -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -n 1 | cut -d' ' -f2-)
+    [[ -n $hypr_dir ]] && export HYPRLAND_INSTANCE_SIGNATURE=${hypr_dir##*/}
+  fi
+  local hypr_err
+  hypr_err=$(hyprctl -j monitors 2>&1 >/dev/null) \
+    || fail "Hyprland 에 닿지 못해 재시작하지 않는다: ${hypr_err:-hyprctl failed}"
 
   # 업스트림 감독자(omarchy-launch-shell)는 비정상 종료면 재기동한다. TERM 으로
   # 죽이면 감독자가 새로 띄우고 우리도 새로 띄워 셸이 이중 기동하므로, 업스트림
-  # omarchy-restart-shell 처럼 quickshell kill(정상 종료)로 멈춘다. kill 한 번은
-  # 가장 오래된 인스턴스 하나를 완전히 종료한 뒤 돌아온다.
+  # omarchy-restart-shell 처럼 quickshell kill(정상 종료)로 멈춘다. 한 번의 kill
+  # 은 인스턴스 하나만 멈추므로 더 없을 때까지 반복한다.
   local n=0
   while (( n < 10 )) && timeout 5 quickshell kill -p "$OMARCHY_PATH/shell" --any-display >/dev/null 2>&1; do
     n=$((n + 1))
@@ -72,15 +88,17 @@ cmd_restart() {
 
   # kill 이 돌아온 직후에도 죽어가는 인스턴스가 남아 있을 수 있다(IPC 종료 뒤
   # 엔진 정리 중). 이때 새로 띄우면 "already running" 으로 exit 0 하고 감독자가
-  # 그것을 의도된 정지로 읽어 셸이 영영 안 뜬다 — 사라질 때까지 잠깐 기다린다.
+  # 그것을 의도된 정지로 읽어 셸이 영영 안 뜬다. 끝내 안 사라지면 옛 인스턴스가
+  # ping 에 답해 거짓 성공이 되므로 여기서 실패한다.
   n=0
   while (( n < 50 )) && pgrep -f "quickshell -n -p $OMARCHY_PATH/shell" >/dev/null 2>&1; do
     sleep 0.1; n=$((n + 1))
   done
+  pgrep -f "quickshell -n -p $OMARCHY_PATH/shell" >/dev/null 2>&1 \
+    && fail "이전 셸이 종료되지 않았다 — 새로 띄우지 않는다."
 
-  # Hyprland 에서 띄워 정식 세션 환경을 상속시킨다(터미널·SSH 의 일시 변수 배제).
-  hyprctl dispatch 'hl.dsp.exec_cmd("omarchy-launch-shell")' >/dev/null 2>&1 \
-    || fail "Hyprland 에 omarchy-launch-shell 기동을 요청하지 못했다"
+  hypr_err=$(hyprctl dispatch 'hl.dsp.exec_cmd("omarchy-launch-shell")' 2>&1 >/dev/null) \
+    || fail "Hyprland 에 omarchy-launch-shell 기동을 요청하지 못했다: ${hypr_err:-hyprctl failed}"
 
   local attempt
   for (( attempt = 0; attempt < 50; attempt++ )); do
@@ -94,9 +112,14 @@ cmd_restart() {
 
 case ${1:-} in
   --restart) shift; cmd_restart "$@" ;;
-  --run|--ipc|--path)
-    printf 'error: cachy-omarchy-shell %s 는 삭제됐다 — 기동은 omarchy-launch-shell, IPC 는 omarchy-shell 을 쓴다.\n' "$1" >&2
-    printf '       예전 bindings.lua 가 --run 을 부르면: cachy-omarchy-bindings --force\n' >&2
+  --run)
+    # 업그레이드해도 라이브 bindings.lua 사본은 --force 없이 갱신되지 않아 옛 사본이
+    # 계속 --run 을 부른다. exec_cmd 는 실패를 알리지 않으므로 여기서 죽으면 로그인
+    # 후 셸이 조용히 사라진다 — 경고만 남기고 업스트림 감독자로 넘긴다.
+    printf 'warning: cachy-omarchy-shell --run 은 폐기됐다 — 사본을 갱신하라: cachy-omarchy-bindings --force\n' >&2
+    exec omarchy-launch-shell ;;
+  --ipc|--path)
+    printf 'error: cachy-omarchy-shell %s 는 삭제됐다 — IPC 는 omarchy-shell 을 쓴다.\n' "$1" >&2
     exit 1 ;;
   --help|"") usage ;;
   *) printf 'error: 알 수 없는 인자: %s\n' "$1" >&2; usage >&2; exit 1 ;;

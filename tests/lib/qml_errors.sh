@@ -1,16 +1,22 @@
 #!/usr/bin/env bash
 # QML error counting for the live tests' shell journals.
 #
-# Qt >= 6.12 (with Quickshell 0.3.2) makes the pinned upstream shell log a burst
-# of "TypeError: Cannot read property '<x>' of undefined" scene warnings at every
-# start, for bindings on the Color/Style singletons (Color.tooltip.background,
-# ...). The surfaces still render. It reproduces with the upstream tree
-# verbatim, so it is not ours to fix; the burst is excluded ONLY on Qt >= 6.12
-# and ONLY in that exact shape. Every other TypeError, ReferenceError, ... still
-# counts, and on older Qt nothing is excluded. Remove this once upstream or
-# Quickshell stops emitting it (tracked in the issue linked from docs).
+# Qt >= 6.12 (with Quickshell 0.3.2) makes the pinned upstream shell log bursts of
+# "TypeError: Cannot read property '<x>' of undefined" scene warnings (location
+# column -1) for bindings on the Color/Style singletons (Color.tooltip.background,
+# ...) while the shell starts and as panels first open. The surfaces still render.
+# It reproduces with the upstream tree verbatim, so it is not ours to fix.
+#
+# The exclusion is exactly: Qt >= 6.12, a `scene` warning at a `.qml[N:-1]`
+# location, and a property from the measured colour-token set below. It is NOT
+# limited to startup or to particular files (the burst spans Ui/, Commons/ and
+# several plugins), so the property set is what keeps it narrow: a TypeError on
+# any other property, any other error kind, or any other location still counts,
+# and on older Qt nothing is excluded. Revisit when upstream or Quickshell stops
+# emitting it; re-measure the set from a live journal if a new token appears.
 COO_QML_ERROR_RE='ReferenceError|TypeError|is not a type|Cannot assign|unavailable'
-COO_QML_STARTUP_UNDEFINED_RE="scene.*\\.qml\\[[0-9]+:-1\\]: TypeError: Cannot read property '[^']*' of undefined\$"
+COO_QML_BURST_PROPS='border|background|text|scrim|selectedText|selectedBackground|placeholder|selectedBorder|selection|borderActive|active|borderError|accent|unselectedBorder|countdown|[a-z]+\.(selected-)?border-alpha'
+COO_QML_STARTUP_UNDEFINED_RE="scene.*\\.qml\\[[0-9]+:-1\\]: TypeError: Cannot read property '($COO_QML_BURST_PROPS)' of undefined\$"
 
 coo_qt_version() {
   if [[ -n ${COO_QT_VERSION:-} ]]; then

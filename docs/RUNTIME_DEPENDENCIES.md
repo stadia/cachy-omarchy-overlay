@@ -219,7 +219,7 @@ qs ipc -n -p "$OMARCHY_PATH/shell" call -- shell toggle omarchy.menu '{"menu":"r
 
 ## M2 실측 메모 (Task 5 라이브 기동 기준)
 
-> 측정한 것과 추론한 것을 구분. 라이브 기동 로그(`journalctl --user -t cachy-omarchy-shell`)와
+> 측정한 것과 추론한 것을 구분. 라이브 기동 로그(`journalctl --user -t omarchy-shell`)와
 > `listPlugins`/`listShellConfig` IPC 로 관측.
 
 - **기동 경로에서 실제로 발생한 missing-binary WARN: `inotifywait` 단 한 종류.**

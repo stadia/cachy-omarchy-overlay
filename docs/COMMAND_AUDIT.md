@@ -530,7 +530,7 @@ REIMPLEMENT 아님. 업스트림 JSONC를 패치하거나 행을 지우지 않�
 | `omarchy-restart-audio` | SAFE | package | audio-tuning 전이. v0.12.0에서 `omarchy-launch-floating-terminal-with-presentation` 프레젠테이션 체인까지 스테이징해 `update.hardware.audio` 메뉴 행의 실행 결손을 닫았다 |
 | `omarchy-restart-bluetooth` | SAFE | package | 0.8.0 verbatim stage. rfkill unblock/list bluetooth |
 | `omarchy-restart-hyprsunset` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
-| `omarchy-restart-shell` | ADAPTED | wrapper | v0.12.0 compat 적응 카피(`overlay/compat/bin/omarchy-restart-shell`) → `cachy-omarchy-shell --restart` 위임. quickshell kill/재기동 + 세션 락 재확보 폴링이 있는 원본은 미스테이징 헬퍼 3개(`omarchy-hyprland-session-locked`(blocked)·`omarchy-launch-shell`·`omarchy-system-sleep-lock`)를 전제하고 이 환경의 quickshell 0.3.0(kill 즉시 반환)에서 레이스를 만들어 verbatim 이 아니라 락 인지 재시작 프런트로 대체한다. `tests/data/closure-exceptions.tsv` 예외 행 회수 |
+| `omarchy-restart-shell` | ADAPTED | wrapper | v0.12.0 compat 적응 카피(`overlay/compat/bin/omarchy-restart-shell`) → `cachy-omarchy-shell --restart` 위임. quickshell kill/재기동 + 세션 락 재확보 폴링이 있는 원본은 미스테이징 헬퍼 2개(`omarchy-hyprland-session-locked`(blocked)·`omarchy-system-sleep-lock`)를 전제하고 kill 직후 죽어가는 인스턴스가 남는 레이스가 있어 verbatim 이 아니라 락 인지 재시작 프런트로 대체한다. `tests/data/closure-exceptions.tsv` 예외 행 회수 |
 | `omarchy-restart-trackpad` | SAFE | package | 0.8.0 verbatim stage. i2c_hid_acpi 언바인드/바인드 + modprobe |
 | `omarchy-restart-wifi` | SAFE | package | 0.8.0 verbatim stage. rfkill + nmcli radio |
 | `omarchy-restart-xcompose` | DISABLED | disable | 공식 omarchy 전체 OS 가정. 바이너리 미설치 |
