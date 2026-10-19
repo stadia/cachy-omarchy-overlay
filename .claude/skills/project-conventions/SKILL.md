@@ -81,7 +81,7 @@ user-invocable: false
   검증하다 실행마다 다른 단언이 깨졌다).
 
 ## 환경 (재측정 금지, 이미 확정)
-- CachyOS, Hyprland 0.56.2(사용자 설정 = `hyprland.lua`만), Quickshell 0.3.1(래퍼는 `quickshell`/`qs`).
+- CachyOS, Hyprland 0.56.2(사용자 설정 = `hyprland.lua`만), Quickshell 0.3.2, Qt 6.12(래퍼는 `quickshell`/`qs`).
 
 ## 검증 원칙
 - 증거 없이 완료 주장 금지. "should/probably" 금지.
