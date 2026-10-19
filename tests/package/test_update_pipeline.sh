@@ -207,6 +207,14 @@ for mode in fetch build audit test; do
   assert_eq "$(git -C "$root" diff HEAD --stat -- README.md README.ko-KR.md | wc -l)" "0" "$mode failure restores the README tables"
 done
 
+# --- artifacts that did not exist before a failed run do not survive it ---
+reset_repo
+: >"$log"
+out=$(run_update COO_FAKE_TEST_MODE=fail) && code=0 || code=$?
+assert_eq "$code" "9" "a failed update with an empty build/ fails"
+[[ -e $root/build/$overlay_art ]] && left=1 || left=0
+assert_eq "$left" "0" "the overlay artifact the rejected run published is removed"
+
 # --- the same version re-tagged to another commit is a new revision ---
 reset_repo
 seed_build

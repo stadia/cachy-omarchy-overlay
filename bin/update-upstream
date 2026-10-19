@@ -92,6 +92,9 @@ restore() {
   for name in "$old_shell_artifact" "$old_overlay_artifact"; do
     if [[ -e $backup/$name ]]; then
       mv -f "$backup/$name" "$build_dir/$name" || { printf 'warn: could not put back %s (kept in %s)\n' "$name" "$backup" >&2; problems=1; }
+    else
+      # Not in build/ before this run, so whatever is there now is the rejected build's.
+      rm -f "${build_dir:?}/$name" || problems=1
     fi
   done
   rm -rf "$shell_dir"/{src,pkg,omarchy}
