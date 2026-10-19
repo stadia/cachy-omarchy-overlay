@@ -200,15 +200,17 @@ mkdir -p "$build_dir"
 ) >"$candidate/artifact-names" || fail 'could not derive candidate artifact names'
 mapfile -t artifact_names <"$candidate/artifact-names"
 published_tmp=()
+declare -A tmp_of
 meta_tmp=()
 trap 'rm -rf "$candidate"; rm -f "${published_tmp[@]}" "${meta_tmp[@]}"' EXIT
 for name in "${artifact_names[@]}"; do
   [[ -f $candidate_build/$name ]] || fail "candidate artifact missing: $name"
-  published_tmp+=("$build_dir/.$name.tmp")
-  "$install_bin" -m 644 "$candidate_build/$name" "$build_dir/.$name.tmp" || fail "could not copy $name into $build_dir"
+  tmp_of[$name]=$(mktemp "$build_dir/.$name.XXXXXX") || fail "could not create a temp file in $build_dir"
+  published_tmp+=("${tmp_of[$name]}")
+  "$install_bin" -m 644 "$candidate_build/$name" "${tmp_of[$name]}" || fail "could not copy $name into $build_dir"
 done
 for name in "${artifact_names[@]}"; do
-  "$mv_bin" -f "$build_dir/.$name.tmp" "$build_dir/$name" ||
+  "$mv_bin" -f "${tmp_of[$name]}" "$build_dir/$name" ||
     fail "partial publish: $name not renamed; rerun bin/update-upstream"
 done
 # POSIX cannot atomically rename different tracked files. Prepare lock,
