@@ -21,8 +21,6 @@ for c in omarchy-shell omarchy-update-available \
   ln -sf "../lib/cachy-omarchy/compat/bin/$c" "$dest/usr/bin/$c"
 done
 
-install -D -m644 "$src/hypr/bindings.conf" \
-  "$dest/usr/share/cachy-omarchy/hypr/bindings.conf"
 install -D -m644 "$src/hypr/bindings.lua" \
   "$dest/usr/share/cachy-omarchy/hypr/bindings.lua"
 

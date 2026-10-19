@@ -18,7 +18,7 @@ export COO_PREFIX_ROOT="$REPO_ROOT/overlay"        # defaults/ 와 hypr/ 가 여
 export COO_SRC_HYPR="$REPO_ROOT/overlay/hypr"
 export COO_HYPR_DIR="$COO_TEST_SANDBOX/hypr"
 mkdir -p "$COO_HYPR_DIR"
-: > "$COO_HYPR_DIR/hyprland.conf"
+: > "$COO_HYPR_DIR/hyprland.lua"
 
 # --dry-run 은 아무것도 쓰지 않는다.
 out=$("$I" --dry-run 2>&1); code=$?
@@ -35,25 +35,25 @@ assert_eq "$made" "0" "init 는 dead shell.json 을 만들지 않는다"
 # bar-off 도 만들지 않는다 — M8 원칙 0 에 따라 바는 기본으로 보인다.
 [[ -e "$HOME/.local/state/omarchy/toggles/bar-off" ]] && made=1 || made=0
 assert_eq "$made" "0" "init 는 bar-off 토글을 만들지 않는다"
-assert_file_exists "$HOME/.config/cachy-omarchy/hypr/bindings.conf" "바인딩 배치"
+assert_file_exists "$HOME/.config/cachy-omarchy/hypr/bindings.lua" "바인딩 배치"
 
-# FINDING 1 회귀: 사용자가 고친 bindings.conf 를 재실행이 덮어쓰지 않는다.
-BIND_CONF="$HOME/.config/cachy-omarchy/hypr/bindings.conf"
-assert_file_exists "$BIND_CONF" "바인딩 conf 배치 확인 (사전 조건)"
-printf '\n# USER_MARKER\n' >> "$BIND_CONF"
-before_marker=$(cat "$BIND_CONF")
+# FINDING 1 회귀: 사용자가 고친 bindings.lua 를 재실행이 덮어쓰지 않는다.
+BIND_LUA="$HOME/.config/cachy-omarchy/hypr/bindings.lua"
+assert_file_exists "$BIND_LUA" "바인딩 lua 배치 확인 (사전 조건)"
+printf '\n# USER_MARKER\n' >> "$BIND_LUA"
+before_marker=$(cat "$BIND_LUA")
 out=$("$I" 2>&1); code=$?
 assert_eq "$code" "0" "바인딩 파일이 이미 있는 채 재실행 exit 0"
-after_marker=$(cat "$BIND_CONF")
-assert_eq "$after_marker" "$before_marker" "사용자가 고친 bindings.conf 를 재실행이 보존한다"
-assert_contains "$out" "bindings.conf" "기본 재실행이 건드리지 않은 바인딩 파일을 알린다"
+after_marker=$(cat "$BIND_LUA")
+assert_eq "$after_marker" "$before_marker" "사용자가 고친 bindings.lua 를 재실행이 보존한다"
+assert_contains "$out" "bindings.lua" "기본 재실행이 건드리지 않은 바인딩 파일을 알린다"
 
 # --force 는 그 반대: 사용자가 명시적으로 새로고침을 요청한 것이므로 갱신한다.
 out=$("$I" --force 2>&1); code=$?
 assert_eq "$code" "0" "--force 재실행 exit 0"
-after_force=$(cat "$BIND_CONF")
+after_force=$(cat "$BIND_LUA")
 [[ $after_force == *"USER_MARKER"* ]] && kept=1 || kept=0
-assert_eq "$kept" "0" "--force 는 bindings.conf 를 갱신해 사용자 마커가 사라진다"
+assert_eq "$kept" "0" "--force 는 bindings.lua 를 갱신해 사용자 마커가 사라진다"
 
 # 사용자가 지운 bar-off 를 되살리지 않는다 — 사용자 의사를 존중한다. init 이
 # 애초에 만들지 않게 된 뒤에도 이 단언은 유지한다: "만들지 않는다" 를 되돌리는
@@ -100,7 +100,7 @@ chmod +x "$ISOLATED_INIT"
 
 REG_HYPR="$COO_TEST_SANDBOX/regress-hypr"
 mkdir -p "$REG_HYPR"
-: > "$REG_HYPR/hyprland.conf"
+: > "$REG_HYPR/hyprland.lua"
 
 REG_CONFIG="$COO_TEST_SANDBOX/regress-config-noargs"
 REG_STATE="$COO_TEST_SANDBOX/regress-state-noargs"

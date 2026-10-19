@@ -40,7 +40,7 @@ export COO_PREFIX_ROOT="$REPO_ROOT/overlay"
 export COO_SRC_HYPR="$REPO_ROOT/overlay/hypr"
 export COO_HYPR_DIR="$COO_TEST_SANDBOX/hypr"
 mkdir -p "$COO_HYPR_DIR"
-: > "$COO_HYPR_DIR/hyprland.conf"
+: > "$COO_HYPR_DIR/hyprland.lua"
 
 stub_bin=$COO_TEST_SANDBOX/stub-bin
 pam_dir=$COO_TEST_SANDBOX/pam
@@ -91,7 +91,7 @@ assert_contains "$out" "sudo" "sudo 가 필요하다는 것을 미리 말한다"
 out=$(STUB_APPLY_LOCK_EXIT=1 run_init "$missing"); code=$?
 assert_eq "$code" "0" "apply-lock 실패해도 init exit 0"
 assert_contains "$out" "omarchy-apply-lock" "실패 시 수동 실행 명령을 안내한다"
-assert_file_exists "$HOME/.config/cachy-omarchy/hypr/bindings.conf" \
+assert_file_exists "$HOME/.config/cachy-omarchy/hypr/bindings.lua" \
   "apply-lock 실패가 뒤따르는 바인딩 설치를 막지 않는다"
 
 # 4) --dry-run 은 아무것도 부르지 않는다.

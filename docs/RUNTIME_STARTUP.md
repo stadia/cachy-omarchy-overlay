@@ -183,8 +183,6 @@ esac
    없이 갱신되지 않는다. 해결: `cachy-omarchy-bindings --force` 로 정본 새로고침
    후 재로그인(또는 수동 `cachy-omarchy-shell --run`). `hyprctl reload` 만으로는
    `hyprland.start` 가 재발화하지 않으므로 셸이 뜨지 않는 게 정상이다.
-   `hyprland.conf` 사용자는 `bindings.conf` 의 `exec-once` 한 줄이 같은 역할을 하며,
-   그 줄이 없는 구형 사본은 `cachy-omarchy-doctor` 가 FAIL 로 잡는다.
    참고: `hyprland.start` 트리거의 1회 발화는 **실측됐다** — 재로그인 후 라이브 셸의
    부모가 곧 `Hyprland` 인 것을 확인했다(§16.1). 이 문단의 "아직 실측되지 않았다"는
    그 이전 기록이다. 정적 테스트가 이벤트 이름 존재만 검증한다는 점은 그대로다. 또, 과거에
@@ -478,8 +476,8 @@ Hyprland -c <tmp>/hyprland.conf --verify-config`, 사용자 세션 무관)로 �
 
 **결론(결말 B):** conf 의 `source =` 는 `.lua` 글롭을 문법적으로만 받아들일
 뿐 그 안의 Lua 를 실행하지 않으므로, seam 은 `hyprland.lua` 설정에서만
-성립한다. 관리 블록(`conf_snippet()`)에는 toggles glob source 줄을 넣지
-않는다. conf 사용자에게는 `cachy-omarchy-doctor` 가 WARN 한다.
+성립한다. 이 실측이 conf 비지원 결정(SPEC §76)의 근거 중 하나다 —
+conf 만 있는 환경은 `cachy-omarchy-doctor` 가 WARN 한다.
 
 ## §24 락 인지 셸 재시작 + reload/compat 위임 체인 (v0.12.0, 2026-08-23)
 

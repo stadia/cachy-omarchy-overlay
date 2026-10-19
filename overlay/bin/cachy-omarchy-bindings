@@ -26,8 +26,6 @@ FORCE=0
 
 LUA_BEGIN='-- >>> cachy-omarchy >>>'
 LUA_END='-- <<< cachy-omarchy <<<'
-CONF_BEGIN='# >>> cachy-omarchy >>>'
-CONF_END='# <<< cachy-omarchy <<<'
 
 fail() { printf 'error: %s\n' "$1" >&2; exit 1; }
 
@@ -36,22 +34,22 @@ usage() {
 사용법: cachy-omarchy-bindings [--force]
 
 ~/.config/cachy-omarchy/hypr/ 에 오버레이 바인딩을 두고, Hyprland 설정에
-관리 source 블록만 주입한다. 전체 hyprland.lua/conf 를 덮어쓰지 않는다.
+관리 source 블록만 주입한다. 전체 hyprland.lua 를 덮어쓰지 않는다(Lua 설정 전용).
 
 SUPER+SPACE 또는 SUPER+K 가 이미 있으면 감지·경고하고 주입하지 않는다.
-bindings.conf/bindings.lua 는 $CONFIG_DIR/hypr/ 에 이미 있으면 건드리지
+bindings.lua 는 $CONFIG_DIR/hypr/ 에 이미 있으면 건드리지
 않는다(사용자가 고쳤을 수 있으므로). hyprctl reload 는 하지 않는다.
 
 --force 는 두 가지를 동시에 한다(하나로 묶인 이유: 둘 다 "더 적극적으로
 하라"는 같은 요청이다):
   1) 바인딩 충돌이 있어도 관리 블록을 주입한다(기존 사용자 줄은 지우지 않음).
-  2) 이미 있는 bindings.conf/bindings.lua 를 정본으로 덮어써 새로고침한다.
+  2) 이미 있는 bindings.lua 를 정본으로 덮어써 새로고침한다.
 
   --help    이 도움말
-  --force   충돌 시에도 관리 블록을 주입하고, 기존 bindings.conf/lua 를 새로고침한다
+  --force   충돌 시에도 관리 블록을 주입하고, 기존 bindings.lua 를 새로고침한다
 
 환경 변수:
-  COO_SRC_HYPR     바인딩 소스 디렉터리를 직접 지정한다(bindings.conf/lua 위치).
+  COO_SRC_HYPR     바인딩 소스 디렉터리를 직접 지정한다(bindings.lua 위치).
   COO_PREFIX_ROOT  설치 프리픽스 루트. 기본값 /usr/share/cachy-omarchy.
                    COO_SRC_HYPR 미설정 시 $COO_PREFIX_ROOT/hypr 를 먼저 찾고,
                    없으면 저장소 상대 경로(../hypr)로 폴백한다.
@@ -70,34 +68,31 @@ strip_block() {
 }
 
 has_space_conflict() {
-  grep -qiE 'SUPER[[:space:]]*\+[[:space:]]*space|[[:space:]]space["'\'']|,\s*SPACE[[:space:],]' <<<"$1"
+  grep -qiE 'SUPER[[:space:]]*\+[[:space:]]*space|[[:space:]]space["'\'']' <<<"$1"
 }
 
 has_k_conflict() {
   awk '
-    /^[[:space:]]*(#|--)/ { next }
+    /^[[:space:]]*--/ { next }
     /^[[:space:]]*hl\.bind[[:space:]]*\([[:space:]]*["\047]SUPER[[:space:]]*\+[[:space:]]*K["\047]/ { found=1; exit }
     /^[[:space:]]*hl\.bind[[:space:]]*\([[:space:]]*mainMod[[:space:]]*\.\.[[:space:]]*["\047][[:space:]]*\+[[:space:]]*K["\047]/ { found=1; exit }
-    /^[[:space:]]*bindd?[[:space:]]*=[[:space:]]*(SUPER|\$mainMod)[[:space:]]*,[[:space:]]*K([[:space:]]*,|$)/ { found=1; exit }
     END { exit !found }
   ' <<<"$1"
 }
 
 install_overlay() {
-  [[ -n $SRC_HYPR && -f $SRC_HYPR/bindings.conf && -f $SRC_HYPR/bindings.lua ]] \
+  [[ -n $SRC_HYPR && -f $SRC_HYPR/bindings.lua ]] \
     || fail "바인딩 소스를 찾을 수 없다: ${SRC_HYPR:-<미해석>} (COO_SRC_HYPR 로 지정 가능)"
   mkdir -p "$DEST_HYPR"
-  # 이 파일들은 SPEC §6.6 상 "사용자 라이브 설정"이다(정본은
+  # 이 파일은 SPEC §6.6 상 "사용자 라이브 설정"이다(정본은
   # /usr/share/cachy-omarchy/hypr/ 에 있다) — 기본은 존재하는 파일을 덮어쓰지
   # 않는다. --force 는 예외적으로 "정본으로 새로고침"을 의미한다.
-  local f
-  for f in bindings.conf bindings.lua; do
-    if [[ -e $DEST_HYPR/$f && $FORCE -eq 0 ]]; then
-      printf '유지: %s (이미 존재 — 덮어쓰지 않음. 정본으로 새로고침하려면 --force)\n' "$DEST_HYPR/$f"
-      continue
-    fi
-    cp -a "$SRC_HYPR/$f" "$DEST_HYPR/$f"
-  done
+  local f=bindings.lua
+  if [[ -e $DEST_HYPR/$f && $FORCE -eq 0 ]]; then
+    printf '유지: %s (이미 존재 — 덮어쓰지 않음. 정본으로 새로고침하려면 --force)\n' "$DEST_HYPR/$f"
+    return 0
+  fi
+  cp -a "$SRC_HYPR/$f" "$DEST_HYPR/$f"
 }
 
 lua_snippet() {
@@ -105,21 +100,6 @@ lua_snippet() {
   path=${path//\\/\\\\}
   path=${path//\"/\\\"}
   printf '%s\npcall(dofile, "%s")\n%s\n' "$LUA_BEGIN" "$path" "$LUA_END"
-}
-
-conf_snippet() {
-  # 테마 hyprland.lua 는 conf 에 조건식이 없어 주입 시점에 존재할 때만 넣는다
-  # (M9 D5). 부재 시 source 를 박아두면 Hyprland 가 매 reload 마다 설정 오류
-  # 를 낸다. init 의 시드(Task 5)가 바인딩 주입보다 먼저 오므로 신규 설치는
-  # 조건이 성립한다. 이미 주입된 사용자는 --force 재주입(아래 inject)으로
-  # 따라온다 — 구형 블록은 doctor 가 보고한다.
-  local theme_hypr=$HOME/.local/state/omarchy/current/theme/hyprland.lua
-  if [[ -f $theme_hypr ]]; then
-    printf '%s\nsource = %s/bindings.conf\nsource = %s\n%s\n' \
-      "$CONF_BEGIN" "$DEST_HYPR" "$theme_hypr" "$CONF_END"
-  else
-    printf '%s\nsource = %s/bindings.conf\n%s\n' "$CONF_BEGIN" "$DEST_HYPR" "$CONF_END"
-  fi
 }
 
 inject() {
@@ -130,7 +110,7 @@ inject() {
   fi
   (( FORCE )) || return 0
   # --force 재주입: 관리 블록을 새 스니펫으로 교체한다 (스니펫 생성 규칙이
-  # 바뀌었을 때 따라오는 길 — 예: M9 테마 source 줄). 이 스크립트가 사용자
+  # 바뀌었을 때 따라오는 길). 이 스크립트가 사용자
   # 설정을 덮어쓰는 유일한 경로이고 set -e 가 없으므로, 원자적으로 간다:
   # 임시 파일에 쓰고 → 성공 확인 후 → mv. 실패하면 원본을 한 바이트도
   # 건드리지 않는다. 블록은 제자리에서 교체한다 (끝으로 밀지 않는다).
@@ -178,25 +158,12 @@ case ${1:-} in
   *) printf 'error: 알 수 없는 인자: %s\n' "$1" >&2; usage >&2; exit 1 ;;
 esac
 
+target=$HYPR_DIR/hyprland.lua
+[[ -f $target ]] || fail "Hyprland 설정을 찾을 수 없다: $target (hyprland.conf 는 지원하지 않는다 — Lua 설정 전용)"
 install_overlay
-
-lua=$HYPR_DIR/hyprland.lua
-conf=$HYPR_DIR/hyprland.conf
-if [[ -f $lua ]]; then
-  kind=lua
-  target=$lua
-  begin=$LUA_BEGIN
-  end=$LUA_END
-  snippet=$(lua_snippet)
-elif [[ -f $conf ]]; then
-  kind=conf
-  target=$conf
-  begin=$CONF_BEGIN
-  end=$CONF_END
-  snippet=$(conf_snippet)
-else
-  fail "Hyprland 설정을 찾을 수 없다: $HYPR_DIR/hyprland.lua 또는 hyprland.conf"
-fi
+begin=$LUA_BEGIN
+end=$LUA_END
+snippet=$(lua_snippet)
 
 body=$(strip_block "$begin" "$end" <"$target")
 conflict=0

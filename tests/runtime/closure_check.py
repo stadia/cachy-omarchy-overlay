@@ -929,7 +929,7 @@ def main():
     # --- roots -----------------------------------------------------------
     roots = set()
     menu_suppressed = set()
-    for name in ("bindings.conf", "bindings.lua"):
+    for name in ("bindings.lua",):
         text = (repo / "overlay/hypr" / name).read_text()
         roots |= set(OMARCHY_RE.findall(text))
     qml_seed = set()

@@ -26,7 +26,7 @@ mkdir -p "$prefix/upstream/shell" "$prefix/upstream/default/omarchy" "$compat" \
   "$root/usr/bin" "$root/usr/lib/systemd/user" "$hypr" "$config" "$user_config" "$state" "$fake_bin"
 printf '// fixture shell\n' >"$prefix/upstream/shell/shell.qml"
 printf '{}\n' >"$prefix/upstream/default/omarchy/omarchy-menu.jsonc"
-printf '# no conflicting bindings\n' >"$hypr/hyprland.conf"
+printf -- '-- no conflicting bindings\n' >"$hypr/hyprland.lua"
 os_release=$COO_TEST_SANDBOX/os-release
 printf 'ID=cachyos\n' >"$os_release"
 # The lock plugin refuses to lock without this PAM service, so the fixture
@@ -210,48 +210,42 @@ printf 'tokyo-night\n' > "$omarchy_state/current/theme.name"
 out=$(run_doctor); code=$?
 assert_contains "$out" "PASS: theme: tokyo-night" "테마 존재는 PASS"
 
-# 구형 conf 주입: 테마가 있는데 관리 블록에 theme source 줄이 없으면 WARN.
-cp "$hypr/hyprland.conf" "$hypr/hyprland.conf.bak"
-printf '# >>> cachy-omarchy >>>\nsource = %s/bindings.conf\n# <<< cachy-omarchy <<<\n' \
-  "$config/hypr" >> "$hypr/hyprland.conf"
+# hyprland.conf 는 지원하지 않는다: lua 없이 conf 만 있으면 WARN.
+mv "$hypr/hyprland.lua" "$hypr/hyprland.lua.bak"
+printf 'monitor=,preferred,auto,1\n' >"$hypr/hyprland.conf"
 out=$(run_doctor); code=$?
-assert_contains "$out" "WARN: theme hyprland.lua not sourced" "구형 주입은 명시적 WARN"
-printf 'source = %s/.local/state/omarchy/current/theme/hyprland.lua\n' "$COO_TEST_SANDBOX" \
-  >> "$hypr/hyprland.conf"
+assert_contains "$out" "FAIL: hyprland.conf is not supported (Lua only)" "conf 전용 구성은 FAIL"
+assert_eq "$code" "1" "conf 전용 구성은 doctor 가 실패로 끝난다"
+assert_contains "$out" "(hyprland.conf unsupported)" "conf 전용이면 충돌 측정 불가 사유를 구분한다"
+printf '# >>> cachy-omarchy >>>\nsource = %s/bindings.conf\n# <<< cachy-omarchy <<<\n' "$config/hypr" >>"$hypr/hyprland.conf"
 out=$(run_doctor); code=$?
-assert_contains "$out" "PASS: theme hyprland.lua sourced" "source 줄 있으면 PASS"
-# A commented stale source is not active Hyprland configuration.
-sed -i 's|^source = \(.*current/theme/hyprland.lua\)|# source = \1|' "$hypr/hyprland.conf"
+assert_contains "$out" "WARN: stale cachy-omarchy block in hyprland.conf" "남은 conf 블록을 알린다"
+mv "$hypr/hyprland.lua.bak" "$hypr/hyprland.lua"
 out=$(run_doctor); code=$?
-assert_contains "$out" "WARN: theme hyprland.lua not sourced" "주석 source 줄은 PASS 가 아니다"
-mv "$hypr/hyprland.conf.bak" "$hypr/hyprland.conf"
+[[ $out == *"hyprland.conf is not supported"* ]] && w=1 || w=0
+assert_eq "$w" "0" "lua 가 있으면 conf 비지원 FAIL 을 내지 않는다"
+assert_contains "$out" "WARN: stale cachy-omarchy block in hyprland.conf" "lua 와 공존해도 남은 conf 블록을 알린다"
+rm -f "$hypr/hyprland.conf"
 
-# 구형 conf 사본: 관리 블록이 불러오는 bindings.conf 에 exec-once 가 없으면
-# 셸이 자동 기동되지 않는다. bindings 는 기존 사본을 --force 없이 보존하므로
-# 업그레이드한 conf 사용자는 doctor 가 잡아야 한다.
-cp "$hypr/hyprland.conf" "$hypr/hyprland.conf.bak"
-printf '# >>> cachy-omarchy >>>\nsource = %s/bindings.conf\n# <<< cachy-omarchy <<<\n' \
-  "$config/hypr" >> "$hypr/hyprland.conf"
+# lua 의 mainMod .. " + K" 형태도 충돌이다(bindings 와 같은 판정).
+cp "$hypr/hyprland.lua" "$hypr/hyprland.lua.bak"
+printf 'hl.bind(mainMod .. " + K", hl.dsp.exec_cmd("x"))\n' >>"$hypr/hyprland.lua"
+out=$(run_doctor); code=$?
+assert_contains "$out" "FAIL: Hyprland binding conflict" "mainMod .. \" + K\" 충돌을 잡는다"
+mv "$hypr/hyprland.lua.bak" "$hypr/hyprland.lua"
+
+# 보존된 구형 bindings.lua 에 hyprland.start 가 없으면 셸이 뜨지 않는다.
 mkdir -p "$config/hypr"
-printf 'bindd = SUPER, SPACE, Launch apps, exec, cachy-omarchy-launcher\n' > "$config/hypr/bindings.conf"
+cp "$hypr/hyprland.lua" "$hypr/hyprland.lua.bak"
+printf -- '-- >>> cachy-omarchy >>>\npcall(dofile, "x")\n-- <<< cachy-omarchy <<<\n' >>"$hypr/hyprland.lua"
+printf 'hl.bind("SUPER + F1", hl.dsp.exec_cmd("x"))\n' >"$config/hypr/bindings.lua"
 out=$(run_doctor); code=$?
-assert_contains "$out" "FAIL: shell autostart missing from $config/hypr/bindings.conf — run: cachy-omarchy-bindings --force" \
-  "exec-once 없는 구형 사본은 FAIL 과 복구 명령"
-printf 'exec-once = cachy-omarchy-shell --run\n' >> "$config/hypr/bindings.conf"
+assert_contains "$out" "FAIL: shell autostart missing from $config/hypr/bindings.lua" "hyprland.start 없는 구형 bindings.lua 를 잡는다"
+printf 'hl.on("hyprland.start", function() end)\n' >>"$config/hypr/bindings.lua"
 out=$(run_doctor); code=$?
-assert_contains "$out" "PASS: shell autostart declared (conf)" "exec-once 있으면 PASS"
-sed -i 's/^exec-once/# exec-once/' "$config/hypr/bindings.conf"
-out=$(run_doctor); code=$?
-assert_contains "$out" "FAIL: shell autostart missing" "주석 처리된 exec-once 는 PASS 가 아니다"
-# hyprland.lua 가 있으면 bindings 는 lua 를 고른다 — 남아 있는 conf 블록은
-# 비활성이므로 conf 진단을 하지 않는다(lua 는 hyprland.start 로 셸을 띄운다).
-: > "$hypr/hyprland.lua"
-out=$(run_doctor); code=$?
-[[ $out == *"shell autostart"* ]] && inactive=1 || inactive=0
-assert_eq "$inactive" "0" "lua 설정이 활성이면 비활성 conf 사본을 진단하지 않는다"
-rm -f "$hypr/hyprland.lua"
-rm -f "$config/hypr/bindings.conf"
-mv "$hypr/hyprland.conf.bak" "$hypr/hyprland.conf"
+assert_contains "$out" "PASS: shell autostart declared (bindings.lua)" "hyprland.start 가 있으면 통과한다"
+rm -f "$config/hypr/bindings.lua"
+mv "$hypr/hyprland.lua.bak" "$hypr/hyprland.lua"
 
 out=$(run_doctor); code=$?
 
@@ -340,7 +334,7 @@ assert_eq "$code" 1 "missing shell.qml fails"
 assert_contains "$out" "FAIL: shell.qml" "missing shell.qml is explicit"
 printf '// fixture shell\n' >"$prefix/upstream/shell/shell.qml"
 
-printf 'bind = SUPER, SPACE, exec, something\n' >"$hypr/hyprland.conf"
+printf 'hl.bind("SUPER + SPACE", hl.dsp.exec_cmd("something"))\n' >"$hypr/hyprland.lua"
 out=$(run_doctor); code=$?
 assert_eq "$code" 1 "binding conflict fails without false green"
 assert_contains "$out" "FAIL: Hyprland binding conflict" "binding conflict is explicit"
