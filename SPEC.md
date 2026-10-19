@@ -2100,8 +2100,8 @@ quickshell 은 프로토콜 오류로 죽는다. 그래서 업스트림 stranded
 
 - **tests** — 핀 커밋으로 두 패키지를 빌드하고 `bin/test-packages` 로 전체 스위트를
   돌린다. 허용목록 밖의 `skip:` 은 실패다.
-- **resolve** — 로컬 pacman 저장소로 실제 설치 트랜잭션을 돌려 의존 선언이 충분한지
-  증명하고, headless `cachy-omarchy-init` 과 폐쇄 스캐너를 설치 트리에 돌린다.
+- **resolve** — tests lane 이 올린 아티팩트를 받아(다시 빌드하지 않는다), 로컬 pacman
+  저장소로 실제 설치 트랜잭션을 돌려 의존 선언이 충분한지 증명하고, headless `cachy-omarchy-init` 과 폐쇄 스캐너를 설치 트리에 돌린다.
 
 CI 는 릴리스를 발행하지 않는다. 업스트림 새 릴리스 감지·PR 자동화는 없다.
 
