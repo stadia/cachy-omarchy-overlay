@@ -9,17 +9,30 @@ coo_repo_root() {
   printf '%s\n' "${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 }
 
-# 최신 빌드 아티팩트 하나를 출력한다. 없으면 exit 1, 출력 없음.
+# 현재 메타데이터(upstream.lock + PKGBUILD, bin/package-names.sh)가 가리키는
+# 아티팩트 경로를 출력한다. build/ 는 롤백 이력으로 옛 버전을 남기므로 mtime 이
+# 아니라 이름으로 고른다 — bin/test-packages 가 확인하는 파일과 같다. 이름을 계산할
+# 수 없거나 파일이 없으면 exit 1, 출력 없음. 서브셸이라 lock 변수가 새지 않는다.
+coo_current_artifact() (
+  local kind=${1:?kind} root build_dir name
+  root=$(coo_repo_root)
+  build_dir=${COO_BUILD_DIR:-$root/build}
+  [[ -f $root/bin/package-names.sh ]] || exit 1
+  # shellcheck disable=SC1091
+  source "$root/bin/package-names.sh"
+  coo_current_artifacts "$root" 2>/dev/null || exit 1
+  case $kind in
+    shell) name=$COO_SHELL_ARTIFACT ;;
+    overlay) name=$COO_OVERLAY_ARTIFACT ;;
+    *) exit 1 ;;
+  esac
+  [[ -f $build_dir/$name ]] || exit 1
+  printf '%s\n' "$build_dir/$name"
+)
+
+# 현재 셸 빌드 아티팩트. 없으면 exit 1, 출력 없음.
 coo_pkg_artifact() {
-  local root; root=$(coo_repo_root)
-  local newest=""
-  local f
-  for f in "$root"/build/cachy-omarchy-shell-*.pkg.tar.zst; do
-    [[ -f $f ]] || continue
-    [[ -z $newest || $f -nt $newest ]] && newest=$f
-  done
-  [[ -n $newest ]] || return 1
-  printf '%s\n' "$newest"
+  coo_current_artifact shell
 }
 
 # 아티팩트를 dest 에 추출한다. sudo/pacman 을 쓰지 않는다.
@@ -34,16 +47,9 @@ coo_upstream_root() {
   printf '%s/usr/share/cachy-omarchy/upstream\n' "${1:?dest}"
 }
 
-# 오버레이 패키지 아티팩트. 셸 패키지용 coo_pkg_artifact 와 별개다.
+# 현재 오버레이 패키지 아티팩트. 셸 패키지용 coo_pkg_artifact 와 별개다.
 coo_overlay_artifact() {
-  local root; root=$(coo_repo_root)
-  local newest="" f
-  for f in "$root"/build/cachy-omarchy-overlay-*.pkg.tar.zst; do
-    [[ -f $f ]] || continue
-    [[ -z $newest || $f -nt $newest ]] && newest=$f
-  done
-  [[ -n $newest ]] || return 1
-  printf '%s\n' "$newest"
+  coo_current_artifact overlay
 }
 
 # coo_extract_pkg 와 달리 dest 를 먼저 비운다 (rm -rf). M2 리뷰에서 지적된
