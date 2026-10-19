@@ -1349,9 +1349,8 @@ audit
 test
 ```
 
-The patches are applied by the PKGBUILD's `prepare()` during the build. After the
-build the closure table is regenerated (`bin/sync-closure-table`) before the
-suite runs, so one run is enough.
+The patches are applied by the PKGBUILD's `prepare()` during the build, so one
+run is enough.
 
 If any stage fails:
 

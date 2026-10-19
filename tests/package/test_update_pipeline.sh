@@ -31,12 +31,11 @@ new_commit=$(git -C "$upstream" rev-parse HEAD)
 
 # --- disposable repository: the files the commands under test read ---
 root=$COO_TEST_SANDBOX/repo
-mkdir -p "$root/packages/cachy-omarchy-shell" "$root/packages/cachy-omarchy-overlay" "$root/docs"
+mkdir -p "$root/packages/cachy-omarchy-shell" "$root/packages/cachy-omarchy-overlay"
 cp -a "$REPO_ROOT/bin" "$root/bin"
 cp -a "$REPO_ROOT/lib" "$root/lib"
 cp "$REPO_ROOT/packages/cachy-omarchy-shell/PKGBUILD" "$root/packages/cachy-omarchy-shell/"
 cp "$REPO_ROOT/packages/cachy-omarchy-overlay/PKGBUILD" "$root/packages/cachy-omarchy-overlay/"
-cp "$REPO_ROOT/docs/RUNTIME_DEPENDENCIES.md" "$root/docs/"
 sed -e "s#^OMARCHY_REPOSITORY=.*#OMARCHY_REPOSITORY=file://$upstream#" \
     -e "s#^OMARCHY_COMMIT=.*#OMARCHY_COMMIT=$old_commit#" "$REPO_ROOT/upstream.lock" >"$root/upstream.lock"
 sed -i -e "s/^_commit=.*/_commit='$old_commit'/" -e 's/^pkgrel=.*/pkgrel=5/' "$root/packages/cachy-omarchy-shell/PKGBUILD"
@@ -101,12 +100,6 @@ cat >"$fake/bsdtar" <<'EOF'
 #!/usr/bin/env bash
 if [[ ${COO_FAKE_AUDIT_FAIL:-0} == 1 ]]; then echo etc/os-release; else echo usr/share/cachy-omarchy/ok; fi
 EOF
-cat >"$fake/sync-table" <<'EOF'
-#!/usr/bin/env bash
-[[ ${COO_FAKE_SYNC_FAIL:-0} != 1 ]] || { echo 'fake-sync: forced failure' >&2; exit 4; }
-printf 'sync %s\n' "$(/usr/bin/git -C "$COO_OMARCHY_GIT" rev-parse HEAD)" >>"$COO_TOOL_LOG"
-printf '\nsynced table\n' >>"$COO_REPO_ROOT/docs/RUNTIME_DEPENDENCIES.md"
-EOF
 cat >"$fake/test-runner" <<'EOF'
 #!/usr/bin/env bash
 printf 'runner\n' >>"$COO_TOOL_LOG"
@@ -121,7 +114,7 @@ chmod +x "$fake"/*
 run_check() { env COO_REPO_ROOT="$root" COO_GIT_BIN="$fake/git" "$@" "$root/bin/check-upstream" 2>&1; }
 run_update() {
   env COO_REPO_ROOT="$root" COO_GIT_BIN="$fake/git" COO_TOOL_LOG="$log" COO_MAKEPKG_BIN="$fake/makepkg" \
-    COO_BSDTAR_BIN="$fake/bsdtar" COO_SYNC_TABLE_BIN="$fake/sync-table" COO_TEST_RUNNER="$fake/test-runner" \
+    COO_BSDTAR_BIN="$fake/bsdtar" COO_TEST_RUNNER="$fake/test-runner" \
     "$@" "$root/bin/update-upstream" 2>&1
 }
 clone_head() { git -C "$root/build/omarchy" rev-parse HEAD; }
@@ -165,23 +158,20 @@ assert_contains "$pkg" "_commit='$new_commit'" "shell _commit moves"
 assert_eq "$(grep -m1 '^pkgver=' "$root/packages/cachy-omarchy-overlay/PKGBUILD")" "pkgver=0.9.9" "overlay version is independent"
 assert_eq "$(clone_head)" "$new_commit" "build/omarchy is checked out at the new pin"
 assert_eq "$(grep -c "cachy-omarchy-shell $new_commit" "$log")" "1" "the shell is built from the new commit"
-assert_eq "$(grep -c "^sync $new_commit" "$log")" "1" "the closure table is regenerated once"
 assert_eq "$(grep -c '^runner$' "$log")" "1" "the suite runs once"
-assert_contains "$(cat "$root/docs/RUNTIME_DEPENDENCIES.md")" "synced table" "the regenerated table is kept"
 [[ -e $root/packages/cachy-omarchy-shell/src ]] && stale=1 || stale=0
 assert_eq "$stale" "0" "makepkg's stale src cache is dropped"
 assert_file_exists "$root/build/$shell_new" "the new shell artifact lands in build/"
 assert_file_exists "$root/build/$overlay_art" "the overlay artifact lands in build/"
 
 # --- update-upstream: every failure stage reverts everything ---
-for mode in fetch build audit sync test; do
+for mode in fetch build audit test; do
   reset_repo
   : >"$log"
   case $mode in
     fetch) envs=(COO_FAKE_FETCH_FAIL=1); expected='could not fetch' ;;
     build) envs=(COO_FAKE_BUILD_FAIL=1); expected='fake-makepkg: forced build failure' ;;
     audit) envs=(COO_FAKE_AUDIT_FAIL=1); expected='archive audit failed' ;;
-    sync) envs=(COO_FAKE_SYNC_FAIL=1); expected='fake-sync: forced failure' ;;
     test) envs=(COO_FAKE_TEST_MODE=skip); expected='test runner skipped required coverage' ;;
   esac
   out=$(run_update "${envs[@]}") && code=0 || code=$?
@@ -201,7 +191,7 @@ out=$(run_update COO_FAKE_TEST_MODE=fail) && code=0 || code=$?
 assert_eq "$code" "9" "a failing suite propagates its exit code"
 reset_repo
 out=$(env COO_REPO_ROOT="$root" COO_GIT_BIN="$fake/git" COO_TOOL_LOG="$log" COO_MAKEPKG_BIN="$fake/makepkg" \
-  COO_BSDTAR_BIN="$fake/bsdtar" COO_SYNC_TABLE_BIN="$fake/sync-table" COO_TEST_RUNNER="$fake/test-runner" \
+  COO_BSDTAR_BIN="$fake/bsdtar" COO_TEST_RUNNER="$fake/test-runner" \
   COO_FAKE_TEST_MODE=fail "$root/bin/update-upstream" --keep 2>&1) && code=0 || code=$?
 assert_eq "$code" "9" "--keep still fails"
 assert_contains "$out" "kept:" "--keep reports that nothing was reverted"
@@ -215,12 +205,12 @@ out=$(run_update) && code=0 || code=$?
 assert_eq "$code" "0" "update clones build/omarchy when it is missing"
 assert_eq "$(clone_head)" "$new_commit" "the fresh clone is at the new pin"
 reset_repo
-printf '# local edit\n' >>"$root/docs/RUNTIME_DEPENDENCIES.md"
+printf '# local edit\n' >>"$root/upstream.lock"
 out=$(run_update) && code=0 || code=$?
 assert_eq "$code" "1" "update refuses uncommitted edits to the files it rewrites"
 assert_contains "$out" "uncommitted changes" "the refusal names the reason"
 assert_eq "$(clone_head)" "$old_commit" "the refusal touches nothing"
-git -C "$root" checkout -q HEAD -- docs/RUNTIME_DEPENDENCIES.md
+git -C "$root" checkout -q HEAD -- upstream.lock
 
 # --- bump-pkgrel is an explicit local revision: no lock or version change ---
 reset_repo

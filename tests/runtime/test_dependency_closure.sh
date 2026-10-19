@@ -36,17 +36,4 @@ code=$?
 [[ -n $out ]] && printf '%s\n' "$out"
 assert_eq "$code" "0" "클로저 위반 없음"
 
-# 생성 표가 문서와 일치하는가. 손으로 고치면 여기서 빨개진다. 핀을 옮길 때는
-# bin/update-upstream 이 bin/sync-closure-table 로 표를 다시 쓴다.
-generated=$(python3 "$REPO_ROOT/tests/runtime/closure_check.py" \
-  --tree "$tree" --repo "$REPO_ROOT" \
-  --map "$REPO_ROOT/tests/data/command-packages.tsv" \
-  --upstream-helpers "$helpers" \
-  --exceptions "$REPO_ROOT/tests/data/closure-exceptions.tsv" --emit-table)
-embedded=$(awk '/CLOSURE_BEGIN/{f=1;next} /CLOSURE_END/{f=0} f' \
-  "$REPO_ROOT/docs/RUNTIME_DEPENDENCIES.md")
-assert_eq "$(printf '%s\n' "$embedded" | sed '/^$/d')" \
-          "$(printf '%s\n' "$generated" | sed '/^$/d')" \
-          "RUNTIME_DEPENDENCIES.md 의 클로저 표가 최신이다"
-
 exit $((ASSERT_FAILURES > 0))

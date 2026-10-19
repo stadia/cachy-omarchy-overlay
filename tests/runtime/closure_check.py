@@ -805,6 +805,31 @@ def read_tsv(path, ncols):
     return rows
 
 
+def base_command_owners():
+    """command -> package for every executable the base/base-devel closure owns.
+
+    Such a command can never be absent, so it needs no row in the map: the
+    scanner derives a BASE row for it from pacman instead. Empty when pactree
+    or pacman is missing (then the command is reported as unmapped).
+    """
+    if shutil.which("pactree") is None or shutil.which("pacman") is None:
+        return {}
+    pkgs = set()
+    for seed in ("base", "base-devel"):
+        r = subprocess.run(["pactree", "-l", "-s", seed], capture_output=True, text=True)
+        pkgs |= {re.split(r"[<>=]", t)[0] for t in r.stdout.split()}
+    if not pkgs:
+        return {}
+    r = subprocess.run(["pacman", "-Ql", *sorted(pkgs)], capture_output=True, text=True)
+    owners = {}
+    for line in r.stdout.splitlines():
+        pkg, _, path = line.partition(" ")
+        m = re.match(r"/usr/(?:s?bin)/([^/]+)$", path)
+        if m:
+            owners.setdefault(m.group(1), pkg)
+    return owners
+
+
 def disabled_plugins(shell_json):
     """Empty set == every plugin is active, which is today's default."""
     cfg = json.loads(Path(shell_json).read_text())
@@ -1041,8 +1066,11 @@ def main():
             queue.append(c)
 
     reachable_pkgs, violations, table = {}, [], []
+    base_owners = base_command_owners()
     for cmd in sorted(external):
         entry = cmdmap.get(cmd)
+        if entry is None and cmd in base_owners:
+            entry = (base_owners[cmd], "BASE", "기반")
         if entry is None:
             violations.append(f"UNMAPPED_COMMAND {cmd}")
             continue

@@ -27,19 +27,16 @@
    (cloned if missing) and checks it out;
 2. rewrites `upstream.lock` and the shell `PKGBUILD` (`pkgver`, `pkgrel=1`,
    `_commit`) and deletes makepkg's stale `src/`, `pkg/` and `omarchy/` caches;
-3. `bin/build-packages`, then `bin/sync-closure-table` (regenerates the closure
-   table in `docs/RUNTIME_DEPENDENCIES.md` for the new tree), then
-   `bin/test-packages` (the whole suite).
+3. `bin/build-packages`, then `bin/test-packages` (the whole suite).
 
-If any step fails, the three tracked files are restored from `HEAD`,
+If any step fails, the two tracked files are restored from `HEAD`,
 `build/omarchy` goes back to the old pin and the new shell artifact is removed.
 Run with `--keep` to leave the failed state in place while you adapt the
 overlay to the new tree (undo with `git checkout HEAD -- upstream.lock
-packages/cachy-omarchy-shell/PKGBUILD docs/RUNTIME_DEPENDENCIES.md`). The command
-refuses to start if those three files have uncommitted edits.
+packages/cachy-omarchy-shell/PKGBUILD`). The command refuses to start if those
+two files have uncommitted edits.
 
-On success, review `git diff` — the table diff in `docs/RUNTIME_DEPENDENCIES.md`
-is the pin's dependency delta — update the table at the top of this file, and
+On success, review `git diff`, update the table at the top of this file, and
 commit. The list of upstream helpers the closure scanner trusts is not stored:
 `bin/list-upstream-helpers` reads `bin/` of `OMARCHY_COMMIT` from
 `build/omarchy` whenever the suite needs it.

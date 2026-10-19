@@ -3,8 +3,7 @@
 # result only if everything passes (SPEC §31–33). Nothing is installed.
 #
 #   fetch the new tag into build/omarchy -> rewrite upstream.lock and the shell
-#   PKGBUILD -> drop makepkg's stale caches -> build -> regenerate the closure
-#   table -> run the full suite.
+#   PKGBUILD -> drop makepkg's stale caches -> build -> run the full suite.
 #
 # On any failure the tracked files are restored with git and build/omarchy goes
 # back to the old pin; --keep leaves the failed state in place for debugging.
@@ -14,11 +13,10 @@ repo_root=${COO_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}
 git_bin=${COO_GIT_BIN:-git}
 omarchy_git=${COO_OMARCHY_GIT:-$repo_root/build/omarchy}
 build_dir=${COO_BUILD_DIR:-$repo_root/build}
-sync_table_bin=${COO_SYNC_TABLE_BIN:-$repo_root/bin/sync-closure-table}
 lock=$repo_root/upstream.lock
 shell_dir=$repo_root/packages/cachy-omarchy-shell
 shell_pkg=$shell_dir/PKGBUILD
-tracked=(upstream.lock packages/cachy-omarchy-shell/PKGBUILD docs/RUNTIME_DEPENDENCIES.md)
+tracked=(upstream.lock packages/cachy-omarchy-shell/PKGBUILD)
 
 fail() { printf 'error: %s\n' "$1" >&2; exit 1; }
 usage() { printf 'Usage: update-upstream [--keep]\n'; }
@@ -73,7 +71,7 @@ restore() {
     rm -f "${build_dir:?}/$new_shell_artifact"
   fi
   rm -rf "$shell_dir"/{src,pkg,omarchy}
-  printf 'reverted: upstream.lock, PKGBUILD and the closure table are back at HEAD\n' >&2
+  printf 'reverted: upstream.lock and the PKGBUILD are back at HEAD\n' >&2
   exit "$status"
 }
 trap restore EXIT
@@ -108,9 +106,8 @@ new_shell_artifact=$COO_SHELL_ARTIFACT
 # 3. makepkg caches still hold the old tree.
 rm -rf "$shell_dir"/{src,pkg,omarchy}
 
-# 4. Build, regenerate the table the suite compares against, test.
+# 4. Build, test.
 COO_REPO_ROOT=$repo_root COO_OMARCHY_GIT=$omarchy_git "$repo_root/bin/build-packages"
-COO_REPO_ROOT=$repo_root COO_OMARCHY_GIT=$omarchy_git "$sync_table_bin"
 COO_REPO_ROOT=$repo_root COO_OMARCHY_GIT=$omarchy_git "$repo_root/bin/test-packages"
 
 printf 'ready: Omarchy %s %s (review git diff; UPSTREAM.md requires human release/test attestation)\n' "$latest" "$commit"
