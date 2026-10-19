@@ -35,7 +35,7 @@ assert_file_exists "$patched_src/shell/plugins/polkit/PolkitAgent.qml" "pristine
 while IFS= read -r -d '' patch; do
   ( cd "$patched_src" && git apply -p1 "$patch" ) \
     || { printf 'error: 패치 적용 실패: %s\n' "${patch##*/}" >&2; exit 1; }
-done < <(find "$REPO_ROOT/packages/cachy-omarchy-shell/patches" -name '*.patch' -type f -print0 | sort -z)
+done < <(find "$REPO_ROOT/packages/cachy-omarchy-shell" -maxdepth 1 -name '*.patch' -type f -print0 | sort -z)
 
 polkit_qml=$(cat "$patched_src/shell/plugins/polkit/PolkitAgent.qml")
 lock_qml=$(cat "$patched_src/shell/plugins/lock/Service.qml")

@@ -105,71 +105,31 @@ optdepends=(
 )
 _commit='c668141e9c42b13c80c9ca4ea108e11708c5e8a5'
 
-# Maintained runtime patches (patches/README.md). The patch set is declared
-# here as a fixed contract — prepare() applies exactly this list from
-# $startdir/patches/, and any absence or application failure aborts the build.
-# A silently unpatched package is exactly the regression
-# tests/runtime/test_reload_watcher_reap.sh exists to catch.
-#
-# The names and their order are also what patches/README.md promises; keep
-# _patches and patches/README.md in lockstep.
+# Maintained runtime patches (PATCHES.md) are ordinary makepkg sources:
+# makepkg checks their sha256sums (`updpkgsums` refreshes them) and fails the
+# build when one is missing or altered. prepare() applies them in this order.
 _patches=(
   '0001-stop-plugin-watcher-on-shell-exit.patch'
   '0002-cancel-polkit-flow-before-session-lock.patch'
 )
-# sha256sum packages/cachy-omarchy-shell/patches/<name>.patch
-_patch_sums=(
-  '4fb973bc114b992f726db6080b21dcc6938e00f81a70e1122e448fd23bba5d96'
-  'a76d0ad12562b9616cd319f9c4cf54774c0feaba0c3925c35cb9f8b7cc3b93e5'
-)
 
 if [[ -n ${COO_OMARCHY_GIT:-} ]]; then
-  source=("omarchy::git+file://${COO_OMARCHY_GIT}#commit=${_commit}")
+  _omarchy_src="omarchy::git+file://${COO_OMARCHY_GIT}#commit=${_commit}"
 else
-  source=("omarchy::git+https://github.com/basecamp/omarchy.git#commit=${_commit}")
+  _omarchy_src="omarchy::git+https://github.com/basecamp/omarchy.git#commit=${_commit}"
 fi
-sha256sums=('SKIP')
+source=("$_omarchy_src" "${_patches[@]}")
+sha256sums=('SKIP'
+            '4fb973bc114b992f726db6080b21dcc6938e00f81a70e1122e448fd23bba5d96'
+            'a76d0ad12562b9616cd319f9c4cf54774c0feaba0c3925c35cb9f8b7cc3b93e5')
 
-# Maintained runtime patches (patches/README.md) must be applied to the source
-# makepkg actually stages. `bin/update-upstream` patches its candidate's *working
-# tree*, but every build path here clones the pinned `#commit=` object into
-# $srcdir — a working-tree patch never survives that clone. Applying them here
-# is the only point every build passes through, so this is where the patch
-# contract becomes real in the artifact.
-#
-# Patches are read from $startdir/patches/ and checksum-verified against
-# _patch_sums before application. Nothing here is conditional: an empty patch
-# set, a missing file, a checksum mismatch, or a failed application all abort
-# the build. A silently unpatched package is exactly the regression
-# tests/runtime/test_reload_watcher_reap.sh exists to catch.
 prepare() {
-  local patch applied=0 sum expected
-
-  if (( ${#_patches[@]} == 0 )); then
-    error 'no maintained runtime patches declared; patches/README.md requires at least one'
-    return 1
-  fi
-
+  local patch
   for patch in "${_patches[@]}"; do
-    local f="$startdir/patches/$patch"
-    [[ -f $f ]] \
-      || { error "maintained runtime patch not found: %s" "$f"; return 1; }
-    sum=$(sha256sum "$f" | cut -d' ' -f1)
-    expected=${_patch_sums[$applied]}
-    if [[ $sum != "$expected" ]]; then
-      error "maintained runtime patch checksum mismatch: %s" "$patch"
-      error "  expected: %s" "$expected"
-      error "  actual:   %s" "$sum"
-      return 1
-    fi
     msg2 "applying maintained runtime patch: %s" "$patch"
-    git -C "$srcdir/omarchy" apply "$f" \
+    git -C "$srcdir/omarchy" apply "$srcdir/$patch" \
       || { error "maintained runtime patch failed to apply: %s" "$patch"; return 1; }
-    applied=$(( applied + 1 ))
   done
-
-  (( applied == ${#_patches[@]} )) \
-    || { error 'applied %s of %s maintained runtime patches' "$applied" "${#_patches[@]}"; return 1; }
 }
 
 package() {

@@ -48,7 +48,7 @@ assert_file_exists "$patched_src/shell/services/PluginRegistry.qml" "pristine pi
 while IFS= read -r -d '' patch; do
   ( cd "$patched_src" && git apply -p1 "$patch" ) \
     || { printf 'error: 패치 적용 실패: %s\n' "${patch##*/}" >&2; exit 1; }
-done < <(find "$REPO_ROOT/packages/cachy-omarchy-shell/patches" -name '*.patch' -type f -print0 | sort -z)
+done < <(find "$REPO_ROOT/packages/cachy-omarchy-shell" -maxdepth 1 -name '*.patch' -type f -print0 | sort -z)
 bash "$script" "$patched_src" "$stage" "$defaults"
 
 root=$stage/usr/share/cachy-omarchy/upstream

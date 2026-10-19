@@ -732,7 +732,7 @@ cachy-omarchy-overlay/
 ├── SPEC.md · UPSTREAM.md · README.md (English) · README.ko-KR.md · LICENSE
 ├── upstream.lock                     # 핀: 버전·커밋·채널·저장소·태그
 ├── packages/
-│   ├── cachy-omarchy-shell/          # PKGBUILD, stage-upstream.sh, patches/
+│   ├── cachy-omarchy-shell/          # PKGBUILD, stage-upstream.sh, *.patch, PATCHES.md
 │   └── cachy-omarchy-overlay/        # PKGBUILD, stage-overlay.sh
 ├── overlay/                          # 우리가 쓴 통합층 — 오버레이 패키지의 원본
 │   ├── bin/                          # cachy-omarchy-{shell,launcher,keybindings,bindings,init,doctor}
@@ -1075,10 +1075,10 @@ The real PKGBUILD must be based on the runtime dependency audit.
 
 # 23. Patch Policy
 
-Patches live under:
+Patches live next to the PKGBUILD, as makepkg `source=` entries with sha256sums:
 
 ```text
-packages/cachy-omarchy-shell/patches/
+packages/cachy-omarchy-shell/*.patch
 ```
 
 Naming:
@@ -1091,7 +1091,7 @@ Naming:
 Every patch must include metadata in:
 
 ```text
-patches/README.md
+packages/cachy-omarchy-shell/PATCHES.md
 ```
 
 Example:

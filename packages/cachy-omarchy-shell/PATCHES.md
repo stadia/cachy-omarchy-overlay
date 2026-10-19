@@ -1,8 +1,9 @@
 # Maintained runtime patches
 
-`PKGBUILD` `prepare()` applies these maintained runtime patches to the pinned
-source in lexicographic filename order (`bin/update-upstream` only checks that they
-still apply to a candidate pin). Each patch is a git-format patch
+`PKGBUILD` lists these maintained runtime patches as `source=` entries (with
+`sha256sums`) and `prepare()` applies them to the pinned source in the order of
+its `_patches` array; `bin/update-upstream` therefore finds out whether they still
+apply when it builds the new pin. Each patch is a git-format patch
 against the commit pinned by `packages/cachy-omarchy-shell/PKGBUILD:_commit`.
 
 ## Plugin watcher cleanup
