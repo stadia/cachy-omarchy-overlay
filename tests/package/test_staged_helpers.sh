@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# 바 위젯이 부르는 업스트림 helper 가 스테이징되는지 검증한다.
-# 목록의 근거: M8 평가 문서 "helper 처리 방침" (Tier A/B).
+# What stage-upstream.sh puts in (and keeps out of) the shell package, checked
+# against the pinned upstream source. The expectations live in
+# tests/data/staged-helpers.tsv; the few checks that are not a row in that
+# table follow the loop.
 set -uo pipefail
 REPO_ROOT="${REPO_ROOT:?}"
 source "$REPO_ROOT/tests/lib/assert.sh"
@@ -11,42 +13,79 @@ src=${COO_OMARCHY_GIT:-$REPO_ROOT/build/omarchy}
 stage=$COO_TEST_SANDBOX/pkg
 bash "$REPO_ROOT/packages/cachy-omarchy-shell/stage-upstream.sh" "$src" "$stage" \
   "$REPO_ROOT/overlay/defaults"
+root="$stage/usr/share/cachy-omarchy/upstream"
+bin="$root/bin"
 
-bin="$stage/usr/share/cachy-omarchy/upstream/bin"
+identical() { cmp -s "$1" "$2" && echo 0 || echo 1; }
 
-# Tier A — 의존 명령이 CachyOS 기본 설치에 있는 것들
-for h in omarchy-menu-select omarchy-cmd-present \
-         omarchy-audio-output-sink omarchy-network-status \
-         omarchy-network-band omarchy-monitor-state \
-         omarchy-hyprland-monitor-scaling ; do
-  assert_file_exists "$bin/$h" "Tier A 스테이징: $h"
-  [[ -x $bin/$h ]] && x=0 || x=1
-  assert_eq "$x" "0" "실행 가능: $h"
+while IFS=$'\t' read -r kind path _; do
+  [[ -z $kind || $kind == \#* ]] && continue
+  case $kind in
+    exists|exec|verbatim|linked|absent)
+      f=$bin/$path ;;
+    data|absent-data)
+      f=$root/$path ;;
+    *) printf 'FAIL: unknown kind in staged-helpers.tsv: %s\n' "$kind"; ASSERT_FAILURES=$((ASSERT_FAILURES + 1)); continue ;;
+  esac
+  case $kind in
+    absent|absent-data)
+      [[ -e $f ]] && x=1 || x=0
+      assert_eq "$x" "0" "not staged: $path"
+      continue ;;
+  esac
+  assert_file_exists "$f" "staged: $path"
+  case $kind in
+    exec|verbatim|linked)
+      [[ -x $f ]] && x=0 || x=1
+      assert_eq "$x" "0" "executable: $path" ;;
+  esac
+  case $kind in
+    verbatim|linked) assert_eq "$(identical "$src/bin/$path" "$f")" "0" "verbatim: $path" ;;
+    data)            assert_eq "$(identical "$src/$path" "$f")" "0" "verbatim: $path" ;;
+  esac
+  if [[ $kind == linked ]]; then
+    link=$stage/usr/bin/$path
+    assert_file_exists "$link" "/usr/bin exposure: $path"
+    [[ $(readlink -f "$link") == "$(readlink -f "$f")" ]] && x=0 || x=1
+    assert_eq "$x" "0" "symlink points at the staged file: $path"
+  fi
+done <"$REPO_ROOT/tests/data/staged-helpers.tsv"
+
+# Themes and their templates evolve as a pair: both come from the same pin and
+# are copied untouched.
+assert_file_exists "$root/themes/tokyo-night/colors.toml" "tokyo-night colors.toml"
+assert_file_exists "$root/default/themed/shell.toml.tpl" "shell.toml.tpl"
+for d in themes default/themed; do
+  diff -r "$src/$d" "$root/$d" >/dev/null && x=0 || x=1
+  assert_eq "$x" "0" "$d is identical to the pin"
 done
 
-# verbatim 이어야 한다 — 적응 카피는 overlay/bin 으로 가고 compat PATH 가 이긴다.
-# 여기서 조용히 갈라지면 업스트림 리베이스가 그 사실을 숨긴다.
-for h in omarchy-audio-output-sink omarchy-monitor-state ; do
-  if cmp -s "$src/bin/$h" "$bin/$h"; then x=0; else x=1; fi
-  assert_eq "$x" "0" "verbatim: $h 는 업스트림과 바이트 동일"
-done
+# The wrapper scripts rely on these seams and declarations.
+assert_contains "$(<"$REPO_ROOT/overlay/hypr/bindings.lua")" "toggles/hypr" \
+  "the bindings seam reads the toggles clamshell writes"
+assert_contains "$(<"$bin/omarchy-show-logo")" '$OMARCHY_PATH/logo.txt' \
+  "omarchy-show-logo reads the staged logo.txt"
+pkgbuild=$(<"$REPO_ROOT/packages/cachy-omarchy-shell/PKGBUILD")
+deps=$(sed -n '/^depends=(/,/)/p' "$REPO_ROOT/packages/cachy-omarchy-shell/PKGBUILD")
+assert_contains "$deps" "socat" "socat is in depends"
+assert_contains "$pkgbuild" "imagemagick:" "imagemagick is an optdepend"
+assert_contains "$pkgbuild" "ttfx:" "ttfx is an optdepend"
+grep -qP "^\s*'?ttfx'?\s*$" <<<"$pkgbuild" && x=1 || x=0
+assert_eq "$x" "0" "ttfx is not in depends (AUR only; pacman -U cannot resolve it)"
 
-# Tier B — 기능 단위 묶음. reminders 는 omarchy-shell(우리 compat shim)과
-# systemd 유저 타이머만 쓰고, agents 수집기는 해당 CLI 가 없으면 조용히 빈다.
-for h in omarchy-reminder omarchy-notification-send \
-         omarchy-agent-usage-update omarchy-agent-usage-claude \
-         omarchy-agent-usage-codex omarchy-agent-usage-fireworks ; do
-  assert_file_exists "$bin/$h" "Tier B 스테이징: $h"
-  [[ -x $bin/$h ]] && x=0 || x=1
-  assert_eq "$x" "0" "실행 가능: $h"
-done
-
-# 바 monitor 위젯이 부르는 밝기 체인 — 채택 후 업스트림과 바이트 동일.
-for h in omarchy-brightness-display omarchy-brightness-display-ddc \
-         omarchy-hw-display ; do
-  assert_file_exists "$bin/$h" "밝기 체인 스테이징: $h"
-  if cmp -s "$src/bin/$h" "$bin/$h"; then x=0; else x=1; fi
-  assert_eq "$x" "0" "verbatim: $h 는 업스트림과 바이트 동일"
+# The five first-party plugins stay default-enabled and kept loaded.
+shell_json="$REPO_ROOT/overlay/defaults/shell.json"
+grep -q '"disabledPlugins"' "$shell_json" && x=1 || x=0
+assert_eq "$x" "0" "shell.json has no disabledPlugins"
+assert_eq "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["plugins"])' "$shell_json")" "[]" \
+  "shell.json plugins is []"
+for p in clipboard emojis image-picker reminders osd; do
+  m=$root/shell/plugins/$p/manifest.json
+  assert_file_exists "$m" "manifest exists: omarchy.$p"
+  if [[ -f $m ]]; then
+    assert_eq "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("keepLoaded"))' "$m")" "True" \
+      "keepLoaded: omarchy.$p"
+  fi
 done
 
 exit "$ASSERT_FAILURES"

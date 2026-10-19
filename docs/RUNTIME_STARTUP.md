@@ -271,9 +271,8 @@ Hyprland 설정이 `~/.local/state/omarchy/toggles/hypr/` 를 source 하지 않�
 단위 증거 (sandbox HOME + fake pactl/wpctl/hyprctl/brightnessctl, 실 세션
 무접촉. `omarchy-restart-audio` 와 `audio-tuning on/off` 는 실행하지 않음):
 
-- `tests/package/test_staged_audio_brightness_helpers.sh` — 16개 helper
-  verbatim, audio/unit 템플릿, hw-laptop·monitor-internal·crash-watch
-  미스테이징.
+- `tests/package/test_staged_helpers.sh`(`tests/data/staged-helpers.tsv`) — helper
+  verbatim, audio/unit 템플릿, crash-watch 미스테이징.
 - `tests/runtime/test_audio_brightness_input_helpers.sh` — switch 순환,
   hw-display sysfs, brightness +5%, touchpad toggle 상태 파일.
 - `tests/package/test_forbidden.sh` — brightnessctl/ddcutil 은 depends 가
@@ -409,7 +408,7 @@ WARN: The Wayland connection experienced a fatal error
 | 현재(헬퍼 미스테이징) | 셸 정상 기동, 개입 없음, hyprlock 유지 — **실측** |
 | 헬퍼 스테이징 시 | 셸이 잠금 탈취 시도 → 거부 → **매번 사망** — **실측** |
 
-`tests/package/test_staged_session_helpers.sh` 가 이 미스테이징을 의도로
+`tests/package/test_staged_helpers.sh` 가 이 미스테이징을 의도로
 고정한다(주석에 사유). 헬퍼 폐쇄(P08)를 이유로 나중에 올리려면 크래시를 먼저
 막아야 한다.
 

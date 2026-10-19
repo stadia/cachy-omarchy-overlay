@@ -125,7 +125,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 ### M10 스테이징 목록 (verbatim, `$OMARCHY_PATH/bin`)
 
 `packages/cachy-omarchy-shell/stage-upstream.sh` 의 M10 슬라이스 — 회귀는
-`tests/package/test_staged_plugin_helpers.sh` + `test_makepkg.sh` 가 단언한다.
+`tests/package/test_staged_helpers.sh` + `test_makepkg.sh` 가 단언한다.
 전체 스테이징 집합은 아래 전수 표가 권위다.
 
 | helper | plugin | class | note |
@@ -148,8 +148,7 @@ idle/lock/osd/battery가 켜져 있으면 아래가  invok된다. v0.1은 플러
 감사 에이전트가 업스트림 `bin/` 본문을 정독해 "공식 omarchy 전체 OS 가정"
 분류를 뒤집은 실측이다. 전부 업스트림 원본 그대로(verbatim) 올리며
 `/usr/bin` 노출 집합은 스테이징 집합과 같다(SPEC §45). 회귀는
-`tests/package/test_staged_theme_helpers.sh`·`test_staged_session_helpers.sh`·
-`test_staged_audio_brightness_helpers.sh`·`test_makepkg.sh`·
+`tests/package/test_staged_helpers.sh`(`tests/data/staged-helpers.tsv`)·`test_makepkg.sh`·
 `test_usr_bin_helpers.sh` 가 단언하고, 감사 일관성은
 `tests/runtime/test_command_audit.sh` 가 단언한다. 전체 집합은 아래 전수 표이고,
 메뉴 가시 행은 메뉴 전수 표에서 SAFE 로 재분류됐다.

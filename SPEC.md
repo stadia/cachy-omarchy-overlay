@@ -2083,7 +2083,7 @@ All must be true:
 
 잠금 공존 실측(§22)이 남긴 결정: ext-session-lock 은 클라이언트 하나만 쥐고, 거부당하면
 quickshell 은 프로토콜 오류로 죽는다. 그래서 업스트림 stranded-lock 회수 헬퍼
-(`omarchy-hyprland-session-locked`)는 올리지 않는다(`test_staged_session_helpers.sh` 가 고정).
+(`omarchy-hyprland-session-locked`)는 올리지 않는다(`test_staged_helpers.sh`(`tests/data/staged-helpers.tsv`)가 고정).
 
 ---
 

@@ -75,7 +75,7 @@ assert_contains "$lock_qml" "cancelPolkitForSessionLock()" "staged lock invokes 
 # Must not stage excluded trees. themes/ 는 M9 부터 스테이징 대상이다 —
 # colors.toml 과 default/themed/*.tpl 이 같이 진화하는 한 쌍이라 셸과 같은
 # 핀 커밋에서 함께 간다 (M9 설계 문서). 테마 스테이징의 정합성은
-# tests/package/test_staged_themes.sh 가 단언한다.
+# tests/package/test_staged_helpers.sh 가 단언한다.
 if [[ -e $root/install || -e $root/migrations ]]; then
   printf 'FAIL: excluded upstream trees were staged\n'
   ASSERT_FAILURES=$((ASSERT_FAILURES + 1))
