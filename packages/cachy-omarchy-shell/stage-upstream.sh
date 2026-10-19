@@ -30,10 +30,19 @@ install -D -m644 "$src/default/systemd/user/omarchy-speaker-tuning.service" \
 # $OMARCHY_PATH/default/hypr/toggles/$FLAG.lua 를 사용자 hypr 설정으로 복사한다
 # (bin/omarchy-hyprland-toggle:18 FLAG_SOURCE). 정적 lua 조각 3개 —
 # flags.lua / single-window-aspect-ratio.lua / window-no-gaps.lua. default/hypr
-# 전체가 아니라 이 디렉터리만 올린다 (나머지 hypr 설정은 CachyOS 소유).
+# 전체가 아니라 이 디렉터리와 바로 아래 seam 모듈만 올린다 (나머지 hypr 설정은
+# CachyOS 소유).
 install -d "$dest/usr/share/cachy-omarchy/upstream/default/hypr"
 cp -a "$src/default/hypr/toggles" \
   "$dest/usr/share/cachy-omarchy/upstream/default/hypr/toggles"
+# toggles seam (#12): overlay/hypr/bindings.lua 가 bootstrap.lua 로 package.path 를
+# 세운 뒤 require("default.hypr.toggles") 를 부른다. 그 require 체인이 닿는
+# 모듈만 verbatim 으로 올린다 — default/hypr 의 나머지(envs/input/bindings 등)는
+# 여전히 CachyOS 소유다.
+for f in bootstrap toggles paths require_all disabled-input-device workspace-layouts; do
+  install -D -m644 "$src/default/hypr/$f.lua" \
+    "$dest/usr/share/cachy-omarchy/upstream/default/hypr/$f.lua"
+done
 # 스크린세이버 터미널 설정. omarchy-launch-screensaver 가
 # $OMARCHY_PATH/default/{alacritty,foot,ghostty}/screensaver* 를 --config 로
 # 넘긴다. kitty 는 --override 인자만 쓰므로 설정 파일이 없다.

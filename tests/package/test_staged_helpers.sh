@@ -61,7 +61,7 @@ for d in themes default/themed; do
 done
 
 # The wrapper scripts rely on these seams and declarations.
-assert_contains "$(<"$REPO_ROOT/overlay/hypr/bindings.lua")" "toggles/hypr" \
+assert_contains "$(<"$REPO_ROOT/overlay/hypr/bindings.lua")" "default.hypr.toggles" \
   "the bindings seam reads the toggles clamshell writes"
 assert_contains "$(<"$bin/omarchy-show-logo")" '$OMARCHY_PATH/logo.txt' \
   "omarchy-show-logo reads the staged logo.txt"

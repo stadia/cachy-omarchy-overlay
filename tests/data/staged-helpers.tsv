@@ -52,6 +52,12 @@ data	default/systemd/user/omarchy-speaker-tuning.service	templates read through 
 data	default/hypr/toggles/flags.lua	templates read through $OMARCHY_PATH
 data	default/hypr/toggles/single-window-aspect-ratio.lua	templates read through $OMARCHY_PATH
 data	default/hypr/toggles/window-no-gaps.lua	templates read through $OMARCHY_PATH
+data	default/hypr/bootstrap.lua	toggles seam require chain (#12)
+data	default/hypr/toggles.lua	toggles seam require chain (#12)
+data	default/hypr/paths.lua	toggles seam require chain (#12)
+data	default/hypr/require_all.lua	toggles seam require chain (#12)
+data	default/hypr/disabled-input-device.lua	toggles seam require chain (#12)
+data	default/hypr/workspace-layouts.lua	toggles seam require chain (#12)
 absent	omarchy-system-factory-reset	Omarchy ISO @factory assumption
 absent	omarchy-system-factory-reset-finish	Omarchy ISO @factory assumption
 absent-data	default/systemd/user/omarchy-crash-watch.service	other user unit templates stay out

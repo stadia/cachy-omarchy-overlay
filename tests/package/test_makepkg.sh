@@ -52,6 +52,10 @@ if [[ -f $shell_artifact ]]; then
     assert_contains "$list" "usr/share/cachy-omarchy/upstream/default/hypr/toggles/$f" \
       "shell artifact has toggle snippet: $f"
   done
+  for f in bootstrap toggles paths require_all disabled-input-device workspace-layouts; do
+    assert_contains "$list" "usr/share/cachy-omarchy/upstream/default/hypr/$f.lua" \
+      "shell artifact has toggles seam module: $f"
+  done
   for h in omarchy-system-factory-reset omarchy-system-factory-reset-finish; do
     if [[ $list == *"upstream/bin/$h"* ]]; then
       printf 'FAIL: excluded helper leaked into artifact: %s\n' "$h"
