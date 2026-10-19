@@ -5,6 +5,7 @@ set -uo pipefail
 REPO_ROOT="${REPO_ROOT:?}"
 source "$REPO_ROOT/tests/lib/assert.sh"
 source "$REPO_ROOT/lib/runtime.sh"
+source "$REPO_ROOT/tests/lib/qml_errors.sh"
 
 # 옵트인 게이트가 먼저다 — 기본 실행은 허용된 사유 하나로만 skip 한다.
 [[ ${COO_RUN_LIVE:-0} == 1 ]] || { echo "skip: 라이브 키 주입 (COO_RUN_LIVE=1 필요)"; exit 0; }
@@ -174,8 +175,9 @@ else
 fi
 [[ -f $journal_log ]] || : > "$journal_log"
 assert_eq "$(grep -c "Configuration Loaded" "$journal_log")" "1" "기동 로그를 저널에서 수집했다"
-errs=$(grep -ciE "ReferenceError|TypeError|is not a type|Cannot assign|unavailable" "$journal_log")
+errs=$(coo_count_qml_errors "$journal_log")
 assert_eq "$errs" "0" "키바인드 UI 경로에 QML 오류 없음"
+coo_report_known_qml_burst "$journal_log"
 fatal=$(grep -cE "ERROR" "$journal_log")
 assert_eq "$fatal" "0" "키바인드 UI 경로에 ERROR 레벨 없음"
 
