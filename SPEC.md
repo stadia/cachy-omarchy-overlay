@@ -1482,6 +1482,9 @@ Independent semantic version:
 패키지마다 `pacman -Q` 로 설치 버전을 읽고, `build/` 에서 그보다 낮은 가장 새
 버전을 `vercmp` 로 골라 `pacman -U` 한다. 더 낮은 버전이 없는 패키지는 그대로
 둔다(overlay 는 독립 버전이라 흔하다). 둘 다 없으면 아무것도 하지 않고 실패한다.
+대상은 `build/` 에 있는 바로 아래 버전이며, 한 번도 설치한 적 없는 빌드일 수
+있다. 다시 실행하면 한 단계씩 더 내려간다. 원치 않는 버전은 `build/` 에서 그
+아티팩트를 지워 후보에서 뺀다.
 `COO_ROLLBACK_SMOKE_BIN` 을 주면 pacman 뒤에 실행한다.
 
 Rollback must not restore unrelated CachyOS system files.

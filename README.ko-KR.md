@@ -148,7 +148,11 @@ bin/update-upstream          # 핀 갱신 + 재빌드 파이프라인
 bin/rollback                 # 패키지마다 build/ 의 더 낮은 최신 아티팩트로 재설치
 ```
 
-이 변경 이전의 빌드는 모든 아티팩트를 `~/.local/state/cachy-omarchy/`
+rollback 대상은 `build/` 에 있는 바로 아래 버전이며, 한 번도 설치한 적 없는
+빌드일 수 있다. 다시 실행하면 한 단계씩 더 내려간다. 원치 않는 버전은 `build/`
+에서 그 아티팩트를 지워 후보에서 뺀다.
+
+0.x 빌드는 모든 아티팩트를 `~/.local/state/cachy-omarchy/`
 (`validated-builds/`, `packages/`, `*.manifest`)에도 복사했다. 이제 그
 디렉터리는 아무것도 읽지 않으므로, 공간이 필요하면 지워도 된다.
 
