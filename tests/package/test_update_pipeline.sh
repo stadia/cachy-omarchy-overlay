@@ -227,11 +227,9 @@ EOF
 cat >"$fake/pacman" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$COO_PACMAN_LOG"
-[[ ${COO_FAKE_PACMAN_FAIL:-0} != 1 ]] || exit 11
 EOF
 cat >"$fake/test-runner" <<'EOF'
 #!/usr/bin/env bash
-[[ -n ${COO_TEST_LOG:-} ]] && printf 'runner\n' >>"$COO_TEST_LOG"
 case ${COO_FAKE_TEST_MODE:-pass} in
   pass) printf 'all test coverage ran\n' ;;
   skip) printf 'skip: installed tree absent\n' ;;
@@ -340,6 +338,14 @@ expected_fixture_names=$(git -C "$fixture_upstream" ls-tree --name-only HEAD -- 
 assert_eq "$inventory_names_actual" "$expected_fixture_names" "U02 inventory content is exactly the fixture repository's real bin/ tree"
 assert_eq "$(grep -m1 '^pkgver=' "$root/packages/cachy-omarchy-overlay/PKGBUILD")" "$overlay_pkgver_before_update" "U02 overlay version is independent"
 assert_eq "$(wc -l <"$pac_update")" "0" "U02 update never invokes pacman"
+# The validated candidate artifacts are copied next to the older builds
+# (bin/rollback installs from build/). Names come from the updated metadata.
+u02_names=$(source "$root/bin/package-names.sh" && coo_current_artifacts "$root" &&
+  printf '%s\n' "$COO_SHELL_ARTIFACT" "$COO_OVERLAY_ARTIFACT")
+for name in $u02_names; do
+  assert_file_exists "$update_build/$name" "U02 copies candidate artifact into build/: $name"
+done
+assert_eq "$(find "$update_build" -maxdepth 1 -type f -name '*.pkg.tar.zst' | wc -l)" "2" "U02 build/ receives exactly the two candidate artifacts"
 assert_contains "$out" "UPSTREAM.md requires human" "UPSTREAM.md deferred with explicit reason"
 
 # U04 is explicit local packaging revision only: no lock or version mutation.
@@ -389,6 +395,7 @@ for mode in patch build audit test; do
   assert_eq "$(sha256sum "$failroot/upstream.lock")" "$before_lock" "U$mode failure preserves lock"
   assert_eq "$(sha256sum "$failroot/packages/cachy-omarchy-shell/PKGBUILD")" "$before_pkg" "U$mode failure preserves PKGBUILD"
   assert_eq "$(wc -l <"$fail_pac")" "0" "U$mode failure invokes no pacman"
+  assert_eq "$(find "$COO_TEST_SANDBOX/fail-$mode-build" -name '*.pkg.tar.zst' 2>/dev/null | wc -l)" "0" "U$mode failure copies no artifact into build/"
 done
 
 # Metadata publication is a transaction boundary: a failed second rename must leave both tracked inputs intact.
