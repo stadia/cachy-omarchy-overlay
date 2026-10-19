@@ -31,6 +31,9 @@ assert_file_exists "$root/usr/bin/omarchy-menu" \
   "R04 extracted upstream menu command exists"
 assert_file_exists "$root/usr/bin/omarchy-menu-keybindings" \
   "R05 extracted keybindings helper exists"
+# 패키지에 든 헬퍼가 패치된 것이어야 한다 — 원본은 CachyOS 에서 빈 시트를 보인다.
+assert_contains "$(cat "$root/usr/bin/omarchy-menu-keybindings")" "cachy-v1" \
+  "R05 packaged keybindings helper carries patch 0003 (cachy-v1 cache key)"
 # R06: app-launch now goes through the real uwsm-app from the uwsm package
 # (session-environment redesign) instead of a shim we extract — there is no
 # artifact of ours to assert here. Live coverage moves to Task 7's systemd

@@ -3,7 +3,7 @@
 `PKGBUILD` lists these maintained runtime patches as `source=` entries (with
 `sha256sums`) and `prepare()` applies them to the pinned source in the order of
 its `_patches` array; `bin/update-upstream` therefore finds out whether they still
-apply when it builds the new pin. Each patch is a git-format patch
+apply when it builds the new pin. Each patch is a unified diff (as produced by `git diff`, applied with `git apply`)
 against the commit pinned by `packages/cachy-omarchy-shell/PKGBUILD:_commit`.
 
 ## Plugin watcher cleanup
@@ -41,8 +41,14 @@ patch records every `hl.bind` from the Lua source (synthesizing a description fr
 the `hl.dsp.*` expression), joins the source cache to `hyprctl binds` on modmask+key instead of
 modmask+description, separates record fields with ASCII 0x1f so command arguments may contain commas,
 drops the two hardcoded Omarchy web-app rows, and changes the cache key so records from the unpatched
-helper are not reused. The Lua scan itself stays upstream's (`pcall(dofile, config)` with a fake `hl`),
-which also follows the managed `pcall(dofile, ...)` block into `~/.config/cachy-omarchy/hypr/bindings.lua`.
+helper are not reused. The Lua scan itself stays upstream's (`pcall(dofile, config)` with a fake `hl`, standard libraries
+not restricted; top-level code of `hyprland.lua` and `bindings.lua` runs with the user's privileges on
+every cache miss, `hl.*` side effects are noops), which also follows the managed `pcall(dofile, ...)`
+block into `~/.config/cachy-omarchy/hypr/bindings.lua`. A `__lua` row is now dropped only when the source
+cache has no bind for its modmask+key (upstream: when it has no description). `lua` is a hard dependency:
+without it the helper reports an error and exits 1 instead of showing an empty sheet. A failing scan prints
+one line on stderr and its (partial) result is not cached; a menu that cannot be shown (shell not running,
+`omarchy-menu-select` missing) also reports and exits 1, while Escape still exits quietly.
 
 Upstream issue: not filed.
 

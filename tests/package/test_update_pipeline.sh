@@ -45,7 +45,7 @@ sed -e "s#^OMARCHY_REPOSITORY=.*#OMARCHY_REPOSITORY=file://$upstream#" \
     -e "s#^OMARCHY_COMMIT=.*#OMARCHY_COMMIT=$old_commit#" "$REPO_ROOT/upstream.lock" >"$root/upstream.lock"
 sed -i -e "s/^_commit=.*/_commit='$old_commit'/" -e 's/^pkgrel=.*/pkgrel=5/' "$root/packages/cachy-omarchy-shell/PKGBUILD"
 sed -i -E "s#^([|] \`cachy-omarchy-shell\` [|] )[^|]*[^| ] *[|]#\1$pin_ver-5 |#" "$root/README.md" "$root/README.ko-KR.md"
-sed -i -e 's/^pkgver=.*/pkgver=0.9.9/' "$root/packages/cachy-omarchy-overlay/PKGBUILD"
+sed -i -e 's/^pkgver=.*/pkgver=0.9.9/' -e 's/^pkgrel=.*/pkgrel=1/' "$root/packages/cachy-omarchy-overlay/PKGBUILD"
 chmod +x "$root"/bin/*
 git init -q "$root"
 printf 'build/\npackages/*/src/\npackages/*/pkg/\npackages/*/omarchy/\n' >"$root/.gitignore"

@@ -92,12 +92,13 @@ omarchy-branding-* / omarchy-theme-bg-install / omarchy-plymouth-*
 - 결론: 업스트림은 description 달린 Omarchy lua 설정을 가정한다 (SPEC §57).
   시각/런타임(`omarchy-menu-select` + `summon omarchy.menu`)은 유지하고
   **데이터 수집만 적응**하는 패치(`packages/cachy-omarchy-shell/0003-…patch`)가 그 산출물이다.
-- 보안: 적응 카피의 사용자 `hyprland.lua` 스캔은 `dofile` 하지 않는다.
-  `loadfile(config, "t", env)` 제한 환경에서 `pcall(chunk)`만 실행하며, config에는
-  fake `hl`, 순수 Lua 기본 기능, 읽기 전용 `string`/`table`/`math`, `os.getenv`만
-  보인다. `io`/`package`/`require`/`debug`/`dofile`/`loadfile` 및 `os.execute` 등은
-  config 환경에 없다. 회귀 테스트는 `os.execute("touch ...")`가 실행되지 않으며
-  그 앞 bind는 계속 수집됨을 확인한다.
+- 보안(트레이드오프): 사용자 `hyprland.lua` 스캔은 업스트림과 같이 `pcall(dofile)`
+  로 실행한다. 가짜 `hl` 을 주지만 표준 라이브러리는 제한하지 않는다. 캐시 미스가
+  날 때마다(`hyprctl binds` 가 바뀐 뒤 첫 실행) 사용자 `hyprland.lua` 와
+  `bindings.lua` 의 최상위 코드(`os.execute`, `io` 등)가 사용자 권한으로 다시
+  실행된다. `hl.*` 부작용은 noop 으로 막힌다. 사용자 자신의 설정은 신뢰 경계가
+  아니라는 결정(이슈 #5)에 따라 이전의 `loadfile(config, "t", env)` 제한 환경은
+  제거했다. 스캔 오류는 stderr 한 줄로 드러나고 부분 결과는 캐시되지 않는다.
 
 호스트 도구 실측: `hyprctl` `lua` `jq` `xkbcli` `perl`(JSON::PP) `awk` `sort`
 `sha256sum` 모두 존재. `gum` 도 설치돼 있으나 이 경로는 부르지 않는다.

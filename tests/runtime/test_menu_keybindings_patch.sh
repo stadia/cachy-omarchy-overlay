@@ -11,6 +11,7 @@ PATCH="$REPO_ROOT/packages/cachy-omarchy-shell/0003-adapt-menu-keybindings-to-ca
 
 # 핀된 업스트림 헬퍼에 패치만 적용한 사본 — 패키지 prepare() 와 같은 git apply 다.
 usrc=${COO_OMARCHY_GIT:-$REPO_ROOT/build/omarchy}
+[[ -f $usrc/bin/omarchy-menu-keybindings ]] || { echo "skip: 핀된 업스트림 소스(build/omarchy) 없음"; exit 0; }
 pk="$COO_TEST_SANDBOX/patched"
 mkdir -p "$pk/bin"
 cp "$usrc/bin/omarchy-menu-keybindings" "$pk/bin/"
@@ -64,6 +65,7 @@ mkdir -p "$HOME/.config/hypr"
 cat >"$HOME/.config/hypr/hyprland.lua" <<LUA
 local mainMod = "SUPER"
 hl.bind(mainMod .. " + T", hl.dsp.exec_cmd("ghostty"))
+hl.bind(mainMod .. " + SHIFT + T", hl.dsp.exec_cmd("ghostty --class=float"))
 hl.bind(mainMod .. " + C", hl.dsp.window.close())
 hl.bind(mainMod .. " + D", hl.dsp.exec_cmd("discord"), { description = "Discord" })
 hl.bind(mainMod .. " + X", hl.dsp.exec_cmd("foo --label=a,b"))
@@ -92,6 +94,7 @@ cat >"$stubbin/hyprctl" <<'STUB'
 case ${1:-} in
   binds)
     printf 'bind\n\tmodmask: 64\n\tsubmap: \n\tkey: T\n\tkeycode: 0\n\tcatchall: false\n\tdescription: \n\tdispatcher: __lua\n\targ: 1\n\n'
+    printf 'bind\n\tmodmask: 65\n\tsubmap: \n\tkey: T\n\tkeycode: 0\n\tcatchall: false\n\tdescription: \n\tdispatcher: __lua\n\targ: 7\n\n'
     printf 'bind\n\tmodmask: 64\n\tsubmap: \n\tkey: C\n\tkeycode: 0\n\tcatchall: false\n\tdescription: \n\tdispatcher: __lua\n\targ: 2\n\n'
     printf 'bind\n\tmodmask: 64\n\tsubmap: \n\tkey: D\n\tkeycode: 0\n\tcatchall: false\n\tdescription: \n\tdispatcher: __lua\n\targ: 3\n\n'
     printf 'bind\n\tmodmask: 64\n\tsubmap: \n\tkey: X\n\tkeycode: 0\n\tcatchall: false\n\tdescription: \n\tdispatcher: __lua\n\targ: 4\n\n'
@@ -118,10 +121,9 @@ old_cache_name=$( {
 mkdir -p "$cachehome/omarchy"
 printf 'STALE V11 RECORD\texec\tstale-command\n' >"$cachehome/omarchy/keybindings-$old_cache_name.records"
 
-# omarchy-cmd-present 를 bare name 으로 부른다(128행) — 실제 설치에서는
+# 헬퍼가 omarchy-cmd-present 를 bare name 으로 부른다 — 실제 설치에서는
 # /usr/bin/omarchy-* 심링크가 공급하지만, 추출 트리에는 설치되지 않으므로
-# 호출자 PATH 에 $root/bin 을 넣어 같은 가시성을 만든다 (SPEC §45, 래퍼는
-# 더 이상 PATH 를 조작하지 않는다).
+# 호출자 PATH 에 $root/bin 을 넣어 같은 가시성을 만든다 (SPEC §45).
 out=$(PATH="$stubbin:$root/bin:$PATH" XDG_CACHE_HOME="$cachehome" \
   OMARCHY_PATH="$root" \
   "$K" --print 2>&1); code=$?
@@ -138,8 +140,10 @@ assert_eq "$raw" "0" "description 이 있으면 날 명령 문자열을 보여�
 assert_eq "$stale" "0" "덮어쓰인 옛 bind 는 남지 않는다"
 [[ $out == *"STALE V11 RECORD"* ]] && stale=1 || stale=0
 assert_eq "$stale" "0" "v11 캐시 레코드는 선택되지 않는다"
-assert_contains "$out" "SUPER + T" "악성 행 전의 description-less lua bind 가 계속 수집된다"
+assert_contains "$out" "SUPER + T" "description 없는 lua bind 가 수집된다"
 assert_contains "$out" "ghostty" "exec_cmd 인자가 표시된다"
+assert_contains "$out" "SUPER SHIFT + T" "수식키 둘(modmask 65)이 modmask+key 로 조인돼 렌더링된다"
+assert_contains "$out" "ghostty --class=float" "modmask 65 bind 는 modmask 64 의 같은 키 bind 와 섞이지 않는다"
 assert_contains "$out" "window.close()" "lua dispatcher 는 hl.dsp. 를 벗긴 설명을 얻는다"
 assert_contains "$out" "Discord" "description 이 있는 bind 는 그것을 쓴다"
 assert_contains "$out" "Browser" "plain conf exec bind 도 그대로 통과한다"
@@ -152,6 +156,35 @@ assert_eq "$c" "0" "레코드 캐시 파일이 생긴다"
 cache_records=$(cat "$cachehome"/omarchy/keybindings-*.records)
 assert_contains "$cache_records" "firefox" "캐시 레코드는 dispatch 메타(exec 인자)를 담는다"
 assert_contains "$cache_records" $'exec\tfoo --label=a,b' "쉼표가 있는 dispatcher/arg 메타가 보존된다"
+
+# --- 실패 모드: 조용히 빈 시트를 내지 않는다 ---------------------------------
+# hyprctl 이 bind 를 하나도 안 주면 exit≠0 이고 레코드 캐시는 생기지 않는다.
+emptybin="$COO_TEST_SANDBOX/emptybin"
+mkdir -p "$emptybin"
+cat >"$emptybin/hyprctl" <<'STUB'
+#!/usr/bin/env bash
+[[ ${1:-} == devices ]] && printf 'Keyboards:\n\t\tactive keymap: stub\n'
+exit 0
+STUB
+chmod +x "$emptybin/hyprctl"
+emptycache="$COO_TEST_SANDBOX/cache-empty"
+out=$(PATH="$emptybin:$root/bin:$PATH" XDG_CACHE_HOME="$emptycache" OMARCHY_PATH="$root" \
+  "$K" --print 2>&1); code=$?
+assert_eq "$code" "1" "bind 가 하나도 없으면 --print 는 exit 1"
+ls "$emptycache"/omarchy/keybindings-*.records >/dev/null 2>&1 && c=1 || c=0
+assert_eq "$c" "0" "빈 결과는 캐시되지 않는다"
+
+# lua 가 PATH 에 없으면 stderr 로 이유를 말하고 exit 1 (빈 시트 exit 0 금지).
+# 스크립트가 lua 를 찾을 수 없도록 lua 만 뺀 심링크 디렉터리를 PATH 로 쓴다.
+nolua="$COO_TEST_SANDBOX/nolua"
+mkdir -p "$nolua"
+for t in bash env cat cut awk sed grep sort sha256sum mktemp mv rm find head tr ls dirname basename date mkdir xkbcli jq; do
+  tp=$(command -v "$t" 2>/dev/null) && ln -sf "$tp" "$nolua/$t"
+done
+out=$(PATH="$stubbin:$root/bin:$nolua" XDG_CACHE_HOME="$COO_TEST_SANDBOX/cache-nolua" OMARCHY_PATH="$root" \
+  "$nolua/bash" "$K" --print 2>&1); code=$?
+assert_eq "$code" "1" "lua 가 없으면 --print 는 exit 1 (빈 시트 exit 0 이 아니다)"
+assert_contains "$out" "lua is not installed" "lua 부재 사유가 stderr 로 나온다"
 
 # --- compat omarchy-shell shim: 실행 인자/오류 모드를 실제로 검증 ------------
 assert_file_exists "$SHIM" "compat omarchy-shell 존재"

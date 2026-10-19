@@ -260,6 +260,11 @@ fi
 if [[ -f $HYPR_DIR/hyprland.conf ]] && grep -qF '# >>> cachy-omarchy >>>' "$HYPR_DIR/hyprland.conf"; then
   warn "stale cachy-omarchy block in hyprland.conf — remove it manually (and $CONFIG_DIR/hypr/bindings.conf)"
 fi
+# 구형 사본의 SUPER+K 는 삭제된 cachy-omarchy-keybindings 를 부른다. Hyprland 의
+# exec_cmd 는 없는 명령의 실패를 알리지 않아 키가 조용히 죽는다.
+if [[ -f $CONFIG_DIR/hypr/bindings.lua ]] && grep -qF -e 'cachy-omarchy-keybindings' "$CONFIG_DIR/hypr/bindings.lua"; then
+  fail "SUPER+K still runs the removed cachy-omarchy-keybindings in $CONFIG_DIR/hypr/bindings.lua — run: cachy-omarchy-bindings --force"
+fi
 # 셸 자동 기동은 bindings.lua 의 hyprland.start 한 곳이다. 그 줄이 생기기 전에 만든
 # 사본은 --force 없이 보존되므로 업그레이드해도 셸이 뜨지 않는다.
 if [[ -f $HYPR_DIR/hyprland.lua && -f $CONFIG_DIR/hypr/bindings.lua ]] \

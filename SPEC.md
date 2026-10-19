@@ -733,7 +733,7 @@ cachy-omarchy-overlay/
 │   ├── cachy-omarchy-shell/          # PKGBUILD, stage-upstream.sh, *.patch, PATCHES.md
 │   └── cachy-omarchy-overlay/        # PKGBUILD, stage-overlay.sh
 ├── overlay/                          # 우리가 쓴 통합층 — 오버레이 패키지의 원본
-│   ├── bin/                          # cachy-omarchy-{shell,launcher,keybindings,bindings,init,doctor}
+│   ├── bin/                          # cachy-omarchy-{shell,launcher,bindings,init,doctor}
 │   ├── compat/bin/                   # 업스트림 이름의 적응 카피 (§44)
 │   ├── defaults/shell.json           # 셸 패키지가 설치하는 기본 설정(업스트림과 동일 내용)
 │   ├── hypr/bindings.lua             # 관리 블록이 불러오는 바인딩 정본
@@ -893,7 +893,10 @@ The shell is launched by Hyprland autostart, not a systemd user unit:
 instance (precise `quickshell -n -p <path>` match) and relaunches detached.
 There is no `Restart=on-failure` (R07 auto-recovery is not provided; recovery is
 manual `--restart`). Migration from the former systemd unit requires
-`cachy-omarchy-bindings --force` to refresh the live bindings copy.
+`cachy-omarchy-bindings --force` to refresh the live bindings copy. The same applies
+when upgrading from a release whose bindings copy runs the removed
+`cachy-omarchy-keybindings` (SUPER+K is now the patched upstream
+`omarchy-menu-keybindings`); `cachy-omarchy-doctor` reports that copy as FAIL.
 
 The overlay must not:
 
