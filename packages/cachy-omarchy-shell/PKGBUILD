@@ -123,30 +123,19 @@ _patch_sums=(
   'a76d0ad12562b9616cd319f9c4cf54774c0feaba0c3925c35cb9f8b7cc3b93e5'
 )
 
-# bin/build-packages --clean creates these source archives only in a temporary
-# makechrootpkg context. They keep the repository overlay as the single
-# tracked source of truth while making every package input available inside
-# the bind-mounted PKGBUILD directory.
-if [[ -f $startdir/clean-omarchy.tar && -f $startdir/clean-overlay-defaults.tar ]]; then
-  source=('clean-omarchy.tar' 'clean-overlay-defaults.tar')
-  sha256sums=('SKIP' 'SKIP')
-  _clean_context=1
-elif [[ -n ${COO_OMARCHY_GIT:-} ]]; then
+if [[ -n ${COO_OMARCHY_GIT:-} ]]; then
   source=("omarchy::git+file://${COO_OMARCHY_GIT}#commit=${_commit}")
-  sha256sums=('SKIP')
-  _clean_context=0
 else
   source=("omarchy::git+https://github.com/basecamp/omarchy.git#commit=${_commit}")
-  sha256sums=('SKIP')
-  _clean_context=0
 fi
+sha256sums=('SKIP')
 
 # Maintained runtime patches (patches/README.md) must be applied to the source
 # makepkg actually stages. `bin/update-upstream` patches its candidate's *working
 # tree*, but every build path here clones the pinned `#commit=` object into
 # $srcdir — a working-tree patch never survives that clone. Applying them here
-# is the only point both the direct makepkg path and the clean-chroot path pass
-# through, so this is where the patch contract becomes real in the artifact.
+# is the only point every build passes through, so this is where the patch
+# contract becomes real in the artifact.
 #
 # Patches are read from $startdir/patches/ and checksum-verified against
 # _patch_sums before application. Nothing here is conditional: an empty patch
@@ -184,14 +173,6 @@ prepare() {
 }
 
 package() {
-  if (( _clean_context )); then
-    bash "$startdir/stage-upstream.sh" "$srcdir/omarchy" "$pkgdir" \
-      "$srcdir/overlay/defaults"
-  else
-    # The direct makepkg fallback retains the repository layout for developers.
-    # A clean chroot cannot see this parent path; use bin/build-packages --clean
-    # rather than copying overlay/defaults into this tracked package directory.
-    bash "$startdir/stage-upstream.sh" "$srcdir/omarchy" "$pkgdir" \
-      "$startdir/../../overlay/defaults"
-  fi
+  bash "$startdir/stage-upstream.sh" "$srcdir/omarchy" "$pkgdir" \
+    "$startdir/../../overlay/defaults"
 }
